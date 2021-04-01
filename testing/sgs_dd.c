@@ -84,7 +84,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.17 20210218";
+static const char * version_str = "4.18 20210331";
 static const char * my_name = "sgs_dd";
 
 #ifndef SGV4_FLAG_HIPRI
@@ -127,7 +127,6 @@ struct flags_t {
     bool immed;
     bool mmap;
     bool noxfer;
-    bool no_waitq;
     bool pack;
     bool tag;
     bool v3;
@@ -224,7 +223,7 @@ usage(int pg_num)
            "           -v (up to -vvvvv) sets deb value to number of 'v's\n"
            "  iflag    comma separated list from: dio,evfd,excl,hipri,immed,"
            "mmap\n"
-           "           no_waitq,noxfer,null,pack,tag,v3,v4 bound to IFILE\n"
+           "           noxfer,null,pack,tag,v3,v4 bound to IFILE\n"
            "  no_sig   0-> use signals; 1-> no signals, hard polling "
            "instead;\n"
            "           default 0, unless hipri flag(s) given then it's 1\n"
@@ -246,7 +245,6 @@ second_page:
            "  hipri    set HIPRI flag and use blk_poll() for completion\n"
            "  immed    use SGV4_FLAG_IMMED flag on each request\n"
            "  mmap     use mmap()-ed IO on IFILE or OFILE\n"
-           "  no_waitq    use SGV4_FLAG_NO_WAIQ flag on each request\n"
            "  noxfer    no transfer between user space and kernel IO "
            "buffers\n"
            "  null      does nothing, placeholder\n"
@@ -363,8 +361,6 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
         hp->dxferp = rep->buffp;
     if (flagp->evfd)
         hp->flags |= SGV4_FLAG_EVENTFD;
-    if (flagp->no_waitq)
-        hp->flags |= SGV4_FLAG_NO_WAITQ;
     if (clp->debug > 5) {
         pr2serr("%s: SCSI %s, blk=%d num_blks=%d\n", __func__,
                 is_wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
@@ -729,20 +725,6 @@ sz_reserve(Rq_coll * clp, bool is_in)
                 return 1;
             }
         }
-        if (flagsp->no_waitq) {
-            memset(seip, 0, sizeof(*seip));
-            seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
-            seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_WAIT_POLL;
-            seip->ctl_flags |= SG_CTL_FLAGM_NO_WAIT_POLL;
-            if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
-                pr2serr("ioctl(EXTENDED(NO_WAIT_POLL)) failed, errno=%d %s\n",
-                        errno, strerror(errno));
-                return 1;
-            }
-        }
-    } else if (flagsp->no_waitq) {
-        pr2serr("need sg version >= 4.0.45 for no_waitq flag\n");
-        return 1;
     }
     if (!clp->no_sig) {
         if (-1 == fcntl(fd, F_SETOWN, getpid())) {
@@ -1209,9 +1191,6 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->immed = true;
         else if (0 == strcmp(cp, "mmap"))
             fp->mmap = true;
-        else if ((0 == strcmp(cp, "no_waitq")) ||
-                 (0 == strcmp(cp, "no-waitq")))
-            fp->no_waitq = true;
         else if (0 == strcmp(cp, "noxfer"))
             fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))

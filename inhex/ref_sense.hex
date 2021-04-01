@@ -1,5 +1,5 @@
 # Test User data segment referral sense data. Values are in hex.
-# Invocation: 'sg_decode_sense -f ref_sense.txt'   [dpg 20110208]
+# Invocation: 'sg_decode_sense -f ref_sense.hex'   [dpg 20210330]
 
 72,0,0,0,0,0,0     38
 b,36,1,0

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 Douglas Gilbert.
+ * Copyright (c) 2014-2021 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.40 20190917";
+static const char * version_str = "1.41 20210331";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -191,7 +191,6 @@ struct opts_t {
     bool generic_sync;
     bool masync;
     bool mmap_io;
-    bool no_waitq;
     bool no_xfer;
     bool pack_id_force;
     bool sg_vn_ge_40000;
@@ -285,9 +284,6 @@ static struct option long_options[] = {
         {"numpt", required_argument, 0, 'n'},
         {"num-pt", required_argument, 0, 'n'},
         {"num_pt", required_argument, 0, 'n'},
-        {"nowaitq", no_argument, 0, 'z'},
-        {"no_waitq", no_argument, 0, 'z'},
-        {"no-waitq", no_argument, 0, 'z'},
         {"noxfer", no_argument, 0, 'N'},
         {"override", required_argument, 0, 'O'},
         {"pack-id", no_argument, 0, 'p'},
@@ -351,8 +347,6 @@ usage(void)
     printf("    --maxqpt=QPT|-M QPT    maximum commands queued per thread "
            "(def:%d)\n", MAX_Q_PER_FD);
     printf("    --mmap-io|-m    mmap-ed IO (1 cmd outstanding per thread)\n");
-    printf("    --no-waitq|-z    set SGV4_FLAG_NO_WAITQ, bypass poll() if "
-           "requested\n");
     printf("    --noxfer|-N          no data xfer (def: xfer on READ and "
            "WRITE)\n");
     printf("    --numpt=NPT|-n NPT    number of commands per thread "
@@ -882,8 +876,6 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
         pr2serr_lk("id=%d: only support TUR here for now\n", id);
         goto err_out;
     }
-    if (op->no_waitq)
-        pr2serr_lk("id=%d: ignoring --no-waitq option\n", id);
     if (op->verbose)
         pr2serr_lk("id=%d: using libsgutils generic sync passthrough\n", id);
 
@@ -1145,8 +1137,6 @@ work_thread(int id, struct opts_t * op)
         sg_flags |= SG_FLAG_MMAP_IO;
     if (op->no_xfer)
         sg_flags |= SG_FLAG_NO_DXFER;
-    if (op->no_waitq)
-        sg_flags |= SGV4_FLAG_NO_WAITQ;
     if (vb > 1)
         pr2serr_lk("  id=%d, sg_flags=0x%x, %s cmds\n", id, sg_flags,
                    ((SCSI_TUR == op->c2e) ? "TUR":
@@ -1421,7 +1411,7 @@ work_thread(int id, struct opts_t * op)
                     }
                 }
                 n = (op->wait_ms > 0) ? op->wait_ms : 0;
-                if ((n > 0) && (! op->no_waitq)) {
+                if (n > 0) {
                     for (j = 0; (j < 1000000) &&
                          (0 == (res = poll(pfd, 1, n)));
                          ++j)
@@ -1787,7 +1777,7 @@ main(int argc, char * argv[])
         int option_index = 0;
 
         c = getopt_long(argc, argv,
-                        "34acdefghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:Wz",
+                        "34acdefghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1994,9 +1984,6 @@ main(int argc, char * argv[])
             break;
         case 'W':
             op->c2e = SCSI_WRITE16;
-            break;
-        case 'z':
-            op->no_waitq = true;
             break;
         default:
             pr2serr_lk("unrecognised option code 0x%x ??\n", c);

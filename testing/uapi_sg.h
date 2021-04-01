@@ -114,8 +114,8 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_YIELD_TAG 0x8  /* sg_io_v4::generated_tag set after SG_IOS */
 #define SGV4_FLAG_Q_AT_TAIL SG_FLAG_Q_AT_TAIL
 #define SGV4_FLAG_Q_AT_HEAD SG_FLAG_Q_AT_HEAD
-#define SGV4_FLAG_NO_WAITQ  0x40	/* need to poll for completion */
-#define SGV4_FLAG_DOUT_OFFSET  0x80	/* dout byte offset in v4::spare_in */
+#define SGV4_FLAG_DOUT_OFFSET  0x40	/* dout byte offset in v4::spare_in */
+#define SGV4_FLAG_EVENTFD 0x80		/* signal completion on ... */
 #define SGV4_FLAG_COMPLETE_B4  0x100	/* mrq: complete this rq before next */
 #define SGV4_FLAG_SIGNAL 0x200	/* v3: ignored; v4 signal on completion */
 #define SGV4_FLAG_IMMED 0x400   /* issue request and return immediately ... */
@@ -127,9 +127,8 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_NO_DXFER SG_FLAG_NO_DXFER /* but keep dev<-->kernel xfr */
 #define SGV4_FLAG_KEEP_SHARE 0x20000  /* ... buffer for another dout command */
 #define SGV4_FLAG_MULTIPLE_REQS 0x40000	/* 1 or more sg_io_v4-s in data-in */
-#define SGV4_FLAG_EVENTFD 0x80000	/* signal completion on ... */
-#define SGV4_FLAG_ORDERED_WR 0x100000	/* svb: issue in-order writes */
-#define SGV4_FLAG_REC_ORDER 0x200000 /* receive order in v4:request_priority */
+#define SGV4_FLAG_ORDERED_WR 0x80000	/* svb: issue in-order writes */
+#define SGV4_FLAG_REC_ORDER 0x100000 /* receive order in v4:request_priority */
 
 /* Output (potentially OR-ed together) in v3::info or v4::info field */
 #define SG_INFO_OK_MASK 0x1
@@ -220,8 +219,7 @@ typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 #define SG_CTL_FLAGM_EXCL_WAITQ 0x1000	/* only 1 wake up per response */
 #define SG_CTL_FLAGM_SNAP_DEV	0x2000	/* output to debugfs::snapped */
 #define SG_CTL_FLAGM_RM_EVENTFD	0x4000	/* only if new eventfd wanted */
-#define SG_CTL_FLAGM_NO_WAIT_POLL 0x8000 /* POLLERR on poll(2)s that wait */
-#define SG_CTL_FLAGM_ALL_BITS	0xffff	/* should be OR of previous items */
+#define SG_CTL_FLAGM_ALL_BITS	0x7fff	/* should be OR of previous items */
 
 /* Write one of the following values to sg_extended_info::read_value, get... */
 #define SG_SEIRV_INT_MASK	0x0	/* get SG_SEIM_ALL_BITS */

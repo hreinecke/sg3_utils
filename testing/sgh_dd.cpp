@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.01 20210328";
+static const char * version_str = "2.03 20210331";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -188,7 +188,7 @@ struct flags_t {
     bool nocreat;
     bool noshare;
     bool no_unshare;    /* leave it for driver close/release */
-    bool no_waitq;
+    bool no_waitq;      /* dummy, no longer supported, just warn */
     bool noxfer;
     bool qhead;
     bool qtail;
@@ -257,7 +257,7 @@ struct global_collection
     bool ofile2_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
     bool mrq_cmds;              /* mrq=<NRQS>,C  given */
-    bool mrq_async;             /* either mrq_immed or no_waitq flags given */
+    bool mrq_async;             /* mrq_immed flag given */
     bool noshare;               /* don't use request sharing */
     bool unbalanced_mrq;        /* so _not_ sg->sg request sharing sync mrq */
     bool verify;                /* don't copy, verify like Unix: cmp */
@@ -538,13 +538,13 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_NO_WAITQ & flags) {           /* 0x40 */
-        n += sg_scnpr(b + n, b_len - n, "NO_WTQ|");
+    if (SGV4_FLAG_DOUT_OFFSET & flags) {        /* 0x40 */
+        n += sg_scnpr(b + n, b_len - n, "DOFF|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_DOUT_OFFSET & flags) {        /* 0x80 */
-        n += sg_scnpr(b + n, b_len - n, "DOFF|");
+    if (SGV4_FLAG_EVENTFD & flags) {           /* 0x80 */
+        n += sg_scnpr(b + n, b_len - n, "EVFD|");
         if (n >= b_len)
             goto fini;
     }
@@ -563,28 +563,28 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_STOP_IF & flags) {            /* 0x800 */
+    if (SGV4_FLAG_HIPRI & flags) {             /* 0x800 */
+        n += sg_scnpr(b + n, b_len - n, "HIPRI|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_STOP_IF & flags) {            /* 0x1000 */
         n += sg_scnpr(b + n, b_len - n, "STOPIF|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_DEV_SCOPE & flags) {          /* 0x1000 */
+    if (SGV4_FLAG_DEV_SCOPE & flags) {          /* 0x2000 */
         n += sg_scnpr(b + n, b_len - n, "DEV_SC|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_SHARE & flags) {              /* 0x2000 */
+    if (SGV4_FLAG_SHARE & flags) {              /* 0x4000 */
         n += sg_scnpr(b + n, b_len - n, "SHARE|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_DO_ON_OTHER & flags) {        /* 0x4000 */
+    if (SGV4_FLAG_DO_ON_OTHER & flags) {        /* 0x8000 */
         n += sg_scnpr(b + n, b_len - n, "DO_OTH|");
-        if (n >= b_len)
-            goto fini;
-    }
-    if (SGV4_FLAG_KEEP_SHARE & flags) {        /* 0x8000 */
-        n += sg_scnpr(b + n, b_len - n, "KEEP_SH|");
         if (n >= b_len)
             goto fini;
     }
@@ -593,13 +593,13 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_MULTIPLE_REQS & flags) {     /* 0x20000 */
-        n += sg_scnpr(b + n, b_len - n, "MRQS|");
+    if (SGV4_FLAG_KEEP_SHARE & flags) {        /* 0x20000 */
+        n += sg_scnpr(b + n, b_len - n, "KEEP_SH|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_EVENTFD & flags) {           /* 0x40000 */
-        n += sg_scnpr(b + n, b_len - n, "EVFD|");
+    if (SGV4_FLAG_MULTIPLE_REQS & flags) {     /* 0x40000 */
+        n += sg_scnpr(b + n, b_len - n, "MRQS|");
         if (n >= b_len)
             goto fini;
     }
@@ -610,11 +610,6 @@ sg_flags_str(int flags, int b_len, char * b)
     }
     if (SGV4_FLAG_REC_ORDER & flags) {         /* 0x100000 */
         n += sg_scnpr(b + n, b_len - n, "RECO|");
-        if (n >= b_len)
-            goto fini;
-    }
-    if (SGV4_FLAG_HIPRI & flags) {             /* 0x200000 */
-        n += sg_scnpr(b + n, b_len - n, "HIPRI|");
         if (n >= b_len)
             goto fini;
     }
@@ -938,7 +933,7 @@ usage(int pg_num)
             "direct,dpo,\n"
             "                dsync,excl,ff,fua,hipri,masync,mmap,mrq_immed,"
             "mrq_svb,\n"
-            "                nocreat,nodur,no_waitq,noxfer,null,qhead,qtail,"
+            "                nocreat,nodur,noxfer,null,qhead,qtail,"
             "random,\n"
             "                same_fds,v3,v4,wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
@@ -1052,8 +1047,6 @@ page3:
             "blocking\n"
             "    nocreat     will fail rather than create OFILE\n"
             "    nodur       turns off command duration calculations\n"
-            "    no_waitq     when non-blocking (async) don't use wait "
-            "queue\n"
             "    noxfer      no transfer to/from the user space\n"
             "    null        does nothing, placeholder\n"
             "    qhead       queue new request at head of block queue\n"
@@ -1363,7 +1356,7 @@ sg_take_snap(int sg_fd, int id, bool vb_b)
     seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
     seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_SNAP_DEV;
-    seip->ctl_flags &= SG_CTL_FLAGM_SNAP_DEV;   /* 0 --> don't append */
+    seip->ctl_flags &= ~SG_CTL_FLAGM_SNAP_DEV;   /* 0 --> append */
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr_lk("tid=%d: ioctl(EXTENDED(SNAP_DEV), failed errno=%d %s\n",
                    id,  errno, strerror(errno));
@@ -2083,7 +2076,7 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
         seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_READ_SIDE_FINI;
-        seip->ctl_flags &= SG_CTL_FLAGM_READ_SIDE_FINI;/* would be 0 anyway */
+        seip->ctl_flags &= ~SG_CTL_FLAGM_READ_SIDE_FINI;/* would be 0 anyway */
     }
     for (k = 0; (ioctl(read_side_fd, SG_SET_GET_EXTENDED, seip) < 0) &&
                  (EBUSY == errno); ++k) {
@@ -2526,9 +2519,9 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     b_len = sizeof(b);
     a_v4p = def_arr.first.data();
     ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
-    if (clp->in_flags.no_waitq || clp->out_flags.no_waitq) {
-        /* waitless non-blocking */
-        ctlop->flags |= (SGV4_FLAG_IMMED | SGV4_FLAG_NO_WAITQ);
+    if (clp->in_flags.hipri || clp->out_flags.hipri) {
+        /* hipri non-blocking */
+        ctlop->flags |= (SGV4_FLAG_IMMED | SGV4_FLAG_HIPRI);
         if (!after1 && (clp->verbose > 1)) {
             after1 = true;
             pr2serr_lk("%s: %s\n", __func__, mrq_nw_nb_s);
@@ -3033,7 +3026,6 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     bool dpo = wr ? clp->out_flags.dpo : clp->in_flags.dpo;
     bool dio = wr ? clp->out_flags.dio : clp->in_flags.dio;
     bool mmap = wr ? clp->out_flags.mmap : clp->in_flags.mmap;
-    bool no_waitq = wr ? clp->out_flags.no_waitq : clp->in_flags.no_waitq;
     bool noxfer = wr ? clp->out_flags.noxfer : clp->in_flags.noxfer;
     bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
     bool qhead = wr ? clp->out_flags.qhead : clp->in_flags.qhead;
@@ -3125,8 +3117,6 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     rep->rq_id = pack_id;
     nblks = rep->num_blks;
     blk_off = 0;
-    if (no_waitq)
-        flags |= SGV4_FLAG_NO_WAITQ;
     if (clp->verbose && 0 == clp->nmrqs && vb_first_time.load()) {
         vb_first_time.store(false);
         pr2serr("First normal IO: %s, flags: %s\n", cp,
@@ -3524,7 +3514,6 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
     bool no_dur = is_in ? clp->in_flags.no_dur : clp->out_flags.no_dur;
     bool masync = is_in ? clp->in_flags.masync : clp->out_flags.masync;
     bool wq_excl = is_in ? clp->in_flags.wq_excl : clp->out_flags.wq_excl;
-    bool no_waitq = is_in ? clp->in_flags.no_waitq : clp->out_flags.no_waitq;
     int res, t, num;
     uint8_t *mmp;
     struct sg_extended_info sei;
@@ -3630,17 +3619,6 @@ bypass:
         if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
             res = -1;
             pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
-                       errno, strerror(errno));
-        }
-    }
-    if (no_waitq && sg_version_ge_40045) {
-        memset(seip, 0, sizeof(*seip));
-        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
-        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_WAIT_POLL;
-        seip->ctl_flags |= SG_CTL_FLAGM_NO_WAIT_POLL;
-        if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
-            res = -1;
-            pr2serr_lk("ioctl(EXTENDED(NO_WAIT_POLL)) failed, errno=%d %s\n",
                        errno, strerror(errno));
         }
     }
@@ -4241,8 +4219,6 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
     if (clp->nmrqs > 0) {
         if (clp->in_flags.mrq_immed || clp->out_flags.mrq_immed)
             clp->mrq_async = true;
-        if (clp->in_flags.no_waitq || clp->out_flags.no_waitq)
-            clp->mrq_async = true;
     }
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
        for the block layer in lk 2.6 and results in an EIO on the
@@ -4413,6 +4389,8 @@ main(int argc, char * argv[])
                     "device\n", my_name);
         }
     }
+    if (clp->verbose && (clp->in_flags.no_waitq || clp->out_flags.no_waitq))
+        pr2serr("no_waitq: flag no longer does anything\n");
     if (outf[0])
         clp->ofile_given = true;
     if (outf[0] && ('-' != outf[0])) {

@@ -7,7 +7,7 @@ MANDIR=$(DESTDIR)/$(PREFIX)/man
 EXECS = sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc sg_tst_nvme \
 	sg_tst_ioctl sg_tst_bidi tst_sg_lib sgs_dd sg_tst_excl \
 	sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async sgh_dd \
-	sg_mrq_dd sg_iovec_tst
+	sg_mrq_dd sg_iovec_tst sg_take_snap
 	
 EXTRAS =
 
@@ -116,6 +116,9 @@ sg_mrq_dd: sg_mrq_dd.o sg_scat_gath.o $(LIBFILESNEW)
 
 sg_iovec_tst: sg_iovec_tst.o sg_scat_gath.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
+
+sg_take_snap: sg_take_snap.o $(LIBFILESNEW)
+	$(LD) -o $@ $(LDFLAGS) $^
 
 
 install: $(EXECS)

@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.23 20210328";
+static const char * version_str = "1.25 20210331";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -190,6 +190,7 @@ struct flags_t {
     bool masync;        /* more async sg v4 driver fd flag */
     bool no_dur;
     bool nocreat;
+    bool no_waitq;      /* dummy, no longer supported, just warn */
     bool order;
     bool qhead;
     bool qtail;
@@ -266,7 +267,6 @@ struct global_collection        /* one instance visible to all threads */
     bool mrq_hipri;
     bool ofile_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
-    bool no_waitq;              /* if set use polling for response instead */
     bool verify;                /* don't copy, verify like Unix: cmp */
     bool prefetch;              /* for verify: do PF(b),RD(a),V(b)_a_data */
     const char * infp;
@@ -504,13 +504,13 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_NO_WAITQ & flags) {           /* 0x40 */
-        n += sg_scnpr(b + n, b_len - n, "NO_WTQ|");
+    if (SGV4_FLAG_DOUT_OFFSET & flags) {        /* 0x40 */
+        n += sg_scnpr(b + n, b_len - n, "DOFF|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_DOUT_OFFSET & flags) {        /* 0x80 */
-        n += sg_scnpr(b + n, b_len - n, "DOFF|");
+    if (SGV4_FLAG_EVENTFD & flags) {           /* 0x80 */
+        n += sg_scnpr(b + n, b_len - n, "EVFD|");
         if (n >= b_len)
             goto fini;
     }
@@ -529,28 +529,28 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_STOP_IF & flags) {            /* 0x800 */
+    if (SGV4_FLAG_HIPRI & flags) {             /* 0x800 */
+        n += sg_scnpr(b + n, b_len - n, "HIPRI|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_STOP_IF & flags) {            /* 0x1000 */
         n += sg_scnpr(b + n, b_len - n, "STOPIF|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_DEV_SCOPE & flags) {          /* 0x1000 */
+    if (SGV4_FLAG_DEV_SCOPE & flags) {          /* 0x2000 */
         n += sg_scnpr(b + n, b_len - n, "DEV_SC|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_SHARE & flags) {              /* 0x2000 */
+    if (SGV4_FLAG_SHARE & flags) {              /* 0x4000 */
         n += sg_scnpr(b + n, b_len - n, "SHARE|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_DO_ON_OTHER & flags) {        /* 0x4000 */
+    if (SGV4_FLAG_DO_ON_OTHER & flags) {        /* 0x8000 */
         n += sg_scnpr(b + n, b_len - n, "DO_OTH|");
-        if (n >= b_len)
-            goto fini;
-    }
-    if (SGV4_FLAG_KEEP_SHARE & flags) {        /* 0x8000 */
-        n += sg_scnpr(b + n, b_len - n, "KEEP_SH|");
         if (n >= b_len)
             goto fini;
     }
@@ -559,13 +559,13 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_MULTIPLE_REQS & flags) {     /* 0x20000 */
-        n += sg_scnpr(b + n, b_len - n, "MRQS|");
+    if (SGV4_FLAG_KEEP_SHARE & flags) {        /* 0x20000 */
+        n += sg_scnpr(b + n, b_len - n, "KEEP_SH|");
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_EVENTFD & flags) {           /* 0x40000 */
-        n += sg_scnpr(b + n, b_len - n, "EVFD|");
+    if (SGV4_FLAG_MULTIPLE_REQS & flags) {     /* 0x40000 */
+        n += sg_scnpr(b + n, b_len - n, "MRQS|");
         if (n >= b_len)
             goto fini;
     }
@@ -579,11 +579,8 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_HIPRI & flags) {             /* 0x200000 */
-        n += sg_scnpr(b + n, b_len - n, "HIPRI|");
-        if (n >= b_len)
-            goto fini;
-    }
+    if (0 == n)
+        n += sg_scnpr(b + n, b_len - n, "<none>");
 fini:
     if (n < b_len) {    /* trim trailing '\' */
         if ('|' == b[n - 1])
@@ -864,11 +861,11 @@ usage(int pg_num)
             "[dio=0|1]\n"
             "                  [elemsz_kb=EKB] [ese=0|1] [fua=0|1|2|3] "
             "[hipri=NRQS]\n"
-            "                  [mrq=NRQS] [no_waitq=0|1] [ofreg=OFREG] "
-            "[sync=0|1]\n"
-            "                  [thr=THR] [time=0|1|2[,TO]] [verbose=VERB] "
-            "[--dry-run]\n"
-            "                  [--pre-fetch] [--verbose] [--version]\n\n"
+            "                  [mrq=NRQS] [ofreg=OFREG] [sync=0|1] "
+            "[thr=THR]\n"
+            "                  [time=0|1|2[,TO]] [verbose=VERB] [--dry-run] "
+            "[--pre-fetch]\n"
+            "                  [--verbose] [--version]\n\n"
             "  where: operands have the form name=value and are pecular to "
             "'dd'\n"
             "         style commands, and options start with one or "
@@ -934,8 +931,6 @@ page2:
             "                (def: 16). Does not set mrq hipri flag.\n"
             "                if mrq=0 does one-by-one, blocking "
             "ioctl(SG_IO)s\n"
-            "    no_waitq=0|1    poll for completion when 1; def: 0 (use "
-            "wait queue)\n"
             "    obs         OFILE logical block size, cannot differ from "
             "ibs or bs\n"
             "    ofreg       OFREG is regular file or pipe to send what is "
@@ -1226,7 +1221,7 @@ sg_take_snap(int sg_fd, int id, bool vb_b)
     seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
     seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_SNAP_DEV;
-    seip->ctl_flags &= SG_CTL_FLAGM_SNAP_DEV;   /* 0 --> don't append */
+    seip->ctl_flags &= ~SG_CTL_FLAGM_SNAP_DEV;   /* 0 --> append */
     if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
         pr2serr_lk("tid=%d: ioctl(EXTENDED(SNAP_DEV), failed errno=%d %s\n",
                    id,  errno, strerror(errno));
@@ -1912,8 +1907,6 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         rflags |= SGV4_FLAG_Q_AT_HEAD;
     if (flagsp->qtail)
         rflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (clp->no_waitq)
-        rflags |= SGV4_FLAG_NO_WAITQ;
     if (flagsp->hipri)
         rflags |= SGV4_FLAG_HIPRI;
 
@@ -2033,8 +2026,6 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         rflags |= SGV4_FLAG_Q_AT_HEAD;
     if (flagsp->qtail)
         rflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (clp->no_waitq)
-        rflags |= SGV4_FLAG_NO_WAITQ;
     if (flagsp->hipri)
         rflags |= SGV4_FLAG_HIPRI;
 
@@ -2449,8 +2440,6 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         iflags |= SGV4_FLAG_Q_AT_HEAD;
     if (iflagsp->qtail)
         iflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (clp->no_waitq)
-        iflags |= SGV4_FLAG_NO_WAITQ;
     if (iflagsp->hipri)
         iflags |= SGV4_FLAG_HIPRI;
 
@@ -2461,8 +2450,6 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         oflags |= SGV4_FLAG_Q_AT_HEAD;
     if (oflagsp->qtail)
         oflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (clp->no_waitq)
-        oflags |= SGV4_FLAG_NO_WAITQ;
     if (oflagsp->hipri)
         oflags |= SGV4_FLAG_HIPRI;
 
@@ -2633,8 +2620,6 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         iflags |= SGV4_FLAG_Q_AT_HEAD;
     if (iflagsp->qtail)
         iflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (clp->no_waitq)
-        iflags |= SGV4_FLAG_NO_WAITQ;
     if (iflagsp->hipri)
         iflags |= SGV4_FLAG_HIPRI;
 
@@ -2645,8 +2630,6 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         oflags |= SGV4_FLAG_Q_AT_HEAD;
     if (oflagsp->qtail)
         oflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (clp->no_waitq)
-        oflags |= SGV4_FLAG_NO_WAITQ;
     if (oflagsp->hipri)
         oflags |= SGV4_FLAG_HIPRI;
     oflags |= SGV4_FLAG_DO_ON_OTHER;
@@ -2984,17 +2967,6 @@ bypass:
         if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
             res = -1;
             pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
-                       errno, strerror(errno));
-        }
-    }
-    if (clp->no_waitq) {
-        memset(seip, 0, sizeof(*seip));
-        seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
-        seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_WAIT_POLL;
-        seip->ctl_flags |= SG_CTL_FLAGM_NO_WAIT_POLL;
-        if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
-            res = -1;
-            pr2serr_lk("ioctl(EXTENDED(NO_WAIT_POLL)) failed, errno=%d %s\n",
                        errno, strerror(errno));
         }
     }
@@ -3459,7 +3431,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                         my_name);
                 goto syn_err;
             }
-            clp->no_waitq = !!n;
+            clp->in_flags.no_waitq = true;
+            clp->out_flags.no_waitq = true;
         } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
             if (-1 == obs) {
@@ -4034,6 +4007,9 @@ main(int argc, char * argv[])
         if (changed)
             pr2serr(">> increasing cdbsz to 16 due to cdl > 0\n");
     }
+    if ((clp->verbose > 0) &&
+        (clp->in_flags.no_waitq || clp->out_flags.no_waitq))
+        pr2serr("no_waitq=<n> operand is now ignored\n");
     if (outf[0]) {
         clp->ofile_given = true;
         if (('-' == outf[0]))
