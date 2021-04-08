@@ -84,7 +84,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.18 20210331";
+static const char * version_str = "4.19 20210406";
 static const char * my_name = "sgs_dd";
 
 #ifndef SGV4_FLAG_HIPRI
@@ -940,7 +940,7 @@ start_write(Rq_coll * clp)
     return blocks;
 }
 
-/* Returns 0 if SGIO/SIGPOLL or (SIGRTMIN + 1) received, else returns negated
+/* Returns 0 if SIGIO/SIGPOLL or (SIGRTMIN + 1) received, else returns negated
  * errno value; -EAGAIN for timeout. */
 static int
 do_sigwait(Rq_coll * clp, bool inc1_clear0)

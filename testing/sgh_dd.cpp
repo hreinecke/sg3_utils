@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.03 20210331";
+static const char * version_str = "2.04 20210402";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -415,8 +415,7 @@ static const char * my_name = "sgh_dd: ";
 static const char * mrq_blk_s = "mrq: ordinary blocking";
 static const char * mrq_vb_s = "mrq: variable blocking";
 static const char * mrq_svb_s = "mrq: shared variable blocking (svb)";
-static const char * mrq_s_nb_s = "mrq: submit non-blocking";
-static const char * mrq_nw_nb_s = "mrq: waitless non-blocking";
+static const char * mrq_s_nb_s = "mrq: submit of full non-blocking";
 
 
 #ifdef __GNUC__
@@ -2500,8 +2499,9 @@ fini:
 }
 #endif
 
-/* do mrq 'submit (waitless) non-blocking' call. These are restricted to
- * a single file descriptor (i.e. the 'fd' argument). */
+/* do mrq 'full non-blocking' invocation so both submission and completion
+ * is async (i.e. uses SGV4_FLAG_IMMED flag). This type of mrq is
+ * restricted to a single file descriptor (i.e. the 'fd' argument). */
 static int
 sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
                  struct sg_io_v4 * ctlop, int nrq)
@@ -2520,11 +2520,11 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     a_v4p = def_arr.first.data();
     ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
     if (clp->in_flags.hipri || clp->out_flags.hipri) {
-        /* hipri non-blocking */
+        /* submit of full non-blocking with HIPRI */
         ctlop->flags |= (SGV4_FLAG_IMMED | SGV4_FLAG_HIPRI);
         if (!after1 && (clp->verbose > 1)) {
             after1 = true;
-            pr2serr_lk("%s: %s\n", __func__, mrq_nw_nb_s);
+            pr2serr_lk("%s: %s\n", __func__, mrq_s_nb_s);
         }
     } else {
         ctlop->flags |= SGV4_FLAG_IMMED;        /* submit non-blocking */
@@ -2835,8 +2835,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
         v4hdr_out_lk("Controlling object before", &ctl_v4, id);
     }
     if (clp->mrq_async && (! rep->both_sg)) {
-        /* do 'submit non-blocking' or 'submit waitless non_blocking'
-         * multiple request */
+        /* do 'submit non-blocking' or 'full non-blocking' mrq */
         mrq_arr_t fd_def_arr;
         mrq_arr_t o_fd_def_arr;
 

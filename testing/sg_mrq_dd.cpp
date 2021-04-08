@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.25 20210331";
+static const char * version_str = "1.26 20210402";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -879,10 +879,11 @@ usage(int pg_num)
             "                null,sync]\n"
             "    count       number of blocks to copy (def: device size)\n"
             "    if          file or device to read from (def: stdin)\n"
-            "    iflag       comma separated list from: [coe,dio,"
+            "    iflag       comma separated list from: [00,coe,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,fua,masync,mmap,nodur,\n"
-            "                null,order,qtail,serial,wq_excl]\n"
+            "                dsync,excl,ff,fua,masync,mmap,nodur,null,"
+            "order,\n"
+            "                qhead,qtail,random,serial,wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "

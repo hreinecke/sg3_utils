@@ -55,7 +55,7 @@
 
 #define ME "sg_take_snap: "
 
-static const char * version_str = "1.00.67 20210330";
+static const char * version_str = "1.01 20210403";
 
 #define SG_TAKE_MAX_DEVS 16
 
@@ -160,6 +160,29 @@ int main(int argc, char * argv[])
             perror("");
             sg_fd = -1;
             goto fini;
+        }
+        if (0 == k) {
+            int t;
+
+            res = ioctl(sg_fd, SG_GET_VERSION_NUM, &t);
+            if ((res < 0) || (t < 30000)) {
+                pr2serr("sg driver prior to 3.0.00\n");
+                ret = SG_LIB_FILE_ERROR;
+                goto fini;
+            }
+            if (verbose) {
+                pr2serr("sg driver version: %d.%02d.%02d\n",
+                        t / 10000, (t % 10000) / 100, t % 100);
+            }
+            if (t < 40000) {
+                pr2serr("Warning: sg driver prior to 4.0.00\n");
+                ret = SG_LIB_FILE_ERROR;
+                goto fini;
+            } else if (t < 40045) {
+                pr2serr("Warning: sg driver prior to 4.0.45\n");
+                ret = SG_LIB_FILE_ERROR;
+                goto fini;
+            }
         }
 
         seip = &sei;
