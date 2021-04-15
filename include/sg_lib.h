@@ -26,7 +26,7 @@
  * be useful to applications that communicate with devices that use a
  * SCSI command set. These command sets have names like SPC-4, SBC-3,
  * SSC-3, SES-2 and draft standards defining them can be found at
- * http://www.t10.org . Virtually all devices in the Linux SCSI subsystem
+ * https://www.t10.org . Virtually all devices in the Linux SCSI subsystem
  * utilize SCSI command sets. Many devices in other Linux device subsystems
  * utilize SCSI command sets either natively or via emulation (e.g. a
  * SATA disk in a USB enclosure).

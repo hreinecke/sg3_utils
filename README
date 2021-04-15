@@ -55,13 +55,13 @@ list of contributors see the CREDITS file.
 Description
 ===========
 A web site supporting the sg3_utils package can be found at
-http://sg.danny.cz/sg/sg3_utils.html . That page has a table of released
+https://sg.danny.cz/sg/sg3_utils.html . That page has a table of released
 versions for download. The most recent release or beta of sg3_utils may
-be found on this page: http://sg.danny.cz/sg in the News section.
+be found on this page: https://sg.danny.cz/sg in the News section.
 
 The predecessor to this package was called sg_utils. It is described in
-http://sg.danny.cz/sg/uu_index.html and old versions can be downloaded
-from the Downloads section of http://sg.danny.cz/sg .
+https://sg.danny.cz/sg/uu_index.html and old versions can be downloaded
+from the Downloads section of https://sg.danny.cz/sg .
 
 In the Linux 2.4 kernel series these utilities need to use the SCSI generic
 (sg) driver to access SCSI devices. The name of this package (i.e. sg3_utils)
@@ -96,11 +96,11 @@ that the user may need to take into account.
 
 If users have problems or questions about them please contact the author.
 Documentation for the Linux sg device driver can be found at:
-http://sg.danny.cz/sg/p/sg_v3_ho.html . This is written in DocBook and the
+https://sg.danny.cz/sg/p/sg_v3_ho.html . This is written in DocBook and the
 original xml can be found in the same directory with the ".xml" extension.
 Postscript and pdf renderings are also in that directory. Older documentation
 for the sg version 3 driver can be found at:
-http://sg.danny.cz/sg/p/scsi_generic_v3.txt .
+https://sg.danny.cz/sg/p/scsi_generic_v3.txt .
 
 To save the repetition of common code (e.g. SCSI error processing) and
 reduce the size of the executable files, a shared library called
@@ -232,7 +232,7 @@ fails on the earlier etch).
 Warning
 =======
 Many devices use SCSI command sets over transport protocols not normally
-associated with SCSI (as defined at http://www.t10.org ). Some of these
+associated with SCSI (as defined at https://www.t10.org ). Some of these
 devices react poorly (e.g. lock up) when sent SCSI commands that they don't
 support. Even sending a supported SCSI command with a field set to an
 unexpected value can cause problems. [The author is talking about billions
@@ -320,7 +320,7 @@ The 'utils' subdirectory contains source and a Makefile to build "hxascdmp"
 which accepts binary data from stdin (or a file on the command line) and
 outputs an ASCII-HEX and ASCII representation of it. It is similar to the
 Unix od command. There is also code to sg_chk_asc.c which checks a given
-text file (typically a copy of http://www.t10.org/lists/asc-num.txt ) and
+text file (typically a copy of https://www.t10.org/lists/asc-num.txt ) and
 checks it against the asc/ascq text strings held in sg_lib_data.c .
 
 The 'doc' subdirectory contains a README file containing the urls of
@@ -537,8 +537,8 @@ used for ASCII text.
 
 Other SCSI and storage tools
 ============================
-See http://sg.danny.cz/sg/tools.html
+See https://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert
-5th June 2020
+8th April 2021

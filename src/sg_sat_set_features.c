@@ -28,7 +28,7 @@
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
- * See http://www.t10.org for drafts. SAT is a standard: SAT ANSI INCITS
+ * See https://www.t10.org for drafts. SAT is a standard: SAT ANSI INCITS
  * 431-2007 (draft prior to that is sat-r09.pdf). SAT-2 is also a
  * standard: SAT-2 ANSI INCITS 465-2010 and the draft prior to that is
  * sat2r09.pdf . The SAT-3 project has started and the most recent draft

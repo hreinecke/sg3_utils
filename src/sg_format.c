@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * See http://www.t10.org for relevant standards and drafts. The most recent
+ * See https://www.t10.org for relevant standards and drafts. The most recent
  * draft is SBC-4 revision 2.
  */
 

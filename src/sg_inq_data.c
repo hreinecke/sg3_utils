@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * This is an auxiliary file holding data tables for the sg_inq utility.
- * It is mainly based on the SCSI SPC-5 document at http://www.t10.org .
+ * It is mainly based on the SCSI SPC-5 document at https://www.t10.org .
  */
 
 #include <unistd.h>
@@ -46,7 +46,7 @@ const char * sg_ansi_version_arr[16] =
 };
 
 /* table from SPC-5 revision 16 [sorted numerically (from Annex E.9)] */
-/* Can also be obtained from : http://www.t10.org/lists/stds.txt 20170114 */
+/* Can also be obtained from : https://www.t10.org/lists/stds.txt 20170114 */
 /* Corrected against spc5r21 on 20190312 */
 
 #ifdef SG_SCSI_STRINGS

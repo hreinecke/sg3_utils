@@ -111,7 +111,7 @@ pr_version()
             "This is free software.  You may redistribute copies of it "
             "under the terms of\n"
             "the GNU General Public License "
-            "<http://www.gnu.org/licenses/gpl.html>.\n"
+            "<https://www.gnu.org/licenses/gpl.html>.\n"
             "There is NO WARRANTY, to the extent permitted by law.\n");
 }
 

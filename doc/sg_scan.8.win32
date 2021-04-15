@@ -103,7 +103,7 @@ When the \fI\-\-scsi\fR option is given the SCSI adapter tuple is followed
 by a list of two or three fields. First is "claimed=0|1" indicating whether
 a class driver has claimed the device. The next field is "pdt=<num>"
 where <num> is the "peripheral device type" as defined in the SCSI INQUIRY
-command (see SPC\-4 at http://www.t10.org). The <num> has a trailing "h" to
+command (see SPC\-4 at https://www.t10.org). The <num> has a trailing "h" to
 indicate that it is hexadecimal. Sometimes a third field with the
 word "dubious" appears. This flags that what is supposed to be a SCSI
 INQUIRY command response has a badly formed "additional length" field.

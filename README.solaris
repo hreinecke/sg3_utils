@@ -87,7 +87,7 @@ that they execute.  Some utilities are slightly higher level, for
 example sg_ses fetches SCSI Enclosure Services (SES) status pages and
 can send control pages. Each utility has a man page (placed in
 section 8). An overview of sg3_utils can be found at:
-http://sg.danny.cz/sg/sg3_utils.html .
+https://sg.danny.cz/sg/sg3_utils.html .
 A copy of the "sg3_utils.html" file is in the "doc" subdirectory.
 
 

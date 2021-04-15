@@ -20,12 +20,12 @@
  * Documentation
  * =============
  * A web site for the SG device driver can be found at:
- *   http://sg.danny.cz/sg  [alternatively check the MAINTAINERS file]
+ *   https://sg.danny.cz/sg  [alternatively check the MAINTAINERS file]
  * The documentation for the sg version 3 driver can be found at:
- *   http://sg.danny.cz/sg/p/sg_v3_ho.html
+ *   https://sg.danny.cz/sg/p/sg_v3_ho.html
  * Also see: <kernel_source>/Documentation/scsi/scsi-generic.txt
  *
- * For utility and test programs see: http://sg.danny.cz/sg/sg3_utils.html
+ * For utility and test programs see: https://sg.danny.cz/sg/sg3_utils.html
  */
 
 #include <stddef.h>

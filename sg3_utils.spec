@@ -5,8 +5,8 @@ Version: 1.47
 Release: 1
 License: GPL
 Group: Utilities/System
-Source: ftp://sg.danny.cz/sg/p/sg3_utils-%{version}.tgz
-Url: http://sg.danny.cz/sg/sg3_utils.html
+Source: https://sg.danny.cz/sg/p/sg3_utils-%{version}.tgz
+Url: https://sg.danny.cz/sg/sg3_utils.html
 Provides: sg_utils
 # BuildRequires: libtool
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
@@ -84,7 +84,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Wed Apr 07 2021 - dgilbert at interlog dot com
+* Wed Apr 14 2021 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.47
 

@@ -24,7 +24,7 @@
  * checks it against the additional sense codes held in the
  * sg_lib.c file.
  * The online version of the asc_ascq codes can be found at:
- * http://www.t10.org/lists/asc-num.txt
+ * https://www.t10.org/lists/asc-num.txt
  */
 
 static const char * version_str = "1.09 20210226";

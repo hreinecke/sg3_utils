@@ -26,7 +26,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  *
  * This command performs a SCSI COMPARE AND WRITE. See SBC-3 at
- * http://www.t10.org
+ * https://www.t10.org
  *
  */
 

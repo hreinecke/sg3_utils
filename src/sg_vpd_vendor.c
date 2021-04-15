@@ -33,7 +33,7 @@
    This program fetches Vital Product Data (VPD) pages from the given
    device and outputs it as directed. VPD pages are obtained via a
    SCSI INQUIRY command. Most of the data in this program is obtained
-   from the SCSI SPC-4 document at http://www.t10.org .
+   from the SCSI SPC-4 document at https://www.t10.org .
 
    Acknowledgments:
       - Lars Marowsky-Bree <lmb at suse dot de> contributed Unit Path Report

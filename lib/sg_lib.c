@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2020 Douglas Gilbert.
+ * Copyright (c) 1999-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,7 +21,7 @@
  *    and a GPL notice.
  *
  *    Much of the data in this file is derived from SCSI draft standards
- *    found at http://www.t10.org with the "SCSI Primary Commands-4" (SPC-4)
+ *    found at https://www.t10.org with the "SCSI Primary Commands-4" (SPC-4)
  *    being the central point of reference.
  *
  *    Contributions:

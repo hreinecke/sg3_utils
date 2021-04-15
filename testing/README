@@ -24,7 +24,7 @@ is also a large amount of error checking, as many of these utilities
 were used to test new features placed in the sg v4 driver in Linux.
 
 The sg_chk_asc utility decodes the SCSI additional sense code table
-found at http://www.t10.org/lists/asc-num.txt and checks it against
+found at https://www.t10.org/lists/asc-num.txt and checks it against
 the table found in sg_lib_data.c in the lib/ subdirectory. It is
 designed to keep the table in sg_lib_data.c in "sync" with the
 table at the t10.org web site.
