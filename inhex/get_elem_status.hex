@@ -1,4 +1,3 @@
-PROPS-END
 # To test sg_get_elem_status with dummy response to the SCSI
 # GET PHYSICAL ELEMENT SATUS command
 
