@@ -128,7 +128,7 @@ print02i()
     if [ "$1" = "*" ] ; then
         echo "00"
     else
-        printf "%02i" "$1"
+        printf "%02s" "$1"
     fi
 }
 
@@ -491,7 +491,7 @@ dolunscan()
     # Well known lun transition case. Only for Direct-Access devs (type 0)
     # If block directory exists && and PQUAL != 0, we unmapped lun0 and just have a well-known lun
     # If block directory doesn't exist && PQUAL == 0, we mapped a real lun0
-    if [ "$lun" -eq 0 ] && [ $IPTYPE -eq 0 ] ; then
+    if [ "$lun" = 0 ] && [ $IPTYPE -eq 0 ] ; then
       if [ $RC = 2 ] ; then
         if [ -e "$devpath" ] ; then
           if [ -d "$devpath/block" ] ; then
@@ -535,7 +535,7 @@ dolunscan()
         sleep 0.02
       else
         echo "scsi remove-single-device $devnr" > /proc/scsi/scsi
-        if [ $RC -eq 1 ] || [ "$lun" -eq 0 ] ; then
+        if [ $RC -eq 1 ] || [ "$lun" = 0 ] ; then
           # Try readding, should fail if device is gone
           echo "scsi add-single-device $devnr" > /proc/scsi/scsi
         fi
