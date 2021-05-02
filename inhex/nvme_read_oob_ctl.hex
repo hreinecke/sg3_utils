@@ -1,4 +1,6 @@
-# 64 byte NVMe, Read command (a NVM command) that is suitable for:
+# 64 byte NVMe, Read command (a NVM command) which what should be an
+# Out-of-Bounds LBA (around 377 TB with 512 byte sectors. This file is
+# suitable for:
 #       sg_raw --cmdfile=<this_file_name> --nvm --request=2048 <nvme_device>
 #
 # The address field (at byte offset 24, 8 bytes and little endian) gives
@@ -11,22 +13,28 @@
 #    fffffffe                  use byte length of data-in buffer
 #    fffffffd                  use byte length of data-out buffer
 #
+# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+# This NVMe (NVM) Read command purposely has a very large starting LBA
+# in order to get a "Attempted write to read only range" error. This is
+# to test error reporting.
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
 # 512 byte logical block size is assumed. Read 4 blocks hence 2048 bytes.
-# The first LBA read is 0x12345 and the namespace is 1. If successful
+# The first LBA read is 0xabcd012345 and the namespace is 1. If successful
 # the four blocks will be read into the data-in buffer. Submission queu
 # 0 is used (the same queue that Admin commands use). The NVM opcode for
 # the Read command is 0x2 and appears in the first command byte.
 
 02 00 00 00 01 00 00 00  00 00 00 00 00 00 00 00
 00 00 00 00 00 00 00 00  fe ff ff ff ff ff ff ff
-00 00 00 00 fe ff ff ff  45 23 01 00 00 00 00 00
+00 00 00 00 fe ff ff ff  45 23 01 cd ab 00 00 00
 03 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
 
 # Notice NVMe uses its quirky "0's based" number of blocks so
 # 03 appears at byte offset 48 to mean "read 4 blocks".
 #
 # A typical invocation in Linux and FreeBSD would look like this:
-#    sg_raw --cmdfile=nvme_read_ctl.hex --nvm -r 2048
+#    sg_raw --cmdfile=nvme_read_oob_ctl.hex --nvm -r 2048
 #           --outfile=t.bin /dev/nvme0n1
 # In FreeBSD the device name would be /dev/nvme0ns1
 #

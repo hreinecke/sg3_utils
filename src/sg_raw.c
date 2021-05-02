@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.34 (2021-01-03)"
+#define SG_RAW_VERSION "0.4.36 (2021-04-29)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -80,7 +80,7 @@ struct opts_t {
     bool do_dataout;
     bool do_enumerate;
     bool no_sense;
-    bool nvm;           /* the NVMe command set containing its READ+WRITE */
+    bool do_nvm;     /* the NVMe command set: NVM containing its READ+WRITE */
     bool do_help;
     bool verbose_given;
     bool version_given;
@@ -133,17 +133,18 @@ usage()
             "DEVICE but\n"
             "                         ignores it\n"
             "  --help|-h              Show this message and exit\n"
-            "  --infile=IFILE|-i IFILE    Read data to send from IFILE "
-            "(default:\n"
-            "                             stdin)\n"
+            "  --infile=IFILE|-i IFILE    Read binary data to send (i.e. "
+            "data-out)\n"
+            "                             from IFILE (default: stdin)\n"
             "  --nosense|-n           Don't display sense information\n"
             "  --nvm|-N               command is for NVM command set (e.g. "
             "Read);\n"
             "                         default, if NVMe fd, Admin command "
             "set\n"
-            "  --outfile=OFILE|-o OFILE    Write binary data to OFILE (def: "
-            "hexdump\n"
-            "                              to stdout)\n"
+            "  --outfile=OFILE|-o OFILE    Write binary data from device "
+            "(i.e. data-in)\n"
+            "                              to OFILE (def: hexdump to "
+            "stdout)\n"
             "  --raw|-w               interpret CF (command file) as "
             "binary (def:\n"
             "                         interpret as ASCII hex)\n"
@@ -225,7 +226,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
             op->no_sense = true;
             break;
         case 'N':
-            op->nvm = true;
+            op->do_nvm = true;
             break;
         case 'o':
             if (op->datain_file) {
@@ -300,7 +301,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
     }
 
     if (optind >= argc) {
-        pr2serr("No device specified\n\n");
+        pr2serr("No device specified\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     op->device_name = argv[optind];
@@ -379,7 +380,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
             printf("Attempt to decode cdb name: %s\n", b);
         } else
             printf(">>> Seems to be NVMe %s command\n",
-                   sg_get_nvme_opcode_name(op->cdb[0], true /* admin */,
+                   sg_get_nvme_opcode_name(op->cdb[0], ! op->do_nvm,
                                            sizeof(b), b));
     }
     return 0;
@@ -577,6 +578,7 @@ main(int argc, char *argv[])
     }
 
     if (ret != 0) {
+        pr2serr("\n");  /* blank line before outputting usage */
         usage();
         goto done;
     } else if (op->do_help) {
@@ -679,7 +681,7 @@ and_again:
             hex2stderr(op->cdb, op->cdb_length, -1);
             if (op->verbose > 1)
                 pr2serr("  Command name: %s\n",
-                        sg_get_nvme_opcode_name(op->cdb[0], true /* admin */,
+                        sg_get_nvme_opcode_name(op->cdb[0], ! op->do_nvm,
                                                 b_len, b));
         }
     }
@@ -689,7 +691,7 @@ and_again:
                 (int)sizeof(sense_buffer));
     set_scsi_pt_sense(ptvp, sense_buffer, sizeof(sense_buffer));
 
-    if (op->nvm)
+    if (op->do_nvm)
         ret = do_nvm_pt(ptvp, 0, op->timeout, op->verbose);
     else
         ret = do_scsi_pt(ptvp, -1, op->timeout, op->verbose);
@@ -732,7 +734,7 @@ and_again:
         k = -ret;
         pr2serr("do_scsi_pt: %s\n", safe_strerror(k));
         err = get_scsi_pt_os_err(ptvp);
-        if (err != k)
+        if ((err != 0) && (err != k))
             pr2serr("    ... or perhaps: %s\n", safe_strerror(err));
         ret = sg_convert_errno(err);
         goto done;

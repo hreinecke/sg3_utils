@@ -5,22 +5,22 @@ removed in version 1.24 .
 Here are the urls of the files that were previously here plus a brief
 summary:
 
-http://sg.danny.cz/sg/sg3_utils.html
+https://sg.danny.cz/sg/sg3_utils.html
     - overview and examples of this package
 
-http://sg.danny.cz/sg/sg_dd.html
+https://sg.danny.cz/sg/sg_dd.html
     - discussion and examples of the sg_dd utility which is a dd variant
       (also discusses the sgm_dd, sgp_dd and sg_read utilities)
 
-http://sg.danny.cz/sg/sg_ses.html
+https://sg.danny.cz/sg/sg_ses.html
     - discussion and examples of the sg_ses utility. SCSI Enclosure
       Services (SES) devices may contain a lot of information,
       structured in a non-trivial way.
 
-http://sg.danny.cz/sg/sg_io.html
+https://sg.danny.cz/sg/sg_io.html
     - discussion of Linux SG_IO ioctl (SCSI pass-through)
 
-http://sg.danny.cz/sg/tools.html
+https://sg.danny.cz/sg/tools.html
     - overview of around 25 storage and SCSI tools
 
 
@@ -31,4 +31,4 @@ sg_scan.8 . sg_scan is not supported for other ports.
 
 
 Douglas Gilbert
-10th February 2010
+16th April 2021

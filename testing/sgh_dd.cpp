@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.04 20210402";
+static const char * version_str = "2.06 20210427";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -130,6 +130,8 @@ using namespace std;
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
 #define DEF_BLOCKS_PER_2048TRANSFER 32
+#define DEF_SDT_ICT_MS 300
+#define DEF_SDT_CRT_SEC 3
 #define DEF_SCSI_CDBSZ 10
 #define MAX_SCSI_CDBSZ 16
 
@@ -244,7 +246,8 @@ struct global_collection
     int ofsplit;
     atomic<int> dio_incomplete_count;
     atomic<int> sum_of_resids;
-    int vebose;
+    uint32_t sdt_ict; /* stall detection; initial check time (milliseconds) */
+    uint32_t sdt_crt; /* check repetition time (seconds), after first stall */
     int fail_mask;
     int verbose;
     int dry_run;
@@ -914,12 +917,13 @@ usage(int pg_num)
             "[fua=0|1|2|3]\n"
             "               [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
             "[of2=OFILE2]\n"
-            "               [ofreg=OFREG] [ofsplit=OSP] [sync=0|1] "
-            "[thr=THR]\n"
-            "               [time=0|1|2[,TO]] [unshare=1|0] [verbose=VERB] "
-            "[--dry-run]\n"
-            "               [--prefetch] [-v|-vv|-vvv] [--verbose] [--verify] "
-            "[--version]\n\n"
+            "               [ofreg=OFREG] [ofsplit=OSP] [sdt=SDT] "
+            "[sync=0|1]\n"
+            "               [thr=THR] [time=0|1|2[,TO]] [unshare=1|0] "
+            "[verbose=VERB]\n"
+            "               [--dry-run] [--prefetch] [-v|-vv|-vvv] "
+            "[--verbose]\n"
+            "               [--verify] [--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -995,6 +999,12 @@ page2:
             "                IFILE in the first half of each shared element\n"
             "    ofsplit     split ofile write in two at block OSP (def: 0 "
             "(no split))\n"
+            "    sdt         stall detection times: CRT[,ICT]. CRT: check "
+            "repetition\n"
+            "                time (after first) in seconds; ICT: initial "
+            "check time\n"
+            "                in milliseconds. Default: 3,300 . Use CRT=0 "
+            "to disable\n"
             "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
@@ -1188,22 +1198,103 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 #endif
 }
 
+static int
+system_wrapper(const char * cmd)
+{
+    int res;
+
+    res = system(cmd);
+    if (WIFSIGNALED(res) &&
+        (WTERMSIG(res) == SIGINT || WTERMSIG(res) == SIGQUIT))
+        raise(WTERMSIG(res));
+    return WEXITSTATUS(res);
+}
+
+/* Has an infinite loop doing a timed wait for any signals in sig_set. After
+ * each timeout (300 ms) checks if the most_recent_pack_id atomic integer
+ * has changed. If not after another two timeouts announces a stall has
+ * been detected. If shutting down atomic is true breaks out of loop and
+ * shuts down this thread. Other than that, this thread is normally cancelled
+ * by the main thread, after other threads have exited. */
 static void *
 sig_listen_thread(void * v_clp)
 {
+    bool stall_reported = false;
+    int prev_pack_id = 0;
+    int sig_number, pack_id;
+    struct timespec ts;
+    struct timespec * tsp = &ts;
     struct global_collection * clp = (struct global_collection *)v_clp;
-    int sig_number;
+    uint32_t ict_ms = (clp->sdt_ict ? clp->sdt_ict : DEF_SDT_ICT_MS);
 
+    tsp->tv_sec = ict_ms / 1000;
+    tsp->tv_nsec = (ict_ms % 1000) * 1000 * 1000;   /* DEF_SDT_ICT_MS */
     while (1) {
-        sigwait(&signal_set, &sig_number);
+        sig_number = sigtimedwait(&signal_set, NULL, tsp);
         if (shutting_down)
             break;
+        if (sig_number < 0) {
+            int err = errno;
+
+            /* EAGAIN implies a timeout */
+            if ((EAGAIN == err) && (clp->sdt_crt > 0)) {
+                pack_id = mono_pack_id.load();
+                if ((pack_id > 0) && (pack_id == prev_pack_id)) {
+                    if (! stall_reported) {
+                        stall_reported = true;
+                        tsp->tv_sec = clp->sdt_crt;
+                        tsp->tv_nsec = 0;
+                        pr2serr_lk("%s: first stall at pack_id=%d detected\n",
+                                   __func__, pack_id);
+                    } else
+                        pr2serr_lk("%s: subsequent stall at pack_id=%d\n",
+                               __func__, pack_id);
+                    system_wrapper("/usr/bin/cat /proc/scsi/sg/debug\n");
+                } else
+                    prev_pack_id = pack_id;
+            } else if (EAGAIN != err)
+                pr2serr_lk("%s: sigtimedwait() errno=%d\n", __func__, err);
+        }
+        if (SIGINT == sig_number) {
+            pr2serr_lk("%sinterrupted by SIGINT\n", my_name);
+            stop_both(clp);
+            pthread_cond_broadcast(&clp->out_sync_cv);
+        }
+    }           /* end of while loop */
+    if (clp->verbose > 1)
+        pr2serr_lk("%s: exiting\n", __func__);
+
+
+#if 0
+
+
+            if (EAGAIN == err) { /* timeout */
+                pack_id = mono_pack_id.load();
+                if (pack_id == prev_pack_id) {
+                    if (! stall_reported) {
+                        stall_reported = true;
+                        tsp->tv_sec = 2;
+                        tsp->tv_nsec = 0;
+                        pr2serr_lk("%s: first stall at pack_id=%d "
+                                   "detected\n", __func__, pack_id);
+                    } else
+                        pr2serr_lk("%s: subsequent stall at pack_id=%d\n",
+                                   __func__, pack_id);
+                    system_wrapper("/usr/bin/cat /proc/scsi/sg/debug\n");
+                } else
+                    prev_pack_id = pack_id;
+            } else
+                pr2serr_lk("%s: sigtimedwait() errno=%d\n", __func__, err);
+        }
         if (SIGINT == sig_number) {
             pr2serr_lk("%sinterrupted by SIGINT\n", my_name);
             stop_both(clp);
             pthread_cond_broadcast(&clp->out_sync_cv);
         }
     }
+    if (clp->verbose > 1)
+        pr2serr_lk("%s: exiting\n", __func__);
+#endif
     return NULL;
 }
 
@@ -2321,7 +2412,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                        sg_info_str(a_v4p->info, sizeof(b), b));
         }
         sstatus = a_v4p->device_status;
-        if ((sstatus && (SAM_STAT_CONDITION_MET != sstatus)) ||
+        if ((! sg_scsi_status_is_good(sstatus)) ||
             a_v4p->transport_status || a_v4p->driver_status) {
             ok = false;
             if (SAM_STAT_CHECK_CONDITION != a_v4p->device_status) {
@@ -2441,7 +2532,7 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                        sg_info_str(a_np->info, sizeof(b), b));
         }
         sstatus = a_np->device_status;
-        if ((sstatus && (SAM_STAT_CONDITION_MET != sstatus)) ||
+        if ((! sg_scsi_status_is_good(sstatus)) ||
             a_np->transport_status || a_np->driver_status) {
             ok = false;
             if (SAM_STAT_CHECK_CONDITION != a_np->device_status) {
@@ -4045,6 +4136,23 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 pr2serr("%sbad argument to 'oflag='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
+        } else if (0 == strcmp(key, "sdt")) {
+            cp = strchr(buf, ',');
+            n = sg_get_num(buf);
+            if (n < 0) {
+                pr2serr("%sbad argument to 'sdt=CRT[,ICT]'\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            clp->sdt_crt = n;
+            if (cp) {
+                n = sg_get_num(cp + 1);
+                if (n < 0) {
+                    pr2serr("%sbad 2nd argument to 'sdt=CRT,ICT'\n",
+                            my_name);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                clp->sdt_ict = n;
+            }
         } else if (0 == strcmp(key, "seek")) {
             clp->seek = sg_get_llnum(buf);
             if (-1LL == clp->seek) {
@@ -4129,7 +4237,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             version_given = true;
         else {
             pr2serr("Unrecognized option '%s'\n", key);
-            pr2serr("For more information use '--help'\n");
+            pr2serr("For more information use '--help' or '-h'\n");
             return SG_LIB_SYNTAX_ERROR;
         }
     }
@@ -4292,6 +4400,8 @@ main(int argc, char * argv[])
     clp->out2_type = FT_DEV_NULL;
     clp->cdbsz_in = DEF_SCSI_CDBSZ;
     clp->cdbsz_out = DEF_SCSI_CDBSZ;
+    clp->sdt_ict = DEF_SDT_ICT_MS;
+    clp->sdt_crt = DEF_SDT_CRT_SEC;
     clp->nmrqs = DEF_NUM_MRQS;
     clp->unshare = true;
     inf[0] = '\0';
@@ -4599,7 +4709,7 @@ main(int argc, char * argv[])
     if ((STDIN_FILENO == clp->infd) && (STDOUT_FILENO == clp->outfd)) {
         pr2serr("Won't default both IFILE to stdin _and_ OFILE to "
                 "/dev/null\n");
-        pr2serr("For more information use '--help'\n");
+        pr2serr("For more information use '--help' or '-h'\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (dd_count < 0) {

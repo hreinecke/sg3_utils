@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.26 20210402";
+static const char * version_str = "1.27 20210424";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -133,6 +133,8 @@ using namespace std;
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
 #define DEF_BLOCKS_PER_2048TRANSFER 32
+#define DEF_SDT_ICT_MS 300
+#define DEF_SDT_CRT_SEC 3
 #define DEF_SCSI_CDB_SZ 10
 #define MAX_SCSI_CDB_SZ 16      /* could be 32 */
 #define PACK_ID_TID_MULTIPLIER (0x1000000)      /* 16,777,216 */
@@ -151,7 +153,6 @@ using namespace std;
 #define DEF_NUM_THREADS 4
 #define MAX_NUM_THREADS 1024 /* was SG_MAX_QUEUE with v3 driver */
 #define DEF_MRQ_NUM 16
-#define DEF_STALL_THRESH 4
 
 #ifndef RAW_MAJOR
 #define RAW_MAJOR 255   /*unlikely value */
@@ -191,7 +192,7 @@ struct flags_t {
     bool no_dur;
     bool nocreat;
     bool no_waitq;      /* dummy, no longer supported, just warn */
-    bool order;
+    bool order_wr;
     bool qhead;
     bool qtail;
     bool random;
@@ -255,6 +256,8 @@ struct global_collection        /* one instance visible to all threads */
     atomic<int> sum_of_resids;
     atomic<int> reason_res;
     atomic<int> most_recent_pack_id;
+    uint32_t sdt_ict; /* stall detection; initial check time (milliseconds) */
+    uint32_t sdt_crt; /* check repetition time (seconds), after first stall */
     int verbose;
     int dry_run;
     bool mrq_eq_0;              /* true when user gives mrq=0 */
@@ -861,11 +864,11 @@ usage(int pg_num)
             "[dio=0|1]\n"
             "                  [elemsz_kb=EKB] [ese=0|1] [fua=0|1|2|3] "
             "[hipri=NRQS]\n"
-            "                  [mrq=NRQS] [ofreg=OFREG] [sync=0|1] "
-            "[thr=THR]\n"
-            "                  [time=0|1|2[,TO]] [verbose=VERB] [--dry-run] "
-            "[--pre-fetch]\n"
-            "                  [--verbose] [--version]\n\n"
+            "                  [mrq=NRQS] [ofreg=OFREG] [sdt=SDT] "
+            "[sync=0|1]\n"
+            "                  [thr=THR] [time=0|1|2[,TO]] [verbose=VERB] "
+            "[--dry-run]\n"
+            "                  [--pre-fetch] [--verbose] [--version]\n\n"
             "  where: operands have the form name=value and are pecular to "
             "'dd'\n"
             "         style commands, and options start with one or "
@@ -937,6 +940,12 @@ page2:
             "    ofreg       OFREG is regular file or pipe to send what is "
             "read from\n"
             "                IFILE in the first half of each shared element\n"
+            "    sdt         stall detection times: CRT[,ICT]. CRT: check "
+            "repetition\n"
+            "                time (after first) in seconds; ICT: initial "
+            "check time\n"
+            "                in milliseconds. Default: 3,300 . Use CRT=0 "
+            "to disable\n"
             "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
             "after copy\n"
             "    thr         is number of threads, must be > 0, default 4, "
@@ -1141,40 +1150,38 @@ static void
 sig_listen_thread(struct global_collection * clp)
 {
     bool stall_reported = false;
-    int stall_count = 0;
     int prev_pack_id = 0;
     int sig_number, pack_id;
+    uint32_t ict_ms = (clp->sdt_ict ? clp->sdt_ict : DEF_SDT_ICT_MS);
     struct timespec ts;
     struct timespec * tsp = &ts;
 
-    tsp->tv_sec = 0;
-    tsp->tv_nsec = 300 * 1000 * 1000;   /* 300 ms */
+    tsp->tv_sec = ict_ms / 1000;
+    tsp->tv_nsec = (ict_ms % 1000) * 1000 * 1000;   /* DEF_SDT_ICT_MS */
     while (1) {
         sig_number = sigtimedwait(&signal_set, NULL, tsp);
         if (shutting_down)
             break;
         if (sig_number < 0) {
-                int err = errno;
+            int err = errno;
 
-                if (EAGAIN == err) { /* timeout */
-                    pack_id = clp->most_recent_pack_id.load();
-                    if (pack_id == prev_pack_id) {
-                        ++stall_count;
-                        if (0 == (stall_count % DEF_STALL_THRESH)) {
-                            if (! stall_reported) {
-                                stall_reported = true;
-                                pr2serr_lk("%s: stall at pack_id=%d "
-                                           "detected\n", __func__, pack_id);
-                        }
-                        pr2serr_lk("%s: stall at pack_id=%d, dump sg/debug\n",
+            /* EAGAIN implies a timeout */
+            if ((EAGAIN == err) && (clp->sdt_crt > 0)) {
+                pack_id = clp->most_recent_pack_id.load();
+                if ((pack_id > 0) && (pack_id == prev_pack_id)) {
+                    if (! stall_reported) {
+                        stall_reported = true;
+                        tsp->tv_sec = clp->sdt_crt;
+                        tsp->tv_nsec = 0;
+                        pr2serr_lk("%s: first stall at pack_id=%d detected\n",
                                    __func__, pack_id);
-                        system_wrapper("/usr/bin/cat /proc/scsi/sg/debug\n");
-                    }
-                } else {
-                    stall_count = 0;
+                    } else
+                        pr2serr_lk("%s: subsequent stall at pack_id=%d\n",
+                               __func__, pack_id);
+                    system_wrapper("/usr/bin/cat /proc/scsi/sg/debug\n");
+                } else
                     prev_pack_id = pack_id;
-                }
-            } else
+            } else if (EAGAIN != err)
                 pr2serr_lk("%s: sigtimedwait() errno=%d\n", __func__, err);
         }
         if (SIGINT == sig_number) {
@@ -1182,7 +1189,7 @@ sig_listen_thread(struct global_collection * clp)
             clp->next_count_pos.store(-1);
             shutting_down.store(true);
         }
-    }
+    }           /* end of while loop */
     if (clp->verbose > 1)
         pr2serr_lk("%s: exiting\n", __func__);
 }
@@ -1809,7 +1816,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
                        sg_info_str(a_v4p->info, sizeof(b), b));
         }
         sstatus = a_v4p->device_status;
-        if ((sstatus && (SAM_STAT_CONDITION_MET != sstatus)) ||
+        if ((! sg_scsi_status_is_good(sstatus)) ||
             a_v4p->transport_status || a_v4p->driver_status) {
             ok = false;
             last_err_on_in = ! (a_v4p->flags & SGV4_FLAG_DO_ON_OTHER);
@@ -2729,7 +2736,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS | SGV4_FLAG_SHARE;
     if (! (iflagsp->coe || oflagsp->coe))
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
-    if ((! clp->verify) && clp->out_flags.order)
+    if ((! clp->verify) && clp->out_flags.order_wr)
         ctl_v4.flags |= SGV4_FLAG_ORDERED_WR;
     if (clp->mrq_hipri)
         ctl_v4.flags |= SGV4_FLAG_HIPRI;
@@ -3117,9 +3124,9 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "null"))
             ;
         else if (0 == strcmp(cp, "ordered"))
-            fp->order = true;
+            fp->order_wr = true;
         else if (0 == strcmp(cp, "order"))
-            fp->order = true;
+            fp->order_wr = true;
         else if (0 == strcmp(cp, "qhead"))
             fp->qhead = true;
         else if (0 == strcmp(cp, "qtail"))
@@ -3462,6 +3469,23 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 pr2serr("%sbad argument to 'oflag='\n", my_name);
                 goto syn_err;
             }
+        } else if (0 == strcmp(key, "sdt")) {
+            ccp = strchr(buf, ',');
+            n = sg_get_num(buf);
+            if (n < 0) {
+                pr2serr("%sbad argument to 'sdt=CRT[,ICT]'\n", my_name);
+                goto syn_err;
+            }
+            clp->sdt_crt = n;
+            if (ccp) {
+                n = sg_get_num(ccp + 1);
+                if (n < 0) {
+                    pr2serr("%sbad 2nd argument to 'sdt=CRT,ICT'\n",
+                            my_name);
+                    goto syn_err;
+                }
+                clp->sdt_ict = n;
+            }
         } else if (0 == strcmp(key, "seek")) {
             n = strlen(buf);
             if (n < 1) {
@@ -3635,7 +3659,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
      * SG_IO ioctl. So reduce it in that case. */
     if ((clp->bs >= 2048) && (! bpt_given))
         clp->bpt = DEF_BLOCKS_PER_2048TRANSFER;
-    if (clp->in_flags.order && (! clp->out_flags.order))
+    if (clp->in_flags.order_wr && (! clp->out_flags.order_wr))
         pr2serr("Warning iflag=order is ignored, use with oflag=\n");
     if ((num_threads < 1) || (num_threads > MAX_NUM_THREADS)) {
         pr2serr("too few or too many threads requested\n");
@@ -3906,6 +3930,8 @@ main(int argc, char * argv[])
     clp->dd_count = SG_COUNT_INDEFINITE;
     clp->bpt = DEF_BLOCKS_PER_TRANSFER;
     clp->cmd_timeout = DEF_TIMEOUT;
+    clp->sdt_ict = DEF_SDT_ICT_MS;
+    clp->sdt_crt = DEF_SDT_CRT_SEC;
     clp->in_type = FT_FIFO;
     /* change dd's default: if of=OFILE not given, assume /dev/null */
     clp->out_type = FT_DEV_NULL;
@@ -4076,7 +4102,10 @@ main(int argc, char * argv[])
         if (clp->in_flags.serial || clp->out_flags.serial)
             pr2serr("serial flag ignored when both IFILE and OFILE are sg "
                     "devices\n");
-    } else if (clp->in_flags.order)
+        if (clp->in_flags.order_wr && (num_threads > 1))
+            pr2serr("Warning: write ordering only guaranteed for single "
+                    "thread\n");
+    } else if (clp->in_flags.order_wr)
         pr2serr("Warning: oflag=order only active on sg->sg copies\n");
 
     if (outregf[0]) {

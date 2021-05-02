@@ -1,4 +1,4 @@
-.TH SG_RAW "8" "January 2021" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_RAW "8" "April 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_raw \- send arbitrary SCSI or NVMe command to a device
 .SH SYNOPSIS
@@ -58,8 +58,9 @@ the NVMe command set.
 Display usage information and exit.
 .TP
 \fB\-i\fR, \fB\-\-infile\fR=\fIIFILE\fR
-Read data from \fIIFILE\fR instead of stdin. This option is ignored if
-\fB\-\-send\fR is not specified.
+Read binary data from \fIIFILE\fR instead of stdin. This option is ignored
+if \fB\-\-send\fR is not specified. That data, if used, will become the
+the command's "data\-out" buffer.
 .TP
 \fB\-n\fR, \fB\-\-nosense\fR
 Don't display SCSI Sense information.
@@ -70,8 +71,9 @@ NVM command set (e.g. the Read and Write (user data) commands) this option
 needs to be given.
 .TP
 \fB\-o\fR, \fB\-\-outfile\fR=\fIOFILE\fR
-Write data received from the \fIDEVICE\fR to \fIOFILE\fR. The data is
-written in binary. By default, data is dumped in hex format to stdout.
+Write data received from the \fIDEVICE\fR to \fIOFILE\fR. That data is
+the command's "data\-in" buffer. The data is written in binary. By default,
+data is dumped in hex format to stdout.
 If \fIOFILE\fR is '\-' then data is dumped in binary to stdout.
 This option is ignored if \fI\-\-request\fR is not specified.
 .TP
@@ -200,7 +202,7 @@ followed by seven "ff"s. A similar arrangement is made for the length
 of that buffer (in bytes), but since that is a 32 byte quantity, the
 first 4 bytes (all "ff"s) are removed.
 .PP
-Several command file examples can be found in the examples directory of this
+Several command file examples can be found in the inhex directory of this
 package's source tarball: nvme_identify_ctl.hex, nvme_dev_self_test.hex,
 nvme_read_ctl.hex and nvme_write_ctl.hex .
 .PP
@@ -249,6 +251,9 @@ the SCSI ATA PASS\-THROUGH(12) command (see the SAT or SAT\-2 standard at
 https://www.t10.org). Notice that the STANDBY IMMEDIATE command does not
 send or receive any additional data, however if it fails sense data
 should be returned and displayed.
+.TP
+For NVME examples see the files in this package's inhex directory that
+start with 'nvme_' such as inhex/nvme_identify_ctl.hex .
 .SH EXIT STATUS
 The exit status of sg_raw is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

@@ -67,7 +67,7 @@ extern "C" {
 /* The SCSI status codes as found in SAM-4 at www.t10.org */
 #define SAM_STAT_GOOD 0x0
 #define SAM_STAT_CHECK_CONDITION 0x2
-#define SAM_STAT_CONDITION_MET 0x4
+#define SAM_STAT_CONDITION_MET 0x4                /* this is not an error */
 #define SAM_STAT_BUSY 0x8
 #define SAM_STAT_INTERMEDIATE 0x10                /* obsolete in SAM-4 */
 #define SAM_STAT_INTERMEDIATE_CONDITION_MET 0x14  /* obsolete in SAM-4 */
@@ -188,6 +188,10 @@ struct sg_scsi_sense_hdr {
     uint8_t byte6;
     uint8_t additional_length;  /* zero for fixed format sense data */
 };
+
+/* Returns true when status is SAM_STAT_GOOD or SAM_STAT_CONDITION_MET,
+ * returns false otherwise. Ignores bit 0. */
+bool sg_scsi_status_is_good(int sstatus);
 
 /* Maps the salient data from a sense buffer which is in either fixed or
  * descriptor format into a structure mimicking a descriptor format

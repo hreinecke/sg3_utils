@@ -261,6 +261,19 @@ static const struct sg_lib_simple_value_name_t sstatus_str_arr[] = {
     {0xffff, NULL},
 };
 
+bool
+sg_scsi_status_is_good(int sstatus)
+{
+    sstatus &= 0xfe;
+    switch (sstatus) {
+    case SAM_STAT_GOOD:
+    case SAM_STAT_CONDITION_MET:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void
 sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
 {

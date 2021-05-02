@@ -2,7 +2,7 @@
 #define SG_PT_H
 
 /*
- * Copyright (c) 2005-2020 Douglas Gilbert.
+ * Copyright (c) 2005-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -21,7 +21,7 @@ extern "C" {
  * structure "derived" (using a C++ term) from this one. It compiles
  * because 'struct sg_pt_base' is only referenced (by pointer: 'objp')
  * in this interface. An instance of this structure represents the
- * context of one SCSI command.
+ * context of one SCSI (or NVME) command.
  * If an instance of sg_pt_base is shared across several threads then
  * it is up to the application to take care of multi-threaded issues
  * with that instance. */
@@ -57,7 +57,9 @@ int scsi_pt_close_device(int device_fd);
  * device_name. Returns 1 if SCSI generic pass-though device, returns 2 if
  * secondary SCSI pass-through device (in Linux a bsg device); returns 3 is
  * char NVMe device (i.e. no NSID); returns 4 if block NVMe device (includes
- * NSID), or 0 if something else (e.g. ATA block device) or dev_fd < 0.
+ * NSID), 5 is also a NVMe device (FreeBSD CAM NVMe (e.g. /dev/nda0)) or 0
+ * if something else (e.g. ATA block device) or dev_fd < 0.
+ * The return value differs somewhat by OS.
  * If error, returns negated errno (operating system) value. */
 int check_pt_file_handle(int dev_fd, const char * device_name, int verbose);
 

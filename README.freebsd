@@ -92,7 +92,19 @@ devices: "nvmecontrol devlist" can be used. Any many, but not all
 contexts, the device name can be used without the '/dev/' prefix.
 FreeBSD is relatively unique in this respect and support for this
 abbreviated form has been broken in this package and fixed in
-release 1.46 .
+sg3_utils release 1.46 .
+
+Device naming for NVMe is a bit more complex. Controllers have names
+like /dev/nvme0 and namespaces /dev/nvme0ns1 . Partitions are not
+supported on /dev/nvme0ns1 type nodes. Instead there are /dev/nvd0
+and /dev/nvd0p<m> where <m> is th partition number starting at 1.
+The nvd driver (written by Intel) is not CAM compatible and has its
+own utility nvmecontrol which has similar capabilities as camcontrol
+has for CAM devices. In FreeBSD release 12 the nda driver was
+introduced with names like /dev/nda0 and /dev/nda0n<m>. The difference
+is that nda is CAM compatible. From the point of view of this package,
+the nda driver is preferred as CAM supports NVMe command timeouts and
+the error processing is more mature. 
 
 FreeBSD installation
 ====================
@@ -149,4 +161,4 @@ utilities.
 
 
 Douglas Gilbert
-8th April 2021
+1st May 2021

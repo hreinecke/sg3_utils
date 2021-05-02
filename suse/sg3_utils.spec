@@ -29,9 +29,9 @@ Release:        0
 Summary:        A collection of tools that send SCSI commands to devices
 License:        GPL-2.0+ and BSD-3-Clause
 Group:          Hardware/Other
-Url:            http://sg.danny.cz/sg/sg3_utils.html
+Url:            https://sg.danny.cz/sg/sg3_utils.html
 
-Source:         http://sg.danny.cz/sg/p/%name-%{version}.tar.xz
+Source:         https://sg.danny.cz/sg/p/%name-%{version}.tar.xz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildRequires:  xz
 Requires(pre):  %insserv_prereq

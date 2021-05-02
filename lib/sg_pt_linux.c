@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.51 20210102 */
+/* sg_pt_linux version 1.52 20210423 */
 
 
 #include <stdio.h>

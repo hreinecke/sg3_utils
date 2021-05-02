@@ -1,4 +1,4 @@
-.TH SG_START "8" "September 2020" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_START "8" "April 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_start \- send SCSI START STOP UNIT command: start, stop, load or eject
 medium
@@ -40,6 +40,11 @@ This utility supports two command line syntaxes, the preferred one is
 shown first in the synopsis and explained in this section. A later
 section on the old command line syntax outlines the second group of
 options.
+.PP
+Linux note: best not to use a standard block device name (e.g. /dev/sdc)
+with the \fI\-\-stop\fR option. Use a sg or bsg device node instead (see
+lsscsi(8) ). The block layer will sometimes notice the disk spinning
+down and decide: "that's not right" and spin it up again!
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -52,6 +57,8 @@ same action as \fI\-\-start\fR.
 \fB\-e\fR, \fB\-\-eject\fR
 stop the medium and eject it from the drive. Only appropriate for a
 device with removable medium. Might be ignored (prevented), see below.
+Note, this is an operation that can be done on a tape drive or CD/DVD/BD
+player, not on a hard disk or SSD!
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
@@ -117,6 +124,9 @@ other options, this option defaults (i.e. set the START cdb bit).
 .TP
 \fB\-S\fR, \fB\-\-stop\fR
 stop (spin\-down) the \fIDEVICE\fR. This clears the START bit in the cdb.
+This operation is typically done on a hard disk or SSD. In the case of a
+SSD it will be placed in low power mode and may need a start operation
+later before normal IO can resume.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity. Can be used multiple times.
@@ -264,10 +274,10 @@ Written by K. Garloff and D. Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2020 Kurt Garloff, Douglas Gilbert
+Copyright \(co 2002\-2021 Kurt Garloff, Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sg_prevent(sg3_utils), sg_requests(sg3_utils), sg_turs(sg3_utils)
-.B sdparm(sdparm)
+.B sdparm(sdparm), lsscsi(lsscsi)

@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.10 20210328";  /* spc6r05 */
+static const char * version_str = "2.11 20210430";  /* spc6r05 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -4399,9 +4399,9 @@ main(int argc, char * argv[])
 #if (HAVE_NVME && (! IGNORE_NVME))
     n = check_pt_file_handle(sg_fd, op->device_name, op->verbose);
     if (op->verbose > 1)
-        pr2serr("check_pt_file_handle()-->%d, page_given=%d\n", n,
-                op->page_given);
-    if ((3 == n) || (4 == n)) {   /* NVMe char or NVMe block */
+        pr2serr("check_pt_file_handle()-->%d, page_given: %s\n", n,
+                (op->page_given ? "yes" : "no"));
+    if (n > 2) {   /* NVMe char or NVMe block */
         op->possible_nvme = true;
         if (! op->page_given) {
             ret = do_nvme_identify_ctrl(sg_fd, op);
