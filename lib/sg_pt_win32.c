@@ -929,7 +929,17 @@ get_scsi_pt_cdb_buf(const struct sg_pt_base * vp)
 {
     const struct sg_pt_win32_scsi * psp = vp->implp;
 
-    return (uint8_t *)(spt_direct ? psp->swb_d.spt.Cdb : psp->swb_i.spt.Cdb);
+    if (spt_direct) {
+        if (psp->swb_d.spt.CdbLength > 0)
+            return (uint8_t *)(psp->swb_d.spt.Cdb);
+        else
+            return NULL;
+    } else {
+        if (psp->swb_i.spt.CdbLength > 0)
+            return (uint8_t *)(psp->swb_i.spt.Cdb);
+        else
+            return NULL;
+    }
 }
 
 void
@@ -1051,7 +1061,7 @@ scsi_pt_direct(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
     psp->os_err = 0;
     if (0 == psp->swb_d.spt.CdbLength) {
         if (vb)
-            pr2ws("No command (cdb) given\n");
+            pr2ws("%s: No command (cdb) given\n", __func__);
         return SCSI_PT_DO_BAD_PARAMS;
     }
     psp->swb_d.spt.Length = sizeof (SCSI_PASS_THROUGH_DIRECT);
@@ -1127,7 +1137,7 @@ scsi_pt_indirect(struct sg_pt_base * vp, struct sg_pt_handle * shp,
 
     if (0 == psp->swb_i.spt.CdbLength) {
         if (vb)
-            pr2ws("No command (cdb) given\n");
+            pr2ws("%s: No command (cdb) given\n", __func__);
         return SCSI_PT_DO_BAD_PARAMS;
     }
     if (psp->dxfer_len > (int)sizeof(psp->swb_i.ucDataBuf)) {
