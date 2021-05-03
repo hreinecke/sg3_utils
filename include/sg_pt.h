@@ -21,10 +21,10 @@ extern "C" {
  * structure "derived" (using a C++ term) from this one. It compiles
  * because 'struct sg_pt_base' is only referenced (by pointer: 'objp')
  * in this interface. An instance of this structure represents the
- * context of one SCSI (or NVME) command.
- * If an instance of sg_pt_base is shared across several threads then
- * it is up to the application to take care of multi-threaded issues
- * with that instance. */
+ * context of one synchronous SCSI (or NVME) command and the context
+ * can be re-used. If an instance of sg_pt_base is shared across several
+ * threads then it is up to the application to take care of multi-threaded
+ * issues with that instance. */
 struct sg_pt_base;
 
 
@@ -213,7 +213,7 @@ uint32_t get_pt_result(const struct sg_pt_base * objp);
 
 /* These two get functions should just echo what has been given to
  * set_scsi_pt_cdb(). If it has not been called or clear_scsi_pt_obj()
- * has been called then return 0 and NULL respectively. */
+ * has been called then they return 0 and NULL respectively. */
 int get_scsi_pt_cdb_len(const struct sg_pt_base * objp);
 uint8_t * get_scsi_pt_cdb_buf(const struct sg_pt_base * objp);
 

@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.41 20210502 */
+/* sg_pt_freebsd version 1.42 20210503 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1504,7 +1504,7 @@ cam_nvme:
 
         if (cam_send_ccb(fdc_p->cam_dev, ccb) < 0) {
             if (vb) {
-                pr2ws("%s: cam_send_ccb(NVME) %s ccb erro\n", __func__,
+                pr2ws("%s: cam_send_ccb(NVME) %s ccb error\n", __func__,
                       (is_admin ? "Admin" : "NVM"));
                 CAM_ERROR_PRINT(fdc_p->cam_dev, ccb, CAM_ESF_ALL,
                                 CAM_EPF_ALL, ferrp);

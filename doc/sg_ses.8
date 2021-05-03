@@ -1,4 +1,4 @@
-.TH SG_SES "8" "February 2021" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_SES "8" "May 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -645,6 +645,14 @@ In draft SES\-3 revision 5 the "Door Lock" element name was changed to
 the "Door" (and an OPEN field was added to the status element). As a
 consequence the former 'dl' element type abbreviation has been changed
 to 'do'.
+.PP
+Some RAID controllers hide SES device nodes from the host Operating System.
+It has been reported that some MegaRAID controllers do this and the
+following command is needed to expose them:
+.PP
+   perccli /cx set backplane expose=<on/off>
+.PP
+where perccli is Dell's version of BroadCom's (LSI) storcli utility.
 .PP
 There is a related command set called SAF\-TE (SCSI attached fault\-tolerant
 enclosure) for enclosure (including RAID) status and control. SCSI devices

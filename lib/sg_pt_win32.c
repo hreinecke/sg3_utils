@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_win32 version 1.33 20210103 */
+/* sg_pt_win32 version 1.34 20210503 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1135,6 +1135,7 @@ scsi_pt_indirect(struct sg_pt_base * vp, struct sg_pt_handle * shp,
     DWORD returned;
     struct sg_pt_win32_scsi * psp = vp->implp;
 
+    psp->os_err = 0;
     if (0 == psp->swb_i.spt.CdbLength) {
         if (vb)
             pr2ws("%s: No command (cdb) given\n", __func__);

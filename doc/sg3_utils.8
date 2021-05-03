@@ -199,6 +199,16 @@ da0 instead of /dev/da0). That worked in this package up until version
 original action (i.e. allowing unadorned device names) has been restored
 in version 1.46 . Also note that symlinks (to device names) are followed
 before prepending "/dev/" if the resultant name doesn't start with a "/".
+.PP
+FreeBSD's NVMe naming has been evolving. The controller naming is the
+same as Linux: "/dev/nvme<n>" but the namespaces have an
+extra "s" (e.g. "/dev/nvme0ns1"). The latter is not a block (GEOM)
+device (strictly speaking FreeBSD does not have block devices). Initially
+FreeBSD had "/dev/nvd<m>" GEOM devices that were not based on the CAM
+subsystem. Then in FreeBSD release 12 a new nda driver was added that is
+CAM (and GEOM) based for NVMe namespaces; it has names like "/dev/nda0".
+The preferred device nodes for this package are "/dev/nvme0" for NVMe
+controllers and "/dev/nda0" for NVMe namespaces.
 .SH SOLARIS DEVICE NAMING
 SCSI device names below the /dev directory have a form like: c5t4d3s2
 where the number following "c" is the controller (HBA) number, the number

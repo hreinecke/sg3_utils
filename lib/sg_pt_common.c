@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2020 Douglas Gilbert.
+ * Copyright (c) 2009-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * scsi_pt_version_str = "3.16 20200722";
+static const char * scsi_pt_version_str = "3.17 20210503";
 
 
 const char *
