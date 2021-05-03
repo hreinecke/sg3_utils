@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.40 20210501 */
+/* sg_pt_freebsd version 1.41 20210502 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,7 +72,7 @@ struct freebsd_dev_channel {    /* one instance per open file descriptor */
     // uint32_t nv_ctrlid;      /* unitnum seems to have this role */
     int nvme_fd_ns;     // for non-CAM NVMe, use -1 to indicate not provided
     int nvme_fd_ctrl;   // open("/dev/nvme<n>") if needed */
-    char* devname;                // the device name
+    char* devname;      // from cam_get_device() or ioctl(NVME_GET_NSID)
     struct cam_device* cam_dev;
     uint8_t * nvme_id_ctlp;
     uint8_t * free_nvme_id_ctlp;
@@ -163,7 +163,8 @@ nvme_get_nsid(int fd, uint32_t *nsid, char *b, int blen, int vb)
         int err = errno;
 
         if (vb > 2)
-            pr2ws("%s: ioctl(NVME_GET_NSID) failed, errno=%d", __func__, err);
+            pr2ws("%s: ioctl(NVME_GET_NSID) failed, errno=%d\n", __func__,
+                  err);
         return -err;
     }
     if (n_cdev < blen) {
@@ -199,22 +200,22 @@ sg_cam_get_cgd(struct cam_device *device, struct ccb_getdev *cgd, int vb)
     ccb = cam_getccb(device);
     if (ccb == NULL) {
         if (vb)
-            pr2ws("%s: couldn't allocate CCB", __func__);
+            pr2ws("%s: couldn't allocate CCB\n", __func__);
         return -ENOMEM;
     }
     CCB_CLEAR_ALL_EXCEPT_HDR(&ccb->cgd);
     ccb->ccb_h.func_code = XPT_GDEV_TYPE;
 
     if (cam_send_ccb(device, ccb) < 0) {
-        if (vb) {
-            pr2ws("%s: error sending Get Device Information CCB", __func__);
+        if (vb > 1) {
+            pr2ws("%s: error sending Get Device Information CCB\n", __func__);
             CAM_ERROR_PRINT(device, ccb, CAM_ESF_ALL, CAM_EPF_ALL, ferrp);
         }
         retval = -ENODEV;
         goto bailout;
     }
     if ((ccb->ccb_h.status & CAM_STATUS_MASK) != CAM_REQ_CMP) {
-        if (vb)
+        if (vb > 1)
             CAM_ERROR_PRINT(device, ccb, CAM_ESF_ALL, CAM_EPF_ALL, ferrp);
         retval = -ENODEV;
         goto bailout;
@@ -364,13 +365,14 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
         }
         if (stat(dev_nm, &a_stat) < 0) {
             err = errno;
-            pr2ws("%s: unable to stat(%s): %s\n", __func__, dev_nm,
-                  strerror(err));
+            if (vb)
+                pr2ws("%s: unable to stat(%s): %s\n", __func__, dev_nm,
+                      strerror(err));
             ret = -err;
             goto err_out;
         }
         if (! (S_ISCHR(a_stat.st_mode))) {
-            if (vb)
+            if (vb > 1)
                 pr2ws("%s: %s is not a char device ??\n", __func__, dev_nm);
             ret = -ENODEV;
             goto err_out;
@@ -378,7 +380,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
         dev_fd = open(dev_nm, oflags);
         if (dev_fd < 0) {
             err = errno;
-            if (vb)
+            if (vb > 1)
                 pr2ws("%s: open(%s) failed: %s (errno=%d), try SCSI/ATA\n",
                       __func__, dev_nm, strerror(err), err);
             ret = -err;
@@ -485,7 +487,7 @@ check_pt_file_handle(int device_han, const char * device_name, int vb)
     } else if (fdc_p->cam_dev)
         return fdc_p->is_pass ? 2 : 1;
     else {
-        if (vb)
+        if (vb > 1)
             pr2ws("%s: neither SCSI nor NVMe ... hmm, device name: %s\n",
                   __func__, device_name);
         return 0;
@@ -1251,7 +1253,9 @@ mk_sense_asc_ascq(struct sg_pt_freebsd_scsi * ptp, int sk, int asc, int ascq,
     ptp->scsi_status = SAM_STAT_CHECK_CONDITION;
     n = ptp->sense_len;
     if ((n < 8) || ((! dsense) && (n < 14))) {
-        pr2ws("%s: sense_len=%d too short, want 14 or more\n", __func__, n);
+        if (vb)
+            pr2ws("%s: sense_len=%d too short, want 14 or more\n", __func__,
+                  n);
         return;
     } else
         ptp->sense_resid = ptp->sense_len -
@@ -1284,7 +1288,9 @@ mk_sense_from_nvme_status(struct sg_pt_freebsd_scsi * ptp, uint16_t sct_sc,
     ptp->scsi_status = sstatus;
     n = ptp->sense_len;
     if ((n < 8) || ((! dsense) && (n < 14))) {
-        pr2ws("%s: sense_len=%d too short, want 14 or more\n", __func__, n);
+        if (vb)
+            pr2ws("%s: sense_len=%d too short, want 14 or more\n", __func__,
+                  n);
         return;
     } else
         ptp->sense_resid = ptp->sense_len -
@@ -1315,8 +1321,9 @@ mk_sense_invalid_fld(struct sg_pt_freebsd_scsi * ptp, bool in_cdb,
     asc = in_cdb ? INVALID_FIELD_IN_CDB : INVALID_FIELD_IN_PARAM_LIST;
     n = ptp->sense_len;
     if ((n < 8) || ((! ds) && (n < 14))) {
-        pr2ws("%s: max_response_len=%d too short, want 14 or more\n",
-              __func__, n);
+        if (vb)
+            pr2ws("%s: max_response_len=%d too short, want 14 or more\n",
+                  __func__, n);
         return;
     } else
         ptp->sense_resid = ptp->sense_len - (ds ? 8 : ((n < 18) ? n : 18));
@@ -1380,17 +1387,35 @@ nvme_pt_low(struct sg_pt_freebsd_scsi * ptp, void * dxferp, uint32_t len,
     if (fdc_p->is_cam_nvme)
         goto cam_nvme;
 
+    /* non-CAM NVMe processing follows */
     if (is_admin) {
         if (fdc_p->nvme_fd_ctrl < 0) {
-            if (vb)
-                pr2ws("%s: not CAM but nvme_fd_ctrl<0, inconsistent\n",
-                      __func__);
-            return -EINVAL;
+            if (vb > 4)
+                pr2ws("%s: not CAM but nvme_fd_ctrl<0, try to open "
+                      "controller\n", __func__);
+            if ((fdc_p->nsid > 0) && fdc_p->devname && *fdc_p->devname) {
+                int fd;
+                char dev_nm[PATH_MAX];
+
+                if ((fdc_p->devname[0] == '/') || (fdc_p->devname[0] == '.'))
+                    strncpy(dev_nm, fdc_p->devname, PATH_MAX);
+                else
+                    snprintf(dev_nm, PATH_MAX, "/dev/%s", fdc_p->devname);
+                fd = open(dev_nm, O_RDWR);
+                if (fd < 0) {
+                    if (vb > 1)
+                        pr2ws("%s: Unable to open %s of NVMe controller: "
+                              "%s\n", __func__, dev_nm, strerror(errno));
+                } else
+                    fdc_p->nvme_fd_ctrl = fd;
+            }
+            if (fdc_p->nvme_fd_ctrl < 0)
+                return -EINVAL;
         }
         dev_fd = fdc_p->nvme_fd_ctrl;
     } else {
         if (fdc_p->nvme_fd_ns < 0) {
-            if (vb)
+            if (vb > 1)
                 pr2ws("%s: not CAM but nvme_fd_ns<0, inconsistent\n",
                       __func__);
             return -EINVAL;
@@ -1626,7 +1651,8 @@ sntl_cache_identity(struct sg_pt_freebsd_scsi * ptp, int time_secs, int vb)
     fdc_p->nvme_id_ctlp = sg_memalign(pg_sz, pg_sz,
                                       &fdc_p->free_nvme_id_ctlp, vb > 3);
     if (NULL == fdc_p->nvme_id_ctlp) {
-        pr2ws("%s: sg_memalign() failed to get memory\n", __func__);
+        if (vb)
+            pr2ws("%s: sg_memalign() failed to get memory\n", __func__);
         return -ENOMEM;
     }
     ret = sntl_do_identify(ptp, 0x1 /* CNS */, 0 /* nsid */, pg_sz,
@@ -1662,7 +1688,8 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int time_secs,
     }
     fdc_p = get_fdc_p(ptp);
     if (NULL == fdc_p) {
-        pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
+        if (vb)
+            pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
         return -EINVAL;
     }
     if (NULL == fdc_p->nvme_id_ctlp) {
@@ -1820,7 +1847,8 @@ sntl_rluns(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: starting\n", __func__);
     fdc_p = get_fdc_p(ptp);
     if (NULL == fdc_p) {
-        pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
+        if (vb)
+            pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
         return -EINVAL;
     }
     sel_report = cdbp[2];
@@ -1856,7 +1884,8 @@ sntl_rluns(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
     }
     rl_doutp = (uint8_t *)calloc(num + 1, 8);
     if (NULL == rl_doutp) {
-        pr2ws("%s: calloc() failed to get memory\n", __func__);
+        if (vb)
+            pr2ws("%s: calloc() failed to get memory\n", __func__);
         return -ENOMEM;
     }
     for (k = 0, up = rl_doutp + 8; k < num; ++k, up += 8)
@@ -1889,7 +1918,8 @@ sntl_tur(struct sg_pt_freebsd_scsi * ptp, int time_secs, int vb)
         pr2ws("%s: starting\n", __func__);
     fdc_p = get_fdc_p(ptp);
     if (NULL == fdc_p) {
-        pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
+        if (vb)
+            pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
         return -EINVAL;
     }
     if (NULL == fdc_p->nvme_id_ctlp) {
@@ -1945,7 +1975,8 @@ sntl_req_sense(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: starting\n", __func__);
     fdc_p = get_fdc_p(ptp);
     if (NULL == fdc_p) {
-        pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
+        if (vb)
+            pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
         return -EINVAL;
     }
     if (NULL == fdc_p->nvme_id_ctlp) {
@@ -2009,7 +2040,8 @@ sntl_mode_ss(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: mse%s\n", __func__, (is_msense ? "nse" : "lect"));
     fdc_p = get_fdc_p(ptp);
     if (NULL == fdc_p) {
-        pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
+        if (vb)
+            pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
         return -EINVAL;
     }
     if (NULL == fdc_p->nvme_id_ctlp) {
@@ -2050,7 +2082,7 @@ sntl_mode_ss(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
             else
                 mk_sense_asc_ascq(ptp, sntl_result.sk, sntl_result.asc,
                                   sntl_result.ascq, vb);
-        } else
+        } else if (vb)
             pr2ws("%s: error but no sense?? n=%d\n", __func__, n);
     }
     return 0;
@@ -2082,7 +2114,8 @@ sntl_senddiag(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
               (int)self_test, (int)st_cd);
     fdc_p = get_fdc_p(ptp);
     if (NULL == fdc_p) {
-        pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
+        if (vb)
+            pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
         return -EINVAL;
     }
     if (self_test || st_cd) {
@@ -2215,7 +2248,8 @@ sntl_recvdiag(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
               dpg_cd, (int)pcv, alloc_len);
     fdc_p = get_fdc_p(ptp);
     if (NULL == fdc_p) {
-        pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
+        if (vb)
+            pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
         return -EINVAL;
     }
     din_len = ptp->dxfer_len;
@@ -2319,7 +2353,8 @@ sntl_rep_opcodes(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
     a_len = pg_sz - 72;
     arr = sg_memalign(pg_sz, pg_sz, &free_arr, vb > 3);
     if (NULL == arr) {
-        pr2ws("%s: calloc() failed to get memory\n", __func__);
+        if (vb)
+            pr2ws("%s: calloc() failed to get memory\n", __func__);
         return -ENOMEM;
     }
     switch (reporting_opts) {
@@ -2783,12 +2818,14 @@ sntl_readcap(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: RCAP%d\n", __func__, (is_rcap10 ? 10 : 16));
     fdc_p = ptp->mchanp;
     if (NULL == fdc_p) {
-        pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
+        if (vb)
+            pr2ws("%s: get_fdc_p() failed, no file descriptor ?\n", __func__);
         return -EINVAL;
     }
     up = sg_memalign(pg_sz, pg_sz, &free_up, false);
     if (NULL == up) {
-        pr2ws("%s: sg_memalign() failed to get memory\n", __func__);
+        if (vb)
+            pr2ws("%s: sg_memalign() failed to get memory\n", __func__);
         return sg_convert_errno(ENOMEM);
     }
     res = sntl_do_identify(ptp, 0x0 /* CNS */, fdc_p->nsid, pg_sz, up,
@@ -2871,7 +2908,8 @@ sg_do_nvme_pt(struct sg_pt_freebsd_scsi * ptp, int fd, bool is_admin,
     fdc_p = ptp->mchanp;
     if (fd < 0) {
         if (NULL == fdc_p) {
-            pr2ws("%s: no device handle in object or fd ?\n", __func__);
+            if (vb)
+                pr2ws("%s: no device handle in object or fd ?\n", __func__);
             return -EINVAL;
         }
         /* no fd, but have fdc_p so that is okay */
@@ -2879,16 +2917,19 @@ sg_do_nvme_pt(struct sg_pt_freebsd_scsi * ptp, int fd, bool is_admin,
         int han = fd - FREEBSD_FDOFFSET;
 
         if ((han < 0) || (han >= FREEBSD_MAXDEV)) {
-            pr2ws("%s: argument 'fd' is bad\n", __func__);
+            if (vb)
+                pr2ws("%s: argument 'fd' is bad\n", __func__);
             return SCSI_PT_DO_BAD_PARAMS;
         }
         if (NULL == devicetable[han]) {
-            pr2ws("%s: argument 'fd' is bad (2)\n", __func__);
+            if (vb)
+                pr2ws("%s: argument 'fd' is bad (2)\n", __func__);
             return SCSI_PT_DO_BAD_PARAMS;
         }
         if (fdc_p && (fdc_p != devicetable[han])) {
-            pr2ws("%s: different device handle in object and fd ?\n",
-                  __func__);
+            if (vb)
+                pr2ws("%s: different device handle in object and fd ?\n",
+                      __func__);
             return SCSI_PT_DO_BAD_PARAMS;
         }
         if (NULL == fdc_p) {
