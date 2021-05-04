@@ -2,9 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20210503] [svn: r899]
+Changelog for pre-release sg3_utils-1.47 [20210503] [svn: r900]
   - sg_raw: fix prints of NVMe NVM command names
   - sg_ses: fix Windows problem "No command (cdb) given"
+  - sg_logs: additions to Volume statistics lpage [ssc5r05c]
   - sg_lib: add sg_scsi_status_is_good()
     - pt_linux: fix verify(BytChk=0) which Linux SNTL translated
       to write, other SNTL cleanups

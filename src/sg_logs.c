@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2020 D. Gilbert
+ *  Copyright (C) 2000-2021 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.81 20200110";    /* spc6r01 + sbc4r17 */
+static const char * version_str = "1.82 20210503";    /* spc6r01 + sbc4r17 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -6288,6 +6288,14 @@ show_volume_stats_pages(const uint8_t * resp, int len,
         case 0x17:
             printf("  Total used native capacity [MB]: %s\n",
                    num_or_unknown(bp + 4, pl - 4, false, b, sizeof(b)));
+            break;
+        case 0x1a:
+            printf("  Volume stop writes of forward wraps: %" PRIu64 "\n",
+                   sg_get_unaligned_be(pl - 4, bp + 4));
+            break;
+        case 0x1b:
+            printf("  Volume stop writes of backward wraps: %" PRIu64 "\n",
+                   sg_get_unaligned_be(pl - 4, bp + 4));
             break;
         case 0x40:
             printf("  Volume serial number: %.*s\n", pl - 4, bp + 4);

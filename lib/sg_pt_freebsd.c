@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.42 20210503 */
+/* sg_pt_freebsd version 1.43 20210503 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -152,6 +152,7 @@ get_fdc_cp(const struct sg_pt_freebsd_scsi * ptp)
     return devicetable[han];
 }
 
+#if __FreeBSD_version >= 1100000
 /* This works with /dev/nvme*, /dev/nvd* and /dev/nda* but not /dev/pass* */
 static int
 nvme_get_nsid(int fd, uint32_t *nsid, char *b, int blen, int vb)
@@ -178,6 +179,7 @@ nvme_get_nsid(int fd, uint32_t *nsid, char *b, int blen, int vb)
         *nsid = gnsid.nsid;
     return 0;
 }
+#endif
 
 /* Returns >= 0 if successful. If error in Unix returns negated errno. */
 int
@@ -189,6 +191,7 @@ scsi_pt_open_device(const char * device_name, bool read_only, int vb)
     return scsi_pt_open_flags(device_name, oflags, vb);
 }
 
+#if __FreeBSD_version >= 1100000
 /* Get a get device CCB for the specified device, borrowed from camdd.c */
 int
 sg_cam_get_cgd(struct cam_device *device, struct ccb_getdev *cgd, int vb)
@@ -225,6 +228,7 @@ bailout:
     cam_freeccb(ccb);
     return retval;
 }
+#endif
 
 /* Similar to scsi_pt_open_device() but takes Unix style open flags OR-ed
  * together. The 'oflags' is only used on NVMe devices. It is ignored on
@@ -294,6 +298,7 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
         }
         maybe_non_cam_nvme = true;
     } else {    /* found CAM, could be SCSI or NVME(CAM) [nda driver] */
+#if __FreeBSD_version >= 1100000
         struct ccb_getdev cgd;
 
         fdc_p->cam_dev = cam_dev;
@@ -334,8 +339,12 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
         }
         if (ret)
             goto err_out;
-        if (0 == memcpy("pass", fdc_p->devname, 4))
+        if (0 == memcpy(fdc_p->devname, "pass", 4))
             fdc_p->is_pass = true;
+#else
+        ret = 0;
+        fdc_p->is_nvme_dev = false;
+#endif
     }
     if (maybe_non_cam_nvme) {
         first_ch = device_name[0];
@@ -386,10 +395,31 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
             ret = -err;
             goto err_out;
         }
+#if __FreeBSD_version >= 1100000
         ret = nvme_get_nsid(dev_fd, &fdc_p->nsid, fdc_p->devname, DEV_IDLEN,
                             vb);
         if (ret)
             goto err_out;
+#else
+        {
+            unsigned int u;
+
+            /* only support /dev/nvme<n> and /dev/nvme<n>ns<m> */
+            k = sscanf(dev_nm, "nvme%uns%u", &u, &fdc_p->nsid);
+            if (2 == k) {
+                char * cp = strchr(dev_nm, 's');
+
+                *(cp - 2) = '\0';
+                strcpy(fdc_p->devname, dev_nm);
+            } else if (1 == k) {
+                strncpy(fdc_p->devname, dev_nm, DEV_IDLEN);
+                fdc_p->nsid = 0;
+            } else if (vb > 1) {
+                pr2ws("%s: only support '[/dev/]nvme<n>[ns<m>]'\n", __func__);
+                goto err_out;
+            }
+        }
+#endif
         if (vb > 6)
             pr2ws("%s: nvme_dev_nm: %s, nsid=%u\n", __func__, fdc_p->devname,
                   fdc_p->nsid);
@@ -1372,7 +1402,6 @@ nvme_pt_low(struct sg_pt_freebsd_scsi * ptp, void * dxferp, uint32_t len,
     uint16_t sct_sc;
     uint8_t opcode;
     struct freebsd_dev_channel *fdc_p = ptp->mchanp;
-    FILE * ferrp = sg_warnings_strm ? sg_warnings_strm : stderr;
     char b[80];
 
     if (vb > 6)
@@ -1384,8 +1413,10 @@ nvme_pt_low(struct sg_pt_freebsd_scsi * ptp, void * dxferp, uint32_t len,
     npcp->len = len;
     npcp->is_read = (uint32_t)is_read;
     opcode = npcp->cmd.opc;
+#if __FreeBSD_version >= 1100000
     if (fdc_p->is_cam_nvme)
         goto cam_nvme;
+#endif
 
     /* non-CAM NVMe processing follows */
     if (is_admin) {
@@ -1456,11 +1487,13 @@ nvme_pt_low(struct sg_pt_freebsd_scsi * ptp, void * dxferp, uint32_t len,
     }
     return sct_sc;
 
+#if __FreeBSD_version >= 1100000
 cam_nvme:
     {
         cam_status ccb_status;
         union ccb *ccb;
         struct ccb_nvmeio *nviop;
+        FILE * ferrp = sg_warnings_strm ? sg_warnings_strm : stderr;
 
         if (NULL == ptp->ccb) {     /* re-use if we have one already */
             if (! (ccb = cam_getccb(fdc_p->cam_dev))) {
@@ -1552,6 +1585,7 @@ cam_nvme:
         }
         return sct_sc ? sct_sc : ptp->os_err;
     }
+#endif
     return 0;
 }
 
