@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.06 20210427";
+static const char * version_str = "2.08 20210515";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -189,6 +189,7 @@ struct flags_t {
     bool no_dur;
     bool nocreat;
     bool noshare;
+    bool no_thresh;
     bool no_unshare;    /* leave it for driver close/release */
     bool no_waitq;      /* dummy, no longer supported, just warn */
     bool noxfer;
@@ -751,9 +752,9 @@ calc_duration_throughput(int contin)
     a = res_tm.tv_sec;
     a += (0.000001 * res_tm.tv_usec);
     b = (double)gcoll.bs * (dd_count - gcoll.out_rem_count.load());
-    pr2serr("time to transfer data %s %d.%06d secs",
-            (contin ? "so far" : "was"), (int)res_tm.tv_sec,
-            (int)res_tm.tv_usec);
+    pr2serr("time to %s data %s %d.%06d secs",
+            (gcoll.verify ? "verify" : "copy"), (contin ? "so far" : "was"),
+            (int)res_tm.tv_sec, (int)res_tm.tv_usec);
     if ((a > 0.00001) && (b > 511))
         pr2serr(", %.2f MB/sec\n", b / (a * 1000000.0));
     else
@@ -1057,6 +1058,7 @@ page3:
             "    nocreat     will fail rather than create OFILE\n"
             "    nodur       turns off command duration calculations\n"
             "    noxfer      no transfer to/from the user space\n"
+            "    no_thresh   skip checking per fd max data xfer\n"
             "    null        does nothing, placeholder\n"
             "    qhead       queue new request at head of block queue\n"
             "    qtail       queue new request at tail of block queue (def: "
@@ -2366,7 +2368,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     int n_good = 0;
     int hole_count = 0;
     int vb = clp->verbose;
-    int k, j, f1, slen, sstatus, blen;
+    int k, j, f1, slen, blen;
     char b[160];
 
     blen = sizeof(b);
@@ -2411,8 +2413,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
             pr2serr_lk("[%d] a_v4[%d]: SG_INFO_CHECK set [%s]\n", id, k,
                        sg_info_str(a_v4p->info, sizeof(b), b));
         }
-        sstatus = a_v4p->device_status;
-        if ((! sg_scsi_status_is_good(sstatus)) ||
+        if (sg_scsi_status_is_bad(a_v4p->device_status) ||
             a_v4p->transport_status || a_v4p->driver_status) {
             ok = false;
             if (SAM_STAT_CHECK_CONDITION != a_v4p->device_status) {
@@ -2488,7 +2489,7 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     int n_cmpl = ctl_v4p->info;
     int n_good = 0;
     int vb = clp->verbose;
-    int k, slen, sstatus, blen;
+    int k, slen, blen;
     uint32_t good_inblks = 0;
     uint32_t good_outblks = 0;
     const struct sg_io_v4 * a_np = a_v4p;
@@ -2531,8 +2532,7 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
             pr2serr_lk("[%d] a_n[%d]: SG_INFO_CHECK set [%s]\n", id, k,
                        sg_info_str(a_np->info, sizeof(b), b));
         }
-        sstatus = a_np->device_status;
-        if ((! sg_scsi_status_is_good(sstatus)) ||
+        if (sg_scsi_status_is_bad(a_np->device_status) ||
             a_np->transport_status || a_np->driver_status) {
             ok = false;
             if (SAM_STAT_CHECK_CONDITION != a_np->device_status) {
@@ -3604,6 +3604,8 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
     bool no_dur = is_in ? clp->in_flags.no_dur : clp->out_flags.no_dur;
     bool masync = is_in ? clp->in_flags.masync : clp->out_flags.masync;
     bool wq_excl = is_in ? clp->in_flags.wq_excl : clp->out_flags.wq_excl;
+    bool skip_thresh = is_in ? clp->in_flags.no_thresh :
+                               clp->out_flags.no_thresh;
     int res, t, num;
     uint8_t *mmp;
     struct sg_extended_info sei;
@@ -3643,7 +3645,7 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
                            "error: %s\n", my_name, __func__, strerror(errno));
         }
     }
-    if (no_dur || masync) {
+    if (no_dur || masync || skip_thresh) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         if (no_dur) {
@@ -3657,6 +3659,10 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
         if (wq_excl) {
             seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_EXCL_WAITQ;
             seip->ctl_flags |= SG_CTL_FLAGM_EXCL_WAITQ;
+        }
+        if (skip_thresh) {
+            seip->tot_fd_thresh = 0;
+            sei.sei_wr_mask |= SG_SEIM_TOT_FD_THRESH;
         }
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
@@ -3781,6 +3787,12 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->noshare = true;
         else if (0 == strcmp(cp, "no_share"))
             fp->noshare = true;
+        else if (0 == strcmp(cp, "no_thresh"))
+            fp->no_thresh = true;
+        else if (0 == strcmp(cp, "no-thresh"))
+            fp->no_thresh = true;
+        else if (0 == strcmp(cp, "nothresh"))
+            fp->no_thresh = true;
         else if (0 == strcmp(cp, "no_unshare"))
             fp->no_unshare = true;
         else if (0 == strcmp(cp, "no-unshare"))

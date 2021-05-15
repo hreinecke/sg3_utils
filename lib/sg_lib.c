@@ -274,6 +274,19 @@ sg_scsi_status_is_good(int sstatus)
     }
 }
 
+bool
+sg_scsi_status_is_bad(int sstatus)
+{
+    sstatus &= 0xfe;
+    switch (sstatus) {
+    case SAM_STAT_GOOD:
+    case SAM_STAT_CONDITION_MET:
+        return false;
+    default:
+        return true;
+    }
+}
+
 void
 sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
 {

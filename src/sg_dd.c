@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.25 20210326";
+static const char * version_str = "6.26 20210512";
 
 
 #define ME "sg_dd: "
@@ -1243,9 +1243,9 @@ calc_duration_throughput(bool contin)
         a = res_tm.tv_sec;
         a += (0.000001 * res_tm.tv_usec);
         b = (double)blk_sz * blks;
-        pr2serr("time to transfer data%s: %d.%06d secs",
-                (contin ? " so far" : ""), (int)res_tm.tv_sec,
-                (int)res_tm.tv_usec);
+        pr2serr("time to %s data%s: %d.%06d secs",
+                (do_verify ? "verify" : "copy"), (contin ? " so far" : ""),
+                (int)res_tm.tv_sec, (int)res_tm.tv_usec);
         if ((a > 0.00001) && (b > 511))
             pr2serr(" at %.2f MB/sec\n", b / (a * 1000000.0));
         else

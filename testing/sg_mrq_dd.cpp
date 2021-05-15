@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.27 20210424";
+static const char * version_str = "1.29 20210515";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -189,8 +189,9 @@ struct flags_t {
     bool fua;
     bool hipri;
     bool masync;        /* more async sg v4 driver fd flag */
-    bool no_dur;
     bool nocreat;
+    bool no_dur;
+    bool no_thresh;
     bool no_waitq;      /* dummy, no longer supported, just warn */
     bool order_wr;
     bool qhead;
@@ -721,9 +722,9 @@ calc_duration_throughput(int contin)
     a = res_tm.tv_sec;
     a += (0.000001 * res_tm.tv_usec);
     b = (double)gcoll.bs * (gcoll.dd_count - gcoll.out_rem_count.load());
-    pr2serr("time to transfer data %s %d.%06d secs",
-            (contin ? "so far" : "was"), (int)res_tm.tv_sec,
-            (int)res_tm.tv_usec);
+    pr2serr("time to %s data %s %d.%06d secs",
+            (gcoll.verify ? "verify" : "copy"), (contin ? "so far" : "was"),
+            (int)res_tm.tv_sec, (int)res_tm.tv_usec);
     if ((a > 0.00001) && (b > 511))
         pr2serr(", %.2f MB/sec\n", b / (a * 1000000.0));
     else
@@ -986,6 +987,7 @@ page3:
             "    mmap,mmap    when used twice, doesn't call munmap()\n"
             "    nocreat     will fail rather than create OFILE\n"
             "    nodur       turns off command duration calculations\n"
+            "    no_thresh   skip checking per fd max data xfer size\n"
             "    order       require write ordering on sg->sg copy; only "
             "for oflag\n"
             "    qhead       queue new request at head of block queue\n"
@@ -1771,7 +1773,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     int hole_count = 0;
     int cat = 0;
     int vb = clp->verbose;
-    int k, j, f1, slen, sstatus;
+    int k, j, f1, slen;
     char b[160];
 
     good_inblks = 0;
@@ -1815,8 +1817,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
             pr2serr_lk("[%d] a_v4[%d]: SG_INFO_CHECK set [%s]\n", id, k,
                        sg_info_str(a_v4p->info, sizeof(b), b));
         }
-        sstatus = a_v4p->device_status;
-        if ((! sg_scsi_status_is_good(sstatus)) ||
+        if (sg_scsi_status_is_bad(a_v4p->device_status) ||
             a_v4p->transport_status || a_v4p->driver_status) {
             ok = false;
             last_err_on_in = ! (a_v4p->flags & SGV4_FLAG_DO_ON_OTHER);
@@ -2876,6 +2877,8 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
     bool no_dur = is_in ? clp->in_flags.no_dur : clp->out_flags.no_dur;
     bool masync = is_in ? clp->in_flags.masync : clp->out_flags.masync;
     bool wq_excl = is_in ? clp->in_flags.wq_excl : clp->out_flags.wq_excl;
+    bool skip_thresh = is_in ? clp->in_flags.no_thresh :
+                               clp->out_flags.no_thresh;
     int elem_sz = clp->elem_sz;
     int res, t, num, err;
     uint8_t *mmp;
@@ -2912,7 +2915,7 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
                            "wr error: %s\n", __func__, strerror(errno));
         }
     }
-    if (no_dur || masync) {
+    if (no_dur || masync || skip_thresh) {
         memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         if (no_dur) {
@@ -2926,6 +2929,10 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
         if (wq_excl) {
             seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_EXCL_WAITQ;
             seip->ctl_flags |= SG_CTL_FLAGM_EXCL_WAITQ;
+        }
+        if (skip_thresh) {
+            seip->tot_fd_thresh = 0;
+            sei.sei_wr_mask |= SG_SEIM_TOT_FD_THRESH;
         }
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
@@ -3119,6 +3126,12 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->no_dur = true;
         else if (0 == strcmp(cp, "no_dur"))
             fp->no_dur = true;
+        else if (0 == strcmp(cp, "nothresh"))
+            fp->no_thresh = true;
+        else if (0 == strcmp(cp, "no_thresh"))
+            fp->no_thresh = true;
+        else if (0 == strcmp(cp, "no-thresh"))
+            fp->no_thresh = true;
         else if (0 == strcmp(cp, "noxfer"))
             ;           /* accept but ignore */
         else if (0 == strcmp(cp, "null"))

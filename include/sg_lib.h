@@ -189,9 +189,11 @@ struct sg_scsi_sense_hdr {
     uint8_t additional_length;  /* zero for fixed format sense data */
 };
 
-/* Returns true when status is SAM_STAT_GOOD or SAM_STAT_CONDITION_MET,
- * returns false otherwise. Ignores bit 0. */
+/* The '_is_good()' returns true when status is SAM_STAT_GOOD or
+ * SAM_STAT_CONDITION_MET, returns false otherwise. Ignores bit 0. The
+ * '_is_bad() variant is the logical inverse. */
 bool sg_scsi_status_is_good(int sstatus);
+bool sg_scsi_status_is_bad(int sstatus);
 
 /* Maps the salient data from a sense buffer which is in either fixed or
  * descriptor format into a structure mimicking a descriptor format
