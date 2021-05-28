@@ -109,7 +109,7 @@ static const char * version_str = "2.11 20210430";  /* spc6r05 */
 #define VPD_ZBC_DEV_CHARS 0xb6          /* zbc-r01b */
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
 #define VPD_FORMAT_PRESETS 0xb8         /* sbc4r18 */
-#define VPD_CON_POS_RANGE 0xb9          /* 20-089r2 */
+#define VPD_CON_POS_RANGE 0xb9          /* sbc5r01 */
 
 #ifndef SG_NVME_VPD_NICR
 #define SG_NVME_VPD_NICR 0xde

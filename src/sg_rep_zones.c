@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020 Douglas Gilbert.
+ * Copyright (c) 2014-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
  * and decodes the response. Based on zbc-r02.pdf
  */
 
-static const char * version_str = "1.23 20201216";
+static const char * version_str = "1.24 20210527";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -52,13 +52,16 @@ static const char * version_str = "1.23 20201216";
 
 
 static struct option long_options[] = {
+        {"domain", no_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
+        {"locator", required_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"num", required_argument, 0, 'n'},
         {"partial", no_argument, 0, 'p'},
         {"raw", no_argument, 0, 'r'},
         {"readonly", no_argument, 0, 'R'},
+        {"realm", no_argument, 0, 'e'},
         {"report", required_argument, 0, 'o'},
         {"start", required_argument, 0, 's'},
         {"verbose", no_argument, 0, 'v'},
@@ -73,16 +76,20 @@ usage(int h)
 {
     if (h > 1) goto h_twoormore;
     pr2serr("Usage: "
-            "sg_rep_zones  [--help] [--hex] [--maxlen=LEN] [--partial]\n"
-            "                     [--raw] [--readonly] [--report=OPT] "
-            "[--start=LBA]\n"
-            "                     [--verbose] [--version] DEVICE\n");
+            "sg_rep_zones  [--domain] [--help] [--hex] [--locator=LBA]\n"
+	    "                     [--maxlen=LEN] [--partial] [--raw] "
+	    "[--readonly]\n"
+	    "                     [--realm] [--report=OPT] [--start=LBA] "
+            "[--verbose]\n"
+	    "                     [--version] DEVICE\n");
     pr2serr("  where:\n"
+            "    --domain|-d        sends a REPORT ZONE DOMAINS command\n"
             "    --help|-h          print out usage message, use twice for "
             "more help\n"
             "    --hex|-H           output response in hexadecimal; used "
             "twice\n"
             "                       shows decoded values in hex\n"
+            "    --locator=LBA|-l LBA    similar to --start= option\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> 8192 bytes)\n"
@@ -94,6 +101,7 @@ usage(int h)
             "in cdb)\n"
             "    --raw|-r           output response in binary\n"
             "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
+            "    --realm|-e         sends a REPORT ZONE REALMS command\n"
             "    --report=OPT|-o OP    reporting options (def: 0: all "
             "zones)\n"
             "    --start=LBA|-s LBA    report zones from the LBA (def: 0)\n"
@@ -101,8 +109,9 @@ usage(int h)
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
             "    --wp|-w            output write pointer only\n\n"
-            "Sends a SCSI REPORT ZONES command and decodes the response. "
-            "Give\nhelp option twice (e.g. '-hh') to see reporting options "
+            "Sends a SCSI REPORT ZONES, REPORT ZONE DOMAINS or REPORT ZONE "
+	    "REALMS\ncommand. By default sends a REPORT ZONES command. Give "
+            "help option twice\n(e.g. '-hh') to see reporting options "
             "enumerated.\n");
     return;
 h_twoormore:
@@ -192,43 +201,6 @@ dStrRaw(const uint8_t * str, int len)
 }
 
 static const char *
-zone_type_str(int zt, char * b, int blen, int vb)
-{
-    const char * cp;
-
-    if (NULL == b)
-        return "zone_type_str: NULL ptr)";
-    switch (zt) {
-    case 1:
-        cp = "Conventional";
-        break;
-    case 2:
-        cp = "Sequential write required";
-        break;
-    case 3:
-        cp = "Sequential write preferred";
-        break;
-    case 4:
-        cp = "Sequential or before required";
-        break;
-    case 5:
-        cp = "Gap";
-        break;
-    default:
-        cp = NULL;
-        break;
-    }
-    if (cp) {
-        if (vb)
-            snprintf(b, blen, "%s [0x%x]", cp, zt);
-        else
-            snprintf(b, blen, "%s", cp);
-    } else
-        snprintf(b, blen, "Reserved [0x%x]", zt);
-    return b;
-}
-
-static const char *
 zone_condition_str(int zc, char * b, int blen, int vb)
 {
     const char * cp;
@@ -293,11 +265,13 @@ main(int argc, char * argv[])
 {
     bool do_partial = false;
     bool do_raw = false;
+    bool do_zdomains = false;
+    bool do_zrealms = false;
     bool o_readonly = false;
     bool verbose_given = false;
     bool version_given = false;
     bool wp_only = false;
-    int k, res, c, zl_len, len, zones, resid, rlen, zt, zc, same;
+    int k, res, c, zl_len, len, zones, resid, rlen, zc, same;
     int sg_fd = -1;
     int do_help = 0;
     int do_hex = 0;
@@ -306,6 +280,7 @@ main(int argc, char * argv[])
     int reporting_opt = 0;
     int ret = 0;
     int verbose = 0;
+    uint8_t zt;
     uint64_t st_lba = 0;
     uint64_t wp;
     int64_t ll;
@@ -318,12 +293,18 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHm:n:o:prRs:vVw", long_options,
+        c = getopt_long(argc, argv, "dehHl:m:n:o:prRs:vVw", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'd':
+	    do_zdomains = true;
+	    break;
+        case 'e':
+	    do_zrealms = true;
+	    break;
         case 'h':
         case '?':
             ++do_help;
@@ -331,6 +312,7 @@ main(int argc, char * argv[])
         case 'H':
             ++do_hex;
             break;
+	/* case 'l': is under case 's': */
         case 'm':
             maxlen = sg_get_num(optarg);
             if ((maxlen < 0) || (maxlen > MAX_RZONES_BUFF_LEN)) {
@@ -364,9 +346,10 @@ main(int argc, char * argv[])
             o_readonly = true;
             break;
         case 's':
+        case 'l':
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
-                pr2serr("bad argument to '--start=LBA'\n");
+                pr2serr("bad argument to '--start=LBA' or '--locator=LBA\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             st_lba = (uint64_t)ll;
@@ -423,6 +406,10 @@ main(int argc, char * argv[])
     if (do_help) {
         usage(do_help);
         return 0;
+    }
+    if (do_zdomains && do_zrealms) {
+        pr2serr("Can't have both --domain and --realm\n");
+        return SG_LIB_SYNTAX_ERROR;
     }
     if (NULL == device_name) {
         pr2serr("missing device name!\n");
@@ -512,8 +499,8 @@ main(int argc, char * argv[])
             }
             zt = bp[0] & 0xf;
             zc = (bp[1] >> 4) & 0xf;
-            printf("   Zone type: %s\n", zone_type_str(zt, b, sizeof(b),
-                   verbose));
+            printf("   Zone type: %s\n", sg_get_zone_type_str(zt, sizeof(b),
+		   b));
             printf("   Zone condition: %s\n", zone_condition_str(zc, b,
                    sizeof(b), verbose));
             printf("   PUEP: %d\n", !!(bp[1] & 0x4));   /* added in zbc2r07 */

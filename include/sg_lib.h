@@ -325,6 +325,11 @@ const char * sg_get_desig_code_set_str(int val);
  * otherwise returns NULL. */
 const char * sg_get_desig_assoc_str(int val);
 
+/* Yield string associated with zone type (see ZBC and ZBC-2) [e.g. REPORT
+ * ZONES command response]. Returns 'buff' unless buff_len < 1 in which
+ * NULL is returned. */
+char * sg_get_zone_type_str(uint8_t zt, int buff_len, char * buff);
+
 /* Yield SCSI Feature Set (sfs) string. When 'peri_type' is < -1 (or > 31)
  * returns pointer to string (same as 'buff') associated with 'sfs_code'.
  * When 'peri_type' is between -1 (for SPC) and 31 (inclusive) then a match

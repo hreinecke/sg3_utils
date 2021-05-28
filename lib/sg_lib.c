@@ -852,6 +852,35 @@ sg_get_desig_type_str(int val)
         return NULL;
 }
 
+char *
+sg_get_zone_type_str(uint8_t zt, int buff_len, char * buff)
+{
+    if ((NULL == buff) || (buff_len < 1))
+        return NULL;
+    switch (zt) {
+    case 1:
+        sg_scnpr(buff, buff_len, "conventional");
+        break;
+    case 2:
+        sg_scnpr(buff, buff_len, "sequential write required");
+        break;
+    case 3:
+        sg_scnpr(buff, buff_len, "sequential write preferred");
+        break;
+    case 4:
+        sg_scnpr(buff, buff_len, "sequential or before required");
+        break;
+    case 5:
+        sg_scnpr(buff, buff_len, "gap");
+        break;
+    default:
+        sg_scnpr(buff, buff_len, "unknown [0x%x]", zt);
+        break;
+    }
+    return buff;
+}
+
+
 /* Expects a T10 UUID designator (as found in the Device Identification VPD
  * page) pointed to by 'dp'. To not produce an error string in 'b', c_set
  * should be 1 (binary) and dlen should be 18. Currently T10 only supports
