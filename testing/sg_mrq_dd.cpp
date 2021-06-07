@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.29 20210515";
+static const char * version_str = "1.30 20210606";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -189,6 +189,7 @@ struct flags_t {
     bool fua;
     bool hipri;
     bool masync;        /* more async sg v4 driver fd flag */
+    bool mout_if;       /* META_OUT_IF flag at mrq level */
     bool nocreat;
     bool no_dur;
     bool no_thresh;
@@ -307,6 +308,8 @@ typedef struct request_element
     int mrq_id;
     int mrq_index;
     int mrq_pack_id_off;
+    uint32_t a_mrq_din_blks;
+    uint32_t a_mrq_dout_blks;
     int64_t in_follow_on;
     int64_t out_follow_on;
     int64_t in_local_count;
@@ -579,7 +582,12 @@ sg_flags_str(int flags, int b_len, char * b)
             goto fini;
     }
     if (SGV4_FLAG_REC_ORDER & flags) {         /* 0x100000 */
-        n += sg_scnpr(b + n, b_len - n, "RECO|");
+        n += sg_scnpr(b + n, b_len - n, "REC_O|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_META_OUT_IF & flags) {       /* 0x200000 */
+        n += sg_scnpr(b + n, b_len - n, "MOUT_IF|");
         if (n >= b_len)
             goto fini;
     }
@@ -885,9 +893,9 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [00,coe,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,ff,fua,masync,mmap,nodur,null,"
-            "order,\n"
-            "                qhead,qtail,random,serial,wq_excl]\n"
+            "                dsync,excl,ff,fua,masync,mmap,mout_if,nodur,"
+            "null,\n"
+            "                order,qhead,qtail,random,serial,wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
@@ -985,6 +993,7 @@ page3:
             "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE\n"
             "    mmap,mmap    when used twice, doesn't call munmap()\n"
+            "    mout_if     set META_OUT_IF flag on control object\n"
             "    nocreat     will fail rather than create OFILE\n"
             "    nodur       turns off command duration calculations\n"
             "    no_thresh   skip checking per fd max data xfer size\n"
@@ -1199,11 +1208,9 @@ sig_listen_thread(struct global_collection * clp)
 static bool
 sg_share_prepare(int write_side_fd, int read_side_fd, int id, bool vb_b)
 {
-    struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    struct sg_extended_info sei {};
+    struct sg_extended_info * seip = &sei;
 
-    seip = &sei;
-    memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_SHARE_FD;
     seip->share_fd = read_side_fd;
@@ -1223,11 +1230,9 @@ sg_share_prepare(int write_side_fd, int read_side_fd, int id, bool vb_b)
 static void
 sg_take_snap(int sg_fd, int id, bool vb_b)
 {
-    struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    struct sg_extended_info sei {};
+    struct sg_extended_info * seip = &sei;
 
-    seip = &sei;
-    memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
     seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_SNAP_DEV;
@@ -1246,7 +1251,7 @@ sg_take_snap(int sg_fd, int id, bool vb_b)
 static void
 read_write_thread(struct global_collection * clp, int id, bool singleton)
 {
-    Rq_elem rel;
+    Rq_elem rel {};
     Rq_elem * rep = &rel;
     int n, sz, fd, vb, err, seg_blks;
     int res = 0;
@@ -1266,7 +1271,6 @@ read_write_thread(struct global_collection * clp, int id, bool singleton)
     in_mmap = (in_is_sg && (clp->in_flags.mmap > 0));
     out_is_sg = (FT_SG == clp->out_type);
     out_mmap = (out_is_sg && (clp->out_flags.mmap > 0));
-    memset(rep, 0, sizeof(Rq_elem));
     rep->clp = clp;
     rep->id = id;
 
@@ -1813,6 +1817,14 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
         ok = true;
         f1 = !!(a_v4p->info);   /* want to skip n_subm count if info is 0x0 */
         if (SG_INFO_CHECK & a_v4p->info) {
+            if ((0 == k) && (SGV4_FLAG_META_OUT_IF & ctl_v4p->flags) &&
+                (UINT32_MAX == a_v4p->info)) {
+                hole_count = 0;
+                n_good = num_mrq;
+                good_inblks = rep->a_mrq_din_blks;
+                good_outblks = rep->a_mrq_dout_blks;
+                break;
+            }
             ok = false;
             pr2serr_lk("[%d] a_v4[%d]: SG_INFO_CHECK set [%s]\n", id, k,
                        sg_info_str(a_v4p->info, sizeof(b), b));
@@ -1898,8 +1910,8 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     int num, kk, lin_blks, cdbsz, err;
     uint32_t q_blks = 0;
     struct global_collection * clp = rep->clp;
-    cdb_arr_t t_cdb = {};
-    struct sg_io_v4 t_v4;
+    cdb_arr_t t_cdb {};
+    struct sg_io_v4 t_v4 {};
     struct sg_io_v4 * t_v4p = &t_v4;
     struct flags_t * flagsp = is_wr ? &clp->out_flags : &clp->in_flags;
     int vb = clp->verbose;
@@ -1940,7 +1952,6 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         } else if (vb > 3)
             lk_print_command_len("cdb: ", t_cdb.data(), cdbsz, true);
 
-        memset(t_v4p, 0, sizeof(*t_v4p));
         t_v4p->guard = 'Q';
         t_v4p->request = (uint64_t)t_cdb.data();
         t_v4p->usr_ptr = t_v4p->request;
@@ -1951,9 +1962,11 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         if (is_wr) {
             t_v4p->dout_xfer_len = num * clp->bs;
             t_v4p->dout_xferp = (uint64_t)(dp + (q_blks * clp->bs));
+            t_v4p->din_xfer_len = 0;
         } else {
             t_v4p->din_xfer_len = num * clp->bs;
             t_v4p->din_xferp = (uint64_t)(dp + (q_blks * clp->bs));
+            t_v4p->dout_xfer_len = 0;
         }
         t_v4p->timeout = clp->cmd_timeout;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
@@ -2005,12 +2018,12 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     uint32_t out_mrq_q_blks = 0;
     const int max_cdb_sz = MAX_SCSI_CDB_SZ;
     struct sg_io_v4 * a_v4p;
-    struct sg_io_v4 ctl_v4;     /* MRQ control object */
+    struct sg_io_v4 ctl_v4 {};     /* MRQ control object */
     struct global_collection * clp = rep->clp;
     const char * iosub_str = "SG_IOSUBMIT(variable blocking)";
     char b[80];
-    cdb_arr_t t_cdb = {};
-    struct sg_io_v4 t_v4;
+    cdb_arr_t t_cdb {};
+    struct sg_io_v4 t_v4 {};
     struct sg_io_v4 * t_v4p = &t_v4;
     struct flags_t * flagsp = is_wr ? &clp->out_flags : &clp->in_flags;
     bool serial = flagsp->serial;
@@ -2024,6 +2037,8 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
 
     a_cdb.clear();
     a_v4.clear();
+    rep->a_mrq_din_blks = 0;
+    rep->a_mrq_dout_blks = 0;
     mrq_pack_id_base = id * PACK_ID_TID_MULTIPLIER;
 
     rflags = 0;
@@ -2060,7 +2075,6 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
             lk_print_command_len("cdb: ", t_cdb.data(), cdbsz, true);
         a_cdb.push_back(t_cdb);
 
-        memset(t_v4p, 0, sizeof(*t_v4p));
         t_v4p->guard = 'Q';
         t_v4p->flags = rflags;
         t_v4p->request_len = cdbsz;
@@ -2069,11 +2083,15 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         t_v4p->flags = rflags;
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
         if (is_wr) {
+            rep->a_mrq_dout_blks += num;
             t_v4p->dout_xfer_len = num * clp->bs;
             t_v4p->dout_xferp = (uint64_t)(dp + (mrq_q_blks * clp->bs));
+            t_v4p->din_xfer_len = 0;
         } else {
+            rep->a_mrq_din_blks += num;
             t_v4p->din_xfer_len = num * clp->bs;
             t_v4p->din_xferp = (uint64_t)(dp + (mrq_q_blks * clp->bs));
+            t_v4p->dout_xfer_len = 0;
         }
         t_v4p->timeout = clp->cmd_timeout;
         mrq_q_blks += num;
@@ -2095,7 +2113,6 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     num_mrq = a_v4.size();
     a_v4p = a_v4.data();
     res = 0;
-    memset(&ctl_v4, 0, sizeof(ctl_v4));
     ctl_v4.guard = 'Q';
     ctl_v4.request_len = a_cdb.size() * max_cdb_sz;
     ctl_v4.request = (uint64_t)a_cdb.data();
@@ -2106,6 +2123,11 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
     if (clp->mrq_hipri)
         ctl_v4.flags |= SGV4_FLAG_HIPRI;
+    if (clp->in_flags.mout_if || clp->out_flags.mout_if) {
+        ctl_v4.flags |= SGV4_FLAG_META_OUT_IF;
+        if (num_mrq > 0)
+            a_v4[0].info = UINT32_MAX;
+    }
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */
@@ -2427,8 +2449,8 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
     uint32_t out_fin_blks = 0;
     struct global_collection * clp = rep->clp;
     int vb = clp->verbose;
-    cdb_arr_t t_cdb = {};
-    struct sg_io_v4 t_v4;
+    cdb_arr_t t_cdb {};
+    struct sg_io_v4 t_v4 {};
     struct sg_io_v4 * t_v4p = &t_v4;
     struct flags_t * iflagsp = &clp->in_flags;
     struct flags_t * oflagsp = &clp->out_flags;
@@ -2486,7 +2508,6 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         } else if (vb > 3)
             lk_print_command_len("input cdb: ", t_cdb.data(), cdbsz, true);
 
-        memset(t_v4p, 0, sizeof(*t_v4p));
         t_v4p->guard = 'Q';
         t_v4p->request = (uint64_t)t_cdb.data();
         t_v4p->usr_ptr = t_v4p->request;
@@ -2495,6 +2516,7 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->flags = iflags;
         t_v4p->request_len = cdbsz;
         t_v4p->din_xfer_len = num * clp->bs;
+        t_v4p->dout_xfer_len = 0;
         t_v4p->timeout = clp->cmd_timeout;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
         clp->most_recent_pack_id.store(t_v4p->request_extra);
@@ -2537,7 +2559,6 @@ mrq0_again:
         } else if (vb > 3)
             lk_print_command_len("output cdb: ", t_cdb.data(), cdbsz, true);
 
-        memset(t_v4p, 0, sizeof(*t_v4p));
         t_v4p->guard = 'Q';
         t_v4p->request = (uint64_t)t_cdb.data();
         t_v4p->usr_ptr = t_v4p->request;
@@ -2545,6 +2566,7 @@ mrq0_again:
         t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->flags = oflags;
         t_v4p->request_len = cdbsz;
+        t_v4p->din_xfer_len = 0;
         t_v4p->dout_xfer_len = num * clp->bs;
         t_v4p->timeout = clp->cmd_timeout;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
@@ -2600,12 +2622,12 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     uint32_t out_mrq_q_blks = 0;
     const int max_cdb_sz = MAX_SCSI_CDB_SZ;
     struct sg_io_v4 * a_v4p;
-    struct sg_io_v4 ctl_v4;     /* MRQ control object */
+    struct sg_io_v4 ctl_v4 {};     /* MRQ control object */
     struct global_collection * clp = rep->clp;
     const char * iosub_str = "SG_IOSUBMIT(svb)";
     char b[80];
-    cdb_arr_t t_cdb = {};
-    struct sg_io_v4 t_v4;
+    cdb_arr_t t_cdb {};
+    struct sg_io_v4 t_v4 {};
     struct sg_io_v4 * t_v4p = &t_v4;
     struct flags_t * iflagsp = &clp->in_flags;
     struct flags_t * oflagsp = &clp->out_flags;
@@ -2616,6 +2638,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
 
     a_cdb.clear();
     a_v4.clear();
+    rep->a_mrq_din_blks = 0;
+    rep->a_mrq_dout_blks = 0;
     mrq_pack_id_base = id * PACK_ID_TID_MULTIPLIER;
 
     iflags = SGV4_FLAG_SHARE;
@@ -2668,7 +2692,6 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
             lk_print_command_len("input cdb: ", t_cdb.data(), cdbsz, true);
         a_cdb.push_back(t_cdb);
 
-        memset(t_v4p, 0, sizeof(*t_v4p));
         t_v4p->guard = 'Q';
         t_v4p->flags = iflags;
         t_v4p->request_len = cdbsz;
@@ -2676,6 +2699,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
         t_v4p->din_xfer_len = num * clp->bs;
+        rep->a_mrq_din_blks += num;
+        t_v4p->dout_xfer_len = 0;
         t_v4p->timeout = clp->cmd_timeout;
         in_mrq_q_blks += num;
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
@@ -2694,14 +2719,15 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         } else if (vb > 3)
             lk_print_command_len("output cdb: ", t_cdb.data(), cdbsz, true);
         a_cdb.push_back(t_cdb);
-        memset(t_v4p, 0, sizeof(*t_v4p));
         t_v4p->guard = 'Q';
         t_v4p->flags = oflags;
         t_v4p->request_len = cdbsz;
         t_v4p->response = (uint64_t)rep->sb;
         t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
+        t_v4p->din_xfer_len = 0;
         t_v4p->dout_xfer_len = num * clp->bs;
+        rep->a_mrq_dout_blks += num;
         t_v4p->timeout = clp->cmd_timeout;
         out_mrq_q_blks += num;
         t_v4p->request_extra = mrq_pack_id_base + ++rep->mrq_pack_id_off;
@@ -2728,7 +2754,6 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     num_mrq = a_v4.size();
     a_v4p = a_v4.data();
     res = 0;
-    memset(&ctl_v4, 0, sizeof(ctl_v4));
     ctl_v4.guard = 'Q';
     ctl_v4.request_len = a_cdb.size() * max_cdb_sz;
     ctl_v4.request = (uint64_t)a_cdb.data();
@@ -2741,6 +2766,11 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         ctl_v4.flags |= SGV4_FLAG_ORDERED_WR;
     if (clp->mrq_hipri)
         ctl_v4.flags |= SGV4_FLAG_HIPRI;
+    if (clp->in_flags.mout_if || clp->out_flags.mout_if) {
+        ctl_v4.flags |= SGV4_FLAG_META_OUT_IF;
+        if (num_mrq > 0)
+            a_v4[0].info = UINT32_MAX;
+    }
     ctl_v4.dout_xferp = (uint64_t)a_v4.data();        /* request array */
     ctl_v4.dout_xfer_len = a_v4.size() * sizeof(struct sg_io_v4);
     ctl_v4.din_xferp = (uint64_t)a_v4.data();         /* response array */
@@ -2851,10 +2881,9 @@ static int
 sg_blk_poll(int fd, int num)
 {
     int res;
-    struct sg_extended_info sei;
+    struct sg_extended_info sei {};
     struct sg_extended_info * seip = &sei;
 
-    memset(seip, 0, sizeof(*seip));
     seip->sei_rd_mask |= SG_SEIM_BLK_POLL;
     seip->sei_wr_mask |= SG_SEIM_BLK_POLL;
     seip->num = (num < 0) ? 0 : num;
@@ -2882,7 +2911,7 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
     int elem_sz = clp->elem_sz;
     int res, t, num, err;
     uint8_t *mmp;
-    struct sg_extended_info sei;
+    struct sg_extended_info sei {};
     struct sg_extended_info * seip = &sei;
 
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
@@ -2899,14 +2928,12 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
         goto bypass;
     }
     if (elem_sz >= 4096) {
-        memset(seip, 0, sizeof(*seip));
         seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
             pr2serr_lk("sg_mrq_dd: %s: SG_SET_GET_EXTENDED(SGAT_ELEM_SZ) rd "
                        "error: %s\n", __func__, strerror(errno));
         if (elem_sz != (int)seip->sgat_elem_sz) {
-            memset(seip, 0, sizeof(*seip));
             seip->sei_wr_mask |= SG_SEIM_SGAT_ELEM_SZ;
             seip->sgat_elem_sz = elem_sz;
             res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
@@ -2916,7 +2943,6 @@ sg_prepare_resbuf(int fd, struct global_collection *clp, bool is_in,
         }
     }
     if (no_dur || masync || skip_thresh) {
-        memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         if (no_dur) {
             seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_NO_DURATION;
@@ -2975,7 +3001,6 @@ bypass:
     if (res < 0)
         perror("sg_mrq_dd: SG_SET_FORCE_PACK_ID error");
     if (clp->unit_nanosec) {
-        memset(seip, 0, sizeof(*seip));
         seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
         seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
         seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
@@ -3146,6 +3171,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->qtail = true;
         else if (0 == strcmp(cp, "random"))
             fp->random = true;
+        else if ((0 == strcmp(cp, "mout_if")) || (0 == strcmp(cp, "mout-if")))
+            fp->mout_if = true;
         else if (0 == strcmp(cp, "serial"))
             fp->serial = true;
         else if (0 == strcmp(cp, "swait"))

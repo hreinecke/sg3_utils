@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2020 Douglas Gilbert.
+ * Copyright (c) 1999-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -42,7 +42,7 @@
 #endif
 
 
-static const char * const version_str = "1.97 20200722";
+static const char * const version_str = "1.98 20210601";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -622,7 +622,7 @@ sg_ll_test_unit_ready_com(struct sg_pt_base * ptvp, int sg_fd, int pack_id,
     bool local_cdb = true;
     int res, ret, sense_cat;
     uint8_t tur_cdb[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
 
     if (verbose) {
         char b[128];
@@ -748,7 +748,7 @@ sg_ll_request_sense_com(struct sg_pt_base * ptvp, int sg_fd, bool desc,
     }
     if (ptvp) {
         ptvp_given = true;
-        if (get_scsi_pt_sense_buf(ptvp))
+        if (get_scsi_pt_cdb_buf(ptvp))
             local_cdb = false;
         else
             set_scsi_pt_cdb(ptvp, rs_cdb, sizeof(rs_cdb));

@@ -14,7 +14,7 @@
  * Later extensions (versions 2, 3 and 4) to driver:
  *   Copyright (C) 1998 - 2021 Douglas Gilbert
  *
- * Version 4.0.46 (20210111)
+ * Version 4.0.47 (20210605)
  *  This version is for Linux 4 and 5 series kernels.
  *
  * Documentation
@@ -129,6 +129,7 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_MULTIPLE_REQS 0x40000	/* 1 or more sg_io_v4-s in data-in */
 #define SGV4_FLAG_ORDERED_WR 0x80000	/* svb: issue in-order writes */
 #define SGV4_FLAG_REC_ORDER 0x100000 /* receive order in v4:request_priority */
+#define SGV4_FLAG_META_OUT_IF 0x200000  /* ... there is something to report */
 
 /* Output (potentially OR-ed together) in v3::info or v4::info field */
 #define SG_INFO_OK_MASK 0x1

@@ -34,11 +34,12 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
  *
- * This program issues the SCSI REPORT ZONES command to the given SCSI device
- * and decodes the response. Based on zbc-r02.pdf
+ * This program issues the SCSI REPORT ZONES, REPORT ZONE DOMAINS or REPORT
+ * REALMS command to the given SCSI device and decodes the response.
+ * Based on zbc2r10.pdf
  */
 
-static const char * version_str = "1.24 20210527";
+static const char * version_str = "1.25 20210602";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -46,6 +47,8 @@ static const char * version_str = "1.24 20210527";
 #define SG_ZONING_IN_CMDLEN 16
 
 #define REPORT_ZONES_SA 0x0
+#define REPORT_ZONE_DOMAINS_SA 0x7
+#define REPORT_REALMS_SA 0x6
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
@@ -77,11 +80,11 @@ usage(int h)
     if (h > 1) goto h_twoormore;
     pr2serr("Usage: "
             "sg_rep_zones  [--domain] [--help] [--hex] [--locator=LBA]\n"
-	    "                     [--maxlen=LEN] [--partial] [--raw] "
-	    "[--readonly]\n"
-	    "                     [--realm] [--report=OPT] [--start=LBA] "
+            "                     [--maxlen=LEN] [--partial] [--raw] "
+            "[--readonly]\n"
+            "                     [--realm] [--report=OPT] [--start=LBA] "
             "[--verbose]\n"
-	    "                     [--version] DEVICE\n");
+            "                     [--version] DEVICE\n");
     pr2serr("  where:\n"
             "    --domain|-d        sends a REPORT ZONE DOMAINS command\n"
             "    --help|-h          print out usage message, use twice for "
@@ -101,7 +104,7 @@ usage(int h)
             "in cdb)\n"
             "    --raw|-r           output response in binary\n"
             "    --readonly|-R      open DEVICE read-only (def: read-write)\n"
-            "    --realm|-e         sends a REPORT ZONE REALMS command\n"
+            "    --realm|-e         sends a REPORT REALMS command\n"
             "    --report=OPT|-o OP    reporting options (def: 0: all "
             "zones)\n"
             "    --start=LBA|-s LBA    report zones from the LBA (def: 0)\n"
@@ -109,13 +112,13 @@ usage(int h)
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
             "    --wp|-w            output write pointer only\n\n"
-            "Sends a SCSI REPORT ZONES, REPORT ZONE DOMAINS or REPORT ZONE "
-	    "REALMS\ncommand. By default sends a REPORT ZONES command. Give "
-            "help option twice\n(e.g. '-hh') to see reporting options "
+            "Sends a SCSI REPORT ZONES, REPORT ZONE DOMAINS or REPORT REALMS "
+            "command.\n By default sends a REPORT ZONES command. Give help "
+            "option twice\n(e.g. '-hh') to see reporting options "
             "enumerated.\n");
     return;
 h_twoormore:
-    pr2serr("Reporting options:\n"
+    pr2serr("Reporting options for REPORT ZONES:\n"
             "    0x0    list all zones\n"
             "    0x1    list zones with a zone condition of EMPTY\n"
             "    0x2    list zones with a zone condition of IMPLICITLY "
@@ -131,15 +134,30 @@ h_twoormore:
             "    0x11   list zones with Non-sequential write resources "
             "active set to true\n"
             "    0x3f   list zones with a zone condition of NOT WRITE "
-            "POINTER\n");
+            "POINTER\n\n");
+    pr2serr("Reporting options for REPORT ZONE DOMAINS:\n"
+            "    0x0    list all zone domains\n"
+            "    0x1    list all zone domains in which all zones are active\n"
+            "    0x2    list all zone domains that contain active zones\n"
+            "    0x3    list all zone domains that do not contain any active "
+            "zones\n\n");
+    pr2serr("Reporting options for REPORT REALMS:\n"
+            "    0x0    list all realms\n"
+            "    0x1    list all realms that contain active Sequential Or "
+            "Before Required zones\n"
+            "    0x2    list all realms that contain active Sequential Write "
+            "Required zones\n"
+            "    0x3    list all realms that contain active Sequential Write "
+            "Preferred zones\n");
 }
 
-/* Invokes a SCSI REPORT ZONES command (ZBC).  Return of 0 -> success,
- * various SG_LIB_CAT_* positive values or -1 -> other errors */
+/* Invokes a SCSI REPORT ZONES, REPORT ZONE DOMAINS or REPORT REALMS command
+ * (see ZBC and ZBC-2).  Return of 0 -> success, various SG_LIB_CAT_* positive
+ * values or -1 -> other errors */
 static int
-sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
-                   void * resp, int mx_resp_len, int * residp, bool noisy,
-                   int verbose)
+sg_ll_report_zzz(int sg_fd, int serv_act, uint64_t zs_lba, bool partial,
+                 int report_opts, void * resp, int mx_resp_len,
+                 int * residp, bool noisy, int verbose)
 {
     int ret, res, sense_cat;
     uint8_t rz_cdb[SG_ZONING_IN_CMDLEN] =
@@ -148,6 +166,7 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
     uint8_t sense_b[SENSE_BUFF_LEN];
     struct sg_pt_base * ptvp;
 
+    rz_cdb[1] = serv_act;
     sg_put_unaligned_be64(zs_lba, rz_cdb + 2);
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rz_cdb + 10);
     rz_cdb[14] = report_opts & 0x3f;
@@ -156,9 +175,8 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
     if (verbose) {
         char b[128];
 
-        pr2serr("    Report zones cdb: %s\n",
-                sg_get_command_str(rz_cdb, SG_ZONING_IN_CMDLEN, false,
-                                   sizeof(b), b));
+        pr2serr("    %s\n", sg_get_command_str(rz_cdb, SG_ZONING_IN_CMDLEN,
+                                               true, sizeof(b), b));
     }
     ptvp = construct_scsi_pt_obj();
     if (NULL == ptvp) {
@@ -169,8 +187,8 @@ sg_ll_report_zones(int sg_fd, uint64_t zs_lba, bool partial, int report_opts,
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, "report zones", res, noisy, verbose,
-                               &sense_cat);
+    ret = sg_cmds_process_resp(ptvp, "report zone/domain/realm", res, noisy,
+			       verbose, &sense_cat);
     if (-1 == ret)
         ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
     else if (-2 == ret) {
@@ -266,7 +284,7 @@ main(int argc, char * argv[])
     bool do_partial = false;
     bool do_raw = false;
     bool do_zdomains = false;
-    bool do_zrealms = false;
+    bool do_realms = false;
     bool o_readonly = false;
     bool verbose_given = false;
     bool version_given = false;
@@ -280,6 +298,7 @@ main(int argc, char * argv[])
     int reporting_opt = 0;
     int ret = 0;
     int verbose = 0;
+    int serv_act = REPORT_ZONES_SA;
     uint8_t zt;
     uint64_t st_lba = 0;
     uint64_t wp;
@@ -288,6 +307,7 @@ main(int argc, char * argv[])
     uint8_t * reportZonesBuff = NULL;
     uint8_t * free_rzbp = NULL;
     uint8_t * bp;
+    const char * cmd_name = "Report zones";
     char b[80];
 
     while (1) {
@@ -300,11 +320,13 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'd':
-	    do_zdomains = true;
-	    break;
+            do_zdomains = true;
+            serv_act = REPORT_ZONE_DOMAINS_SA;
+            break;
         case 'e':
-	    do_zrealms = true;
-	    break;
+            do_realms = true;
+            serv_act = REPORT_REALMS_SA;
+            break;
         case 'h':
         case '?':
             ++do_help;
@@ -312,7 +334,7 @@ main(int argc, char * argv[])
         case 'H':
             ++do_hex;
             break;
-	/* case 'l': is under case 's': */
+        /* case 'l': is under case 's': */
         case 'm':
             maxlen = sg_get_num(optarg);
             if ((maxlen < 0) || (maxlen > MAX_RZONES_BUFF_LEN)) {
@@ -346,7 +368,7 @@ main(int argc, char * argv[])
             o_readonly = true;
             break;
         case 's':
-        case 'l':
+        case 'l':       /* --locator= and --start= are interchangeable */
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
                 pr2serr("bad argument to '--start=LBA' or '--locator=LBA\n");
@@ -407,8 +429,15 @@ main(int argc, char * argv[])
         usage(do_help);
         return 0;
     }
-    if (do_zdomains && do_zrealms) {
+    if (do_zdomains && do_realms) {
         pr2serr("Can't have both --domain and --realm\n");
+        return SG_LIB_SYNTAX_ERROR;
+    } else if (do_zdomains)
+        cmd_name = "Report zone domains";
+    else if (do_realms)
+        cmd_name = "Report realms";
+    if ((serv_act != REPORT_ZONES_SA) && do_partial) {
+        pr2serr("Can only use --partial with REPORT ZONES\n");
         return SG_LIB_SYNTAX_ERROR;
     }
     if (NULL == device_name) {
@@ -442,7 +471,7 @@ main(int argc, char * argv[])
         return sg_convert_errno(ENOMEM);
     }
 
-    res = sg_ll_report_zones(sg_fd, st_lba, do_partial, reporting_opt,
+    res = sg_ll_report_zzz(sg_fd, serv_act, st_lba, do_partial, reporting_opt,
                              reportZonesBuff, maxlen, &resid, true, verbose);
     ret = res;
     if (0 == res) {
@@ -470,7 +499,7 @@ main(int argc, char * argv[])
             goto the_end;
         }
         if (! wp_only)
-            printf("Report zones response:\n");
+            printf("%s response:\n", cmd_name);
         if (len < 64) {
             pr2serr("Zone length [%d] too short (perhaps after truncation\n)",
                     len);
@@ -500,7 +529,7 @@ main(int argc, char * argv[])
             zt = bp[0] & 0xf;
             zc = (bp[1] >> 4) & 0xf;
             printf("   Zone type: %s\n", sg_get_zone_type_str(zt, sizeof(b),
-		   b));
+                   b));
             printf("   Zone condition: %s\n", zone_condition_str(zc, b,
                    sizeof(b), verbose));
             printf("   PUEP: %d\n", !!(bp[1] & 0x4));   /* added in zbc2r07 */
@@ -522,10 +551,10 @@ main(int argc, char * argv[])
                        "call\n");
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)
-        pr2serr("Report zones command not supported\n");
+        pr2serr("%s command not supported\n", cmd_name);
     else {
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
-        pr2serr("Report zones command: %s\n", b);
+        pr2serr("%s command: %s\n", cmd_name, b);
     }
 
 the_end:

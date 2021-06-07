@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.26 20210512";
+static const char * version_str = "6.27 20210601";
 
 
 #define ME "sg_dd: "
@@ -2479,7 +2479,7 @@ main(int argc, char * argv[])
             } else if (FT_DEV_NULL & out_type)
                 ;
             else {
-                off64_t offset = blocks * blk_sz;
+                off64_t offset = (off64_t)blocks * blk_sz;
                 off64_t off_res;
 
                 if (verbose > 2)
@@ -2681,10 +2681,12 @@ bypass_copy:
         free(wrkBuff);
     if (free_zeros_buff)
         free(free_zeros_buff);
-    if (STDIN_FILENO != infd)
+    if ((STDIN_FILENO != infd) && (infd >= 0))
         close(infd);
-    if (! ((STDOUT_FILENO == outfd) || (FT_DEV_NULL & out_type)))
-        close(outfd);
+    if (! ((STDOUT_FILENO == outfd) || (FT_DEV_NULL & out_type))) {
+        if (outfd >= 0)
+            close(outfd);
+    }
     if (dry_run > 0)
         goto bypass2;
 

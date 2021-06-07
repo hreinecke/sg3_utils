@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.08 20210515";
+static const char * version_str = "2.09 20210605";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -196,6 +196,7 @@ struct flags_t {
     bool qhead;
     bool qtail;
     bool random;
+    bool mout_if;       /* META_OUT_IF flag at mrq level */
     bool same_fds;
     bool swait;         /* now ignore; kept for backward compatibility */
     bool v3;
@@ -612,7 +613,12 @@ sg_flags_str(int flags, int b_len, char * b)
             goto fini;
     }
     if (SGV4_FLAG_REC_ORDER & flags) {         /* 0x100000 */
-        n += sg_scnpr(b + n, b_len - n, "RECO|");
+        n += sg_scnpr(b + n, b_len - n, "REC_O|");
+        if (n >= b_len)
+            goto fini;
+    }
+    if (SGV4_FLAG_META_OUT_IF & flags) {       /* 0x200000 */
+        n += sg_scnpr(b + n, b_len - n, "MOUT_IF|");
         if (n >= b_len)
             goto fini;
     }
@@ -935,11 +941,11 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [00,coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,ff,fua,hipri,masync,mmap,mrq_immed,"
-            "mrq_svb,\n"
-            "                nocreat,nodur,noxfer,null,qhead,qtail,"
-            "random,\n"
-            "                same_fds,v3,v4,wq_excl]\n"
+            "                dsync,excl,ff,fua,hipri,masync,mmap,mout_if,"
+            "mrq_immed,\n"
+            "                mrq_svb,nocreat,nodur,noxfer,null,qhead,"
+            "qtail,\n"
+            "                random,same_fds,v3,v4,wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
             "N.B. different\n"
             "                from dd it defaults to stdout). If 'of=.' "
@@ -1050,6 +1056,7 @@ page3:
             "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
             "with noshare\n"
             "    mmap,mmap    when used twice, doesn't call munmap()\n"
+            "    mout_if     set META_OUT_IF flag on each request\n"
             "    mrq_immed    if mrq active, do submit non-blocking (def: "
             "ordered\n"
             "                 blocking)\n"
@@ -1308,7 +1315,7 @@ mrq_abort_thread(void * v_maip)
     int seed;
     unsigned int rn;
     Mrq_abort_info l_mai = *(Mrq_abort_info *)v_maip;
-    struct sg_io_v4 ctl_v4;
+    struct sg_io_v4 ctl_v4 {};
 
 #ifdef HAVE_GETRANDOM
     {
@@ -1347,7 +1354,6 @@ mrq_abort_thread(void * v_maip)
         pr2serr_lk("%s: skipping nanosleep cause delay < 20 usecs\n",
                    __func__);
 
-    memset(&ctl_v4, 0, sizeof(ctl_v4));
     ctl_v4.guard = 'Q';
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS;
     ctl_v4.request_extra = l_mai.mrq_id;
@@ -1374,11 +1380,9 @@ mrq_abort_thread(void * v_maip)
 static bool
 sg_share_prepare(int write_side_fd, int read_side_fd, int id, bool vb_b)
 {
-    struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    struct sg_extended_info sei {};
+    struct sg_extended_info * seip = &sei;
 
-    seip = &sei;
-    memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_SHARE_FD;
     seip->share_fd = read_side_fd;
@@ -1398,11 +1402,9 @@ sg_share_prepare(int write_side_fd, int read_side_fd, int id, bool vb_b)
 static void
 sg_unshare(int sg_fd, int id, bool vb_b)
 {
-    struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    struct sg_extended_info sei {};
+    struct sg_extended_info * seip = &sei;
 
-    seip = &sei;
-    memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
     seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_UNSHARE;
@@ -1420,11 +1422,9 @@ static void
 sg_noshare_enlarge(int sg_fd, bool vb_b)
 {
     if (sg_version_ge_40045) {
-        struct sg_extended_info sei;
-        struct sg_extended_info * seip;
+        struct sg_extended_info sei {};
+        struct sg_extended_info * seip = &sei;
 
-        seip = &sei;
-        memset(seip, 0, sizeof(*seip));
         sei.sei_wr_mask |= SG_SEIM_TOT_FD_THRESH;
         seip->tot_fd_thresh = 96 * 1024 * 1024;
         if (ioctl(sg_fd, SG_SET_GET_EXTENDED, seip) < 0) {
@@ -1440,11 +1440,9 @@ sg_noshare_enlarge(int sg_fd, bool vb_b)
 static void
 sg_take_snap(int sg_fd, int id, bool vb_b)
 {
-    struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    struct sg_extended_info sei {};
+    struct sg_extended_info * seip = &sei;
 
-    seip = &sei;
-    memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_CTL_FLAGS;
     seip->sei_rd_mask |= SG_SEIM_CTL_FLAGS;
     seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_SNAP_DEV;
@@ -1507,7 +1505,7 @@ read_write_thread(void * v_tip)
 {
     Thread_info * tip;
     struct global_collection * clp;
-    Rq_elem rel;
+    Rq_elem rel {};
     Rq_elem * rep = &rel;
     int n, sz, blocks, status, vb, err, res, wr_blks;
     int num_sg = 0;
@@ -1528,7 +1526,6 @@ read_write_thread(void * v_tip)
     in_mmap = (in_is_sg && (clp->in_flags.mmap > 0));
     out_is_sg = (FT_SG == clp->out_type);
     out_mmap = (out_is_sg && (clp->out_flags.mmap > 0));
-    memset(rep, 0, sizeof(Rq_elem));
     /* Following clp members are constant during lifetime of thread */
     rep->clp = clp;
     rep->id = tip->id;
@@ -2153,13 +2150,12 @@ sg_wr_swap_share(Rq_elem * rep, int to_fd, bool before)
     int k;
     int read_side_fd = rep->infd;
     struct global_collection * clp = rep->clp;
-    struct sg_extended_info sei;
+    struct sg_extended_info sei {};
     struct sg_extended_info * seip = &sei;
 
     if (rep->clp->verbose > 2)
         pr2serr_lk("%s: tid=%d: to_fd=%d, before=%d\n", __func__, rep->id,
                    to_fd, (int)before);
-    memset(seip, 0, sizeof(*seip));
     seip->sei_wr_mask |= SG_SEIM_CHG_SHARE_FD;
     seip->sei_rd_mask |= SG_SEIM_CHG_SHARE_FD;
     seip->share_fd = to_fd;
@@ -2205,11 +2201,10 @@ sg_out_wr_cmd(Rq_elem * rep, mrq_arr_t & def_arr, bool is_wr2, bool prefetch)
     struct global_collection * clp = rep->clp;
     uint32_t ofsplit = clp->ofsplit;
     pthread_mutex_t * mutexp = is_wr2 ? &clp->out2_mutex : &clp->out_mutex;
-    struct sg_io_extra xtr;
+    struct sg_io_extra xtr {};
     struct sg_io_extra * xtrp = &xtr;
     const char * wr_or_ver = clp->verify ? "verify" : "out";
 
-    memset(xtrp, 0, sizeof(*xtrp));
     xtrp->is_wr2 = is_wr2;
     xtrp->prefetch = prefetch;
     nblks = rep->num_blks;
@@ -2423,6 +2418,7 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
             }
         }
         if (slen > 0) {
+pr2serr(">>>>>>>>>>>> %s: slen=%d\n", __func__, slen);
             struct sg_scsi_sense_hdr ssh;
             const uint8_t *sbp = (const uint8_t *)
                         (sb_in_co ? ctl_v4p->response : a_v4p->response);
@@ -2826,7 +2822,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     uint32_t in_fin_blks, out_fin_blks;
     const int max_cdb_sz = 16;
     struct sg_io_v4 * a_v4p;
-    struct sg_io_v4 ctl_v4;
+    struct sg_io_v4 ctl_v4 {};
     uint8_t * cmd_ap = NULL;
     struct global_collection * clp = rep->clp;
     const char * iosub_str = "iosub_str";
@@ -2834,7 +2830,6 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
 
     id = rep->id;
     b_len = sizeof(b);
-    memset(&ctl_v4, 0, sizeof(ctl_v4));
     ctl_v4.guard = 'Q';
     a_v4p = def_arr.first.data();
     nrq = def_arr.first.size();
@@ -3121,6 +3116,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     bool qhead = wr ? clp->out_flags.qhead : clp->in_flags.qhead;
     bool qtail = wr ? clp->out_flags.qtail : clp->in_flags.qtail;
     bool hipri = wr ? clp->out_flags.hipri : clp->in_flags.hipri;
+    bool mout_if = wr ? clp->out_flags.mout_if : clp->in_flags.mout_if;
     bool prefetch = xtrp ? xtrp->prefetch : false;
     bool is_wr2 = xtrp ? xtrp->is_wr2 : false;
     int cdbsz = wr ? clp->cdbsz_out : clp->cdbsz_in;
@@ -3185,6 +3181,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         flags |= SG_FLAG_Q_AT_HEAD;
     if (qtail)
         flags |= SG_FLAG_Q_AT_TAIL;
+    if (mout_if)
+        flags |= SGV4_FLAG_META_OUT_IF;
     if (rep->has_share) {
         flags |= SGV4_FLAG_SHARE;
         if (wr)
@@ -3416,6 +3414,7 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
 {
     struct global_collection * clp = rep->clp;
     bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
+    bool mout_if = wr ? clp->out_flags.mout_if : clp->in_flags.mout_if;
     bool is_wr2 = xtrp ? xtrp->is_wr2 : false;
     bool prefetch = xtrp ? xtrp->prefetch : false;
     int res, fd;
@@ -3514,6 +3513,11 @@ do_v4:
     }
     h4p = &rep->io_hdr4[xtrp ? xtrp->hpv4_ind : 0];
     h4p->request_extra = pack_id;
+    if (mout_if) {
+        h4p->info = 0;
+        h4p->din_resid = 0;
+    }
+pr2serr(">>>>> %s: h4p->response: %sNULL, max_slen=%d\n", __func__, h4p->response ? "non-" : "", h4p->max_response_len);
     while (((res = ioctl(fd, SG_IORECEIVE, h4p)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
         if (EAGAIN == errno) {
@@ -3534,6 +3538,11 @@ do_v4:
     if (res < 0) {
         perror("finishing io [SG_IORECEIVE] on sg device, error");
         return -1;
+    }
+pr2serr(">>>>> %s: h4p->response_len=%d\n", __func__, h4p->response_len);
+    if (mout_if && (0 == h4p->info) && (0 == h4p->din_resid)) {
+pr2serr("%s: META_OUT_IF set plus info and resid are zero, skip\n", __func__);
+        goto all_good;
     }
     if (rep != (Rq_elem *)h4p->usr_ptr)
         err_exit(0, "sg_finish_io: bad usr_ptr, request-response mismatch\n");
@@ -3591,6 +3600,7 @@ do_v4:
                        !!(h4p->info & SG_INFO_DEVICE_DETACHING),
                        !!(h4p->info & SG_INFO_ABORTED));
     }
+all_good:
     return 0;
 }
 
@@ -3608,10 +3618,9 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
                                clp->out_flags.no_thresh;
     int res, t, num;
     uint8_t *mmp;
-    struct sg_extended_info sei;
-    struct sg_extended_info * seip;
+    struct sg_extended_info sei {};
+    struct sg_extended_info * seip = &sei;
 
-    seip = &sei;
     res = ioctl(fd, SG_GET_VERSION_NUM, &t);
     if ((res < 0) || (t < 40000)) {
         if (ioctl(fd, SG_GET_RESERVED_SIZE, &num) < 0) {
@@ -3629,7 +3638,6 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
     if (! sg_version_ge_40045)
         goto bypass;
     if (clp->elem_sz >= 4096) {
-        memset(seip, 0, sizeof(*seip));
         seip->sei_rd_mask |= SG_SEIM_SGAT_ELEM_SZ;
         res = ioctl(fd, SG_SET_GET_EXTENDED, seip);
         if (res < 0)
@@ -3815,6 +3823,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->qtail = true;
         else if (0 == strcmp(cp, "random"))
             fp->random = true;
+        else if ((0 == strcmp(cp, "mout_if")) || (0 == strcmp(cp, "mout-if")))
+            fp->mout_if = true;
         else if (0 == strcmp(cp, "same_fds"))
             fp->same_fds = true;
         else if (0 == strcmp(cp, "swait"))
@@ -4390,7 +4400,7 @@ main(int argc, char * argv[])
     const char * ccp = NULL;
     const char * cc2p;
     struct global_collection * clp = &gcoll;
-    Thread_info thread_arr[MAX_NUM_THREADS];
+    Thread_info thread_arr[MAX_NUM_THREADS] {};
     char ebuff[EBUFF_SZ];
 #if SG_LIB_ANDROID
     struct sigaction actions;
@@ -4403,7 +4413,6 @@ main(int argc, char * argv[])
     sigaction(SIGUSR2, &actions, NULL);
 #endif
     /* memset(clp, 0, sizeof(*clp)); */
-    memset(thread_arr, 0, sizeof(thread_arr));
     clp->bpt = DEF_BLOCKS_PER_TRANSFER;
     clp->cmd_timeout = DEF_TIMEOUT;
     clp->in_type = FT_OTHER;

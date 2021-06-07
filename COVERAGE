@@ -82,7 +82,7 @@ REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
 REPORT TARGET PORT GROUPS       sg_rtpg, sg_stpg ++
 REPORT TIMESTAMP    sg_timestamp
 REPORT ZONE DOMAINS  sg_rep_zones
-REPORT ZONE_REALMS  sg_rep_zones
+REPORT REALMS       sg_rep_zones
 REPORT ZONES        sg_rep_zones
 REQUEST SENSE       sg_requests, ++
 RESET WRITE POINTER sg_reset_wp
@@ -180,4 +180,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-28th May 2021
+7th June 2021

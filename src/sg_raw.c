@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.36 (2021-04-29)"
+#define SG_RAW_VERSION "0.4.37 (2021-06-01)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -300,19 +300,19 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
         }
     }
 
-    if (optind >= argc) {
-        pr2serr("No device specified\n");
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    op->device_name = argv[optind];
-    ++optind;
-
     if (op->version_given
 #ifdef DEBUG
         && ! op->verbose_given
 #endif
        )
         return 0;
+
+    if (optind >= argc) {
+        pr2serr("No device specified\n");
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    op->device_name = argv[optind];
+    ++optind;
 
     while (optind < argc) {
         char *opt = argv[optind++];

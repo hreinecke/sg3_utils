@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2020 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2021 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -69,7 +69,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.67 20200510";
+static const char * version_str = "1.68 20210601";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1442,10 +1442,12 @@ main(int argc, char * argv[])
 fini:
     if (wrkBuff)
         free(wrkBuff);
-    if (STDIN_FILENO != infd)
+    if ((STDIN_FILENO != infd) && (infd >= 0))
         close(infd);
-    if ((STDOUT_FILENO != outfd) && (FT_DEV_NULL != out_type))
-        close(outfd);
+    if ((STDOUT_FILENO != outfd) && (FT_DEV_NULL != out_type)) {
+        if (outfd >= 0)
+            close(outfd);
+    }
     if ((0 != dd_count) && (0 == dry_run)) {
         pr2serr("Some error occurred,");
         if (0 == ret)

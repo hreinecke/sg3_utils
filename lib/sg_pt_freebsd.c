@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.43 20210503 */
+/* sg_pt_freebsd version 1.44 20210601 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2514,7 +2514,7 @@ sntl_rread(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
     bool is_read10 = (SCSI_READ10_OPC == cdbp[0]);
     bool have_fua = !!(cdbp[1] & 0x8);
     int err;
-    uint32_t nblks_t10 = 0;
+    uint32_t nblks_t10 = 0;     /* 'control' in upper 16 bits */
     uint64_t lba;
     struct nvme_pt_command npc;
     uint8_t * npc_up = (uint8_t *)&npc;

@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.63 20210328";  /* spc6r05 + sbc4r22 */
+static const char * version_str = "1.64 20210601";  /* spc6r05 + sbc4r22 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2654,7 +2654,7 @@ decode_b7_vpd(uint8_t * buff, int len, int do_hex, int pdt)
 
 /* VPD_FORMAT_PRESETS  0xb8 (added sbc4r18) */
 static void
-decode_format_presets_vpd(uint8_t * buff, int len, bool do_hex)
+decode_format_presets_vpd(uint8_t * buff, int len, int do_hex)
 {
     int k;
     unsigned int sch_type;
@@ -2723,7 +2723,7 @@ decode_format_presets_vpd(uint8_t * buff, int len, bool do_hex)
 
 /* VPD_CON_POS_RANGE  0xb9 (added sbc5r01) */
 static void
-decode_con_pos_range_vpd(uint8_t * buff, int len, bool do_hex)
+decode_con_pos_range_vpd(uint8_t * buff, int len, int do_hex)
 {
     int k;
     uint64_t u;

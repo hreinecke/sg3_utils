@@ -84,7 +84,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.77 20210103";
+static const char * version_str = "5.78 20210601";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1911,10 +1911,12 @@ main(int argc, char * argv[])
      * _join() to clear heap taken by associated _create() */
 
 fini:
-    if (STDIN_FILENO != clp->infd)
+    if ((STDIN_FILENO != clp->infd) && (clp->infd >= 0))
         close(clp->infd);
-    if ((STDOUT_FILENO != clp->outfd) && (FT_DEV_NULL != clp->out_type))
-        close(clp->outfd);
+    if ((STDOUT_FILENO != clp->outfd) && (FT_DEV_NULL != clp->out_type)) {
+        if (clp->outfd >= 0)
+            close(clp->outfd);
+    }
     res = exit_status;
     if ((0 != clp->out_count) && (0 == clp->dry_run)) {
         pr2serr(">>>> Some error occurred, remaining blocks=%" PRId64 "\n",

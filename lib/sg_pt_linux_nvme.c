@@ -41,7 +41,7 @@
  *                   MA 02110-1301, USA.
  */
 
-/* sg_pt_linux_nvme version 1.17 20210501 */
+/* sg_pt_linux_nvme version 1.18 20210601 */
 
 /* This file contains a small "SPC-only" SNTL to support the SES pass-through
  * of SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS through NVME-MI
@@ -154,7 +154,7 @@
 #define SG_NVME_NVM_WRITE 0x1
 #define SG_NVME_NVM_WRITE_ZEROES 0x8    /* SCSI WRITE SAME */
 
-#define SG_NVME_RW_CDW12_FUA (1 << 30) /* Force Unit Access bit */
+#define SG_NVME_RW_CONTROL_FUA (1 << 14) /* Force Unit Access bit */
 
 
 #if (HAVE_NVME && (! IGNORE_NVME))
@@ -1480,7 +1480,7 @@ sntl_rread(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     }
     iop->nblocks = nblks_t10 - 1;       /* crazy "0's based" */
     if (have_fua)
-        iop->nblocks |= SG_NVME_RW_CDW12_FUA;
+        iop->control |= SG_NVME_RW_CONTROL_FUA;
     iop->addr = (uint64_t)ptp->io_hdr.din_xferp;
     res = sntl_do_nvm_cmd(ptp, iop, ptp->io_hdr.din_xfer_len,
                           true /* is_read */, time_secs, vb);
@@ -1526,7 +1526,7 @@ sntl_write(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     }
     iop->nblocks = nblks_t10 - 1;
     if (have_fua)
-        iop->nblocks |= SG_NVME_RW_CDW12_FUA;
+        iop->control |= SG_NVME_RW_CONTROL_FUA;
     iop->addr = (uint64_t)ptp->io_hdr.dout_xferp;
     res = sntl_do_nvm_cmd(ptp, iop, ptp->io_hdr.dout_xfer_len, false,
                           time_secs, vb);
