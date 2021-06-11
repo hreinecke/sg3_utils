@@ -135,6 +135,12 @@
 /* also MinGW environment */
 #undef SG_LIB_MINGW
 
+/* sg3_utils on NetBSD */
+#undef SG_LIB_NETBSD
+
+/* sg3_utils on OpenBSD */
+#undef SG_LIB_OPENBSD
+
 /* sg3_utils on Tru64 UNIX */
 #undef SG_LIB_OSF1
 

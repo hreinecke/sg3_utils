@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.64 20210601";  /* spc6r05 + sbc4r22 */
+static const char * version_str = "1.64 20210610";  /* spc6r05 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -3898,7 +3898,7 @@ main(int argc, char * argv[])
             pr2serr("Device name %s ignored when --enumerate given\n",
                     op->device_name);
         if (op->vend_prod) {
-            if (isdigit(op->vend_prod[0])) {
+            if (isdigit((uint8_t)op->vend_prod[0])) {
                 op->vend_prod_num = sg_get_num_nomult(op->vend_prod);
                 if ((op->vend_prod_num < 0) || (op->vend_prod_num > 10)) {
                     pr2serr("Bad vendor/product number after '--vendor=' "
@@ -3920,7 +3920,7 @@ main(int argc, char * argv[])
             if ((0 == strcmp("-1", op->page_str)) ||
                 (0 == strcmp("-2", op->page_str)))
                 op->vpd_pn = VPD_NOPE_WANT_STD_INQ;
-            else if (isdigit(op->page_str[0])) {
+            else if (isdigit((uint8_t)op->page_str[0])) {
                 op->vpd_pn = sg_get_num_nomult(op->page_str);
                 if ((op->vpd_pn < 0) || (op->vpd_pn > 255)) {
                     pr2serr("Bad page code value after '-p' option\n");
@@ -3948,7 +3948,7 @@ main(int argc, char * argv[])
         if ((0 == strcmp("-1", op->page_str)) ||
             (0 == strcmp("-2", op->page_str)))
             op->vpd_pn = VPD_NOPE_WANT_STD_INQ;
-        else if (isalpha(op->page_str[0])) {
+        else if (isalpha((uint8_t)op->page_str[0])) {
             vnp = sdp_find_vpd_by_acron(op->page_str);
             if (NULL == vnp) {
                 vnp = svpd_find_vendor_by_acron(op->page_str);
@@ -3977,7 +3977,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
-                if (isdigit(*(cp + 1)))
+                if (isdigit((uint8_t)*(cp + 1)))
                     op->vend_prod_num = sg_get_num_nomult(cp + 1);
                 else
                     op->vend_prod_num = svpd_find_vp_num_by_acron(cp + 1);
@@ -3990,7 +3990,7 @@ main(int argc, char * argv[])
                 }
                 subvalue = op->vend_prod_num;
             } else if (op->vend_prod) {
-                if (isdigit(op->vend_prod[0]))
+                if (isdigit((uint8_t)op->vend_prod[0]))
                     op->vend_prod_num = sg_get_num_nomult(op->vend_prod);
                 else
                     op->vend_prod_num =
@@ -4005,7 +4005,7 @@ main(int argc, char * argv[])
             }
         }
     } else if (op->vend_prod) {
-        if (isdigit(op->vend_prod[0]))
+        if (isdigit((uint8_t)op->vend_prod[0]))
             op->vend_prod_num = sg_get_num_nomult(op->vend_prod);
         else
             op->vend_prod_num = svpd_find_vp_num_by_acron(op->vend_prod);

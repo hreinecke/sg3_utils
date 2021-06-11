@@ -1,6 +1,6 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem
- *    Copyright (C) 2003-2018 D. Gilbert
+ *    Copyright (C) 2003-2021 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.63 20180628";
+static const char * version_str = "0.64 20210610";
 
 #define ME "sg_senddiag: "
 
@@ -511,7 +511,7 @@ build_diag_page(const char * inp, uint8_t * mp_arr, int * mp_arr_len,
                 continue;
             }
             if (carry_over[0]) {
-                if (isxdigit(line[0])) {
+                if (isxdigit((uint8_t)line[0])) {
                     carry_over[1] = line[0];
                     carry_over[2] = '\0';
                     if (1 == sscanf(carry_over, "%x", &h))

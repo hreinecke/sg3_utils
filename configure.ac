@@ -87,6 +87,10 @@ case "${host}" in
                 LIBS="$LIBS -lcam";;
         *-*-solaris*)
 		AC_DEFINE_UNQUOTED(SG_LIB_SOLARIS, 1, [sg3_utils on Solaris]);;
+        *-*-netbsd*)
+		AC_DEFINE_UNQUOTED(SG_LIB_NETBSD, 1, [sg3_utils on NetBSD]);;
+        *-*-openbsd*)
+		AC_DEFINE_UNQUOTED(SG_LIB_OPENBSD, 1, [sg3_utils on OpenBSD]);;
         *-*-osf*)
 		AC_DEFINE_UNQUOTED(SG_LIB_OSF1, 1, [sg3_utils on Tru64 UNIX]);;
         *-*-cygwin*)
@@ -117,15 +121,26 @@ AM_CONDITIONAL(OS_SOLARIS, [echo $host_os | grep '^solaris' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 AM_CONDITIONAL(OS_ANDROID, [echo $host_os | grep 'android' > /dev/null])
+AM_CONDITIONAL(OS_NETBSD, [echo $host_os | grep 'netbsd' > /dev/null])
+AM_CONDITIONAL(OS_OPENBSD, [echo $host_os | grep 'openbsd' > /dev/null])
 
 AC_ARG_ENABLE([debug],
-	      [  --enable-debug    Turn on debugging],
+	      [  --enable-debug          Turn on debugging],
 	      [case "${enableval}" in
 		  yes) debug=true ;;
 		  no)  debug=false ;;
 		  *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
 	       esac],[debug=false])
 AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+
+AC_ARG_ENABLE([pt_dummy],
+	      [  --enable-pt_dummy       pass-through codes compiles, does nothing],
+	      [case "${enableval}" in
+		  yes) pt_dummy=true ;;
+		  no)  pt_dummy=false ;;
+		  *) AC_MSG_ERROR([bad value ${enableval} for --enable-dummy_pt]) ;;
+	       esac],[pt_dummy=false])
+AM_CONDITIONAL([PT_DUMMY], [test x$pt_dummy = xtrue])
 
 AC_ARG_ENABLE([linuxbsg],
   AC_HELP_STRING([--disable-linuxbsg], [option ignored, this is placeholder]),

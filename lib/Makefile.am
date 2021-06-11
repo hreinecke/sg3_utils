@@ -8,10 +8,14 @@ libsgutils2_la_SOURCES = \
 	sg_pt_common.c
 
 if OS_LINUX
+if PT_DUMMY
+libsgutils2_la_SOURCES += sg_pt_dummy.c
+else
 libsgutils2_la_SOURCES += \
 	sg_pt_linux.c \
 	sg_io_linux.c \
 	sg_pt_linux_nvme.c
+endif
 endif
 
 if OS_WIN32_MINGW
@@ -23,7 +27,11 @@ libsgutils2_la_SOURCES += sg_pt_win32.c
 endif
 
 if OS_FREEBSD
+if PT_DUMMY
+libsgutils2_la_SOURCES += sg_pt_dummy.c
+else
 libsgutils2_la_SOURCES += sg_pt_freebsd.c
+endif
 endif
 
 if OS_SOLARIS
@@ -32,6 +40,14 @@ endif
 
 if OS_OSF
 libsgutils2_la_SOURCES += sg_pt_osf1.c
+endif
+
+if OS_NETBSD
+libsgutils2_la_SOURCES += sg_pt_dummy.c
+endif
+
+if OS_OPENBSD
+libsgutils2_la_SOURCES += sg_pt_dummy.c
 endif
 
 if DEBUG

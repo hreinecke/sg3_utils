@@ -111,11 +111,11 @@ bin_PROGRAMS = sg_bg_ctl$(EXEEXT) sg_compare_and_write$(EXEEXT) \
 	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
 	sg_write_verify$(EXEEXT) sg_write_x$(EXEEXT) sg_zone$(EXEEXT) \
 	$(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3)
-@OS_LINUX_TRUE@am__append_1 = \
-@OS_LINUX_TRUE@	sg_copy_results sg_dd sg_emc_trespass sg_map sg_map26 sg_rbuf \
-@OS_LINUX_TRUE@	sg_read sg_reset sg_scan sg_test_rwbuf sg_xcopy sginfo sgm_dd sgp_dd
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@am__append_1 = \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_copy_results sg_dd sg_emc_trespass sg_map sg_map26 sg_rbuf \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_read sg_reset sg_scan sg_test_rwbuf sg_xcopy sginfo sgm_dd sgp_dd
 
-@OS_LINUX_TRUE@am__append_2 = sg_scan_linux.c
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@am__append_2 = sg_scan_linux.c
 @OS_WIN32_MINGW_TRUE@am__append_3 = sg_scan
 @OS_WIN32_MINGW_TRUE@am__append_4 = sg_scan_win32.c
 @OS_WIN32_CYGWIN_TRUE@am__append_5 = sg_scan
@@ -130,13 +130,20 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-@OS_LINUX_TRUE@am__EXEEXT_1 = sg_copy_results$(EXEEXT) sg_dd$(EXEEXT) \
-@OS_LINUX_TRUE@	sg_emc_trespass$(EXEEXT) sg_map$(EXEEXT) \
-@OS_LINUX_TRUE@	sg_map26$(EXEEXT) sg_rbuf$(EXEEXT) \
-@OS_LINUX_TRUE@	sg_read$(EXEEXT) sg_reset$(EXEEXT) \
-@OS_LINUX_TRUE@	sg_scan$(EXEEXT) sg_test_rwbuf$(EXEEXT) \
-@OS_LINUX_TRUE@	sg_xcopy$(EXEEXT) sginfo$(EXEEXT) \
-@OS_LINUX_TRUE@	sgm_dd$(EXEEXT) sgp_dd$(EXEEXT)
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@am__EXEEXT_1 =  \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_copy_results$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_dd$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_emc_trespass$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_map$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_map26$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_rbuf$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_read$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_reset$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_scan$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_test_rwbuf$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_xcopy$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sginfo$(EXEEXT) sgm_dd$(EXEEXT) \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sgp_dd$(EXEEXT)
 @OS_WIN32_MINGW_TRUE@am__EXEEXT_2 = sg_scan$(EXEEXT)
 @OS_WIN32_CYGWIN_TRUE@am__EXEEXT_3 = sg_scan$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)"
@@ -278,7 +285,8 @@ sg_sat_set_features_SOURCES = sg_sat_set_features.c
 sg_sat_set_features_OBJECTS = sg_sat_set_features.$(OBJEXT)
 sg_sat_set_features_DEPENDENCIES = ../lib/libsgutils2.la
 am__sg_scan_SOURCES_DIST = sg_scan_linux.c sg_scan_win32.c
-@OS_LINUX_TRUE@am__objects_1 = sg_scan_linux.$(OBJEXT)
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@am__objects_1 =  \
+@OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_scan_linux.$(OBJEXT)
 @OS_WIN32_MINGW_TRUE@am__objects_2 = sg_scan_win32.$(OBJEXT)
 @OS_WIN32_CYGWIN_TRUE@am__objects_3 = sg_scan_win32.$(OBJEXT)
 am_sg_scan_OBJECTS = $(am__objects_1) $(am__objects_2) \

@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.09 20210605";
+static const char * version_str = "2.09 20210609";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -160,9 +160,10 @@ using namespace std;
 #define FT_DEV_NULL 8           /* either "/dev/null" or "." as filename */
 #define FT_ST 16                /* filetype is st char device (tape) */
 #define FT_BLOCK 32             /* filetype is a block device */
-#define FT_RANDOM_0_FF 64       /* iflag=00, iflag=ff and iflag=random
+#define FT_FIFO 64              /* fifo (named or unnamed pipe (stdout)) */
+#define FT_RANDOM_0_FF 128      /* iflag=00, iflag=ff and iflag=random
                                    override if=IFILE */
-#define FT_ERROR 128            /* couldn't "stat" file */
+#define FT_ERROR 256            /* couldn't "stat" file */
 
 #define DEV_NULL_MINOR_NUM 3
 
@@ -221,6 +222,7 @@ struct global_collection
     atomic<int64_t> in_rem_count;     /*  | count of remaining in blocks */
     atomic<int> in_partial;           /*  | */
     atomic<bool> in_stop;             /*  | */
+    off_t in_st_size;                 /* Only for FT_OTHER (regular) file */
     pthread_mutex_t in_mutex;         /* -/ */
     int nmrqs;                        /* Number of multi-reqs for sg v4 */
     int outfd;
@@ -237,6 +239,7 @@ struct global_collection
     atomic<int64_t> out_rem_count;    /*  | count of remaining out blocks */
     atomic<int> out_partial;          /*  | */
     atomic<bool> out_stop;            /*  | */
+    off_t out_st_size;                /* Only for FT_OTHER (regular) file */
     pthread_mutex_t out_mutex;        /*  | */
     pthread_cond_t out_sync_cv;       /*  | hold writes until "in order" */
     pthread_mutex_t out2_mutex;
@@ -879,6 +882,35 @@ tsafe_strerror(int code, char * ebp)
 
 
 static int
+dd_filetype(const char * filename, off_t & st_size)
+{
+    struct stat st;
+    size_t len = strlen(filename);
+
+    if ((1 == len) && ('.' == filename[0]))
+        return FT_DEV_NULL;
+    if (stat(filename, &st) < 0)
+        return FT_ERROR;
+    if (S_ISCHR(st.st_mode)) {
+        if ((MEM_MAJOR == major(st.st_rdev)) &&
+            (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
+            return FT_DEV_NULL;
+        if (RAW_MAJOR == major(st.st_rdev))
+            return FT_RAW;
+        if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
+            return FT_SG;
+        if (SCSI_TAPE_MAJOR == major(st.st_rdev))
+            return FT_ST;
+    } else if (S_ISBLK(st.st_mode))
+        return FT_BLOCK;
+    else if (S_ISFIFO(st.st_mode))
+        return FT_FIFO;
+    st_size = st.st_size;
+    return FT_OTHER;
+}
+
+#if 0
+static int
 dd_filetype(const char * filename)
 {
     struct stat st;
@@ -902,6 +934,7 @@ dd_filetype(const char * filename)
         return FT_BLOCK;
     return FT_OTHER;
 }
+#endif
 
 static void
 usage(int pg_num)
@@ -2418,7 +2451,6 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
             }
         }
         if (slen > 0) {
-pr2serr(">>>>>>>>>>>> %s: slen=%d\n", __func__, slen);
             struct sg_scsi_sense_hdr ssh;
             const uint8_t *sbp = (const uint8_t *)
                         (sb_in_co ? ctl_v4p->response : a_v4p->response);
@@ -3517,7 +3549,6 @@ do_v4:
         h4p->info = 0;
         h4p->din_resid = 0;
     }
-pr2serr(">>>>> %s: h4p->response: %sNULL, max_slen=%d\n", __func__, h4p->response ? "non-" : "", h4p->max_response_len);
     while (((res = ioctl(fd, SG_IORECEIVE, h4p)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno))) {
         if (EAGAIN == errno) {
@@ -3539,11 +3570,8 @@ pr2serr(">>>>> %s: h4p->response: %sNULL, max_slen=%d\n", __func__, h4p->respons
         perror("finishing io [SG_IORECEIVE] on sg device, error");
         return -1;
     }
-pr2serr(">>>>> %s: h4p->response_len=%d\n", __func__, h4p->response_len);
-    if (mout_if && (0 == h4p->info) && (0 == h4p->din_resid)) {
-pr2serr("%s: META_OUT_IF set plus info and resid are zero, skip\n", __func__);
+    if (mout_if && (0 == h4p->info) && (0 == h4p->din_resid))
         goto all_good;
-    }
     if (rep != (Rq_elem *)h4p->usr_ptr)
         err_exit(0, "sg_finish_io: bad usr_ptr, request-response mismatch\n");
     res = sg_err_category_new(h4p->device_status, h4p->transport_status,
@@ -4470,7 +4498,7 @@ main(int argc, char * argv[])
         clp->infp = ccp;
         clp->infd = -1;
     } else if (inf[0] && ('-' != inf[0])) {
-        clp->in_type = dd_filetype(inf);
+        clp->in_type = dd_filetype(inf, clp->in_st_size);
 
         if (FT_ERROR == clp->in_type) {
             pr2serr("%sunable to access %s\n", my_name, inf);
@@ -4524,7 +4552,7 @@ main(int argc, char * argv[])
     if (outf[0])
         clp->ofile_given = true;
     if (outf[0] && ('-' != outf[0])) {
-        clp->out_type = dd_filetype(outf);
+        clp->out_type = dd_filetype(outf, clp->out_st_size);
 
         if ((FT_SG != clp->out_type) && clp->verify) {
             pr2serr("%s --verify only supported by sg OFILEs\n", my_name);
@@ -4598,8 +4626,9 @@ main(int argc, char * argv[])
     if (out2f[0])
         clp->ofile2_given = true;
     if (out2f[0] && ('-' != out2f[0])) {
-        clp->out2_type = dd_filetype(out2f);
+	off_t out2_st_size;
 
+        clp->out2_type = dd_filetype(out2f, out2_st_size);
         if (FT_ST == clp->out2_type) {
             pr2serr("%sunable to use scsi tape device %s\n", my_name, out2f);
             return SG_LIB_FILE_ERROR;
@@ -4704,7 +4733,8 @@ main(int argc, char * argv[])
             clp->unbalanced_mrq = true;
     }
     if (outregf[0]) {
-        int ftyp = dd_filetype(outregf);
+	off_t outrf_st_size;
+        int ftyp = dd_filetype(outregf, outrf_st_size);
 
         clp->outreg_type = ftyp;
         if (! ((FT_OTHER == ftyp) || (FT_ERROR == ftyp) ||
@@ -4767,6 +4797,13 @@ main(int argc, char * argv[])
                         "device=%d\n", inf, clp->bs, in_sect_sz);
                 in_num_sect = -1;
             }
+        } else if (FT_OTHER == clp->in_type) {
+            in_num_sect = clp->in_st_size / clp->bs;
+            if (clp->in_st_size % clp->bs) {
+                ++in_num_sect;
+                pr2serr("Warning: the file size of %s is not a multiple of BS "
+                        "[%d]\n", inf, clp->bs);
+            }
         }
         if (in_num_sect > clp->skip)
             in_num_sect -= clp->skip;
@@ -4804,6 +4841,13 @@ main(int argc, char * argv[])
                 pr2serr("logical block size on %s confusion: bs=%d, from "
                         "device=%d\n", outf, clp->bs, out_sect_sz);
                 out_num_sect = -1;
+            }
+        } else if (FT_OTHER == clp->out_type) {
+            out_num_sect = clp->out_st_size / clp->bs;
+            if (clp->out_st_size % clp->bs) {
+                ++out_num_sect;
+                pr2serr("Warning: the file size of %s is not a multiple of BS "
+                        "[%d]\n", outf, clp->bs);
             }
         }
         if (out_num_sect > clp->seek)

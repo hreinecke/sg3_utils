@@ -661,8 +661,14 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+PT_DUMMY_FALSE
+PT_DUMMY_TRUE
 DEBUG_FALSE
 DEBUG_TRUE
+OS_OPENBSD_FALSE
+OS_OPENBSD_TRUE
+OS_NETBSD_FALSE
+OS_NETBSD_TRUE
 OS_ANDROID_FALSE
 OS_ANDROID_TRUE
 OS_WIN32_CYGWIN_FALSE
@@ -812,6 +818,7 @@ with_gnu_ld
 with_sysroot
 enable_libtool_lock
 enable_debug
+enable_pt_dummy
 enable_linuxbsg
 enable_win32_spt_direct
 enable_scsistrings
@@ -1470,7 +1477,8 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
-  --enable-debug    Turn on debugging
+  --enable-debug          Turn on debugging
+  --enable-pt_dummy       pass-through codes compiles, does nothing
   --disable-linuxbsg      option ignored, this is placeholder
   --enable-win32-spt-direct
                           enable Win32 SPT Direct
@@ -13248,6 +13256,14 @@ printf "%s\n" "#define HAVE_NVME 1" >>confdefs.h
 
 printf "%s\n" "#define SG_LIB_SOLARIS 1" >>confdefs.h
 ;;
+        *-*-netbsd*)
+
+printf "%s\n" "#define SG_LIB_NETBSD 1" >>confdefs.h
+;;
+        *-*-openbsd*)
+
+printf "%s\n" "#define SG_LIB_OPENBSD 1" >>confdefs.h
+;;
         *-*-osf*)
 
 printf "%s\n" "#define SG_LIB_OSF1 1" >>confdefs.h
@@ -13341,6 +13357,22 @@ else
   OS_ANDROID_FALSE=
 fi
 
+ if echo $host_os | grep 'netbsd' > /dev/null; then
+  OS_NETBSD_TRUE=
+  OS_NETBSD_FALSE='#'
+else
+  OS_NETBSD_TRUE='#'
+  OS_NETBSD_FALSE=
+fi
+
+ if echo $host_os | grep 'openbsd' > /dev/null; then
+  OS_OPENBSD_TRUE=
+  OS_OPENBSD_FALSE='#'
+else
+  OS_OPENBSD_TRUE='#'
+  OS_OPENBSD_FALSE=
+fi
+
 
 # Check whether --enable-debug was given.
 if test ${enable_debug+y}
@@ -13360,6 +13392,27 @@ fi
 else
   DEBUG_TRUE='#'
   DEBUG_FALSE=
+fi
+
+
+# Check whether --enable-pt_dummy was given.
+if test ${enable_pt_dummy+y}
+then :
+  enableval=$enable_pt_dummy; case "${enableval}" in
+		  yes) pt_dummy=true ;;
+		  no)  pt_dummy=false ;;
+		  *) as_fn_error $? "bad value ${enableval} for --enable-dummy_pt" "$LINENO" 5 ;;
+	       esac
+else $as_nop
+  pt_dummy=false
+fi
+
+ if test x$pt_dummy = xtrue; then
+  PT_DUMMY_TRUE=
+  PT_DUMMY_FALSE='#'
+else
+  PT_DUMMY_TRUE='#'
+  PT_DUMMY_FALSE=
 fi
 
 
@@ -13587,8 +13640,20 @@ if test -z "${OS_ANDROID_TRUE}" && test -z "${OS_ANDROID_FALSE}"; then
   as_fn_error $? "conditional \"OS_ANDROID\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
+if test -z "${OS_NETBSD_TRUE}" && test -z "${OS_NETBSD_FALSE}"; then
+  as_fn_error $? "conditional \"OS_NETBSD\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${OS_OPENBSD_TRUE}" && test -z "${OS_OPENBSD_FALSE}"; then
+  as_fn_error $? "conditional \"OS_OPENBSD\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
 if test -z "${DEBUG_TRUE}" && test -z "${DEBUG_FALSE}"; then
   as_fn_error $? "conditional \"DEBUG\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${PT_DUMMY_TRUE}" && test -z "${PT_DUMMY_FALSE}"; then
+  as_fn_error $? "conditional \"PT_DUMMY\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

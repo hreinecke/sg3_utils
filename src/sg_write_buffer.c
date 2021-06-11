@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2021 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.29 20181112";    /* spc5r19 */
+static const char * version_str = "1.30 20210610";    /* spc6r05 */
 
 #define ME "sg_write_buffer: "
 #define DEF_XFER_LEN (8 * 1024 * 1024)
@@ -268,7 +268,7 @@ main(int argc, char * argv[])
              wb_len_given = true;
              break;
         case 'm':
-            if (isdigit(*optarg)) {
+            if (isdigit((uint8_t)*optarg)) {
                 wb_mode = sg_get_num(optarg);
                 if ((wb_mode < 0) || (wb_mode > 31)) {
                     pr2serr("argument to '--mode' should be in the range 0 "

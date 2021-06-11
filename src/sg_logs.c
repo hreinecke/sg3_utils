@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.82 20210503";    /* spc6r01 + sbc4r17 */
+static const char * version_str = "1.83 20210610";    /* spc6r05 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -800,7 +800,7 @@ find_vpn_by_acron(const char * vp_ap)
     for (vpp = vp_arr; vpp->acron; ++vpp) {
         len = strlen(vpp->acron);
         for (k = 0; k < len; ++k) {
-            if (tolower(vp_ap[k]) != vpp->acron[k])
+            if (tolower((uint8_t)vp_ap[k]) != (uint8_t)vpp->acron[k])
                 break;
         }
         if (k < len)
@@ -1216,7 +1216,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 const struct log_elem * lep;
                 char b[80];
 
-                if (isalpha(ccp[0])) {
+                if (isalpha((uint8_t)ccp[0])) {
                     if (strlen(ccp) >= (sizeof(b) - 1)) {
                         pr2serr("argument to '-p=' is too long\n");
                         return SG_LIB_SYNTAX_ERROR;
@@ -6773,7 +6773,7 @@ decode_pg_arg(struct opts_t * op)
     char * cp;
     char b[80];
 
-    if (isalpha(op->pg_arg[0])) {
+    if (isalpha((uint8_t)op->pg_arg[0])) {
         if (strlen(op->pg_arg) >= (sizeof(b) - 1)) {
             pr2serr("argument to '--page=' is too long\n");
             return SG_LIB_SYNTAX_ERROR;
@@ -6876,7 +6876,7 @@ main(int argc, char * argv[])
     }
     vb = op->verbose;
     if (op->vend_prod) {
-        if (isdigit(op->vend_prod[0]))
+        if (isdigit((uint8_t)op->vend_prod[0]))
             k = sg_get_num_nomult(op->vend_prod);
         else
             k = find_vpn_by_acron(op->vend_prod);

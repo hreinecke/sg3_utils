@@ -529,3 +529,22 @@ do_nvm_pt(struct sg_pt_base * vp, int submq, int timeout_secs, int verbose)
     if (verbose) { }
     return SCSI_PT_DO_NOT_SUPPORTED;
 }
+
+int
+check_pt_file_handle(int device_fd, const char * device_name, int vb)
+{
+    if (device_fd) {}
+    if (device_name) {}
+    if (vb) {}
+    return 0;
+}
+
+/* If a NVMe block device (which includes the NSID) handle is associated
+ * with 'vp', then its NSID is returned (values range from 0x1 to
+ * 0xffffffe). Otherwise 0 is returned. */
+uint32_t
+get_pt_nvme_nsid(const struct sg_pt_base * vp)
+{
+    if (vp) { }
+    return 0;
+}

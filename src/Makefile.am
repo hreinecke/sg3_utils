@@ -15,10 +15,12 @@ sg_scan_SOURCES =
 
 
 if OS_LINUX
+if !PT_DUMMY
 bin_PROGRAMS += \
 	sg_copy_results sg_dd sg_emc_trespass sg_map sg_map26 sg_rbuf \
 	sg_read sg_reset sg_scan sg_test_rwbuf sg_xcopy sginfo sgm_dd sgp_dd
 sg_scan_SOURCES += sg_scan_linux.c
+endif
 endif
 
 

@@ -2,21 +2,25 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20210607] [svn: r903]
+Changelog for pre-release sg3_utils-1.47 [20210610] [svn: r904]
   - sg_rep_zones: add support for REPORT ZONE DOMAINS and
     REPORT REALMS in this utility
   - sg_raw: fix prints of NVMe NVM command names
   - sg_ses: fix Windows problem "No command (cdb) given"
   - sg_logs: additions to Volume statistics lpage [ssc5r05c]
   - sg_vpd: fix do_hex type on some recent pages
-  - sg_lib: add sg_scsi_status_is_good(),
+  - sg_read_buffer: fix --length= problem
   - sg_dd, sgm_dd, sgp_dd: don't close negative file descriptors
+  - sg_lib: add sg_scsi_status_is_good(),
     sg_scsi_status_is_bad() and sg_get_zone_type_str()
     - pt_linux: fix verify(BytChk=0) which Linux SNTL translated
       to write, other SNTL cleanups
     - pt_linux_nvme: fix fua setting
     - pt: check_pt_file_handle() add return value of 5 for
       FreeBSD for nvme(cam)
+    - pt: new configure option --enable-pt_dummy builds the
+      library with sg_pt_dummy.c instead of OS specific code.
+      To experiment with --inhex= decoding on netbsd
   - move some hex files from examples to inhex directory
   - major rework of lib/sg_pt_freebsd.c; make SNTL as similar
     as feasible to the Linux implementation

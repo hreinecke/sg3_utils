@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2004-2018 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
+ * Copyright (c) 2004-2021 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.19 20180628";
+static const char * version_str = "1.20 20210610";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -357,13 +357,13 @@ build_state_arr(const char * inp, int * state_arr, int * state_arr_len,
     }
     for (k = 0; k < max_arr_len; ++k) {
         try_num = true;
-        if (isalpha(*lcp)) {
+        if (isalpha((uint8_t)*lcp)) {
             try_num = false;
-            switch (toupper(*lcp)) {
+            switch (toupper((uint8_t)*lcp)) {
             case 'A':
-                if ('N' == toupper(*(lcp + 1)))
+                if ('N' == toupper((uint8_t)*(lcp + 1)))
                     state_arr[k] = 1;
-                else if ('O' == toupper(*(lcp + 1)))
+                else if ('O' == toupper((uint8_t)*(lcp + 1)))
                     state_arr[k] = 0;
                 else
                     try_num = true;

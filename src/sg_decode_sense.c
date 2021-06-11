@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2019 Douglas Gilbert.
+ * Copyright (c) 2010-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.21 20190602";
+static const char * version_str = "1.22 20210610";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 255+8 */
 
@@ -347,7 +347,8 @@ main(int argc, char *argv[])
         if (op->verbose > 2)
             pr2serr("no_space str: %s\n", op->no_space_str);
         cp = op->no_space_str;
-        for (k = 0; isxdigit(cp[k]) && isxdigit(cp[k + 1]); k += 2) {
+        for (k = 0; isxdigit((uint8_t)cp[k]) &&
+                    isxdigit((uint8_t)cp[k + 1]); k += 2) {
             if (1 != sscanf(cp + k, "%2x", &ui)) {
                 pr2serr("bad no_space hex string: %s\n", cp);
                 return SG_LIB_SYNTAX_ERROR;

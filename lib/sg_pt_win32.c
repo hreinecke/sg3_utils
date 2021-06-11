@@ -1445,8 +1445,8 @@ pt_device_is_nvme(const struct sg_pt_base * vp)
 }
 
 /* If a NVMe block device (which includes the NSID) handle is associated
- *  * with 'vp', then its NSID is returned (values range from 0x1 to
- *   * 0xffffffe). Otherwise 0 is returned. */
+ * with 'vp', then its NSID is returned (values range from 0x1 to
+ * 0xffffffe). Otherwise 0 is returned. */
 uint32_t
 get_pt_nvme_nsid(const struct sg_pt_base * vp)
 {

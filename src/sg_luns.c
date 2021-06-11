@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2020 Douglas Gilbert.
+ * Copyright (c) 2004-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.45 20200708";      /* spc6r02 */
+static const char * version_str = "1.46 20210610";      /* spc6r05 */
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -503,7 +503,7 @@ main(int argc, char * argv[])
         if ('L' == toupper(cp[0])) {
             uint64_t ull;
 
-            if (('0' == cp[1]) && ('X' == toupper(cp[2])))
+            if (('0' == cp[1]) && ('X' == toupper((uint8_t)cp[2])))
                 k = sscanf(cp + 3, " %" SCNx64, &ull);
             else
                 k = sscanf(cp + 1, " %" SCNu64, &ull);

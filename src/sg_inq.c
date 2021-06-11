@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.11 20210430";  /* spc6r05 */
+static const char * version_str = "2.12 20210610";  /* spc6r05 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -4130,7 +4130,7 @@ main(int argc, char * argv[])
                     "implies a page\n");
             return SG_LIB_CONTRADICT;
         }
-        if (isalpha(op->page_arg[0])) {
+        if (isalpha((uint8_t)op->page_arg[0])) {
             vnp = sdp_find_vpd_by_acron(op->page_arg);
             if (NULL == vnp) {
 #ifdef SG_SCSI_STRINGS

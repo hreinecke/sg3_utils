@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.36 20210329";
+static const char * version_str = "1.36 20210610";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -320,11 +320,11 @@ main(int argc, char * argv[])
                 n = 0;
             } else {
                 if (verbose && (0 == k)) {
-                    char b[128];
+                    char bb[128];
 
                     pr2serr("    cdb: %s\n",
                             sg_get_command_str(rs_cdb, REQUEST_SENSE_CMDLEN,
-                                               true, sizeof(b), b));
+                                               true, sizeof(bb), bb));
                 }
                 rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
                 n = sg_cmds_process_resp(ptvp, "Request sense", rs, (0 == k),
@@ -413,11 +413,11 @@ main(int argc, char * argv[])
             n = 0;
         } else {
             if (verbose && (0 == k)) {
-                char b[128];
+                char bb[128];
 
                 pr2serr("    cdb: %s\n",
                         sg_get_command_str(rs_cdb, REQUEST_SENSE_CMDLEN,
-                                           true, sizeof(b), b));
+                                           true, sizeof(bb), bb));
             }
             rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
             n = sg_cmds_process_resp(ptvp, "Request sense", rs, (0 == k),
@@ -468,10 +468,10 @@ main(int argc, char * argv[])
                     most_recent_skey = ssh.sense_key;
                 }
                 if (not_raw_hex && ((1 == num_rs) || verbose)) {
-                    char b[144];
+                    char bb[144];
 
                     sg_get_sense_str(NULL, rsBuff, act_din_len,
-                                     false, sizeof(b), b);
+                                     false, sizeof(bb), bb);
                     pr2serr("data-in decoded as sense:\n%s\n", b);
                 }
             }

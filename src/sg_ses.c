@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.49 20210503";    /* ses4r04 */
+static const char * version_str = "2.50 20210610";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1046,7 +1046,7 @@ parse_index(struct opts_t *op)
         }
         op->ind_th = 0;
         op->ind_indiv = -1;
-    } else if (isdigit(b[0])) {
+    } else if (isdigit((uint8_t)b[0])) {
         n = sg_get_num_nomult(b);
         if ((n < 0) || (n > 255)) {
             pr2serr("bad numeric argument to '--index', expect number from 0 "
@@ -1157,7 +1157,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'A':       /* SAS address, assumed to be hex */
             cp = optarg;
-            if ((strlen(optarg) > 2) && ('X' == toupper(optarg[1])))
+            if ((strlen(optarg) > 2) && ('X' == toupper((uint8_t)optarg[1])))
                 cp = optarg + 2;
             if (1 != sscanf(cp, "%" SCNx64 "", &saddr)) {
                 pr2serr("bad argument to '--sas-addr=SA'\n");
@@ -1289,7 +1289,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->mask_ign = true;
             break;
         case 'p':
-            if (isdigit(optarg[0])) {
+            if (isdigit((uint8_t)optarg[0])) {
                 op->page_code = sg_get_num_nomult(optarg);
                 if ((op->page_code < 0) || (op->page_code > 255)) {
                     pr2serr("bad argument to '--page=PG' (0 to 255 "
@@ -1587,18 +1587,18 @@ parse_cgs_str(char * buff, struct tuple_acronym_val * tavp)
             }
         }
     }
-    if (isalpha(buff[0]))
+    if (isalpha((uint8_t)buff[0]))
         tavp->acron = buff;
     else {
         colp = strchr(buff, ':');
         if ((NULL == colp) || (buff == colp))
             return -1;
         *colp = '\0';
-        if (('0' == buff[0]) && ('X' == toupper(buff[1]))) {
+        if (('0' == buff[0]) && ('X' == toupper((uint8_t)buff[1]))) {
             if (1 != sscanf(buff + 2, "%x", &ui))
                 return -1;
             tavp->start_byte = ui;
-        } else if ('H' == toupper(*(colp - 1))) {
+        } else if ('H' == toupper((uint8_t)*(colp - 1))) {
             if (1 != sscanf(buff, "%x", &ui))
                 return -1;
             tavp->start_byte = ui;
@@ -4011,7 +4011,7 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
                 continue;
             }
             if (carry_over[0]) {
-                if (isxdigit(line[0])) {
+                if (isxdigit((uint8_t)line[0])) {
                     carry_over[1] = line[0];
                     carry_over[2] = '\0';
                     if (1 == sscanf(carry_over, "%x", &h))

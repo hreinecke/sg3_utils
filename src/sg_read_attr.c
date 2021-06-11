@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 Douglas Gilbert.
+ * Copyright (c) 2016-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.13 20191220";
+static const char * version_str = "1.14 20210610";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -323,7 +323,7 @@ find_sa_acron(const char * cp)
         for (mp = cp, k = 0; *mp; ++mp, ++k) {
             if (0 == anvp->acron[k])
                 return anvp->val;
-            if (tolower(*mp) != anvp->acron[k])
+            if (tolower((uint8_t)*mp) != (uint8_t)anvp->acron[k])
                 break;
         }
         if ((0 == *mp) && (0 == anvp->acron[k]))
@@ -827,7 +827,7 @@ main(int argc, char * argv[])
             op->o_readonly = true;
             break;
         case 's':
-           if (isdigit(*optarg)) {
+           if (isdigit((uint8_t)*optarg)) {
                op->sa = sg_get_num(optarg);
                if ((op->sa < 0) || (op->sa > 63)) {
                     pr2serr("bad argument to '--sa=SA', expect 0 to 63\n");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 Douglas Gilbert.
+ * Copyright (c) 2014-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -45,7 +45,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.18 20190513";    /* ses4r02 */
+static const char * version_str = "1.19 20210610";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -557,7 +557,7 @@ main(int argc, char * argv[])
              op->mc_len_given = true;
              break;
         case 'm':
-            if (isdigit(*optarg)) {
+            if (isdigit((uint8_t)*optarg)) {
                 op->mc_mode = sg_get_num_nomult(optarg);
                 if ((op->mc_mode < 0) || (op->mc_mode > 255)) {
                     pr2serr("argument to '--mode' should be in the range 0 "

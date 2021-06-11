@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2019 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2021 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * device.
  */
 
-static const char * version_str = "1.30 20191220";      /* spc5r22 */
+static const char * version_str = "1.31 20210608";      /* spc6r05 */
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -410,7 +410,8 @@ main(int argc, char * argv[])
     bool do_raw = false;
     bool verbose_given = false;
     bool version_given = false;
-    int res, c, len, k, inhex_len;
+    int res, c, len, k;
+    int inhex_len = 0;
     int sg_fd = -1;
     int do_help = 0;
     int do_hex = 0;
@@ -476,7 +477,7 @@ main(int argc, char * argv[])
             do_long = true;
             break;
         case 'm':
-            if (isdigit(*optarg)) {
+            if (isdigit((uint8_t)*optarg)) {
                 rb_mode = sg_get_num(optarg);
                 if ((rb_mode < 0) || (rb_mode > 31)) {
                     pr2serr("argument to '--mode' should be in the range 0 "
@@ -574,8 +575,6 @@ main(int argc, char * argv[])
         return 0;
     }
 
-    rb_len = 0;
-    inhex_len = 0;
     if (device_name && fname) {
         pr2serr("Confused: both DEVICE (%s) and --inhex= option given. One "
                 "only please\n", device_name);

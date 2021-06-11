@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 Douglas Gilbert.
+ * Copyright (c) 2017-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.24 20200429";
+static const char * version_str = "1.25 20210610";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -521,7 +521,7 @@ all_ascii_f_s(const char * cp, int num_of_f_chars)
     if (('0' == cp[0]) && (('x' == cp[1]) || ('X' == cp[1])))
         cp += 2;
     for ( ; num_of_f_chars >= 0 ; --num_of_f_chars, ++cp) {
-        if ('F' != toupper(*cp))
+        if ('F' != toupper((uint8_t)*cp))
             return false;
     }
     return true;
@@ -1375,8 +1375,8 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
             ret = sense_cat;
             break;
         case SG_LIB_CAT_ILLEGAL_REQ:
-	    if (vb)
-	        sg_print_command_len(x_cdb, cdb_len);
+            if (vb)
+                sg_print_command_len(x_cdb, cdb_len);
             ret = sense_cat;
             break;
         default:

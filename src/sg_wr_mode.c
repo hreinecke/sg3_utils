@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2018 Douglas Gilbert.
+ * Copyright (c) 2004-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.26 20180628";
+static const char * version_str = "1.27 20210610";
 
 #define ME "sg_wr_mode: "
 
@@ -151,7 +151,7 @@ build_mode_page(const char * inp, uint8_t * mp_arr, int * mp_arr_len,
                 continue;
             }
             if (carry_over[0]) {
-                if (isxdigit(line[0])) {
+                if (isxdigit((uint8_t)line[0])) {
                     carry_over[1] = line[0];
                     carry_over[2] = '\0';
                     if (1 == sscanf(carry_over, "%x", &h))

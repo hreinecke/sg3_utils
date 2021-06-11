@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.69 20210319";    /* spc6r05 */
+static const char * version_str = "0.70 20210610";    /* spc6r05 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -382,7 +382,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             return 0;
         case 'p':
             n = -2;
-            if (isdigit(optarg[0]))
+            if (isdigit((uint8_t)optarg[0]))
                 n = sg_get_num(optarg);
             else if ((2 == strlen(optarg)) && (0 == strcmp("-1", optarg)))
                 n = -1;
