@@ -665,6 +665,10 @@ PT_DUMMY_FALSE
 PT_DUMMY_TRUE
 DEBUG_FALSE
 DEBUG_TRUE
+OS_OTHER_FALSE
+OS_OTHER_TRUE
+OS_HAIKU_FALSE
+OS_HAIKU_TRUE
 OS_OPENBSD_FALSE
 OS_OPENBSD_TRUE
 OS_NETBSD_FALSE
@@ -683,6 +687,8 @@ OS_LINUX_FALSE
 OS_LINUX_TRUE
 OS_FREEBSD_FALSE
 OS_FREEBSD_TRUE
+os_libs
+os_cflags
 CPP
 GETOPT_O_FILES
 RT_LIB
@@ -13291,13 +13297,26 @@ printf "%s\n" "#define HAVE_NVME 1" >>confdefs.h
 
 		check_for_getrandom
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
-        *-*-linux-gnu* | *-*-linux* | *)
+        *-*-linux-gnu* | *-*-linux*)
 
 printf "%s\n" "#define SG_LIB_LINUX 1" >>confdefs.h
 
 		check_for_linux_sg_v4_hdr
 		check_for_getrandom
                 check_for_linux_nvme_headers;;
+        *-*-haiku*)
+
+printf "%s\n" "#define SG_LIB_HAIKU 1" >>confdefs.h
+
+                os_cflags=''
+
+                os_libs=''
+ ;;
+        *)
+
+printf "%s\n" "#define SG_LIB_OTHER 1" >>confdefs.h
+
+		isother=yes;;
 esac
 
 # Define platform-specific symbol.
@@ -13371,6 +13390,22 @@ fi
 else
   OS_OPENBSD_TRUE='#'
   OS_OPENBSD_FALSE=
+fi
+
+ if echo $host_os | grep '^haiku' > /dev/null; then
+  OS_HAIKU_TRUE=
+  OS_HAIKU_FALSE='#'
+else
+  OS_HAIKU_TRUE='#'
+  OS_HAIKU_FALSE=
+fi
+
+ if test "x$isother" = "xyes"; then
+  OS_OTHER_TRUE=
+  OS_OTHER_FALSE='#'
+else
+  OS_OTHER_TRUE='#'
+  OS_OTHER_FALSE=
 fi
 
 
@@ -13646,6 +13681,14 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${OS_OPENBSD_TRUE}" && test -z "${OS_OPENBSD_FALSE}"; then
   as_fn_error $? "conditional \"OS_OPENBSD\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${OS_HAIKU_TRUE}" && test -z "${OS_HAIKU_FALSE}"; then
+  as_fn_error $? "conditional \"OS_HAIKU\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${OS_OTHER_TRUE}" && test -z "${OS_OTHER_FALSE}"; then
+  as_fn_error $? "conditional \"OS_OTHER\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${DEBUG_TRUE}" && test -z "${DEBUG_FALSE}"; then

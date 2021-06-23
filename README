@@ -418,7 +418,7 @@ user reports are welcome as the author does not have equipment to test
 this.
 
 Other utilities in this package that use the SES Send and Receive commands,
-or the SNTL in the library are sg_senddiag, sg_inq and sg_readcap.
+or the SNTL in the library are sg_senddiag, sg_inq, sg_raw and sg_readcap.
 
 
 Command line processing
@@ -541,4 +541,4 @@ See https://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert		dgilbert@interlog.com
-4th May 2021
+17th June 2021

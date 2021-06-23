@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2020 Douglas Gilbert.
+ * Copyright (c) 2005-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
 
-/* Version 2.03 20200722 */
+/* Version 2.04 20210617 */
 
 #define OSF1_MAXDEV 64
 
@@ -660,6 +660,16 @@ check_pt_file_handle(int device_fd, const char * device_name, int vb)
     return 0;
 }
 
+/* Valid file handles (which is the return value) are >= 0 . Returns -1
+ * if there is no valid file handle. */
+int
+get_pt_file_handle(const struct sg_pt_base * vp)
+{
+    const struct sg_pt_osf1_scsi * ptp = &vp->impl;
+
+    return ptp->dev_fd;
+}
+
 /* If a NVMe block device (which includes the NSID) handle is associated
  * with 'vp', then its NSID is returned (values range from 0x1 to
  * 0xffffffe). Otherwise 0 is returned. */
@@ -675,4 +685,38 @@ get_pt_result(const struct sg_pt_base * vp)
 {
     if (vp) { }
     return 0;
+}
+
+/* Forget any previous dev_han and install the one given. May attempt to
+ * find file type (e.g. if pass-though) from OS so there could be an error.
+ * Returns 0 for success or the same value as get_scsi_pt_os_err()
+ * will return. dev_han should be >= 0 for a valid file handle or -1 . */
+int
+set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int vb)
+{
+    struct sg_pt_osf1_scsi * ptp = &vp->impl;
+
+    if (vb) {}
+    ptp->dev_fd = (dev_han < 0) ? -1 : dev_han;
+    ptp->in_err = 0;
+    ptp->os_err = 0;
+    ptp->is_nvme = false;
+    return 0;
+}
+
+void
+set_scsi_pt_transport_err(struct sg_pt_base * vp, int err)
+{
+    if (vp) { }
+    if (err) { }
+}
+
+void
+set_pt_metadata_xfer(struct sg_pt_base * vp, uint8_t * mdxferp,
+                     uint32_t mdxfer_len, bool out_true)
+{
+    if (vp) { }
+    if (mdxferp) { }
+    if (mdxfer_len) { }
+    if (out_true) { }
 }

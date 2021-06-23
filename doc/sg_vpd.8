@@ -1,4 +1,4 @@
-.TH SG_VPD "8" "March 2021" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_VPD "8" "June 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
@@ -313,6 +313,22 @@ hexadecimal by default. Next we only decode T10 specified VPD pages
 excluding vendor specific VPD pages that start at page number 0xc0:
 .PP
    # sg_vpd \-\-all \-\-page=0xbf \-\-raw \-\-inhex=all_vpds.bin
+.PP
+In Linux, binary images of some important VPD page responses (e.g. 0, 80h
+and 83h) are cached in files within the sysfs pseudo file system. Since
+VPD pages hardly ever change their contents, decoding those files will
+give the same output as probing the device with the added benefit that
+decoding those files doesn't need root permissions. The long and short
+forms are shown:
+.PP
+   sg_vpd \-\-raw \-\-inhex=/sys/class/scsi_generic/sg3/device/vpd_pg83
+.PP
+   sg_vpd \-rI /sys/class/scsi_generic/sg3/device/vpd_pg83
+.PP
+If /dev/sg3 is a disk at 2:0:0:0 , then this invocation should give more
+verbose output but essentially the same as the previous two examples.
+.PP
+   sg_vpd \-v \-r \-I /sys/class/scsi_disk/2:0:0:0/device/vpd_pg83
 .PP
 Further examples can be found on the https://sg.danny.cz/sg/sg3_utils.html
 web page.

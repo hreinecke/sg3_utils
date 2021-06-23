@@ -23,7 +23,53 @@
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
 
-/* Version 1.01 20210609 */
+/* Version 1.02 20210618 */
+
+/* List of function names with external linkage that need to be defined
+ *
+ *   check_pt_file_handle
+ *   clear_scsi_pt_obj
+ *   construct_scsi_pt_obj
+ *   construct_scsi_pt_obj_with_fd
+ *   destruct_scsi_pt_obj
+ *   do_scsi_pt
+ *   do_nvm_pt
+ *   get_pt_actual_lengths
+ *   get_pt_duration_ns
+ *   get_pt_file_handle
+ *   get_pt_nvme_nsid
+ *   get_pt_req_lengths
+ *   get_pt_result
+ *   get_scsi_pt_cdb_buf
+ *   get_scsi_pt_cdb_len
+ *   get_scsi_pt_duration_ms
+ *   get_scsi_pt_os_err
+ *   get_scsi_pt_os_err_str
+ *   get_scsi_pt_resid
+ *   get_scsi_pt_result_category
+ *   get_scsi_pt_sense_buf
+ *   get_scsi_pt_sense_len
+ *   get_scsi_pt_status_response
+ *   get_scsi_pt_transport_err
+ *   get_scsi_pt_transport_err_str
+ *   partial_clear_scsi_pt_obj
+ *   pt_device_is_nvme
+ *   scsi_pt_close_device
+ *   scsi_pt_open_device
+ *   scsi_pt_open_flags
+ *   set_pt_file_handle
+ *   set_pt_metadata_xfer
+ *   set_scsi_pt_cdb
+ *   set_scsi_pt_data_in
+ *   set_scsi_pt_data_out
+ *   set_scsi_pt_flags
+ *   set_scsi_pt_packet_id
+ *   set_scsi_pt_sense
+ *   set_scsi_pt_tag
+ *   set_scsi_pt_task_attr
+ *   set_scsi_pt_task_management
+ *   set_scsi_pt_transport_err
+ */
 
 /* Simply defines all the functions needed by the pt interface (see sg_pt.h).
  * They do nothing. This allows decoding of hex files (e.g. with the --in=
@@ -344,6 +390,15 @@ check_pt_file_handle(int device_fd, const char * device_name, int vb)
     return 0;
 }
 
+/* Valid file handles (which is the return value) are >= 0 . Returns -1
+ * if there is no valid file handle. */
+int
+get_pt_file_handle(const struct sg_pt_base * vp)
+{
+    if (vp) { }
+    return -1;
+}
+
 /* If a NVMe block device (which includes the NSID) handle is associated
  * with 'vp', then its NSID is returned (values range from 0x1 to
  * 0xffffffe). Otherwise 0 is returned. */
@@ -359,4 +414,30 @@ get_pt_result(const struct sg_pt_base * vp)
 {
     if (vp) { }
     return 0;
+}
+
+int
+set_pt_file_handle(struct sg_pt_base * vp, int dev_han, int vb)
+{
+    if (vp) { }
+    if (dev_han) { }
+    if (vb) { }
+    return 0;
+}
+
+void
+set_pt_metadata_xfer(struct sg_pt_base * vp, uint8_t * mdxferp,
+                     uint32_t mdxfer_len, bool out_true)
+{
+    if (vp) { }
+    if (mdxferp) { }
+    if (mdxfer_len) { }
+    if (out_true) { }
+}
+
+void
+set_scsi_pt_transport_err(struct sg_pt_base * vp, int err)
+{
+    if (vp) { }
+    if (err) { }
 }

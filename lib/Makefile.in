@@ -100,8 +100,11 @@ host_triplet = @host@
 @OS_FREEBSD_TRUE@@PT_DUMMY_FALSE@am__append_6 = sg_pt_freebsd.c
 @OS_SOLARIS_TRUE@am__append_7 = sg_pt_solaris.c
 @OS_OSF_TRUE@am__append_8 = sg_pt_osf1.c
-@OS_NETBSD_TRUE@am__append_9 = sg_pt_dummy.c
-@OS_OPENBSD_TRUE@am__append_10 = sg_pt_dummy.c
+@OS_HAIKU_TRUE@@PT_DUMMY_TRUE@am__append_9 = sg_pt_dummy.c
+@OS_HAIKU_TRUE@@PT_DUMMY_FALSE@am__append_10 = sg_pt_haiku.c
+@OS_NETBSD_TRUE@am__append_11 = sg_pt_dummy.c
+@OS_OPENBSD_TRUE@am__append_12 = sg_pt_dummy.c
+@OS_OTHER_TRUE@am__append_13 = sg_pt_dummy.c
 subdir = lib
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -145,7 +148,7 @@ am__libsgutils2_la_SOURCES_DIST = sg_lib.c sg_lib_data.c \
 	sg_cmds_basic.c sg_cmds_basic2.c sg_cmds_extra.c sg_cmds_mmc.c \
 	sg_pt_common.c sg_pt_dummy.c sg_pt_linux.c sg_io_linux.c \
 	sg_pt_linux_nvme.c sg_pt_win32.c sg_pt_freebsd.c \
-	sg_pt_solaris.c sg_pt_osf1.c
+	sg_pt_solaris.c sg_pt_osf1.c sg_pt_haiku.c
 @OS_LINUX_TRUE@@PT_DUMMY_TRUE@am__objects_1 = sg_pt_dummy.lo
 @OS_LINUX_TRUE@@PT_DUMMY_FALSE@am__objects_2 = sg_pt_linux.lo \
 @OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_io_linux.lo \
@@ -156,14 +159,18 @@ am__libsgutils2_la_SOURCES_DIST = sg_lib.c sg_lib_data.c \
 @OS_FREEBSD_TRUE@@PT_DUMMY_FALSE@am__objects_6 = sg_pt_freebsd.lo
 @OS_SOLARIS_TRUE@am__objects_7 = sg_pt_solaris.lo
 @OS_OSF_TRUE@am__objects_8 = sg_pt_osf1.lo
-@OS_NETBSD_TRUE@am__objects_9 = sg_pt_dummy.lo
-@OS_OPENBSD_TRUE@am__objects_10 = sg_pt_dummy.lo
+@OS_HAIKU_TRUE@@PT_DUMMY_TRUE@am__objects_9 = sg_pt_dummy.lo
+@OS_HAIKU_TRUE@@PT_DUMMY_FALSE@am__objects_10 = sg_pt_haiku.lo
+@OS_NETBSD_TRUE@am__objects_11 = sg_pt_dummy.lo
+@OS_OPENBSD_TRUE@am__objects_12 = sg_pt_dummy.lo
+@OS_OTHER_TRUE@am__objects_13 = sg_pt_dummy.lo
 am_libsgutils2_la_OBJECTS = sg_lib.lo sg_lib_data.lo sg_cmds_basic.lo \
 	sg_cmds_basic2.lo sg_cmds_extra.lo sg_cmds_mmc.lo \
 	sg_pt_common.lo $(am__objects_1) $(am__objects_2) \
 	$(am__objects_3) $(am__objects_4) $(am__objects_5) \
 	$(am__objects_6) $(am__objects_7) $(am__objects_8) \
-	$(am__objects_9) $(am__objects_10)
+	$(am__objects_9) $(am__objects_10) $(am__objects_11) \
+	$(am__objects_12) $(am__objects_13)
 libsgutils2_la_OBJECTS = $(am_libsgutils2_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -193,9 +200,10 @@ am__depfiles_remade = ./$(DEPDIR)/sg_cmds_basic.Plo \
 	./$(DEPDIR)/sg_cmds_mmc.Plo ./$(DEPDIR)/sg_io_linux.Plo \
 	./$(DEPDIR)/sg_lib.Plo ./$(DEPDIR)/sg_lib_data.Plo \
 	./$(DEPDIR)/sg_pt_common.Plo ./$(DEPDIR)/sg_pt_dummy.Plo \
-	./$(DEPDIR)/sg_pt_freebsd.Plo ./$(DEPDIR)/sg_pt_linux.Plo \
-	./$(DEPDIR)/sg_pt_linux_nvme.Plo ./$(DEPDIR)/sg_pt_osf1.Plo \
-	./$(DEPDIR)/sg_pt_solaris.Plo ./$(DEPDIR)/sg_pt_win32.Plo
+	./$(DEPDIR)/sg_pt_freebsd.Plo ./$(DEPDIR)/sg_pt_haiku.Plo \
+	./$(DEPDIR)/sg_pt_linux.Plo ./$(DEPDIR)/sg_pt_linux_nvme.Plo \
+	./$(DEPDIR)/sg_pt_osf1.Plo ./$(DEPDIR)/sg_pt_solaris.Plo \
+	./$(DEPDIR)/sg_pt_win32.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -350,6 +358,8 @@ localstatedir = @localstatedir@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
+os_cflags = @os_cflags@
+os_libs = @os_libs@
 pdfdir = @pdfdir@
 prefix = @prefix@
 program_transform_name = @program_transform_name@
@@ -368,7 +378,8 @@ libsgutils2_la_SOURCES = sg_lib.c sg_lib_data.c sg_cmds_basic.c \
 	$(am__append_1) $(am__append_2) $(am__append_3) \
 	$(am__append_4) $(am__append_5) $(am__append_6) \
 	$(am__append_7) $(am__append_8) $(am__append_9) \
-	$(am__append_10)
+	$(am__append_10) $(am__append_11) $(am__append_12) \
+	$(am__append_13)
 @DEBUG_FALSE@DBG_CFLAGS = 
 
 # This is active if --enable-debug given to ./configure
@@ -481,6 +492,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_pt_common.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_pt_dummy.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_pt_freebsd.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_pt_haiku.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_pt_linux.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_pt_linux_nvme.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_pt_osf1.Plo@am__quote@ # am--include-marker
@@ -658,6 +670,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sg_pt_common.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_dummy.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_freebsd.Plo
+	-rm -f ./$(DEPDIR)/sg_pt_haiku.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_linux.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_linux_nvme.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_osf1.Plo
@@ -718,6 +731,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sg_pt_common.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_dummy.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_freebsd.Plo
+	-rm -f ./$(DEPDIR)/sg_pt_haiku.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_linux.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_linux_nvme.Plo
 	-rm -f ./$(DEPDIR)/sg_pt_osf1.Plo

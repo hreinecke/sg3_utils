@@ -129,6 +129,9 @@
 /* sg3_utils on FreeBSD */
 #undef SG_LIB_FREEBSD
 
+/* sg3_utils on Haiku */
+#undef SG_LIB_HAIKU
+
 /* sg3_utils on linux */
 #undef SG_LIB_LINUX
 
@@ -143,6 +146,9 @@
 
 /* sg3_utils on Tru64 UNIX */
 #undef SG_LIB_OSF1
+
+/* sg3_utils on other */
+#undef SG_LIB_OTHER
 
 /* sg3_utils on Solaris */
 #undef SG_LIB_SOLARIS

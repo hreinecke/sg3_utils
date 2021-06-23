@@ -106,11 +106,18 @@ case "${host}" in
 		AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])
 		check_for_getrandom
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
-        *-*-linux-gnu* | *-*-linux* | *)
+        *-*-linux-gnu* | *-*-linux*)
                 AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
 		check_for_linux_sg_v4_hdr
 		check_for_getrandom
                 check_for_linux_nvme_headers;;
+        *-*-haiku*)
+		AC_DEFINE_UNQUOTED(SG_LIB_HAIKU, 1, [sg3_utils on Haiku])
+                AC_SUBST([os_cflags], [''])
+                AC_SUBST([os_libs], ['']) ;;
+        *)
+                AC_DEFINE_UNQUOTED(SG_LIB_OTHER, 1, [sg3_utils on other])
+		isother=yes;;
 esac
 
 # Define platform-specific symbol.
@@ -123,6 +130,8 @@ AM_CONDITIONAL(OS_WIN32_CYGWIN, [echo $host_os | grep '^cygwin' > /dev/null])
 AM_CONDITIONAL(OS_ANDROID, [echo $host_os | grep 'android' > /dev/null])
 AM_CONDITIONAL(OS_NETBSD, [echo $host_os | grep 'netbsd' > /dev/null])
 AM_CONDITIONAL(OS_OPENBSD, [echo $host_os | grep 'openbsd' > /dev/null])
+AM_CONDITIONAL(OS_HAIKU, [echo $host_os | grep '^haiku' > /dev/null])
+AM_CONDITIONAL(OS_OTHER, [test "x$isother" = "xyes"])
 
 AC_ARG_ENABLE([debug],
 	      [  --enable-debug          Turn on debugging],

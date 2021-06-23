@@ -31,8 +31,10 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * scsi_pt_version_str = "3.17 20210503";
+static const char * scsi_pt_version_str = "3.18 20210617";
 
+/* List of external functions that need to be defined for each OS are
+ * listed at the top of sg_pt_dummy.c   */
 
 const char *
 scsi_pt_version()

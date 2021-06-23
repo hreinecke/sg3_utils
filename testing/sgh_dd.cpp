@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.09 20210609";
+static const char * version_str = "2.10 20210621";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -150,15 +150,11 @@ using namespace std;
 #define MAX_NUM_THREADS 1024 /* was SG_MAX_QUEUE with v3 driver */
 #define DEF_NUM_MRQS 0
 
-#ifndef RAW_MAJOR
-#define RAW_MAJOR 255   /*unlikely value */
-#endif
-
 #define FT_OTHER 1              /* filetype other than one of the following */
 #define FT_SG 2                 /* filetype is sg char device */
-#define FT_RAW 4                /* filetype is raw char device */
-#define FT_DEV_NULL 8           /* either "/dev/null" or "." as filename */
-#define FT_ST 16                /* filetype is st char device (tape) */
+#define FT_DEV_NULL 4           /* either /dev/null, /dev/zero or "." */
+#define FT_ST 8                 /* filetype is st char device (tape) */
+#define FT_CHAR 16              /* filetype is st char device (tape) */
 #define FT_BLOCK 32             /* filetype is a block device */
 #define FT_FIFO 64              /* fifo (named or unnamed pipe (stdout)) */
 #define FT_RANDOM_0_FF 128      /* iflag=00, iflag=ff and iflag=random
@@ -166,6 +162,7 @@ using namespace std;
 #define FT_ERROR 256            /* couldn't "stat" file */
 
 #define DEV_NULL_MINOR_NUM 3
+#define DEV_ZERO_MINOR_NUM 5
 
 #define EBUFF_SZ 768
 
@@ -455,21 +452,237 @@ pr2serr_lk(const char * fmt, ...)
     return n;
 }
 
-#if 0   // not used yet
 static void
-pr_errno_lk(int e_no, const char * fmt, ...)
+usage(int pg_num)
 {
-    char b[180];
-    va_list args;
+    if (pg_num > 3)
+        goto page4;
+    else if (pg_num > 2)
+        goto page3;
+    else if (pg_num > 1)
+        goto page2;
 
-    pthread_mutex_lock(&strerr_mut);
-    va_start(args, fmt);
-    vsnprintf(b, sizeof(b), fmt, args);
-    fprintf(stderr, "%s: %s\n", b, strerror(e_no));
-    va_end(args);
-    pthread_mutex_unlock(&strerr_mut);
+    pr2serr("Usage: sgh_dd  [bs=BS] [conv=CONVS] [count=COUNT] [ibs=BS] "
+            "[if=IFILE]\n"
+            "               [iflag=FLAGS] [obs=BS] [of=OFILE] [oflag=FLAGS] "
+            "[seek=SEEK]\n"
+            "               [skip=SKIP] [--help] [--version]\n\n");
+    pr2serr("               [ae=AEN[,MAEN]] [bpt=BPT] [cdbsz=6|10|12|16] "
+            "[coe=0|1]\n"
+            "               [dio=0|1] [elemsz_kb=EKB] [fail_mask=FM] "
+            "[fua=0|1|2|3]\n"
+            "               [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
+            "[of2=OFILE2]\n"
+            "               [ofreg=OFREG] [ofsplit=OSP] [sdt=SDT] "
+            "[sync=0|1]\n"
+            "               [thr=THR] [time=0|1|2[,TO]] [unshare=1|0] "
+            "[verbose=VERB]\n"
+            "               [--dry-run] [--prefetch] [-v|-vv|-vvv] "
+            "[--verbose]\n"
+            "               [--verify] [--version]\n\n"
+            "  where the main options (shown in first group above) are:\n"
+            "    bs          must be device logical block size (default "
+            "512)\n"
+            "    conv        comma separated list from: [nocreat,noerror,"
+            "notrunc,\n"
+            "                null,sync]\n"
+            "    count       number of blocks to copy (def: device size)\n"
+            "    if          file or device to read from (def: stdin)\n"
+            "    iflag       comma separated list from: [00,coe,defres,dio,"
+            "direct,dpo,\n"
+            "                dsync,excl,ff,fua,hipri,masync,mmap,mout_if,"
+            "mrq_immed,\n"
+            "                mrq_svb,nocreat,nodur,noxfer,null,qhead,"
+            "qtail,\n"
+            "                random,same_fds,v3,v4,wq_excl]\n"
+            "    of          file or device to write to (def: /dev/null "
+            "N.B. different\n"
+            "                from dd it defaults to stdout). If 'of=.' "
+            "uses /dev/null\n"
+            "    of2         second file or device to write to (def: "
+            "/dev/null)\n"
+            "    oflag       comma separated list from: [append,<<list from "
+            "iflag>>]\n"
+            "    seek        block position to start writing to OFILE\n"
+            "    skip        block position to start reading from IFILE\n"
+            "    --help|-h      output this usage message then exit\n"
+            "    --prefetch|-p    with verify: do pre-fetch first\n"
+            "    --verify|-x    do a verify (compare) operation [def: do a "
+            "copy]\n"
+            "    --version|-V   output version string then exit\n\n"
+            "Copy IFILE to OFILE, similar to dd command. This utility is "
+            "specialized for\nSCSI devices and uses multiple POSIX threads. "
+            "It expects one or both IFILE\nand OFILE to be sg devices. With "
+            "--verify option does a verify/compare\noperation instead of a "
+            "copy. This utility is Linux specific and uses the\nv4 sg "
+            "driver 'share' capability if available. Use '-hh', '-hhh' or "
+            "'-hhhh'\nfor more information.\n"
+           );
+    return;
+page2:
+    pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
+            "  where: operands have the form name=value and are pecular to "
+            "'dd'\n"
+            "         style commands, and options start with one or "
+            "two hyphens;\n"
+            "         the lesser used operands and option are:\n\n"
+            "    ae          AEN: abort every n commands (def: 0 --> don't "
+            "abort any)\n"
+            "                MAEN: abort every n mrq commands (def: 0 --> "
+            "don't)\n"
+            "                [requires commands with > 1 ms duration]\n"
+            "    bpt         is blocks_per_transfer (default is 128)\n"
+            "    cdbsz       size of SCSI READ, WRITE or VERIFY cdb_s "
+            "(default is 10)\n"
+            "    coe         continue on error, 0->exit (def), "
+            "1->zero + continue\n"
+            "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
+            "    elemsz_kb    scatter gather list element size in kilobytes "
+            "(def: 32[KB])\n"
+            "    fail_mask    1: misuse KEEP_SHARE flag; 0: nothing (def)\n"
+            "    fua         force unit access: 0->don't(def), 1->OFILE, "
+            "2->IFILE,\n"
+            "                3->OFILE+IFILE\n"
+            "    mrq         number of cmds placed in each sg call "
+            "(def: 0);\n"
+            "                may have trailing ',C', to send bulk cdb_s; "
+            "if preceded\n"
+            "                by 'I' then mrq only on IFILE, likewise 'O' "
+            "for OFILE\n"
+            "    noshare     0->use request sharing(def), 1->don't\n"
+            "    ofreg       OFREG is regular file or pipe to send what is "
+            "read from\n"
+            "                IFILE in the first half of each shared element\n"
+            "    ofsplit     split ofile write in two at block OSP (def: 0 "
+            "(no split))\n"
+            "    sdt         stall detection times: CRT[,ICT]. CRT: check "
+            "repetition\n"
+            "                time (after first) in seconds; ICT: initial "
+            "check time\n"
+            "                in milliseconds. Default: 3,300 . Use CRT=0 "
+            "to disable\n"
+            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
+            "after copy\n"
+            "    thr         is number of threads, must be > 0, default 4, "
+            "max 1024\n"
+            "    time        0->no timing, 1->calc throughput(def), "
+            "2->nanosec\n"
+            "                precision; TO is command timeout in seconds "
+            "(def: 60)\n"
+            "    unshare     0->don't explicitly unshare after share; 1->let "
+            "close do\n"
+            "                file unshare (default)\n"
+            "    verbose     increase verbosity\n"
+            "    --dry-run|-d    prepare but bypass copy/read\n"
+            "    --verbose|-v   increase verbosity of utility\n\n"
+            "Use '-hhh' or '-hhhh' for more information about flags.\n"
+           );
+    return;
+page3:
+    pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
+            "  where: 'iflag=<arg>' and 'oflag=<arg>' arguments are listed "
+            "below:\n\n"
+            "    00          use all zeros instead of if=IFILE (only in "
+            "iflags)\n"
+            "    append      append output to OFILE (assumes OFILE is "
+            "regular file)\n"
+            "    coe         continue of error (reading, fills with zeros)\n"
+            "    defres      keep default reserve buffer size (else its "
+            "bs*bpt)\n"
+            "    dio         sets the SG_FLAG_DIRECT_IO in sg requests\n"
+            "    direct      sets the O_DIRECT flag on open()\n"
+            "    dpo         sets the DPO (disable page out) in SCSI READs "
+            "and WRITEs\n"
+            "    dsync       sets the O_SYNC flag on open()\n"
+            "    excl        sets the O_EXCL flag on open()\n"
+            "    ff          use all 0xff bytes instead of if=IFILE (only in "
+            "iflags)\n"
+            "    fua         sets the FUA (force unit access) in SCSI READs "
+            "and WRITEs\n"
+            "    hipri       set HIPRI flag on command, uses blk_poll() to "
+            "complete\n"
+            "    masync      set 'more async' flag on this sg device\n"
+            "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
+            "with noshare\n"
+            "    mmap,mmap    when used twice, doesn't call munmap()\n"
+            "    mout_if     set META_OUT_IF flag on each request\n"
+            "    mrq_immed    if mrq active, do submit non-blocking (def: "
+            "ordered\n"
+            "                 blocking)\n"
+            "    mrq_svb     if mrq and sg->sg copy, do shared_variable_"
+            "blocking\n"
+            "    nocreat     will fail rather than create OFILE\n"
+            "    nodur       turns off command duration calculations\n"
+            "    noxfer      no transfer to/from the user space\n"
+            "    no_thresh   skip checking per fd max data xfer\n"
+            "    null        does nothing, placeholder\n"
+            "    qhead       queue new request at head of block queue\n"
+            "    qtail       queue new request at tail of block queue (def: "
+            "q at head)\n"
+            "    random      use random data instead of if=IFILE (only in "
+            "iflags)\n"
+            "    same_fds    each thread uses the same IFILE and OFILE(2) "
+            "file\n"
+            "                descriptors (def: each threads has own file "
+            "descriptors)\n"
+            "    swait       this option is now ignored\n"
+            "    v3          use v3 sg interface (def: v3 unless sg driver "
+            "is v4)\n"
+            "    v4          use v4 sg interface (def: v3 unless sg driver "
+            "is v4)\n"
+            "    wq_excl     set SG_CTL_FLAGM_EXCL_WAITQ on this sg fd\n"
+            "\n"
+            "Copies IFILE to OFILE (and to OFILE2 if given). If IFILE and "
+            "OFILE are sg\ndevices 'shared' mode is selected unless "
+            "'noshare' is given to 'iflag=' or\n'oflag='. of2=OFILE2 uses "
+            "'oflag=FLAGS'. When sharing, the data stays in a\nsingle "
+            "in-kernel buffer which is copied (or mmap-ed) to the user "
+            "space\nif the 'ofreg=OFREG' is given. Use '-hhhh' for more "
+            "information.\n"
+           );
+    return;
+page4:
+    pr2serr("pack_id:\n"
+            "These are ascending integers, starting at 1, associated with "
+            "each issued\nSCSI command. When both IFILE and OFILE are sg "
+            "devices, then the READ in\neach read-write pair is issued an "
+            "even pack_id and its WRITE pair is\ngiven the pack_id one "
+            "higher (i.e. an odd number). This enables a\n'cat '"
+            "/proc/scsi/sg/debug' user to see that progress is being "
+            "made.\n\n");
+    pr2serr("Debugging:\n"
+            "Apart from using one or more '--verbose' options which gets a "
+            "bit noisy\n'cat /proc/scsi/sg/debug' can give a good overview "
+            "of what is happening.\nThat does a sg driver object tree "
+            "traversal that does minimal locking\nto make sure that each "
+            "traversal is 'safe'. So it is important to note\nthe whole "
+            "tree is not locked. This means for fast devices the overall\n"
+            "tree state may change while the traversal is occurring. For "
+            "example,\nit has been observed that both the read- and write- "
+            "sides of a request\nshare show they are in 'active' state "
+            "which should not be possible.\nIt occurs because the read-"
+            "sie probably jumped out of active state and\nthe write-side "
+            "request entered it while some other nodes were being "
+            "printed.\n\n");
+    pr2serr("Busy state:\n"
+            "Busy state (abbreviated to 'bsy' in the /proc/scsi/sg/debug "
+            "output)\nis entered during request setup and completion. It "
+            "is intended to be\na temporary state. It should not block "
+            "but does sometimes (e.g. in\nblock_get_request()). Even so "
+            "that blockage should be short and if not\nthere is a "
+            "problem.\n\n");
+    pr2serr("--verify :\n"
+            "For comparing IFILE with OFILE. Does repeated sequences of: "
+            "READ(ifile)\nand uses data returned to send to VERIFY(ofile, "
+            "BYTCHK=1). So the OFILE\ndevice/disk is doing the actual "
+            "comparison. Stops on first miscompare.\n\n");
+    pr2serr("--prefetch :\n"
+            "Used with --verify option. Prepends a PRE-FETCH(ofile, IMMED) "
+            "to verify\nsequence. This should speed the trailing VERIFY by "
+            "making sure that\nthe data it needs for the comparison is "
+            "already in its cache.\n");
+    return;
 }
-#endif
 
 static void
 lk_print_command_len(const char *prefix, uint8_t * cmdp, int len, bool lock)
@@ -893,279 +1106,20 @@ dd_filetype(const char * filename, off_t & st_size)
         return FT_ERROR;
     if (S_ISCHR(st.st_mode)) {
         if ((MEM_MAJOR == major(st.st_rdev)) &&
-            (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
-            return FT_DEV_NULL;
-        if (RAW_MAJOR == major(st.st_rdev))
-            return FT_RAW;
+            ((DEV_NULL_MINOR_NUM == minor(st.st_rdev)) ||
+             (DEV_ZERO_MINOR_NUM == minor(st.st_rdev))))
+            return FT_DEV_NULL; /* treat /dev/null + /dev/zero the same */
         if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
             return FT_SG;
         if (SCSI_TAPE_MAJOR == major(st.st_rdev))
             return FT_ST;
+        return FT_CHAR;
     } else if (S_ISBLK(st.st_mode))
         return FT_BLOCK;
     else if (S_ISFIFO(st.st_mode))
         return FT_FIFO;
     st_size = st.st_size;
     return FT_OTHER;
-}
-
-#if 0
-static int
-dd_filetype(const char * filename)
-{
-    struct stat st;
-    size_t len = strlen(filename);
-
-    if ((1 == len) && ('.' == filename[0]))
-        return FT_DEV_NULL;
-    if (stat(filename, &st) < 0)
-        return FT_ERROR;
-    if (S_ISCHR(st.st_mode)) {
-        if ((MEM_MAJOR == major(st.st_rdev)) &&
-            (DEV_NULL_MINOR_NUM == minor(st.st_rdev)))
-            return FT_DEV_NULL;
-        if (RAW_MAJOR == major(st.st_rdev))
-            return FT_RAW;
-        if (SCSI_GENERIC_MAJOR == major(st.st_rdev))
-            return FT_SG;
-        if (SCSI_TAPE_MAJOR == major(st.st_rdev))
-            return FT_ST;
-    } else if (S_ISBLK(st.st_mode))
-        return FT_BLOCK;
-    return FT_OTHER;
-}
-#endif
-
-static void
-usage(int pg_num)
-{
-    if (pg_num > 3)
-        goto page4;
-    else if (pg_num > 2)
-        goto page3;
-    else if (pg_num > 1)
-        goto page2;
-
-    pr2serr("Usage: sgh_dd  [bs=BS] [conv=CONVS] [count=COUNT] [ibs=BS] "
-            "[if=IFILE]\n"
-            "               [iflag=FLAGS] [obs=BS] [of=OFILE] [oflag=FLAGS] "
-            "[seek=SEEK]\n"
-            "               [skip=SKIP] [--help] [--version]\n\n");
-    pr2serr("               [ae=AEN[,MAEN]] [bpt=BPT] [cdbsz=6|10|12|16] "
-            "[coe=0|1]\n"
-            "               [dio=0|1] [elemsz_kb=EKB] [fail_mask=FM] "
-            "[fua=0|1|2|3]\n"
-            "               [mrq=[I|O,]NRQS[,C]] [noshare=0|1] "
-            "[of2=OFILE2]\n"
-            "               [ofreg=OFREG] [ofsplit=OSP] [sdt=SDT] "
-            "[sync=0|1]\n"
-            "               [thr=THR] [time=0|1|2[,TO]] [unshare=1|0] "
-            "[verbose=VERB]\n"
-            "               [--dry-run] [--prefetch] [-v|-vv|-vvv] "
-            "[--verbose]\n"
-            "               [--verify] [--version]\n\n"
-            "  where the main options (shown in first group above) are:\n"
-            "    bs          must be device logical block size (default "
-            "512)\n"
-            "    conv        comma separated list from: [nocreat,noerror,"
-            "notrunc,\n"
-            "                null,sync]\n"
-            "    count       number of blocks to copy (def: device size)\n"
-            "    if          file or device to read from (def: stdin)\n"
-            "    iflag       comma separated list from: [00,coe,defres,dio,"
-            "direct,dpo,\n"
-            "                dsync,excl,ff,fua,hipri,masync,mmap,mout_if,"
-            "mrq_immed,\n"
-            "                mrq_svb,nocreat,nodur,noxfer,null,qhead,"
-            "qtail,\n"
-            "                random,same_fds,v3,v4,wq_excl]\n"
-            "    of          file or device to write to (def: /dev/null "
-            "N.B. different\n"
-            "                from dd it defaults to stdout). If 'of=.' "
-            "uses /dev/null\n"
-            "    of2         second file or device to write to (def: "
-            "/dev/null)\n"
-            "    oflag       comma separated list from: [append,<<list from "
-            "iflag>>]\n"
-            "    seek        block position to start writing to OFILE\n"
-            "    skip        block position to start reading from IFILE\n"
-            "    --help|-h      output this usage message then exit\n"
-            "    --prefetch|-p    with verify: do pre-fetch first\n"
-            "    --verify|-x    do a verify (compare) operation [def: do a "
-            "copy]\n"
-            "    --version|-V   output version string then exit\n\n"
-            "Copy IFILE to OFILE, similar to dd command. This utility is "
-            "specialized for\nSCSI devices and uses multiple POSIX threads. "
-            "It expects one or both IFILE\nand OFILE to be sg devices. With "
-            "--verify option does a verify/compare\noperation instead of a "
-            "copy. This utility is Linux specific and uses the\nv4 sg "
-            "driver 'share' capability if available. Use '-hh', '-hhh' or "
-            "'-hhhh'\nfor more information.\n"
-           );
-    return;
-page2:
-    pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
-            "  where: operands have the form name=value and are pecular to "
-            "'dd'\n"
-            "         style commands, and options start with one or "
-            "two hyphens;\n"
-            "         the lesser used operands and option are:\n\n"
-            "    ae          AEN: abort every n commands (def: 0 --> don't "
-            "abort any)\n"
-            "                MAEN: abort every n mrq commands (def: 0 --> "
-            "don't)\n"
-            "                [requires commands with > 1 ms duration]\n"
-            "    bpt         is blocks_per_transfer (default is 128)\n"
-            "    cdbsz       size of SCSI READ, WRITE or VERIFY cdb_s "
-            "(default is 10)\n"
-            "    coe         continue on error, 0->exit (def), "
-            "1->zero + continue\n"
-            "    dio         is direct IO, 1->attempt, 0->indirect IO (def)\n"
-            "    elemsz_kb    scatter gather list element size in kilobytes "
-            "(def: 32[KB])\n"
-            "    fail_mask    1: misuse KEEP_SHARE flag; 0: nothing (def)\n"
-            "    fua         force unit access: 0->don't(def), 1->OFILE, "
-            "2->IFILE,\n"
-            "                3->OFILE+IFILE\n"
-            "    mrq         number of cmds placed in each sg call "
-            "(def: 0);\n"
-            "                may have trailing ',C', to send bulk cdb_s; "
-            "if preceded\n"
-            "                by 'I' then mrq only on IFILE, likewise 'O' "
-            "for OFILE\n"
-            "    noshare     0->use request sharing(def), 1->don't\n"
-            "    ofreg       OFREG is regular file or pipe to send what is "
-            "read from\n"
-            "                IFILE in the first half of each shared element\n"
-            "    ofsplit     split ofile write in two at block OSP (def: 0 "
-            "(no split))\n"
-            "    sdt         stall detection times: CRT[,ICT]. CRT: check "
-            "repetition\n"
-            "                time (after first) in seconds; ICT: initial "
-            "check time\n"
-            "                in milliseconds. Default: 3,300 . Use CRT=0 "
-            "to disable\n"
-            "    sync        0->no sync(def), 1->SYNCHRONIZE CACHE on OFILE "
-            "after copy\n"
-            "    thr         is number of threads, must be > 0, default 4, "
-            "max 1024\n"
-            "    time        0->no timing, 1->calc throughput(def), "
-            "2->nanosec\n"
-            "                precision; TO is command timeout in seconds "
-            "(def: 60)\n"
-            "    unshare     0->don't explicitly unshare after share; 1->let "
-            "close do\n"
-            "                file unshare (default)\n"
-            "    verbose     increase verbosity\n"
-            "    --dry-run|-d    prepare but bypass copy/read\n"
-            "    --verbose|-v   increase verbosity of utility\n\n"
-            "Use '-hhh' or '-hhhh' for more information about flags.\n"
-           );
-    return;
-page3:
-    pr2serr("Syntax:  sgh_dd [operands] [options]\n\n"
-            "  where: 'iflag=<arg>' and 'oflag=<arg>' arguments are listed "
-            "below:\n\n"
-            "    00          use all zeros instead of if=IFILE (only in "
-            "iflags)\n"
-            "    append      append output to OFILE (assumes OFILE is "
-            "regular file)\n"
-            "    coe         continue of error (reading, fills with zeros)\n"
-            "    defres      keep default reserve buffer size (else its "
-            "bs*bpt)\n"
-            "    dio         sets the SG_FLAG_DIRECT_IO in sg requests\n"
-            "    direct      sets the O_DIRECT flag on open()\n"
-            "    dpo         sets the DPO (disable page out) in SCSI READs "
-            "and WRITEs\n"
-            "    dsync       sets the O_SYNC flag on open()\n"
-            "    excl        sets the O_EXCL flag on open()\n"
-            "    ff          use all 0xff bytes instead of if=IFILE (only in "
-            "iflags)\n"
-            "    fua         sets the FUA (force unit access) in SCSI READs "
-            "and WRITEs\n"
-            "    hipri       set HIPRI flag on command, uses blk_poll() to "
-            "complete\n"
-            "    masync      set 'more async' flag on this sg device\n"
-            "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
-            "with noshare\n"
-            "    mmap,mmap    when used twice, doesn't call munmap()\n"
-            "    mout_if     set META_OUT_IF flag on each request\n"
-            "    mrq_immed    if mrq active, do submit non-blocking (def: "
-            "ordered\n"
-            "                 blocking)\n"
-            "    mrq_svb     if mrq and sg->sg copy, do shared_variable_"
-            "blocking\n"
-            "    nocreat     will fail rather than create OFILE\n"
-            "    nodur       turns off command duration calculations\n"
-            "    noxfer      no transfer to/from the user space\n"
-            "    no_thresh   skip checking per fd max data xfer\n"
-            "    null        does nothing, placeholder\n"
-            "    qhead       queue new request at head of block queue\n"
-            "    qtail       queue new request at tail of block queue (def: "
-            "q at head)\n"
-            "    random      use random data instead of if=IFILE (only in "
-            "iflags)\n"
-            "    same_fds    each thread use the same IFILE and OFILE(2) "
-            "file\n"
-            "                descriptors (def: each threads has own file "
-            "descriptors)\n"
-            "    swait       this option is now ignored\n"
-            "    v3          use v3 sg interface (def: v3 unless sg driver "
-            "is v4)\n"
-            "    v4          use v4 sg interface (def: v3 unless sg driver "
-            "is v4)\n"
-            "    wq_excl     set SG_CTL_FLAGM_EXCL_WAITQ on this sg fd\n"
-            "\n"
-            "Copies IFILE to OFILE (and to OFILE2 if given). If IFILE and "
-            "OFILE are sg\ndevices 'shared' mode is selected unless "
-            "'noshare' is given to 'iflag=' or\n'oflag='. of2=OFILE2 uses "
-            "'oflag=FLAGS'. When sharing, the data stays in a\nsingle "
-            "in-kernel buffer which is copied (or mmap-ed) to the user "
-            "space\nif the 'ofreg=OFREG' is given. Use '-hhhh' for more "
-            "information.\n"
-           );
-    return;
-page4:
-    pr2serr("pack_id:\n"
-            "These are ascending integers, starting at 1, associated with "
-            "each issued\nSCSI command. When both IFILE and OFILE are sg "
-            "devices, then the READ in\neach read-write pair is issued an "
-            "even pack_id and its WRITE pair is\ngiven the pack_id one "
-            "higher (i.e. an odd number). This enables a\n'cat '"
-            "/proc/scsi/sg/debug' user to see that progress is being "
-            "made.\n\n");
-    pr2serr("Debugging:\n"
-            "Apart from using one or more '--verbose' options which gets a "
-            "bit noisy\n'cat /proc/scsi/sg/debug' can give a good overview "
-            "of what is happening.\nThat does a sg driver object tree "
-            "traversal that does minimal locking\nto make sure that each "
-            "traversal is 'safe'. So it is important to note\nthe whole "
-            "tree is not locked. This means for fast devices the overall\n"
-            "tree state may change while the traversal is occurring. For "
-            "example,\nit has been observed that both the read- and write- "
-            "sides of a request\nshare show they are in 'active' state "
-            "which should not be possible.\nIt occurs because the read-"
-            "sie probably jumped out of active state and\nthe write-side "
-            "request entered it while some other nodes were being "
-            "printed.\n\n");
-    pr2serr("Busy state:\n"
-            "Busy state (abbreviated to 'bsy' in the /proc/scsi/sg/debug "
-            "output)\nis entered during request setup and completion. It "
-            "is intended to be\na temporary state. It should not block "
-            "but does sometimes (e.g. in\nblock_get_request()). Even so "
-            "that blockage should be short and if not\nthere is a "
-            "problem.\n\n");
-    pr2serr("--verify :\n"
-            "For comparing IFILE with OFILE. Does repeated sequences of: "
-            "READ(ifile)\nand uses data returned to send to VERIFY(ofile, "
-            "BYTCHK=1). So the OFILE\ndevice/disk is doing the actual "
-            "comparison. Stops on first miscompare.\n\n");
-    pr2serr("--prefetch :\n"
-            "Used with --verify option. Prepends a PRE-FETCH(ofile, IMMED) "
-            "to verify\nsequence. This should speed the trailing VERIFY by "
-            "making sure that\nthe data it needs for the comparison is "
-            "already in its cache.\n");
-    return;
 }
 
 static inline void
@@ -4506,6 +4460,9 @@ main(int argc, char * argv[])
         } else if (FT_ST == clp->in_type) {
             pr2serr("%sunable to use scsi tape device %s\n", my_name, inf);
             return SG_LIB_FILE_ERROR;
+        } else if (FT_CHAR == clp->in_type) {
+            pr2serr("%sunable to use unknown char device %s\n", my_name, inf);
+            return SG_LIB_FILE_ERROR;
         } else if (FT_SG == clp->in_type) {
             clp->infd = sg_in_open(clp, inf, NULL, NULL);
             if (clp->infd < 0)
@@ -4557,48 +4514,37 @@ main(int argc, char * argv[])
         if ((FT_SG != clp->out_type) && clp->verify) {
             pr2serr("%s --verify only supported by sg OFILEs\n", my_name);
             return SG_LIB_FILE_ERROR;
-        }
-        if (FT_ST == clp->out_type) {
+        } else if (FT_ST == clp->out_type) {
             pr2serr("%sunable to use scsi tape device %s\n", my_name, outf);
             return SG_LIB_FILE_ERROR;
-        }
-        else if (FT_SG == clp->out_type) {
+        } else if (FT_CHAR == clp->out_type) {
+            pr2serr("%sunable to use unknown char device %s\n", my_name, outf);
+            return SG_LIB_FILE_ERROR;
+        } else if (FT_SG == clp->out_type) {
             clp->outfd = sg_out_open(clp, outf, NULL, NULL);
             if (clp->outfd < 0)
                 return -clp->outfd;
-        }
-        else if (FT_DEV_NULL == clp->out_type)
+        } else if (FT_DEV_NULL == clp->out_type)
             clp->outfd = -1; /* don't bother opening */
         else {
-            if (FT_RAW != clp->out_type) {
-                flags = O_WRONLY;
-                if (! clp->out_flags.nocreat)
-                    flags |= O_CREAT;
-                if (clp->out_flags.direct)
-                    flags |= O_DIRECT;
-                if (clp->out_flags.excl)
-                    flags |= O_EXCL;
-                if (clp->out_flags.dsync)
-                    flags |= O_SYNC;
-                if (clp->out_flags.append)
-                    flags |= O_APPEND;
+            flags = O_WRONLY;
+            if (! clp->out_flags.nocreat)
+                flags |= O_CREAT;
+            if (clp->out_flags.direct)
+                flags |= O_DIRECT;
+            if (clp->out_flags.excl)
+                flags |= O_EXCL;
+            if (clp->out_flags.dsync)
+                flags |= O_SYNC;
+            if (clp->out_flags.append)
+                flags |= O_APPEND;
 
-                if ((clp->outfd = open(outf, flags, 0666)) < 0) {
-                    err = errno;
-                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
-                             "writing", my_name, outf);
-                    perror(ebuff);
-                    return sg_convert_errno(err);
-                }
-            }
-            else {      /* raw output file */
-                if ((clp->outfd = open(outf, O_WRONLY)) < 0) {
-                    err = errno;
-                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for raw "
-                             "writing", my_name, outf);
-                    perror(ebuff);
-                    return sg_convert_errno(err);
-                }
+            if ((clp->outfd = open(outf, flags, 0666)) < 0) {
+                err = errno;
+                snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
+                         "writing", my_name, outf);
+                perror(ebuff);
+                return sg_convert_errno(err);
             }
             if (clp->seek > 0) {
                 off64_t offset = clp->seek;
@@ -4626,7 +4572,7 @@ main(int argc, char * argv[])
     if (out2f[0])
         clp->ofile2_given = true;
     if (out2f[0] && ('-' != out2f[0])) {
-	off_t out2_st_size;
+        off_t out2_st_size;
 
         clp->out2_type = dd_filetype(out2f, out2_st_size);
         if (FT_ST == clp->out2_type) {
@@ -4641,35 +4587,24 @@ main(int argc, char * argv[])
         else if (FT_DEV_NULL == clp->out2_type)
             clp->out2fd = -1; /* don't bother opening */
         else {
-            if (FT_RAW != clp->out2_type) {
-                flags = O_WRONLY;
-                if (! clp->out_flags.nocreat)
-                    flags |= O_CREAT;
-                if (clp->out_flags.direct)
-                    flags |= O_DIRECT;
-                if (clp->out_flags.excl)
-                    flags |= O_EXCL;
-                if (clp->out_flags.dsync)
-                    flags |= O_SYNC;
-                if (clp->out_flags.append)
-                    flags |= O_APPEND;
+            flags = O_WRONLY;
+            if (! clp->out_flags.nocreat)
+                flags |= O_CREAT;
+            if (clp->out_flags.direct)
+                flags |= O_DIRECT;
+            if (clp->out_flags.excl)
+                flags |= O_EXCL;
+            if (clp->out_flags.dsync)
+                flags |= O_SYNC;
+            if (clp->out_flags.append)
+                flags |= O_APPEND;
 
-                if ((clp->out2fd = open(out2f, flags, 0666)) < 0) {
-                    err = errno;
-                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
-                             "writing", my_name, out2f);
-                    perror(ebuff);
-                    return sg_convert_errno(err);
-                }
-            }
-            else {      /* raw output file */
-                if ((clp->out2fd = open(out2f, O_WRONLY)) < 0) {
-                    err = errno;
-                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for raw "
-                             "writing", my_name, out2f);
-                    perror(ebuff);
-                    return sg_convert_errno(err);
-                }
+            if ((clp->out2fd = open(out2f, flags, 0666)) < 0) {
+                err = errno;
+                snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
+                         "writing", my_name, out2f);
+                perror(ebuff);
+                return sg_convert_errno(err);
             }
             if (clp->seek > 0) {
                 off64_t offset = clp->seek;
@@ -4733,7 +4668,7 @@ main(int argc, char * argv[])
             clp->unbalanced_mrq = true;
     }
     if (outregf[0]) {
-	off_t outrf_st_size;
+        off_t outrf_st_size;
         int ftyp = dd_filetype(outregf, outrf_st_size);
 
         clp->outreg_type = ftyp;

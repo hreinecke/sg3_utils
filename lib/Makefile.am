@@ -42,11 +42,23 @@ if OS_OSF
 libsgutils2_la_SOURCES += sg_pt_osf1.c
 endif
 
+if OS_HAIKU
+if PT_DUMMY
+libsgutils2_la_SOURCES += sg_pt_dummy.c
+else
+libsgutils2_la_SOURCES += sg_pt_haiku.c
+endif
+endif
+
 if OS_NETBSD
 libsgutils2_la_SOURCES += sg_pt_dummy.c
 endif
 
 if OS_OPENBSD
+libsgutils2_la_SOURCES += sg_pt_dummy.c
+endif
+
+if OS_OTHER
 libsgutils2_la_SOURCES += sg_pt_dummy.c
 endif
 

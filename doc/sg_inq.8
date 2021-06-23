@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "March 2021" "sg3_utils\-1.46" SG3_UTILS
+.TH SG_INQ "8" "June 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -491,6 +491,24 @@ viewed with the SCSI INQUIRY command. To list the supported VPD
 pages (but not their contents) try:
 .PP
    sg_inq \-e /dev/sda
+.PP
+In Linux, binary images of some important VPD page responses (e.g. 0, 80h
+and 83h) are cached in files within the sysfs pseudo file system. Since
+VPD pages hardly ever change their contents, decoding those files will
+give the same output as probing the device with the added benefit that
+decoding those files doesn't need root permissions. If /dev/sg3 is a disk
+at 2:0:0:0 , then these three invocations should result in the same output:
+.PP
+   sg_inq \-\-raw \-\-inhex=/sys/class/scsi_generic/sg3/device/vpd_pg83
+.PP
+   sg_inq \-rI /sys/class/scsi_generic/sg3/device/vpd_pg83
+.PP
+   sg_inq \-r \-I /sys/class/scsi_disk/2:0:0:0/device/vpd_pg83
+.PP
+Without the \fI\-\-raw\fR option, the \fI\-\-inhex=FN\fR option would
+expect the contents of those files to be hexadecimal. vpd_pg83 contains
+the response (in binary) to the Device Identification VPD page whose page
+number is 83h (i.e. hexadecimal).
 .PP
 Some VPD pages can be read with the sg_inq utility but a newer utility
 called sg_vpd specializes in showing their contents. The sdparm utility
