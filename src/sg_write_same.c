@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.31 20200430";
+static const char * version_str = "1.32 20210630";
 
 
 #define ME "sg_write_same: "
@@ -277,7 +277,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     ret = sg_cmds_process_resp(ptvp, "Write same", res, true /*noisy */,
                                op->verbose, &sense_cat);
     if (-1 == ret)
-        get_scsi_pt_os_err(ptvp);
+        ret = get_scsi_pt_os_err(ptvp);
     else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:

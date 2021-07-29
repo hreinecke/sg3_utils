@@ -84,7 +84,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.19 20210406";
+static const char * version_str = "4.20 20210727";
 static const char * my_name = "sgs_dd";
 
 #ifndef SGV4_FLAG_HIPRI
@@ -478,11 +478,11 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
                 return res;
             }
             if (n > 0) {
-                if ( ((res = ioctl(fd, SG_GET_PACK_ID, &id))) < 0) {
-                    res = -errno;
+                if ( (ioctl(fd, SG_GET_PACK_ID, &id)) < 0) {
+                    res = errno;
                     pr2serr("%s: ioctl(SG_GET_PACK_ID): %s [%d]\n",
-                            __func__, strerror(errno), errno);
-                    return res;
+                            __func__, strerror(res), res);
+                    return -res;
                 }
                 /* got pack_id or tag of first waiting */
                 break;
@@ -553,11 +553,11 @@ do_v4:
                 return res;
             }
             if (n > 0) {
-                if ( ((res = ioctl(fd, SG_GET_PACK_ID, &id))) < 0) {
-                    res = -errno;
+                if ( (ioctl(fd, SG_GET_PACK_ID, &id)) < 0) {
+                    res = errno;
                     pr2serr("%s: ioctl(SG_GET_PACK_ID): %s [%d]\n",
-                            __func__, strerror(errno), errno);
-                    return res;
+                            __func__, strerror(res), res);
+                    return -res;
                 }
                 /* got pack_id or tag of first waiting */
                 break;
@@ -664,7 +664,6 @@ sz_reserve(Rq_coll * clp, bool is_in)
         sgs_full_v4_sg_driver = false;
     } else
         sgs_full_v4_sg_driver = true;
-    res = 0;
     t = clp->bs * clp->bpt;
     res = ioctl(fd, SG_SET_RESERVED_SIZE, &t);
     if (res < 0)
@@ -721,7 +720,7 @@ sz_reserve(Rq_coll * clp, bool is_in)
             if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
                 err = errno;
                 pr2serr("ioctl(EXTENDED(SG_SEIM_EVENTFD)) failed, "
-                        "errno=%d %s\n", errno, strerror(errno));
+                        "errno=%d %s\n", err, strerror(err));
                 return 1;
             }
         }
@@ -830,7 +829,7 @@ start_read(Rq_coll * clp)
     if (clp->in_is_sg) {
         res = sg_start_io(clp, rep);
         if (1 == res) {     /* ENOMEM, find what's available+try that */
-            if ((res = ioctl(clp->infd, SG_GET_RESERVED_SIZE, &buf_sz)) < 0) {
+            if (ioctl(clp->infd, SG_GET_RESERVED_SIZE, &buf_sz) < 0) {
                 res = -errno;
                 perror("RESERVED_SIZE ioctls failed");
                 return res;
@@ -843,7 +842,7 @@ start_read(Rq_coll * clp)
             if (1 == res)
                 res = -ENOMEM;
         }
-        else if (res < 0) {
+        if (res < 0) {
             pr2serr("%s: inputting from sg failed, blk=%d\n", my_name,
                     rep->blk);
             rep->state = SGQ_IO_ERR;
@@ -987,7 +986,7 @@ do_sigwait(Rq_coll * clp, bool inc1_clear0)
 static int
 do_num_poll_in(Rq_coll * clp, int fd, bool is_evfd)
 {
-    int err;
+    int err, res;
     struct pollfd a_pollfd = {0, POLLIN | POLLOUT, 0};
 
     if (! clp->no_sig) {
@@ -1009,13 +1008,13 @@ do_num_poll_in(Rq_coll * clp, int fd, bool is_evfd)
         if (is_evfd) {
             uint64_t count;
 
-            if (read(fd, &count, sizeof(count)) < 0) {
+            if ((res = read(fd, &count, sizeof(count))) < 0) {
                 err = errno;
                 pr2serr("%s: read(): %s [%d]\n", __func__,
                         strerror(err), err);
                 return -err;
             }
-            return (int)count;
+            return (res < (int)sizeof(uint64_t)) ? 0 : (int)count;
         } else
             return 1;   /* could be more but don't know without evfd */
     } else if (a_pollfd.revents & POLLERR)
@@ -1100,7 +1099,7 @@ can_read_write(Rq_coll * clp)
     }
 
     for (rep = clp->wr_posp, res = 1;
-         rep != clp->rd_posp; rep = rep->nextp) {
+         rep && (rep != clp->rd_posp); rep = rep->nextp) {
         if (SGQ_IO_STARTED == rep->state) {
             if (rep->wr)
                 ++writing;
@@ -1148,7 +1147,8 @@ can_read_write(Rq_coll * clp)
             return res;     /* wasn't timeout */
     }
     /* Now check the _whole_ buffer for pending requests */
-    for (rep = clp->rd_posp->nextp; rep != clp->rd_posp; rep = rep->nextp) {
+    for (rep = clp->rd_posp->nextp; rep && (rep != clp->rd_posp);
+         rep = rep->nextp) {
         if (SGQ_IO_WAIT == rep->state) {
             res = sg_start_io(clp, rep);
             if (res < 0)
@@ -1441,6 +1441,7 @@ main(int argc, char * argv[])
             if (ioctl(clp->outfd, SG_GET_TIMEOUT, 0) < 0) {
                 /* not a scsi generic device so now try and open RDONLY */
                 close(clp->outfd);
+                clp->outfd = -1;
             }
             else {
                 clp->out_is_sg = true;
@@ -1454,8 +1455,10 @@ main(int argc, char * argv[])
             }
         }
         if (! clp->out_is_sg) {
-            if (clp->outfd >= 0)
+            if (clp->outfd >= 0) {
                 close(clp->outfd);
+                clp->outfd = -1;
+            }
             open_fl = clp->oflag.excl ? O_EXCL : 0;
             open_fl |= (O_WRONLY | O_CREAT);
             if ((clp->outfd = open(outf, open_fl, 0666)) < 0) {
@@ -1560,6 +1563,8 @@ main(int argc, char * argv[])
     clp->out_done_count = count;
     clp->out_blk = seek;
     res = init_elems(clp);
+    if (res < 0)
+        pr2serr("init_elems() failed, res=%d\n", res);
     res = 0;
 
 /* vvvvvvvvvvvvvvvvv  Main Loop  vvvvvvvvvvvvvvvvvvvvvvvv */
@@ -1585,9 +1590,9 @@ main(int argc, char * argv[])
         }
     }
 
-    if (STDIN_FILENO != clp->infd)
+    if ((STDIN_FILENO != clp->infd) && (clp->infd >= 0))
         close(clp->infd);
-    if (STDOUT_FILENO != clp->outfd)
+    if ((STDOUT_FILENO != clp->outfd) && (clp->outfd >= 0))
         close(clp->outfd);
     if (0 != clp->out_count) {
         pr2serr("Some error occurred, remaining blocks=%d\n", clp->out_count);

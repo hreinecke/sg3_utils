@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.10 20210621";
+static const char * version_str = "2.12 20210727";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -375,8 +375,10 @@ static atomic<int> num_mrq_abort_req_success(0);
 static atomic<int> num_miscompare(0);
 static atomic<long> num_waiting_calls(0);
 static atomic<bool> vb_first_time(true);
+static atomic<bool> shutting_down(false);
 
 static sigset_t signal_set;
+static sigset_t orig_signal_set;
 static pthread_t sig_listen_thread_id;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
@@ -405,7 +407,6 @@ static bool have_sg_version = false;
 static int sg_version = 0;
 static bool sg_version_lt_4 = false;
 static bool sg_version_ge_40045 = false;
-static bool shutting_down = false;
 static bool do_sync = false;
 static int do_time = 1;
 static struct global_collection gcoll;
@@ -1227,8 +1228,6 @@ sig_listen_thread(void * v_clp)
     tsp->tv_nsec = (ict_ms % 1000) * 1000 * 1000;   /* DEF_SDT_ICT_MS */
     while (1) {
         sig_number = sigtimedwait(&signal_set, NULL, tsp);
-        if (shutting_down)
-            break;
         if (sig_number < 0) {
             int err = errno;
 
@@ -1255,7 +1254,12 @@ sig_listen_thread(void * v_clp)
             pr2serr_lk("%sinterrupted by SIGINT\n", my_name);
             stop_both(clp);
             pthread_cond_broadcast(&clp->out_sync_cv);
+            sigprocmask(SIG_SETMASK, &orig_signal_set, NULL);
+            raise(SIGINT);
+            break;
         }
+        if (shutting_down)
+            break;
     }           /* end of while loop */
     if (clp->verbose > 1)
         pr2serr_lk("%s: exiting\n", __func__);
@@ -1361,6 +1365,7 @@ mrq_abort_thread(void * v_maip)
                        "%d, success\n", __func__, l_mai.from_tid,
                        l_mai.mrq_id);
     }
+    delete ruip;
     return NULL;
 }
 
@@ -1785,8 +1790,6 @@ skip_force_out_sequence:
     if (0 != status) err_exit(status, "unlock in_mutex");
 
 fini:
-    if ((rep->mmap_active == 0) && rep->alloc_bp)
-        free(rep->alloc_bp);
     if ((1 == rep->mmap_active) && (rep->mmap_len > 0)) {
         if (munmap(rep->buffp, rep->mmap_len) < 0) {
             int err = errno;
@@ -1799,6 +1802,11 @@ fini:
             pr2serr_lk("thread=%d: munmap(%p, %d)\n", rep->id, rep->buffp,
                        rep->mmap_len);
         rep->mmap_active = 0;
+    }
+    if (rep->alloc_bp) {
+        free(rep->alloc_bp);
+	rep->alloc_bp = NULL;
+	rep->buffp = NULL;
     }
 
     if (sg_version_ge_40045) {
@@ -2871,7 +2879,7 @@ sgh_do_deferred_mrq(Rq_elem * rep, mrq_arr_t & def_arr)
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS;
     if (! clp->mrq_async) {
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
-        if (clp->in_flags.mrq_svb || clp->in_flags.mrq_svb)
+        if (clp->in_flags.mrq_svb || clp->out_flags.mrq_svb)
             ctl_v4.flags |= SGV4_FLAG_SHARE;
     }
     ctl_v4.dout_xferp = (uint64_t)a_v4p;        /* request array */
@@ -2993,7 +3001,7 @@ try_again:
                 pr2serr_lk("%s: %s\n", __func__, mrq_vb_s);
             }
             res = ioctl(fd, SG_IOSUBMIT, &ctl_v4);
-        } else if (clp->in_flags.mrq_svb || clp->in_flags.mrq_svb) {
+        } else if (clp->in_flags.mrq_svb || clp->out_flags.mrq_svb) {
             iosub_str = "SG_IOSUBMIT(shared_variable_blocking)";
             if (!after1 && (clp->verbose > 1)) {
                 after1 = true;
@@ -3598,7 +3606,8 @@ sg_prepare_resbuf(int fd, bool is_in, struct global_collection *clp,
     bool wq_excl = is_in ? clp->in_flags.wq_excl : clp->out_flags.wq_excl;
     bool skip_thresh = is_in ? clp->in_flags.no_thresh :
                                clp->out_flags.no_thresh;
-    int res, t, num;
+    int res, t;
+    int num = 0;
     uint8_t *mmp;
     struct sg_extended_info sei {};
     struct sg_extended_info * seip = &sei;
@@ -3703,7 +3712,6 @@ bypass:
         seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
         seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
         if (ioctl(fd, SG_SET_GET_EXTENDED, seip) < 0) {
-            res = -1;
             pr2serr_lk("ioctl(EXTENDED(TIME_IN_NS)) failed, errno=%d %s\n",
                        errno, strerror(errno));
         }
@@ -3864,8 +3872,10 @@ sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
         return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, true, clp, mmpp);
-    if (n <= 0)
+    if (n <= 0) {
+        close(fd);
         return -SG_LIB_FILE_ERROR;
+    }
     if (clp->noshare)
         sg_noshare_enlarge(fd, clp->verbose > 3);
     if (mmap_lenp)
@@ -3896,8 +3906,10 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
         return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, false, clp, mmpp);
-    if (n <= 0)
+    if (n <= 0) {
+        close(fd);
         return -SG_LIB_FILE_ERROR;
+    }
     if (clp->noshare)
         sg_noshare_enlarge(fd, clp->verbose > 3);
     if (mmap_lenp)
@@ -4319,7 +4331,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         return SG_LIB_SYNTAX_ERROR;
     }
     if ((clp->in_flags.mmap || clp->out_flags.mmap) &&
-        (clp->in_flags.same_fds || clp->in_flags.same_fds)) {
+        (clp->in_flags.same_fds || clp->out_flags.same_fds)) {
         pr2serr("can't have both 'mmap' and 'same_fds' flags\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -4628,12 +4640,14 @@ main(int argc, char * argv[])
                     if (0 != (clp->nmrqs % 3)) {
                         pr2serr("When both IFILE+OFILE sg devices and OSP>0, "
                                 "mrq=NRQS must be divisible by 3\n");
-                        return SG_LIB_SYNTAX_ERROR;
+                        pr2serr("    triple NRQS to avoid error\n");
+                        clp->nmrqs *= 3;
                     }
                 } else if (0 != (clp->nmrqs % 2)) {
                     pr2serr("When both IFILE+OFILE sg devices (and OSP=0), "
                             "mrq=NRQS must be even\n");
-                    return SG_LIB_SYNTAX_ERROR;
+                    pr2serr("    double NRQS to avoid error\n");
+                    clp->nmrqs *= 2;
                 }
             }
             if (clp->is_mrq_i && clp->is_mrq_o)
@@ -4845,7 +4859,7 @@ main(int argc, char * argv[])
 
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGINT);
-    status = pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
+    status = pthread_sigmask(SIG_BLOCK, &signal_set, &orig_signal_set);
     if (0 != status) err_exit(status, "pthread_sigmask");
     status = pthread_create(&sig_listen_thread_id, NULL,
                             sig_listen_thread, (void *)clp);
@@ -4899,6 +4913,11 @@ main(int argc, char * argv[])
         }
     }   /* started worker threads and here after they have all exited */
 
+    shutting_down = true;
+    /* pthread_cancel() has issues and is not supported in Android */
+    status = pthread_kill(sig_listen_thread_id, SIGINT);
+    if (0 != status) err_exit(status, "pthread_kill");
+
     if (do_time && (start_tm.tv_sec || start_tm.tv_usec))
         calc_duration_throughput(0);
 
@@ -4927,14 +4946,7 @@ main(int argc, char * argv[])
         }
     }
 
-    shutting_down = true;
-    status = pthread_kill(sig_listen_thread_id, SIGINT);
-    if (0 != status) err_exit(status, "pthread_kill");
-    /* valgrind says the above _kill() leaks; web says it needs a following
-     * _join() to clear heap taken by associated _create() */
-
 fini:
-
     if ((STDIN_FILENO != clp->infd) && (clp->infd >= 0))
         close(clp->infd);
     if ((STDOUT_FILENO != clp->outfd) && (FT_DEV_NULL != clp->out_type) &&

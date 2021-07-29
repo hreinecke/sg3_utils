@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.25 20210610";
+static const char * version_str = "1.26 20210630";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1606,7 +1606,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[],
             break;
         case 'c':       /* --combined=DOF for W SCATTERED, DOF: data offset */
             j = sg_get_num(optarg);
-            if ((j < 0) || (j > INT32_MAX)) {
+            if (j < 0) {
                 pr2serr("bad argument to '--combined='. Expect 0 to "
                         "0x7fffffff\n");
                 return SG_LIB_SYNTAX_ERROR;

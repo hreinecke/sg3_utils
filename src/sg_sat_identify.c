@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Douglas Gilbert.
+ * Copyright (c) 2006-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -54,7 +54,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.17 20180515";
+static const char * version_str = "1.18 20210630";
 
 static struct option long_options[] = {
         {"ck-cond", no_argument, 0, 'c'},
@@ -119,8 +119,8 @@ do_identify_dev(int sg_fd, bool do_packet, int cdb_len, bool ck_cond,
                 bool extend, bool do_ident, int do_hex, bool do_raw,
                 int verbose)
 {
-    bool t_type = false;/* false -> 512 byte blocks,
-                           true -> device's LB size */
+    const bool t_type = false;/* false -> 512 byte blocks,
+                                 true -> device's LB size */
     bool t_dir = true;  /* false -> to device, true -> from device */
     bool byte_block = true; /* false -> bytes, true -> 512 byte blocks (if
                                t_type=false) */

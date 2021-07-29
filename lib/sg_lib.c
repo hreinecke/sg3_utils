@@ -3775,7 +3775,7 @@ uint32_t
 sg_get_page_size(void)
 {
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
-    return sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+    return (uint32_t)sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
 #elif defined(SG_LIB_WIN32)
     static bool got_page_size = false;
     static uint32_t win_page_size;

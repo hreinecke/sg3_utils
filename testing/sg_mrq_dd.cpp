@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.31 20210620";
+static const char * version_str = "1.32 20210627";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -386,6 +386,7 @@ static atomic<int> num_miscompare(0);
 static atomic<bool> vb_first_time(true);
 
 static sigset_t signal_set;
+static sigset_t orig_signal_set;
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
@@ -1272,8 +1273,10 @@ sg_in_open(struct global_collection *clp, const string & inf, uint8_t **mmpp,
         return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, clp, true, mmpp);
-    if (n <= 0)
+    if (n <= 0) {
+        close(fd);
         return -SG_LIB_FILE_ERROR;
+    }
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -1303,8 +1306,10 @@ sg_out_open(struct global_collection *clp, const string & outf,
         return -sg_convert_errno(err);
     }
     n = sg_prepare_resbuf(fd, clp, false, mmpp);
-    if (n <= 0)
+    if (n <= 0) {
+        close(fd);
         return -SG_LIB_FILE_ERROR;
+    }
     if (mmap_lenp)
         *mmap_lenp = n;
     return fd;
@@ -1447,10 +1452,10 @@ flag_all_stop(struct global_collection * clp)
     }
 }
 
-/* Has an infinite loop doing a timed wait for any signals in sig_set. After
- * each timeout (300 ms) checks if the most_recent_pack_id atomic integer
- * has changed. If not after another two timeouts announces a stall has
- * been detected. If shutting down atomic is true breaks out of loop and
+/* Has an infinite loop doing a timed wait for any signals in signal_set.
+ * After each timeout (300 ms) checks if the most_recent_pack_id atomic
+ * integer has changed. If not after another two timeouts announces a stall
+ * has been detected. If shutting down atomic is true breaks out of loop and
  * shuts down this thread. Other than that, this thread is normally cancelled
  * by the main thread, after other threads have exited. */
 static void
@@ -1467,8 +1472,6 @@ sig_listen_thread(struct global_collection * clp)
     tsp->tv_nsec = (ict_ms % 1000) * 1000 * 1000;   /* DEF_SDT_ICT_MS */
     while (1) {
         sig_number = sigtimedwait(&signal_set, NULL, tsp);
-        if (shutting_down)
-            break;
         if (sig_number < 0) {
             int err = errno;
 
@@ -1484,7 +1487,7 @@ sig_listen_thread(struct global_collection * clp)
                                    __func__, pack_id);
                     } else
                         pr2serr_lk("%s: subsequent stall at pack_id=%d\n",
-                               __func__, pack_id);
+                                   __func__, pack_id);
                     system_wrapper("/usr/bin/cat /proc/scsi/sg/debug\n");
                 } else
                     prev_pack_id = pack_id;
@@ -1495,7 +1498,12 @@ sig_listen_thread(struct global_collection * clp)
             pr2serr_lk("%sinterrupted by SIGINT\n", my_name);
             flag_all_stop(clp);
             shutting_down.store(true);
+            sigprocmask(SIG_SETMASK, &orig_signal_set, NULL);
+            raise(SIGINT);
+            break;
         }
+        if (shutting_down)
+            break;
     }           /* end of while loop */
     if (clp->verbose > 1)
         pr2serr_lk("%s: exiting\n", __func__);
@@ -2968,7 +2976,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
     int num_mrq, k, res, fd, mrq_pack_id_base, id, b_len, iflags, oflags;
     int num, kk, i_lin_blks, o_lin_blks, cdbsz, num_good, err;
     int o_seg_blks = seg_blks;
-    uint32_t in_fin_blks, out_fin_blks;
+    uint32_t in_fin_blks = 0;
+    uint32_t out_fin_blks = 0;;
     uint32_t in_mrq_q_blks = 0;
     uint32_t out_mrq_q_blks = 0;
     const int max_cdb_sz = MAX_SCSI_CDB_SZ;
@@ -3473,6 +3482,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
     bool bpt_given = false;
     int ibs = 0;
     int obs = 0;
+    int ret = 0;
     int k, keylen, n, res;
     char str[STR_SZ];
     char * key;
@@ -3513,7 +3523,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             if ((n < 0) || (n > 32)) {
                 pr2serr("%s: bad argument to 'cdbsz=', expect 6, 10, 12 or "
                         "16\n", my_name);
-                return SG_LIB_SYNTAX_ERROR;
+                goto syn_err;
             }
             clp->cdbsz_in = n;
             if (ccp) {
@@ -3521,7 +3531,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 if ((n < 0) || (n > 32)) {
                     pr2serr("%s: bad second argument to 'cdbsz=', expect 6, "
                             "10, 12 or 16\n", my_name);
-                    return SG_LIB_SYNTAX_ERROR;
+                    goto syn_err;
                 }
             }
             clp->cdbsz_out = n;
@@ -3532,7 +3542,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             if ((n < 0) || (n > 7)) {
                 pr2serr("%s: bad argument to 'cdl=', expect 0 to 7\n",
                          my_name);
-                return SG_LIB_SYNTAX_ERROR;
+                goto syn_err;
             }
             clp->in_flags.cdl = n;
             if (ccp) {
@@ -3540,7 +3550,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 if ((n < 0) || (n > 7)) {
                     pr2serr("%s: bad second argument to 'cdl=', expect 0 "
                             "to 7\n", my_name);
-                    return SG_LIB_SYNTAX_ERROR;
+                    goto syn_err;
                 }
             }
             clp->out_flags.cdl = n;
@@ -3552,7 +3562,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         } else if (0 == strcmp(key, "conv")) {
             if (process_conv(buf, &clp->in_flags, &clp->out_flags)) {
                 pr2serr("%s: bad argument to 'conv='\n", my_name);
-                return SG_LIB_SYNTAX_ERROR;
+                goto syn_err;
             }
         } else if (0 == strcmp(key, "count")) {
             if (clp->count_given) {
@@ -3706,6 +3716,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 goto syn_err;
             }
             seek_buf = (char *)calloc(n + 16, 1);
+	    if (NULL == seek_buf)
+		goto syn_err;
             memcpy(seek_buf, buf, n + 1);
         } else if (0 == strcmp(key, "skip")) {
             n = strlen(buf);
@@ -3714,6 +3726,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 goto syn_err;
             }
             skip_buf = (char *)calloc(n + 16, 1);
+	    if (NULL == skip_buf)
+		goto syn_err;
             memcpy(skip_buf, buf, n + 1);
         } else if (0 == strcmp(key, "sync"))
             do_sync = !! sg_get_num(buf);
@@ -3828,11 +3842,13 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
 #endif
     if (version_given) {
         pr2serr("%s%s\n", my_name, version_str);
-        return SG_LIB_OK_FALSE;
+        ret = SG_LIB_OK_FALSE;
+        goto oth_err;
     }
     if (clp->help > 0) {
         usage(clp->help);
-        return SG_LIB_OK_FALSE;
+        ret = SG_LIB_OK_FALSE;
+        goto oth_err;
     }
     if (clp->bs <= 0) {
         clp->bs = DEF_BLOCK_SIZE;
@@ -3846,26 +3862,26 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
     if ((ibs && (ibs != clp->bs)) || (obs && (obs != clp->bs))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
         usage(0);
-        return SG_LIB_SYNTAX_ERROR;
+        goto syn_err;
     }
     if (clp->out_flags.append) {
         if ((clp->o_sgl.lowest_lba > 0) ||
             (clp->o_sgl.linearity != SGL_LINEAR)) {
             pr2serr("Can't use both append and seek switches\n");
-            return SG_LIB_SYNTAX_ERROR;
+            goto syn_err;
         }
         if (verify_given) {
             pr2serr("Can't use both append and verify switches\n");
-            return SG_LIB_SYNTAX_ERROR;
+            goto syn_err;
         }
     }
     if (clp->bpt < 1) {
         pr2serr("bpt must be greater than 0\n");
-        return SG_LIB_SYNTAX_ERROR;
+        goto syn_err;
     }
     if (clp->in_flags.mmap && clp->out_flags.mmap) {
         pr2serr("mmap flag on both IFILE and OFILE doesn't work\n");
-        return SG_LIB_SYNTAX_ERROR;
+        goto syn_err;
     }
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large
      * for the block layer in lk 2.6 and results in an EIO on the
@@ -3877,7 +3893,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
     if ((num_threads < 1) || (num_threads > MAX_NUM_THREADS)) {
         pr2serr("too few or too many threads requested\n");
         usage(1);
-        return SG_LIB_SYNTAX_ERROR;
+        goto syn_err;
     }
     clp->unit_nanosec = (do_time > 1) || !!getenv("SG3_UTILS_LINUX_NANO");
     return 0;
@@ -3888,6 +3904,12 @@ syn_err:
     if (skip_buf)
         free(skip_buf);
     return contra ? SG_LIB_CONTRADICT : SG_LIB_SYNTAX_ERROR;
+oth_err:
+    if (seek_buf)
+        free(seek_buf);
+    if (skip_buf)
+        free(skip_buf);
+    return ret;
 }
 
 static int
@@ -4443,7 +4465,7 @@ main(int argc, char * argv[])
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGINT);
 
-    res = sigprocmask(SIG_BLOCK, &signal_set, NULL);
+    res = sigprocmask(SIG_BLOCK, &signal_set, &orig_signal_set);
     if (res < 0) {
         pr2serr("sigprocmask failed: %s\n", safe_strerror(errno));
         goto fini;
@@ -4566,5 +4588,6 @@ fini:
         pr2serr("Verify/compare failed due to miscompare\n");
     if (0 == res)
         res = clp->reason_res.load();
+    sigprocmask(SIG_SETMASK, &orig_signal_set, NULL);
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }

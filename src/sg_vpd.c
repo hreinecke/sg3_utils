@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.64 20210610";  /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.65 20210630";  /* spc6r05 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1798,7 +1798,7 @@ decode_3party_copy_vpd(uint8_t * buff, int len, int do_hex, int pdt,
                 printf(" Held data:\n");
                 u = sg_get_unaligned_be32(bp + 4);
                 printf("  Held data limit: %u\n", u);
-                ull = (1 << bp[8]);
+                ull = ((uint64_t)1 << bp[8]);
                 printf("  Held data granularity: %" PRIu64 "\n", ull);
                 break;
             default:
@@ -3732,7 +3732,8 @@ svpd_examine_all(int sg_fd, struct opts_t * op)
         }
         if (op->do_long)
             snprintf(b, sizeof(b), "[0x%x] ", k);
-
+	else
+	    b[0] = '\0';
         res = svpd_decode_t10(sg_fd, op, 0, 0, b);
         if (SG_LIB_CAT_OTHER == res) {
             res = svpd_decode_vendor(sg_fd, op, 0);

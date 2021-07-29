@@ -1,0 +1,32 @@
+# This is the output (in hex) of the SCSI REPORT REALMS command.
+# This page is constructed from the command description in zbc2r10
+# with three realms, and two zone domains
+
+
+# parameter data header (64 bytes)
+00 00 00 90 00 00 00 03  00 00 00 30 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+
+# first zone domain descriptor
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+# first realm descriptor, zone domain 0 start,last
+00 00 00 00 00 00 00 00  00 00 00 00 00 03 ff ff
+# first realm descriptor, zone domain 1 start,last
+00 00 00 00 00 04 00 00  00 00 00 00 00 07 ff ff
+
+# second zone domain descriptor
+00 00 00 01 00 00 00 00  00 00 00 00 00 00 00 00
+# second realm descriptor, zone domain 0 start,last
+00 00 00 00 00 08 00 00  00 00 00 00 00 0b ff ff
+# second realm descriptor, zone domain 1 start,last
+00 00 00 00 00 0c 00 00  00 00 00 00 00 0f ff ff
+
+# third realm descriptor
+00 00 00 02 00 00 00 00  00 00 00 00 00 00 00 00
+# second realm descriptor, zone domain 0 start,last
+00 00 00 00 00 10 00 00  00 00 00 00 00 13 ff ff
+# second realm descriptor, zone domain 1 start,last
+00 00 00 00 00 14 00 00  00 00 00 00 00 17 ff ff
+
