@@ -359,15 +359,14 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
 {
     int k, num, rlen;
     bool found = false;
-    struct sg_lib_asc_ascq_t * eip;
-    struct sg_lib_asc_ascq_range_t * ei2p;
 
     if (1 == buff_len) {
         buff[0] = '\0';
         return buff;
     }
     for (k = 0; sg_lib_asc_ascq_range[k].text; ++k) {
-        ei2p = &sg_lib_asc_ascq_range[k];
+        struct sg_lib_asc_ascq_range_t * ei2p = &sg_lib_asc_ascq_range[k];
+
         if ((ei2p->asc == asc) &&
             (ascq >= ei2p->ascq_min)  &&
             (ascq <= ei2p->ascq_max)) {
@@ -381,7 +380,8 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
         return buff;
 
     for (k = 0; sg_lib_asc_ascq[k].text; ++k) {
-        eip = &sg_lib_asc_ascq[k];
+        struct sg_lib_asc_ascq_t * eip = &sg_lib_asc_ascq[k];
+
         if (eip->asc == asc &&
             eip->ascq == ascq) {
             found = true;
@@ -408,7 +408,7 @@ const uint8_t *
 sg_scsi_sense_desc_find(const uint8_t * sbp, int sb_len,
                         int desc_type)
 {
-    int add_sb_len, add_d_len, desc_len, k;
+    int add_sb_len, desc_len, k;
     const uint8_t * descp;
 
     if ((sb_len < 8) || (0 == (add_sb_len = sbp[7])))
@@ -418,6 +418,8 @@ sg_scsi_sense_desc_find(const uint8_t * sbp, int sb_len,
     add_sb_len = (add_sb_len < (sb_len - 8)) ?  add_sb_len : (sb_len - 8);
     descp = &sbp[8];
     for (desc_len = 0, k = 0; k < add_sb_len; k += desc_len) {
+        int add_d_len;
+
         descp += desc_len;
         add_d_len = (k < (add_sb_len - 1)) ? descp[1]: -1;
         desc_len = add_d_len + 2;
@@ -437,7 +439,6 @@ sg_get_sense_info_fld(const uint8_t * sbp, int sb_len,
                       uint64_t * info_outp)
 {
     const uint8_t * bp;
-    uint64_t ull;
 
     if (info_outp)
         *info_outp = 0;
@@ -453,7 +454,8 @@ sg_get_sense_info_fld(const uint8_t * sbp, int sb_len,
     case 0x73:
         bp = sg_scsi_sense_desc_find(sbp, sb_len, 0 /* info desc */);
         if (bp && (0xa == bp[1])) {
-            ull = sg_get_unaligned_be64(bp + 4);
+            uint64_t ull = sg_get_unaligned_be64(bp + 4);
+
             if (info_outp)
                 *info_outp = ull;
             return !!(bp[2] & 0x80);   /* since spc3r23 should be set */
@@ -631,7 +633,7 @@ char *
 sg_decode_transportid_str(const char * lip, uint8_t * bp, int bplen,
                           bool only_one, int blen, char * b)
 {
-    int proto_id, num, k, n, normal_len, tpid_format;
+    int num, k, n;
     uint64_t ull;
     int bump;
 
@@ -645,6 +647,8 @@ sg_decode_transportid_str(const char * lip, uint8_t * bp, int bplen,
         lip = "";
     /* bump = TRANSPORT_ID_MIN_LEN; // some old compilers insisted on this */
     for (k = 0, n = 0; bplen > 0; ++k, bp += bump, bplen -= bump) {
+        int proto_id, normal_len, tpid_format;
+
         if ((k > 0) && only_one)
             break;
         if ((bplen < 24) || (0 != (bplen % 4)))
@@ -941,7 +945,6 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
     int vsi, k, n, dlen;
     const uint8_t * ip;
     uint64_t vsei;
-    uint64_t id_ext;
     char e[64];
     const char * cp;
 
@@ -1036,8 +1039,9 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
         }
         ci_off = 0;
         if (16 == dlen) {       /* first 8 bytes are 'Identifier Extension' */
+            uint64_t id_ext = sg_get_unaligned_be64(ip);
+
             ci_off = 8;
-            id_ext = sg_get_unaligned_be64(ip);
             n += sg_scnpr(b + n, blen - n, "%s      Identifier extension: 0x%"
                           PRIx64 "\n", lip, id_ext);
         } else if ((8 != dlen) && (12 != dlen)) {
@@ -1402,9 +1406,8 @@ uds_referral_descriptor_str(char * b, int blen, const uint8_t * dp,
 {
     int n = 0;
     int dlen = alen - 2;
-    int k, j, g, f, tpgd;
+    int k, j, g, f;
     const uint8_t * tp;
-    uint64_t ull;
     char c[40];
 
     if (NULL == lip)
@@ -1413,7 +1416,9 @@ uds_referral_descriptor_str(char * b, int blen, const uint8_t * dp,
                   !!(dp[2] & 0x1));
     dp += 4;
     for (k = 0, f = 1; (k + 4) < dlen; k += g, dp += g, ++f) {
-        tpgd = dp[3];
+        int tpgd = dp[3];
+        uint64_t ull;
+
         g = (tpgd * 4) + 20;
         n += sg_scnpr(b + n, blen - n, "%s    Descriptor %d\n", lip, f);
         if ((k + g) > dlen) {
@@ -1454,7 +1459,7 @@ int
 sg_get_sense_descriptors_str(const char * lip, const uint8_t * sbp,
                              int sb_len, int blen, char * b)
 {
-    int add_sb_len, add_d_len, desc_len, k, j, sense_key;
+    int add_sb_len, desc_len, k, j, sense_key;
     int n, progress, pr, rem;
     uint16_t sct_sc;
     bool processed;
@@ -1479,7 +1484,8 @@ sg_get_sense_descriptors_str(const char * lip, const uint8_t * sbp,
     for (descp = (sbp + 8), k = 0, n = 0;
          (k < add_sb_len) && (n < blen);
          k += desc_len, descp += desc_len) {
-        add_d_len = (k < (add_sb_len - 1)) ? descp[1] : -1;
+        int add_d_len = (k < (add_sb_len - 1)) ? descp[1] : -1;
+
         if ((k + add_d_len + 2) > add_sb_len)
             add_d_len = add_sb_len - k - 2;
         desc_len = add_d_len + 2;
@@ -2161,14 +2167,13 @@ static const char * const bad_sense_cat = "Bad sense category";
 const char *
 sg_get_category_sense_str(int sense_cat, int b_len, char * b, int verbose)
 {
-    int n;
-
     if (NULL == b)
         return bad_sense_cat;
     if (b_len <= 0)
         return b;
     if (! sg_exit2str(sense_cat, (verbose > 0), b_len, b)) {
-        n = sg_scnpr(b, b_len, "Sense category: %d", sense_cat);
+        int n = sg_scnpr(b, b_len, "Sense category: %d", sense_cat);
+
         if ((0 == verbose) && (n < (b_len - 1)))
             sg_scnpr(b + n, b_len - n, ", try '-v' option for more "
                      "information");
@@ -2620,7 +2625,6 @@ sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len, char * buff,
 bool
 sg_is_scsi_cdb(const uint8_t * cdbp, int clen)
 {
-    int ilen, sa;
     uint8_t opcode;
     uint8_t top3bits;
 
@@ -2629,6 +2633,8 @@ sg_is_scsi_cdb(const uint8_t * cdbp, int clen)
     opcode = cdbp[0];
     top3bits = opcode >> 5;
     if (0x3 == top3bits) {
+        int ilen, sa;
+
         if ((clen < 12) || (clen % 4))
             return false;       /* must be modulo 4 and 12 or more bytes */
         switch (opcode) {
@@ -2801,14 +2807,14 @@ static char safe_errbuf[64] = {'u', 'n', 'k', 'n', 'o', 'w', 'n', ' ',
 char *
 safe_strerror(int errnum)
 {
-    size_t len;
     char * errstr;
 
     if (errnum < 0)
         errnum = -errnum;
     errstr = strerror(errnum);
     if (NULL == errstr) {
-        len = strlen(safe_errbuf);
+        size_t len = strlen(safe_errbuf);
+
         sg_scnpr(safe_errbuf + len, sizeof(safe_errbuf) - len, "%i", errnum);
         return safe_errbuf;
     }
@@ -2946,7 +2952,6 @@ int
 dStrHexStr(const char * str, int len, const char * leadin, int format,
            int b_len, char * b)
 {
-    uint8_t c;
     int bpstart, bpos, k, n, prior_ascii_len;
     bool want_ascii;
     char buff[DSHS_LINE_BLEN + 2];
@@ -2980,7 +2985,8 @@ dStrHexStr(const char * str, int len, const char * leadin, int format,
     if (bpstart > 0)
         memcpy(buff, leadin, bpstart);
     for (k = 0; k < len; k++) {
-        c = *p++;
+        uint8_t c = *p++;
+
         if (bpos == (bpstart + ((DSHS_BPL / 2) * 3)))
             bpos++;     /* for extra space in middle of each line's hex */
         sg_scnpr(buff + bpos, (int)sizeof(buff) - bpos, "%.2x",
@@ -3742,12 +3748,12 @@ sg_ata_get_chars(const uint16_t * word_arr, int start_word,
                  int num_words, bool is_big_endian, char * ochars)
 {
     int k;
-    uint16_t s;
-    char a, b;
     char * op = ochars;
 
     for (k = start_word; k < (start_word + num_words); ++k) {
-        s = word_arr[k];
+        char a, b;
+        uint16_t s = word_arr[k];
+
         if (is_big_endian) {
             a = s & 0xff;
             b = (s >> 8) & 0xff;
@@ -3806,7 +3812,6 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
             bool vb)
 {
     size_t psz;
-    uint8_t * res;
 
     if (buff_to_free)   /* make sure buff_to_free is NULL if alloc fails */
         *buff_to_free = NULL;
@@ -3817,6 +3822,7 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
 #ifdef HAVE_POSIX_MEMALIGN
     {
         int err;
+        uint8_t * res;
         void * wp = NULL;
 
         err = posix_memalign(&wp, psz, num_bytes);
@@ -3840,6 +3846,7 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
 #else
     {
         void * wrkBuff;
+        uint8_t * res;
         sg_uintptr_t align_1 = psz - 1;
 
         wrkBuff = (uint8_t *)calloc(num_bytes + psz, 1);

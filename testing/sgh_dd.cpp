@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.12 20210727";
+static const char * version_str = "2.13 20210730";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -987,7 +987,7 @@ calc_duration_throughput(int contin)
 static void
 print_stats(const char * str)
 {
-    int64_t infull, outfull;
+    int64_t infull;
 
     if (0 != gcoll.out_rem_count.load())
         pr2serr("  remaining block count=%" PRId64 "\n",
@@ -999,7 +999,8 @@ print_stats(const char * str)
     if (gcoll.out_type == FT_DEV_NULL)
         pr2serr("%s0+0 records out\n", str);
     else {
-        outfull = dd_count - gcoll.out_rem_count.load();
+        int64_t outfull = dd_count - gcoll.out_rem_count.load();
+
         pr2serr("%s%" PRId64 "+%d records %s\n", str,
                 outfull - gcoll.out_partial.load(), gcoll.out_partial.load(),
                 (gcoll.verify ? "verified" : "out"));
@@ -1218,7 +1219,6 @@ sig_listen_thread(void * v_clp)
 {
     bool stall_reported = false;
     int prev_pack_id = 0;
-    int sig_number, pack_id;
     struct timespec ts;
     struct timespec * tsp = &ts;
     struct global_collection * clp = (struct global_collection *)v_clp;
@@ -1227,13 +1227,15 @@ sig_listen_thread(void * v_clp)
     tsp->tv_sec = ict_ms / 1000;
     tsp->tv_nsec = (ict_ms % 1000) * 1000 * 1000;   /* DEF_SDT_ICT_MS */
     while (1) {
-        sig_number = sigtimedwait(&signal_set, NULL, tsp);
+        int sig_number = sigtimedwait(&signal_set, NULL, tsp);
+
         if (sig_number < 0) {
             int err = errno;
 
             /* EAGAIN implies a timeout */
             if ((EAGAIN == err) && (clp->sdt_crt > 0)) {
-                pack_id = mono_pack_id.load();
+                int pack_id = mono_pack_id.load();
+
                 if ((pack_id > 0) && (pack_id == prev_pack_id)) {
                     if (! stall_reported) {
                         stall_reported = true;
@@ -1264,37 +1266,6 @@ sig_listen_thread(void * v_clp)
     if (clp->verbose > 1)
         pr2serr_lk("%s: exiting\n", __func__);
 
-
-#if 0
-
-
-            if (EAGAIN == err) { /* timeout */
-                pack_id = mono_pack_id.load();
-                if (pack_id == prev_pack_id) {
-                    if (! stall_reported) {
-                        stall_reported = true;
-                        tsp->tv_sec = 2;
-                        tsp->tv_nsec = 0;
-                        pr2serr_lk("%s: first stall at pack_id=%d "
-                                   "detected\n", __func__, pack_id);
-                    } else
-                        pr2serr_lk("%s: subsequent stall at pack_id=%d\n",
-                                   __func__, pack_id);
-                    system_wrapper("/usr/bin/cat /proc/scsi/sg/debug\n");
-                } else
-                    prev_pack_id = pack_id;
-            } else
-                pr2serr_lk("%s: sigtimedwait() errno=%d\n", __func__, err);
-        }
-        if (SIGINT == sig_number) {
-            pr2serr_lk("%sinterrupted by SIGINT\n", my_name);
-            stop_both(clp);
-            pthread_cond_broadcast(&clp->out_sync_cv);
-        }
-    }
-    if (clp->verbose > 1)
-        pr2serr_lk("%s: exiting\n", __func__);
-#endif
     return NULL;
 }
 
@@ -1524,8 +1495,7 @@ read_write_thread(void * v_tip)
     if (vb > 2)
         pr2serr_lk("%d <-- Starting worker thread\n", rep->id);
     if (! (in_mmap || out_mmap)) {
-        int n = sz;
-
+        n = sz;
         if (clp->unbalanced_mrq)
             n *= clp->nmrqs;
         rep->buffp = sg_memalign(n, 0 /* page align */, &rep->alloc_bp,
@@ -1659,6 +1629,9 @@ read_write_thread(void * v_tip)
                                    "to_do=%u\n", rep->id,
                                    (uint32_t)deferred_arr.first.size());
                     res = sgh_do_deferred_mrq(rep, deferred_arr);
+                    if (res)
+                        pr2serr_lk("%s tid=%d: sgh_do_deferred_mrq failed\n",
+                                   __func__, rep->id);
                 }
                 break;  /* at or beyond end, so leave loop >>>>>>>>>>  */
             } else if ((my_index + clp->bpt) > dd_count)
@@ -1771,6 +1744,9 @@ skip_force_out_sequence:
                     pr2serr_lk("thread=%d: tail-end, to_do=%u\n", rep->id,
                                (uint32_t)deferred_arr.first.size());
                 res = sgh_do_deferred_mrq(rep, deferred_arr);
+                if (res)
+                    pr2serr_lk("%s tid=%d: sgh_do_deferred_mrq failed\n",
+                               __func__, rep->id);
             }
             clp->out_stop = true;
             stop_after_write = true;
@@ -1792,7 +1768,7 @@ skip_force_out_sequence:
 fini:
     if ((1 == rep->mmap_active) && (rep->mmap_len > 0)) {
         if (munmap(rep->buffp, rep->mmap_len) < 0) {
-            int err = errno;
+            err = errno;
             char bb[STRERR_BUFF_LEN + 1];
 
             pr2serr_lk("thread=%d: munmap() failed: %s\n", rep->id,
@@ -1805,8 +1781,8 @@ fini:
     }
     if (rep->alloc_bp) {
         free(rep->alloc_bp);
-	rep->alloc_bp = NULL;
-	rep->buffp = NULL;
+        rep->alloc_bp = NULL;
+        rep->buffp = NULL;
     }
 
     if (sg_version_ge_40045) {
@@ -1862,7 +1838,6 @@ normal_in_rd(Rq_elem * rep, int blocks)
     bool stop_after_write = false;
     bool same_fds = clp->in_flags.same_fds || clp->out_flags.same_fds;
     int res;
-    char strerr_buff[STRERR_BUFF_LEN + 1];
 
     if (clp->verbose > 4)
         pr2serr_lk("%s: tid=%d: iblk=%" PRIu64 ", blocks=%d\n", __func__,
@@ -1904,6 +1879,8 @@ normal_in_rd(Rq_elem * rep, int blocks)
            ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
+        char strerr_buff[STRERR_BUFF_LEN + 1];
+
         if (clp->in_flags.coe) {
             memset(rep->buffp, 0, rep->num_blks * clp->bs);
             pr2serr_lk("tid=%d: >> substituted zeros for in blk=%" PRId64
@@ -1944,7 +1921,6 @@ normal_out_wr(Rq_elem * rep, int blocks)
 {
     int res;
     struct global_collection * clp = rep->clp;
-    char strerr_buff[STRERR_BUFF_LEN + 1];
 
     /* enters holding out_mutex */
     if (clp->verbose > 4)
@@ -1954,6 +1930,8 @@ normal_out_wr(Rq_elem * rep, int blocks)
             < 0) && ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
+        char strerr_buff[STRERR_BUFF_LEN + 1];
+
         if (clp->out_flags.coe) {
             pr2serr_lk("tid=%d: >> ignored error for out blk=%" PRId64
                        " for %d bytes, %s\n", rep->id, rep->oblk,
@@ -2068,10 +2046,11 @@ static void
 sg_in_rd_cmd(struct global_collection * clp, Rq_elem * rep,
              mrq_arr_t & def_arr)
 {
-    int res, status, pack_id;
+    int status, pack_id;
 
     while (1) {
-        res = sg_start_io(rep, def_arr, pack_id, NULL);
+        int res = sg_start_io(rep, def_arr, pack_id, NULL);
+
         if (1 == res)
             err_exit(ENOMEM, "sg starting in command");
         else if (res < 0) {
@@ -2419,11 +2398,8 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
 
             if (sg_scsi_normalize_sense(sbp, slen, &ssh) &&
                 (ssh.response_code >= 0x70)) {
-                char b[256];
-
-                if (ssh.response_code & 0x1) {
+                if (ssh.response_code & 0x1)
                     ok = true;
-                }
                 if (vb) {
                     sg_get_sense_str("  ", sbp, slen, false, blen, b);
                     pr2serr_lk("[%d] a_v4[%d]:\n%s\n", id, k, b);
@@ -2442,9 +2418,8 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     }   /* end of request array scan loop */
     if ((n_subm == num_mrq) || (vb < 3))
         goto fini;
-    if (vb)
-        pr2serr_lk("[%d] checking response array _beyond_ number of "
-                   "submissions [%d] to num_mrq:\n", id, k);
+    pr2serr_lk("[%d] checking response array _beyond_ number of "
+               "submissions [%d] to num_mrq:\n", id, k);
     for (all_good = true; k < num_mrq; ++k, ++a_v4p) {
         if (SG_INFO_MRQ_FINI & a_v4p->info) {
             pr2serr_lk("[%d] a_v4[%d]: unexpected SG_INFO_MRQ_FINI set [%s]\n",
@@ -2780,7 +2755,7 @@ static int
 split_def_arr(const mrq_arr_t & def_arr, mrq_arr_t & fd_def_arr,
               mrq_arr_t & o_fd_def_arr)
 {
-    int nrq, k, flags;
+    int nrq, k;
     int res = 0;
     const struct sg_io_v4 * a_v4p;
 
@@ -2788,6 +2763,7 @@ split_def_arr(const mrq_arr_t & def_arr, mrq_arr_t & fd_def_arr,
     nrq = def_arr.first.size();
 
     for (k = 0; k < nrq; ++k) {
+        int flags;
         const struct sg_io_v4 * h4p = a_v4p + k;
 
         flags = h4p->flags;
@@ -3327,8 +3303,12 @@ do_v4:
         def_arr.first.push_back(*h4p);
         def_arr.second.push_back(cdb_arr);
         res = 0;
-        if ((int)def_arr.first.size() >= clp->nmrqs)
+        if ((int)def_arr.first.size() >= clp->nmrqs) {
             res = sgh_do_deferred_mrq(rep, def_arr);
+            if (res)
+                pr2serr_lk("%s tid=%d: sgh_do_deferred_mrq failed\n",
+                           __func__, rep->id);
+        }
         return res;
     }
     while (((res = ioctl(fd, SG_IOSUBMIT, h4p)) < 0) &&
@@ -3853,9 +3833,8 @@ static int
 sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
            int * mmap_lenp)
 {
-    int fd, err, n;
+    int fd, n;
     int flags = O_RDWR;
-    char ebuff[EBUFF_SZ];
 
     if (clp->in_flags.direct)
         flags |= O_DIRECT;
@@ -3865,7 +3844,9 @@ sg_in_open(struct global_collection *clp, const char *inf, uint8_t **mmpp,
         flags |= O_SYNC;
 
     if ((fd = open(inf, flags)) < 0) {
-        err = errno;
+        int err = errno;
+        char ebuff[EBUFF_SZ];
+
         snprintf(ebuff, EBUFF_SZ, "%s: could not open %s for sg reading",
                  __func__, inf);
         perror(ebuff);
@@ -3887,9 +3868,8 @@ static int
 sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
             int * mmap_lenp)
 {
-    int fd, err, n;
+    int fd, n;
     int flags = O_RDWR;
-    char ebuff[EBUFF_SZ];
 
     if (clp->out_flags.direct)
         flags |= O_DIRECT;
@@ -3899,7 +3879,9 @@ sg_out_open(struct global_collection *clp, const char *outf, uint8_t **mmpp,
         flags |= O_SYNC;
 
     if ((fd = open(outf, flags)) < 0) {
-        err = errno;
+        int err = errno;
+        char ebuff[EBUFF_SZ];
+
         snprintf(ebuff,  EBUFF_SZ, "%s: could not open %s for sg %s",
                  __func__, outf, (clp->verify ? "verifying" : "writing"));
         perror(ebuff);

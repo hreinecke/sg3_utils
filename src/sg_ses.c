@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.50 20210610";    /* ses4r04 */
+static const char * version_str = "2.51 20210730";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -994,7 +994,6 @@ parse_index(struct opts_t *op)
     const char * cp;
     char * mallcp;
     char * c2p;
-    const char * cc3p;
     const struct element_type_t * etp;
     char b[64];
     const int blen = sizeof(b);
@@ -1006,6 +1005,8 @@ parse_index(struct opts_t *op)
         if (0 == strcmp("-1", cp + 1))
             n = -1;
         else {
+            const char * cc3p;
+
             n = sg_get_num_nomult(cp + 1);
             if ((n < 0) || (n > 255)) {
                 pr2serr("bad argument to '--index=', after comma expect "
@@ -1566,7 +1567,6 @@ parse_cgs_str(char * buff, struct tuple_acronym_val * tavp)
 {
     char * esp;
     char * colp;
-    char * cp;
     unsigned int ui;
 
     tavp->acron = NULL;
@@ -1590,6 +1590,8 @@ parse_cgs_str(char * buff, struct tuple_acronym_val * tavp)
     if (isalpha((uint8_t)buff[0]))
         tavp->acron = buff;
     else {
+        char * cp;
+
         colp = strchr(buff, ':');
         if ((NULL == colp) || (buff == colp))
             return -1;
@@ -1677,20 +1679,19 @@ static int
 do_senddiag(struct sg_pt_base * ptvp, void * outgoing_pg, int outgoing_len,
             bool noisy, int verbose)
 {
-    const bool pf_bit = true;
-    int page_num, ret;
-    const char * cp;
+    int ret;
 
     if (outgoing_pg && (verbose > 2)) {
-        page_num = ((const char *)outgoing_pg)[0];
-        cp = find_out_diag_page_desc(page_num);
+        int page_num = ((const char *)outgoing_pg)[0];
+        const char * cp = find_out_diag_page_desc(page_num);
+
         if (cp)
             pr2serr("    Send diagnostic command page name: %s\n", cp);
         else
             pr2serr("    Send diagnostic command page number: 0x%x\n",
                     page_num);
     }
-    ret = sg_ll_send_diag_pt(ptvp, 0 /* sf_code */, pf_bit,
+    ret = sg_ll_send_diag_pt(ptvp, 0 /* sf_code */, true /* pf_bit */,
                              false /* sf_bit */, false /* devofl_bit */,
                              false /* unitofl_bit */, 0 /* long_duration */,
                              outgoing_pg, outgoing_len, noisy, verbose);
@@ -2711,12 +2712,12 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
     case DISPLAY_ETC:   /* Display (ses2r15) */
         if (nofilter || (0xc0 & statp[1])) {
             int dms = statp[1] & 0x3;
-            uint16_t dcs;
 
             printf("%sIdent=%d, Fail=%d, Display mode status=%d", pad,
                    !!(statp[1] & 0x80), !!(statp[1] & 0x40), dms);
             if ((1 == dms) || (2 == dms)) {
-                dcs = sg_get_unaligned_be16(statp + 2);
+                uint16_t dcs = sg_get_unaligned_be16(statp + 2);
+
                 printf(", Display character status=0x%x", dcs);
                 if (statp[2] && (0 == statp[3]))
                     printf(" ['%c']", statp[2]);
@@ -3255,7 +3256,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
 {
     int phys, j, m, n, desc_type, eiioe, eip_offset;
     bool nofilter = ! op->do_filter;
-    bool eip, print_sas_addr, saddr_nz;
+    bool eip;
     const struct join_row_t * jrp;
     const uint8_t * aep;
     const uint8_t * ed_bp;
@@ -3277,6 +3278,9 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
         printf("\n");
         aep = ae_bp + 4 + eip_offset + eip_offset;
         for (j = 0; j < phys; ++j, aep += 28) {
+            bool print_sas_addr = false;
+            bool saddr_nz;
+
             printf("%sphy index: %d\n", pad, j);
             printf("%s  SAS device type: %s\n", pad,
                    sas_device_type[(0x70 & aep[0]) >> 4]);
@@ -3292,7 +3296,6 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                        ((aep[3] & 4) ? " STP" : ""),
                        ((aep[3] & 2) ? " SMP" : ""),
                        ((aep[3] & 1) ? " SATA_device" : ""));
-            print_sas_addr = false;
             saddr_nz = saddr_non_zero(aep + 4);
             if (nofilter || saddr_nz) {
                 print_sas_addr = true;
@@ -3464,7 +3467,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
                        const struct opts_t * op)
 {
     int ports, phys, j, m, eip_offset, pcie_pt;
-    bool cid_valid, psn_valid, bdf_valid, eip;
+    bool eip;
     uint16_t pcie_vid;
     const uint8_t * aep;
     char b[64];
@@ -3542,10 +3545,11 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
         printf("%smodel number: %.40s\n", pad, ae_bp + 32);
         aep = ae_bp + 72;
         for (j = 0; j < phys; ++j, aep += 8) {
+            bool psn_valid = !!(0x4 & aep[0]);
+            bool bdf_valid = !!(0x2 & aep[0]);
+            bool cid_valid = !!(0x1 & aep[0]);
+
             printf("%sport index: %d\n", pad, j);
-            psn_valid = !!(0x4 & aep[0]);
-            bdf_valid = !!(0x2 & aep[0]);
-            cid_valid = !!(0x1 & aep[0]);
             printf("%s  PSN_VALID=%d, BDF_VALID=%d, CID_VALID=%d\n", pad,
                    (int)psn_valid, (int)bdf_valid, (int)cid_valid);
             if (cid_valid)      /* N.B. little endian */
@@ -3807,11 +3811,12 @@ supported_pages_sdg(const char * leadin, const uint8_t * resp,
 {
     int k, code, prev;
     bool got1;
-    const char * cp;
     const struct diag_page_abbrev * ap;
 
     printf("%s:\n", leadin);
     for (k = 0, prev = 0; k < (resp_len - 4); ++k, prev = code) {
+        const char * cp;
+
         code = resp[k + 4];
         if (code < prev)
             break;      /* assume to be padding at end */
@@ -4387,8 +4392,6 @@ fini:
 static void
 devslotnum_and_sasaddr(struct join_row_t * jrp, const uint8_t * ae_bp)
 {
-    int m;
-
     if ((NULL == jrp) || (NULL == ae_bp) || (0 == (0x10 & ae_bp[0])))
         return; /* sanity and expect EIP=1 */
     switch (0xf & ae_bp[0]) {
@@ -4400,6 +4403,8 @@ devslotnum_and_sasaddr(struct join_row_t * jrp, const uint8_t * ae_bp)
             /* only for device slot and array device slot elements */
             jrp->dev_slot_num = ae_bp[7];
             if (ae_bp[4] > 0) {        /* number of phys */
+                int m;
+
                 /* Use the first phy's "SAS ADDRESS" field */
                 for (m = 0; m < 8; ++m)
                     jrp->sas_addr[m] = ae_bp[(4 + 4 + 12) + m];
@@ -4780,7 +4785,6 @@ static void
 join_juggle_aes(struct th_es_t * tesp, uint8_t * es_bp, const uint8_t * ed_bp,
                 uint8_t * t_bp)
 {
-    bool et_used_by_aes;
     int k, j, eoe, ei4aess;
     struct join_row_t * jrp;
     const struct type_desc_hdr_t * tdhp;
@@ -4788,6 +4792,8 @@ join_juggle_aes(struct th_es_t * tesp, uint8_t * es_bp, const uint8_t * ed_bp,
     jrp = tesp->j_base;
     tdhp = tesp->th_base;
     for (k = 0, eoe = 0, ei4aess = 0; k < tesp->num_ths; ++k, ++tdhp) {
+        bool et_used_by_aes;
+
         jrp->th_i = k;
         jrp->indiv_i = -1;
         jrp->etype = tdhp->etype;
@@ -4834,7 +4840,7 @@ join_juggle_aes(struct th_es_t * tesp, uint8_t * es_bp, const uint8_t * ed_bp,
             ++tesp->num_j_eoe;
         }
         if (jrp >= join_arr_lastp) {
-            ++k;
+            /* ++k; */
             break;      /* leave last row all zeros */
         }
     }
@@ -4852,7 +4858,7 @@ static int
 join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
 {
     bool broken_ei;
-    int j, res, num_ths, mlen;
+    int res, num_ths, mlen;
     uint32_t ref_gen_code, gen_code;
     const uint8_t * ae_bp;
     const uint8_t * ae_last_bp;
@@ -4875,6 +4881,8 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
     tesp->th_base = type_desc_hdr_arr;
     tesp->num_ths = num_ths;
     if (display && primary_info.have_info) {
+        int j;
+
         printf("  Primary enclosure logical identifier (hex): ");
         for (j = 0; j < 8; ++j)
             printf("%02x", primary_info.enc_log_id[j]);
@@ -5018,9 +5026,11 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
 static int
 strcase_eq(const char * s1p, const char * s2p)
 {
-    int c1, c2;
+    int c1;
 
     do {
+        int c2;
+
         c1 = *s1p++;
         c2 = *s2p++;
         if (c1 != c2) {
@@ -5081,8 +5091,7 @@ cgs_enc_ctl_stat(struct sg_pt_base * ptvp, struct join_row_t * jrp,
                  const struct tuple_acronym_val * tavp,
                  const struct opts_t * op, bool last)
 {
-    int ret, len, s_byte, s_bit, n_bits, k;
-    uint64_t ui;
+    int s_byte, s_bit, n_bits;
     const struct acronym2tuple * ap;
 
     if (NULL == tavp->acron) {
@@ -5116,13 +5125,19 @@ cgs_enc_ctl_stat(struct sg_pt_base * ptvp, struct join_row_t * jrp,
     if (op->verbose > 1)
         pr2serr("  s_byte=%d, s_bit=%d, n_bits=%d\n", s_byte, s_bit, n_bits);
     if (GET_OPT == tavp->cgs_sel) {
-        ui = sg_get_big_endian(jrp->enc_statp + s_byte, s_bit, n_bits);
+        uint64_t ui = sg_get_big_endian(jrp->enc_statp + s_byte, s_bit,
+                                        n_bits);
+
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
         else
             printf("%" PRId64 "\n", (int64_t)ui);
     } else {    /* --set or --clear */
+        int len;
+
         if ((! op->mask_ign) && (jrp->etype < NUM_ETC)) {
+            int k;
+
             if (op->verbose > 2)
                 pr2serr("Applying mask to element status [etc=%d] prior to "
                         "modify then write\n", jrp->etype);
@@ -5138,8 +5153,9 @@ cgs_enc_ctl_stat(struct sg_pt_base * ptvp, struct join_row_t * jrp,
             enc_stat_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(enc_stat_rsp + 2) + 4;
         if (last) {
-            ret = do_senddiag(ptvp, enc_stat_rsp, len, ! op->quiet,
-                              op->verbose);
+            int ret = do_senddiag(ptvp, enc_stat_rsp, len, ! op->quiet,
+                                  op->verbose);
+
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
                 return -1;
@@ -5157,8 +5173,7 @@ cgs_threshold(struct sg_pt_base * ptvp, const struct join_row_t * jrp,
               const struct tuple_acronym_val * tavp,
               const struct opts_t * op, bool last)
 {
-    int ret, len, s_byte, s_bit, n_bits;
-    uint64_t ui;
+    int s_byte, s_bit, n_bits;
     const struct acronym2tuple * ap;
 
     if (NULL == jrp->thresh_inp) {
@@ -5184,20 +5199,25 @@ cgs_threshold(struct sg_pt_base * ptvp, const struct join_row_t * jrp,
             return -2;
     }
     if (GET_OPT == tavp->cgs_sel) {
-        ui = sg_get_big_endian(jrp->thresh_inp + s_byte, s_bit, n_bits);
+        uint64_t ui = sg_get_big_endian(jrp->thresh_inp + s_byte, s_bit,
+                                         n_bits);
+
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
         else
             printf("%" PRId64 "\n", (int64_t)ui);
     } else {
+        int len;
+
         sg_set_big_endian((uint64_t)tavp->val,
                           jrp->thresh_inp + s_byte, s_bit, n_bits);
         if (op->byte1_given)
             threshold_rsp[1] = op->byte1;
         len = sg_get_unaligned_be16(threshold_rsp + 2) + 4;
         if (last) {
-            ret = do_senddiag(ptvp, threshold_rsp, len, ! op->quiet,
-                              op->verbose);
+            int ret = do_senddiag(ptvp, threshold_rsp, len, ! op->quiet,
+                                  op->verbose);
+
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
                 return -1;
@@ -5216,7 +5236,6 @@ cgs_additional_el(const struct join_row_t * jrp,
                   const struct opts_t * op)
 {
     int s_byte, s_bit, n_bits;
-    uint64_t ui;
     const struct acronym2tuple * ap;
 
     if (NULL == jrp->ae_statp) {
@@ -5242,7 +5261,9 @@ cgs_additional_el(const struct join_row_t * jrp,
             return -2;
     }
     if (GET_OPT == tavp->cgs_sel) {
-        ui = sg_get_big_endian(jrp->ae_statp + s_byte, s_bit, n_bits);
+        uint64_t ui = sg_get_big_endian(jrp->ae_statp + s_byte, s_bit,
+                                         n_bits);
+
         if (op->do_hex)
             printf("0x%" PRIx64 "\n", ui);
         else
@@ -5454,17 +5475,14 @@ static void
 enumerate_work(const struct opts_t * op)
 {
     int num;
-    const struct element_type_t * etp;
-    const struct acronym2tuple * ap;
-    char b[64];
-    char a[160];
-    const char * cp;
 
     if (op->dev_name)
         printf(">>> DEVICE %s ignored when --%s option given.\n",
                op->dev_name, (op->do_list ? "list" : "enumerate"));
     num = op->enumerate + (int)op->do_list;
     if (num < 2) {
+        const struct element_type_t * etp;
+
         enumerate_diag_pages();
         printf("\nSES element type names, followed by abbreviation and "
                "element type code:\n");
@@ -5472,8 +5490,12 @@ enumerate_work(const struct opts_t * op)
             printf("    %s  [%s] [0x%x]\n", etp->desc, etp->abbrev,
                    etp->elem_type_code);
     } else {
-        char bb[64];
         bool given_et = false;
+        const struct acronym2tuple * ap;
+        const char * cp;
+        char a[160];
+        char b[64];
+        char bb[64];
 
         /* command line has multiple --enumerate and/or --list options */
         printf("--clear, --get, --set acronyms for Enclosure Status/Control "
@@ -5530,7 +5552,7 @@ int
 main(int argc, char * argv[])
 {
     bool have_cgs = false;
-    int k, d_len, res, resid, vb;
+    int k, n, d_len, res, resid, vb;
     int sg_fd = -1;
     int pd_type = 0;
     int ret = 0;
@@ -5764,15 +5786,17 @@ main(int argc, char * argv[])
             }
         }
         clear_scsi_pt_obj(ptvp);
-        memset(enc_stat_rsp, 0, 4096);
+        memset(enc_stat_rsp, 0, enc_stat_rsp_sz);
     }
 #endif
 
     if (ptvp) {
-        ret = sg_ll_request_sense_pt(ptvp, false, enc_stat_rsp,
-                                     REQUEST_SENSE_RESP_SZ, ! op->quiet, vb);
+        n = (enc_stat_rsp_sz < REQUEST_SENSE_RESP_SZ) ? enc_stat_rsp_sz :
+                                                        REQUEST_SENSE_RESP_SZ;
+        ret = sg_ll_request_sense_pt(ptvp, false, enc_stat_rsp, n,
+                                     ! op->quiet, vb);
         if (0 == ret) {
-            int sense_len = REQUEST_SENSE_RESP_SZ - get_scsi_pt_resid(ptvp);
+            int sense_len = n - get_scsi_pt_resid(ptvp);
             struct sg_scsi_sense_hdr ssh;
 
             if ((sense_len > 7) && sg_scsi_normalize_sense(enc_stat_rsp,
@@ -5801,7 +5825,7 @@ main(int argc, char * argv[])
                         " problems ahead\n", ret);
         }
         clear_scsi_pt_obj(ptvp);
-        memset(enc_stat_rsp, 0, REQUEST_SENSE_RESP_SZ);
+        memset(enc_stat_rsp, 0, enc_stat_rsp_sz);
     }
 
     if (op->nickname_str)

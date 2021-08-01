@@ -251,7 +251,7 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
                      int in_bit, int vb)
 {
     bool dsense = !! ptp->dev_stat.scsi_dsense;
-    int sl, asc, n;
+    int asc, n;
     uint8_t * sbp = (uint8_t *)(sg_uintptr_t)ptp->io_hdr.response;
     uint8_t sks[4];
 
@@ -278,7 +278,8 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
     }
     sg_put_unaligned_be16(in_byte, sks + 1);
     if (dsense) {
-        sl = sbp[7] + 8;
+        int sl = sbp[7] + 8;
+
         sbp[7] = sl;
         sbp[sl] = 0x2;
         sbp[sl + 1] = 0x6;
@@ -408,7 +409,7 @@ sntl_check_enclosure_override(struct sg_pt_linux_scsi * ptp, int vb)
     ptp->dev_stat.id_ctl253 = nvmsr;
     switch (ptp->dev_stat.enclosure_override) {
     case 0x0:       /* no override */
-        if (0x3 & nvmsr) {
+        if (0x3 == (0x3 & nvmsr)) {
             ptp->dev_stat.pdt = PDT_DISK;
             ptp->dev_stat.enc_serv = 1;
         } else if (0x2 & nvmsr) {
@@ -521,7 +522,6 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
          int vb)
 {
     bool evpd;
-    bool cp_id_ctl = false;
     int res;
     uint16_t n, alloc_len, pg_cd;
     uint32_t pg_sz = sg_get_page_size();
@@ -549,6 +549,8 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
     evpd = !!(0x1 & cdbp[1]);
     pg_cd = cdbp[2];
     if (evpd) {         /* VPD page responses */
+        bool cp_id_ctl = false;
+
         switch (pg_cd) {
         case 0:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
@@ -885,7 +887,7 @@ sntl_mode_ss(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
             cmdp->nsid = nsid ? nsid : SG_NVME_BROADCAST_NSID;
             cmdp->cdw10 = 0x6; /* "Volatile write cache" feature id */
             if (sp)
-                cmdp->cdw10 |= (1 << 31);
+                cmdp->cdw10 |= (1U << 31);
             cmdp->cdw11 = (uint32_t)ptp->dev_stat.wce;
             cmdp->timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
             res = sg_nvme_admin_cmd(ptp, cmdp, NULL, false, time_secs, vb);
@@ -934,7 +936,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     bool pf, self_test;
     int res;
     uint8_t st_cd, dpg_cd;
-    uint32_t alloc_len, n, dout_len, dpg_len, nvme_dst;
+    uint32_t alloc_len, n, dout_len, dpg_len;
     const uint32_t pg_sz = sg_get_page_size();
     uint8_t * dop;
     struct sg_nvme_passthru_cmd cmd;
@@ -947,6 +949,8 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
         pr2ws("%s: pf=%d, self_test=%d (st_code=%d)\n", __func__, (int)pf,
               (int)self_test, (int)st_cd);
     if (self_test || st_cd) {
+        uint32_t nvme_dst;
+
         memset(cmd_up, 0, sizeof(cmd));
         cmd_up[SG_NVME_PT_OPCODE] = SG_NVME_AD_DEV_SELT_TEST;
         /* just this namespace (if there is one) and controller */
@@ -1107,10 +1111,10 @@ sntl_rep_opcodes(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
 {
     bool rctd;
     uint8_t reporting_opts, req_opcode, supp;
-    uint16_t req_sa, u;
+    uint16_t req_sa;
     uint32_t alloc_len, offset, a_len;
     uint32_t pg_sz = sg_get_page_size();
-    int k, len, count, bump;
+    int len, count, bump;
     const struct sg_opcode_info_t *oip;
     uint8_t *arr;
     uint8_t *free_arr;
@@ -1186,6 +1190,9 @@ sntl_rep_opcodes(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
             else
                 supp = 3;
             if (3 == supp) {
+                uint16_t u;
+                int k;
+
                 u = oip->len_mask[0];
                 sg_put_unaligned_be16(u, arr + 2);
                 arr[4] = oip->opcode;

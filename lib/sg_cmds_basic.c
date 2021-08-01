@@ -113,7 +113,6 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
     int scat;
     bool n = false;
     bool check_data_in = false;
-    char b[512];
 
     scat = sg_err_category_sense(sbp, slen);
     switch (scat) {
@@ -145,6 +144,8 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
         break;
     }
     if (verbose || n) {
+        char b[512];
+
         if (leadin && (strlen(leadin) > 0))
             pr2ws("%s:\n", leadin);
         sg_get_sense_str(NULL, sbp, slen, (verbose > 1),
@@ -192,7 +193,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                      int pt_res, bool noisy, int verbose, int * o_sense_cat)
 {
     bool favour_sense;
-    int cat, slen, resp_code, sstat, req_din_x, req_dout_x;
+    int cat, slen, sstat, req_din_x, req_dout_x;
     int act_din_x, act_dout_x;
     const uint8_t * sbp;
     char b[1024];
@@ -244,7 +245,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     switch ((cat = get_scsi_pt_result_category(ptvp))) {
     case SCSI_PT_RESULT_GOOD:
         if (sbp && (slen > 7)) {
-            resp_code = sbp[0] & 0x7f;
+            int resp_code = sbp[0] & 0x7f;
+
             /* SBC referrals can have status=GOOD and sense_key=COMPLETED */
             if (resp_code >= 0x70) {
                 if (resp_code < 0x72) {
@@ -399,7 +401,7 @@ sg_ll_inquiry_com(struct sg_pt_base * ptvp, int sg_fd, bool cmddt, bool evpd,
               sg_get_command_str(inq_cdb, INQUIRY_CMDLEN, false, sizeof(b),
                                  b));
     }
-    if (resp && (mx_resp_len > 0)) {
+    if (mx_resp_len > 0) {
         up = (uint8_t *)resp;
         up[0] = 0x7f;   /* defensive prefill */
         if (mx_resp_len > 4)

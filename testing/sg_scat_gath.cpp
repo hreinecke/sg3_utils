@@ -418,7 +418,6 @@ void
 scat_gath_list::dbg_print(bool skip_meta, const char * id_str, bool to_stdout,
                           bool show_sgl) const
 {
-    int k;
     int num = sgl.size();
     const char * caller = id_str ? id_str : "unknown";
     FILE * fp = to_stdout ? stdout : stderr;
@@ -435,6 +434,8 @@ scat_gath_list::dbg_print(bool skip_meta, const char * id_str, bool to_stdout,
     fprintf(fp, "  >> %s scatter gather list (%d element%s):\n", caller, num,
             (num == 1 ? "" : "s"));
     if (show_sgl) {
+        int k;
+
         for (k = 0; k < num; ++k) {
             const class scat_gath_elem & sge = sgl[k];
 
@@ -622,7 +623,6 @@ sgls_eq_off(const scat_gath_list & left, int l_e_ind, int l_blk_off,
             const scat_gath_list & right, int r_e_ind, int r_blk_off,
             bool allow_partial)
 {
-    int lrem, rrem;
     int lelems = left.sgl.size();
     int relems = right.sgl.size();
 
@@ -630,8 +630,10 @@ sgls_eq_off(const scat_gath_list & left, int l_e_ind, int l_blk_off,
         if ((left.sgl[l_e_ind].lba + l_blk_off) !=
             (right.sgl[r_e_ind].lba + r_blk_off))
             return false;
-        lrem = left.sgl[l_e_ind].num - l_blk_off;
-        rrem = right.sgl[r_e_ind].num - r_blk_off;
+
+        int lrem = left.sgl[l_e_ind].num - l_blk_off;
+        int rrem = right.sgl[r_e_ind].num - r_blk_off;
+
         if (lrem == rrem) {
             ++l_e_ind;
             l_blk_off = 0;
@@ -726,7 +728,6 @@ scat_gath_iter::set_by_blk_idx(int64_t _blk_idx)
     int k;
     const int elems = sglist.sgl.size();
     const int last_ind = elems - 1;
-    uint32_t num;
     int64_t bc = _blk_idx;
 
     if (bc < 0)
@@ -740,8 +741,8 @@ scat_gath_iter::set_by_blk_idx(int64_t _blk_idx)
     } else
         k = 0;
     for (first = true; k < elems; ++k, first = false) {
-        num = ((k == last_ind) && extend_last) ? MAX_SGL_NUM_VAL :
-                                                 sglist.sgl[k].num;
+        uint32_t num = ((k == last_ind) && extend_last) ? MAX_SGL_NUM_VAL :
+                                                          sglist.sgl[k].num;
         if (first) {
             if ((int64_t)(num - it_blk_off) < bc)
                 bc -= (num - it_blk_off);
@@ -780,14 +781,13 @@ scat_gath_iter::add_blks(uint64_t blk_count)
     int k;
     const int elems = sglist.sgl.size();
     const int last_ind = elems - 1;
-    uint32_t num;
     uint64_t bc = blk_count;
 
     if (0 == bc)
         return true;
     for (first = true, k = it_el_ind; k < elems; ++k) {
-        num = ((k == last_ind) && extend_last) ? MAX_SGL_NUM_VAL :
-                                                 sglist.sgl[k].num;
+        uint32_t num = ((k == last_ind) && extend_last) ? MAX_SGL_NUM_VAL :
+                                                          sglist.sgl[k].num;
         if (first) {
             first = false;
             if ((uint64_t)(num - it_blk_off) <= bc)

@@ -137,7 +137,7 @@ using namespace std::chrono;
 #define DEF_DIRECT false        /* true: direct_io */
 #define DEF_MMAP_IO false       /* true: mmap-ed IO with sg */
 #define DEF_NO_XFER 0
-#define DEF_LBA 1000
+#define DEF_LBA 1000U
 
 #define MAX_Q_PER_FD 16383      /* sg driver per file descriptor limit */
 #define MAX_CONSEC_NOMEMS 4     /* was 16 */
@@ -432,13 +432,13 @@ static unsigned int
 get_urandom_uint(void)
 {
     unsigned int res = 0;
-    int n;
-    uint8_t b[sizeof(unsigned int)];
     lock_guard<mutex> lg(rand_lba_mutex);
 
     int fd = open(URANDOM_DEV, O_RDONLY);
     if (fd >= 0) {
-        n = read(fd, b, sizeof(unsigned int));
+        uint8_t b[sizeof(unsigned int)];
+        int n = read(fd, b, sizeof(unsigned int));
+
         if (sizeof(unsigned int) == n)
             memcpy(&res, b, sizeof(unsigned int));
         close(fd);
@@ -965,10 +965,9 @@ work_thread(int id, struct opts_t * op)
     int open_flags = O_RDWR;
     int thr_async_starts = 0;
     int thr_async_finishes = 0;
-    int thr_ovn_force_read = 0;
     int vb = op->verbose;
     int k, n, res, sg_fd, num_outstanding, do_inc, npt, pack_id, sg_flags;
-    int num_waiting_read, num_to_read, sz, ern, encore_pack_id, ask, j, m, o;
+    int num_waiting_read, sz, encore_pack_id, ask, j, m, o;
     int prev_pack_id, blk_sz;
     unsigned int thr_enomem_count = 0;
     unsigned int thr_start_eagain_count = 0;
@@ -977,7 +976,6 @@ work_thread(int id, struct opts_t * op)
     unsigned int thr_fin_eagain_count = 0;
     unsigned int thr_fin_ebusy_count = 0;
     unsigned int thr_start_edom_count = 0;
-    unsigned int seed = 0;
     int needed_sz = op->lb_sz * op->num_lbs;
     unsigned int nanosecs;
     unsigned int hi_lba;
@@ -1112,7 +1110,8 @@ work_thread(int id, struct opts_t * op)
         wrkMmap = (uint8_t *)mmap(NULL, needed_sz, PROT_READ | PROT_WRITE,
                                   MAP_SHARED, sg_fd, 0);
         if (MAP_FAILED == wrkMmap) {
-            ern = errno;
+            int ern = errno;
+
             pr2serr_lk("t_id=%d: mmap() failed, errno=%d\n", id, ern);
             return;
         }
@@ -1120,7 +1119,8 @@ work_thread(int id, struct opts_t * op)
     pfd[0].fd = sg_fd;
     pfd[0].events = POLLIN;
     if (is_rw && hi_lba) {
-        seed = get_urandom_uint();
+        unsigned int seed = get_urandom_uint();
+
         if (vb > 1)
             pr2serr_lk("  id=%d, /dev/urandom seed=0x%x\n", id, seed);
         ruip = new Rand_uint((unsigned int)op->lba, hi_lba, seed);
@@ -1153,6 +1153,8 @@ work_thread(int id, struct opts_t * op)
      * no more outstanding responses */
     for (k = 0, m = 0, o=0, num_outstanding = 0; (k < npt) || num_outstanding;
          k = do_inc ? k + 1 : k, ++o) {
+        int num_to_read = 0;
+
         if (do_inc)
             m = 0;
         else {
@@ -1336,7 +1338,6 @@ work_thread(int id, struct opts_t * op)
                 pr2serr_lk("%d->id: free_lst.size() over 6000 (b)\n", id);
             }
         }
-        num_to_read = 0;
         if (need_finish) {
             num_waiting_read = 0;
             if (ioctl(sg_fd, SG_GET_NUM_WAITING, &num_waiting_read) < 0) {
@@ -1579,9 +1580,6 @@ work_thread(int id, struct opts_t * op)
     if ((vb > 2) && (k > 0))
         pr2serr_lk("%d->id: Maximum number of READ/WRITEs queued: %d\n",
                    id, k);
-    if (vb && (thr_ovn_force_read > 0))
-        pr2serr_lk("%d->id: Number of ovn (override number) forced reads: "
-                   "%d\n", id, thr_ovn_force_read);
     async_starts += thr_async_starts;
     async_finishes += thr_async_finishes;
     start_eagain_count += thr_start_eagain_count;
@@ -1742,15 +1740,13 @@ int
 main(int argc, char * argv[])
 {
     bool maxq_per_thread_given = false;
-    int k, n, c, res;
+    int n;
     int force = 0;
     int64_t ll;
     int num_threads = DEF_NUM_THREADS;
-    char b[128];
     struct timespec start_tm, end_tm;
     struct opts_t * op;
     const char * cp;
-    const char * dev_name;
 
     op = &a_opts;
 #if 0
@@ -1775,6 +1771,7 @@ main(int argc, char * argv[])
 
     while (1) {
         int option_index = 0;
+        int c;
 
         c = getopt_long(argc, argv,
                         "34acdefghl:L:mM:n:NO:pq:Q:Rs:St:TuvVw:W",
@@ -1992,10 +1989,8 @@ main(int argc, char * argv[])
         }
     }
     if (optind < argc) {
-        if (optind < argc) {
-            for (; optind < argc; ++optind)
-                op->dev_names.push_back(argv[optind]);
-        }
+        for (; optind < argc; ++optind)
+            op->dev_names.push_back(argv[optind]);
     }
 #ifdef DEBUG
     pr2serr_lk("In DEBUG mode, ");
@@ -2054,12 +2049,16 @@ main(int argc, char * argv[])
     }
 
     try {
-        int sg_ver_num;
+        int k, sg_ver_num;
         unsigned int last_lba;
         unsigned int blk_sz;
         struct stat a_stat;
 
         for (k = 0; k < (int)op->dev_names.size(); ++k) {
+            int res;
+            const char * dev_name;
+            char b[128];
+
             dev_name = op->dev_names[k];
             if (stat(dev_name, &a_stat) < 0) {
                 snprintf(b, sizeof(b), "could not stat() %s", dev_name);

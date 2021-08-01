@@ -277,9 +277,7 @@ work_thread(const char * dev_name, int id, int num, bool share,
     int res = 0;
     unsigned int thr_even_notreadys = 0;
     unsigned int thr_odd_notreadys = 0;
-    unsigned int thr_ebusy_count = 0;
     struct sg_pt_base * ptp = NULL;
-    char ebuff[EBUFF_SZ];
 
     {
         lock_guard<mutex> lg(console_mutex);
@@ -289,6 +287,7 @@ work_thread(const char * dev_name, int id, int num, bool share,
     }
     if (! share) {      /* ignore passed ptp, make this thread's own */
         int oflags = O_RDWR;
+        unsigned int thr_ebusy_count = 0;
 
         if (nonblock)
             oflags |= O_NONBLOCK;
@@ -300,6 +299,8 @@ work_thread(const char * dev_name, int id, int num, bool share,
             this_thread::yield();       // give other threads a chance
         }
         if (pt_fd < 0) {
+            char ebuff[EBUFF_SZ];
+
             snprintf(ebuff, EBUFF_SZ, "work_thread id=%d: error opening: %s",
                      id, dev_name);
             perror(ebuff);
@@ -379,7 +380,6 @@ main(int argc, char * argv[])
     bool share = false;
     int num_threads = DEF_NUM_THREADS;
     char * dev_name = NULL;
-    char ebuff[EBUFF_SZ];
 
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-e", argv[k], 2))
@@ -446,6 +446,8 @@ main(int argc, char * argv[])
                 sleep(0);                   // process yield ??
             }
             if (pt_fd < 0) {
+                char ebuff[EBUFF_SZ];
+
                 snprintf(ebuff, EBUFF_SZ, "main: error opening: %s",
                          dev_name);
                 perror(ebuff);

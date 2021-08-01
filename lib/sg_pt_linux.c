@@ -385,12 +385,13 @@ static bool ev_dsense = false;
 struct sg_pt_base *
 construct_scsi_pt_obj_with_fd(int dev_fd, int verbose)
 {
-    int err;
     struct sg_pt_linux_scsi * ptp;
 
     ptp = (struct sg_pt_linux_scsi *)
           calloc(1, sizeof(struct sg_pt_linux_scsi));
     if (ptp) {
+        int err;
+
 #if (HAVE_NVME && (! IGNORE_NVME))
         sntl_init_dev_stat(&ptp->dev_stat);
         if (! checked_ev_dsense) {
@@ -444,13 +445,14 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 void
 clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
-    bool is_sg, is_bsg, is_nvme;
-    int fd;
-    uint32_t nvme_nsid;
-    struct sg_sntl_dev_state_t dev_stat;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
 
     if (ptp) {
+        bool is_sg, is_bsg, is_nvme;
+        int fd;
+        uint32_t nvme_nsid;
+        struct sg_sntl_dev_state_t dev_stat;
+
         fd = ptp->dev_fd;
         is_sg = ptp->is_sg;
         is_bsg = ptp->is_bsg;
@@ -1119,7 +1121,6 @@ do_scsi_pt_v4(struct sg_pt_linux_scsi * ptp, int fd, int time_secs,
 int
 do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
 {
-    int err;
     struct sg_pt_linux_scsi * ptp = &vp->impl;
     bool have_checked_for_type = (ptp->dev_fd >= 0);
 
@@ -1147,7 +1148,8 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     } else
         fd = ptp->dev_fd;
     if (! have_checked_for_type) {
-        err = set_pt_file_handle(vp, ptp->dev_fd, verbose);
+        int err = set_pt_file_handle(vp, ptp->dev_fd, verbose);
+
         if (err)
             return -ptp->os_err;
     }

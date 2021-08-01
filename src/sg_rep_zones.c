@@ -381,11 +381,10 @@ static int
 decode_rep_realms(const uint8_t * rzBuff, int act_len,
                   const struct opts_t * op)
 {
-    uint32_t k, j, realms_count, derived_realms_count, r_desc_len,
+    uint32_t k, realms_count, derived_realms_count, r_desc_len,
              zdomains_count;
     uint64_t nr_locator;
     const uint8_t * bp;
-    const uint8_t * zp;
 
     if (act_len < 12) {
         pr2serr("need more than 12 bytes to decode, got %u\n", act_len);
@@ -431,6 +430,9 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
                                 (uint32_t)op->do_num : realms_count;
 
     for (k = 0, bp = rzBuff + 64; k < realms_count; ++k, bp += r_desc_len) {
+        uint32_t j;
+        const uint8_t * zp;
+
         printf(" Realm_id=%u\n", sg_get_unaligned_be32(bp + 0));
         if (op->do_hex) {
             hex2stdout(bp, r_desc_len, -1);
@@ -454,11 +456,10 @@ static int
 decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
                   const struct opts_t * op)
 {
-    uint32_t k, j, zd_len, zd_ret_len, zdoms_sup, zdoms_rep, zd_rep_opts;
+    uint32_t k, zd_len, zd_ret_len, zdoms_sup, zdoms_rep, zd_rep_opts;
     uint32_t num, der_zdoms;
     uint64_t zd_locator;
     const uint8_t * bp;
-    const uint8_t * zp;
 
     if (act_len < 12) {
         pr2serr("need more than 12 bytes to decode, got %u\n", act_len);

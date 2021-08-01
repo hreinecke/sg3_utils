@@ -1203,12 +1203,13 @@ static bool
 has_blk_ili(uint8_t * sensep, int sb_len)
 {
     int resp_code;
-    const uint8_t * cup;
 
     if (sb_len < 8)
         return false;
     resp_code = (0x7f & sensep[0]);
     if (resp_code >= 0x72) { /* descriptor format */
+        const uint8_t * cup;
+
         /* find block command descriptor */
         if ((cup = sg_scsi_sense_desc_find(sensep, sb_len, 0x5)))
             return (cup[3] & 0x20);
@@ -1567,7 +1568,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
                int vb)
 {
     static const char * const cdb_s = "verify(10)";
-    int k, res, ret, s_cat, slen;
+    int res, ret, s_cat, slen;
     uint8_t v_cdb[VERIFY10_CMDLEN] =
                 {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -1586,7 +1587,8 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
               sg_get_command_str(v_cdb, VERIFY10_CMDLEN,
                                  false, sizeof(b), b));
         if ((vb > 3) && bytchk && data_out && (data_out_len > 0)) {
-            k = data_out_len > 4104 ? 4104 : data_out_len;
+            int k = data_out_len > 4104 ? 4104 : data_out_len;
+
             pr2ws("    data_out buffer%s\n",
                   (data_out_len > 4104 ? ", first 4104 bytes" : ""));
             hex2stderr((const uint8_t *)data_out, k, vb < 5);
@@ -1644,7 +1646,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
                int data_out_len, uint64_t * infop, bool noisy, int vb)
 {
     static const char * const cdb_s = "verify(16)";
-    int k, res, ret, s_cat, slen;
+    int res, ret, s_cat, slen;
     uint8_t v_cdb[VERIFY16_CMDLEN] =
                 {VERIFY16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN];
@@ -1664,7 +1666,8 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
               sg_get_command_str(v_cdb, VERIFY16_CMDLEN,
                                  false, sizeof(b), b));
         if ((vb > 3) && bytchk && data_out && (data_out_len > 0)) {
-            k = data_out_len > 4104 ? 4104 : data_out_len;
+            int k = data_out_len > 4104 ? 4104 : data_out_len;
+
             pr2ws("    data_out buffer%s\n",
                   (data_out_len > 4104 ? ", first 4104 bytes" : ""));
             hex2stderr((const uint8_t *)data_out, k, vb < 5);

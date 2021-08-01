@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.83 20210610";    /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.84 20210731";    /* spc6r05 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -750,12 +750,14 @@ enumerate_helper(const struct log_elem * lep, bool first,
 static void
 enumerate_pages(const struct opts_t * op)
 {
-    int k, j;
+    int j;
     struct log_elem * lep;
-    struct log_elem ** lepp;
     struct log_elem ** lep_arr;
 
     if (op->do_enumerate < 3) { /* -e, -ee: sort by acronym */
+        int k;
+        struct log_elem ** lepp;
+
         for (k = 0, lep = log_arr; lep->pg_code >=0; ++lep, ++k)
             ;
         ++k;
@@ -794,11 +796,12 @@ acron_search(const char * acron)
 static int
 find_vpn_by_acron(const char * vp_ap)
 {
-    size_t len, k;
     const struct vp_name_t * vpp;
 
     for (vpp = vp_arr; vpp->acron; ++vpp) {
-        len = strlen(vpp->acron);
+        size_t k;
+        size_t len = strlen(vpp->acron);
+
         for (k = 0; k < len; ++k) {
             if (tolower((uint8_t)vp_ap[k]) != (uint8_t)vpp->acron[k])
                 break;
@@ -816,13 +819,13 @@ find_vpn_by_inquiry(void)
     size_t len;
     size_t t10_v_len = strlen(t10_vendor_str);
     size_t t10_p_len = strlen(t10_product_str);
-    bool matched;
     const struct vp_name_t * vpp;
 
     if ((0 == t10_v_len) && (0 == t10_p_len))
         return VP_NONE;
     for (vpp = vp_arr; vpp->acron; ++vpp) {
-        matched = false;
+        bool matched = false;
+
         if (vpp->t10_vendorp && (t10_v_len > 0)) {
             len = strlen(vpp->t10_vendorp);
             len = (len > t10_v_len) ? t10_v_len : len;
@@ -906,9 +909,8 @@ usage_for(int hval, const struct opts_t * op)
 static int
 new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
-    int c, n;
-
     while (1) {
+        int c, n;
         int option_index = 0;
 
         c = getopt_long(argc, argv, "aAbc:D:ef:hHi:lLm:M:nNOp:P:qQrRsStTvV"
@@ -1086,11 +1088,13 @@ static int
 old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     bool jmp_out;
-    int k, plen, num, n;
+    int k, num, n;
     unsigned int u, uu;
     const char * cp;
 
     for (k = 1; k < argc; ++k) {
+        int plen;
+
         cp = argv[k];
         plen = strlen(cp);
         if (plen <= 0)
@@ -1212,11 +1216,12 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->vend_prod = cp + 2;
             } else if (0 == strncmp("p=", cp, 2)) {
                 const char * ccp = cp + 2;
-                char * xp;
                 const struct log_elem * lep;
-                char b[80];
 
                 if (isalpha((uint8_t)ccp[0])) {
+                    char * xp;
+                    char b[80];
+
                     if (strlen(ccp) >= (sizeof(b) - 1)) {
                         pr2serr("argument to '-p=' is too long\n");
                         return SG_LIB_SYNTAX_ERROR;
@@ -1499,9 +1504,8 @@ static bool
 show_supported_pgs_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int num, k, pg_code;
+    int num, k;
     const uint8_t * bp;
-    const struct log_elem * lep;
     char b[64];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
@@ -1509,7 +1513,9 @@ show_supported_pgs_page(const uint8_t * resp, int len,
     num = len - 4;
     bp = &resp[0] + 4;
     for (k = 0; k < num; ++k) {
-        pg_code = bp[k];
+        int pg_code = bp[k];
+        const struct log_elem * lep;
+
         snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
         lep = pg_subpg_pdt_search(pg_code, 0, op->dev_pdt, -1);
         if (lep) {
@@ -1531,7 +1537,7 @@ static bool
 show_supported_pgs_sub_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
-    int num, k, pg_code, subpg_code;
+    int num, k;
     const uint8_t * bp;
     const struct log_elem * lep;
     char b[64];
@@ -1545,8 +1551,9 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
     num = len - 4;
     bp = &resp[0] + 4;
     for (k = 0; k < num; k += 2) {
-        pg_code = bp[k];
-        subpg_code = bp[k + 1];
+        int pg_code = bp[k];
+        int subpg_code = bp[k + 1];
+
         if ((op->do_list == 2) && (subpg_code == 0xff) && (pg_code > 0))
             continue;
         if (NOT_SPG_SUBPG == subpg_code)
@@ -2167,7 +2174,7 @@ skip:
 static bool
 show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc;
+    int k, num, extra;
     unsigned int n;
     uint64_t ull;
     const uint8_t * bp;
@@ -2182,7 +2189,8 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Tape usage page  (LTO-5 and LTO-6 specific) [0x30]\n");
     for (k = num; k > 0; k -= extra, bp += extra) {
-        pc = sg_get_unaligned_be16(bp + 0);
+        int pc = sg_get_unaligned_be16(bp + 0);
+
         extra = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2272,7 +2280,7 @@ static bool
 show_hgst_perf_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
     bool valid = false;
-    int num, pl, pc;
+    int num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2286,7 +2294,8 @@ show_hgst_perf_page(const uint8_t * resp, int len, const struct opts_t * op)
     }
     bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(bp + 0);
+        int pc = sg_get_unaligned_be16(bp + 0);
+
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2348,7 +2357,7 @@ static bool
 show_tape_capacity_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
-    int k, num, extra, pc;
+    int k, num, extra;
     unsigned int n;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -2362,7 +2371,8 @@ show_tape_capacity_page(const uint8_t * resp, int len,
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Tape capacity page  (LTO-5 and LTO-6 specific) [0x31]\n");
     for (k = num; k > 0; k -= extra, bp += extra) {
-        pc = sg_get_unaligned_be16(bp + 0);
+        int pc = sg_get_unaligned_be16(bp + 0);
+
         extra = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2513,7 +2523,7 @@ static bool
 show_last_n_error_page(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
-    int k, num, pl, pc;
+    int k, num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2526,6 +2536,8 @@ show_last_n_error_page(const uint8_t * resp, int len,
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n error events page  [0x7]\n");
     for (k = num; k > 0; k -= pl, bp += pl) {
+        int pc;
+
         if (k < 3) {
             printf("short Last n error events page\n");
             return false;
@@ -2568,7 +2580,7 @@ static bool
 show_last_n_deferred_error_page(const uint8_t * resp, int len,
                                 const struct opts_t * op)
 {
-    int k, num, pl, pc;
+    int k, num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2581,6 +2593,8 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n deferred errors page  [0xb]\n");
     for (k = num; k > 0; k -= pl, bp += pl) {
+        int pc;
+
         if (k < 3) {
             printf("short Last n deferred errors page\n");
             return true;
@@ -2613,7 +2627,7 @@ static bool
 show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
-    int j, num, pl, pc;
+    int j, num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2622,7 +2636,8 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(bp + 0);
+        int pc = sg_get_unaligned_be16(bp + 0);
+
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2672,7 +2687,7 @@ static bool
 show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
                                  const struct opts_t * op)
 {
-    int j, num, pl, pc;
+    int j, num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2681,7 +2696,7 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
-        pc = sg_get_unaligned_be16(bp + 0);
+        int pc = sg_get_unaligned_be16(bp + 0);
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -2749,7 +2764,7 @@ static const char * self_test_result[] = {
 static bool
 show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, n, res, pc, pl;
+    int k, num, n, res;
     unsigned int v;
     const uint8_t * bp;
     uint64_t ull;
@@ -2765,8 +2780,9 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Self-test results page  [0x10]\n");
     for (k = 0, bp = resp + 4; k < 20; ++k, bp += 20 ) {
-        pl = bp[3] + 4;
-        pc = sg_get_unaligned_be16(bp + 0);
+        int pc = sg_get_unaligned_be16(bp + 0);
+        int pl = bp[3] + 4;
+
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
@@ -2817,7 +2833,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc;
+    int k, num, extra;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2832,6 +2848,8 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
             printf("Temperature page  [0xd]\n");
     }
     for (k = num; k > 0; k -= extra, bp += extra) {
+        int pc;
+
         if (k < 3) {
             pr2serr("short Temperature page\n");
             return true;
@@ -2889,7 +2907,7 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc;
+    int k, num, extra;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2902,6 +2920,8 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Start-stop cycle counter page  [0xe]\n");
     for (k = num; k > 0; k -= extra, bp += extra) {
+        int pc;
+
         if (k < 3) {
             pr2serr("short Start-stop cycle counter page\n");
             return true;
@@ -2997,7 +3017,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, extra, pc;
+    int k, num, extra;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -3021,6 +3041,8 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
     }
     /* only here if filter_given set */
     for (k = num; k > 0; k -= extra, bp += extra) {
+        int pc;
+
         if (k < 3) {
             pr2serr("short Application client page\n");
             return true;
@@ -3049,7 +3071,7 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, param_len, pc;
+    int k, num, param_len;
     const uint8_t * bp;
     const char * cp;
     char str[PCB_STR_LEN];
@@ -3076,6 +3098,8 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
             printf("Informational Exceptions page  [0x2f]\n");
     }
     for (k = num; k > 0; k -= param_len, bp += param_len) {
+        int pc;
+
         if (k < 3) {
             printf("short Informational Exceptions page\n");
             return false;
@@ -3439,7 +3463,6 @@ show_sas_port_param(const uint8_t * bp, int param_len,
     const uint8_t * vcp;
     uint64_t ull;
     unsigned int ui;
-    char str[PCB_STR_LEN];
     char s[64];
 
     sz = sizeof(s);
@@ -3457,8 +3480,11 @@ show_sas_port_param(const uint8_t * bp, int param_len,
         printf("  num_phys=%d\n", nphys);
     else {
         printf("  number of phys = %d\n", nphys);
-        if ((op->do_pcb) && (! op->do_name))
+        if ((op->do_pcb) && (! op->do_name)) {
+            char str[PCB_STR_LEN];
+
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+        }
     }
 
     for (j = 0, vcp = bp + 8; j < (param_len - 8);
@@ -3561,9 +3587,8 @@ show_sas_port_param(const uint8_t * bp, int param_len,
             printf("    Phy reset problem count = %u\n", ui);
         }
         if (spld_len > 51) {
-            int num_ped, pes;
+            int num_ped;
             const uint8_t * xcp;
-            unsigned int pvdt;
 
             num_ped = vcp[51];
             if (op->verbose > 1)
@@ -3579,7 +3604,9 @@ show_sas_port_param(const uint8_t * bp, int param_len,
             }
             xcp = vcp + 52;
             for (m = 0; m < (num_ped * 12); m += 12, xcp += 12) {
-                pes = xcp[3];
+                int pes = xcp[3];
+                unsigned int pvdt;
+
                 ui = sg_get_unaligned_be32(xcp + 4);
                 pvdt = sg_get_unaligned_be32(xcp + 8);
                 show_sas_phy_event_info(pes, ui, pvdt);
@@ -3594,7 +3621,7 @@ static bool
 show_protocol_specific_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
-    int k, num, pl, pc, pid;
+    int k, num, pl, pid;
     const uint8_t * bp;
 
     num = len - 4;
@@ -3603,7 +3630,8 @@ show_protocol_specific_page(const uint8_t * resp, int len,
             printf("log_page=0x%x\n", PROTO_SPECIFIC_LPAGE);
     }
     for (k = 0, bp = resp + 4; k < num; ) {
-        pc = sg_get_unaligned_be16(bp + 0);
+        int pc = sg_get_unaligned_be16(bp + 0);
+
         pl = bp[3] + 4;
         if (op->filter_given) {
             if (pc != op->filter)
@@ -3643,7 +3671,6 @@ show_stats_perform_pages(const uint8_t * resp, int len,
 {
     bool nam, spf;
     int k, num, param_len, param_code, subpg_code, extra;
-    unsigned int ui;
     uint64_t ull;
     const uint8_t * bp;
     const char * ccp;
@@ -3673,6 +3700,8 @@ show_stats_perform_pages(const uint8_t * resp, int len,
         if (num < 0x5c)
             return false;
         for (k = num; k > 0; k -= extra, bp += extra) {
+            unsigned int ui;
+
             if (k < 3)
                 return false;
             param_len = bp[3];
@@ -3926,7 +3955,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
 static bool
 show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
-    int k, num, pc, subpg_code, extra;
+    int k, num, subpg_code, extra;
     bool nam, spf;
     unsigned int ui;
     const uint8_t * bp;
@@ -3953,6 +3982,8 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
     }
 
     for (k = num; k > 0; k -= extra, bp += extra) {
+        int pc;
+
         if (k < 3) {
             pr2serr("short Cache memory statistics page\n");
             return false;
@@ -6086,11 +6117,12 @@ skip:
 static void
 volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
 {
-    int dl, pn;
-    bool all_ffs, ffs_last_fe;
     uint64_t ull;
 
     while (len > 3) {
+        bool all_ffs, ffs_last_fe;
+        int dl, pn;
+
         dl = xp[0] + 1;
         if (dl < 3)
             return;
@@ -6133,9 +6165,9 @@ volume_stats_partition(const uint8_t * xp, int len, bool in_hex)
 static void
 volume_stats_history(const uint8_t * xp, int len)
 {
-    int dl, mhi;
-
     while (len > 3) {
+        int dl, mhi;
+
         dl = xp[0] + 1;
         if (dl < 4)
             return;
@@ -6768,12 +6800,13 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
 static int
 decode_pg_arg(struct opts_t * op)
 {
-    int n, nn;
+    int nn;
     const struct log_elem * lep;
     char * cp;
-    char b[80];
 
     if (isalpha((uint8_t)op->pg_arg[0])) {
+        char b[80];
+
         if (strlen(op->pg_arg) >= (sizeof(b) - 1)) {
             pr2serr("argument to '--page=' is too long\n");
             return SG_LIB_SYNTAX_ERROR;
@@ -6803,6 +6836,8 @@ decode_pg_arg(struct opts_t * op)
         } else
             op->subpg_code = lep->subpg_code;
     } else { /* numeric arg: either 'pg_num' or 'pg_num,subpg_num' */
+        int n;
+
         cp = (char *)strchr(op->pg_arg, ',');
         n = sg_get_num_nomult(op->pg_arg);
         if ((n < 0) || (n > 63)) {

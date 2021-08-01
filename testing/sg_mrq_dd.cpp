@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.32 20210627";
+static const char * version_str = "1.33 20210730";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -1797,7 +1797,6 @@ read_write_thread(struct global_collection * clp, int thr_idx, int slice_idx,
             clp->processed = true;
         }   /* this unlocks lk */
         clp->infant_cv.notify_one();
-        singleton = false;
     }
     if (res < 0) {
         if (seg_blks >= 0)
@@ -2235,9 +2234,8 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
     }   /* end of request array scan loop */
     if ((n_subm == num_mrq) || (vb < 3))
         goto fini;
-    if (vb)
-        pr2serr_lk("[%d] checking response array _beyond_ number of "
-                   "submissions [%d] to num_mrq:\n", id, k);
+    pr2serr_lk("[%d] checking response array _beyond_ number of "
+               "submissions [%d] to num_mrq:\n", id, k);
     for (all_good = true; k < num_mrq; ++k, ++a_v4p) {
         if (SG_INFO_MRQ_FINI & a_v4p->info) {
             pr2serr_lk("[%d] a_v4[%d]: unexpected SG_INFO_MRQ_FINI set [%s]\n",
@@ -3386,7 +3384,7 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->no_dur = true;
         else if (0 == strcmp(cp, "no_dur"))
             fp->no_dur = true;
-        else if (0 == strcmp(cp, "no_dur"))
+        else if (0 == strcmp(cp, "no-dur"))
             fp->no_dur = true;
         else if (0 == strcmp(cp, "nothresh"))
             fp->no_thresh = true;
@@ -3716,8 +3714,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 goto syn_err;
             }
             seek_buf = (char *)calloc(n + 16, 1);
-	    if (NULL == seek_buf)
-		goto syn_err;
+            if (NULL == seek_buf)
+                goto syn_err;
             memcpy(seek_buf, buf, n + 1);
         } else if (0 == strcmp(key, "skip")) {
             n = strlen(buf);
@@ -3726,8 +3724,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 goto syn_err;
             }
             skip_buf = (char *)calloc(n + 16, 1);
-	    if (NULL == skip_buf)
-		goto syn_err;
+            if (NULL == skip_buf)
+                goto syn_err;
             memcpy(skip_buf, buf, n + 1);
         } else if (0 == strcmp(key, "sync"))
             do_sync = !! sg_get_num(buf);

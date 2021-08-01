@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.44 20210601 */
+/* sg_pt_freebsd version 1.45 20210731 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -587,19 +587,18 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
 void
 clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
-    int dev_han;
     struct sg_pt_freebsd_scsi * ptp;
-    struct freebsd_dev_channel *fdc_p;
 
     if (NULL == vp) {
         pr2ws(">>>>> %s: NULL pointer given\n", __func__);
         return;
     }
     if ((ptp = &vp->impl)) {
+        int dev_han = ptp->dev_han;
+        struct freebsd_dev_channel *fdc_p = ptp->mchanp;
+
         if (ptp->ccb)
             cam_freeccb(ptp->ccb);
-        dev_han = ptp->dev_han;
-        fdc_p = ptp->mchanp;
         memset(ptp, 0, sizeof(struct sg_pt_freebsd_scsi));
         ptp->dxfer_dir = CAM_DIR_NONE;
         ptp->dev_han = dev_han;
@@ -817,7 +816,6 @@ set_scsi_pt_flags(struct sg_pt_base * objp, int flags)
 int
 do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int vb)
 {
-    int len;
     struct sg_pt_freebsd_scsi * ptp = &vp->impl;
     struct freebsd_dev_channel *fdc_p;
     FILE * ferrp = sg_warnings_strm ? sg_warnings_strm : stderr;
@@ -928,6 +926,8 @@ do_scsi_pt(struct sg_pt_base * vp, int dev_han, int time_secs, int vb)
 
         if ((SAM_STAT_CHECK_CONDITION == ptp->scsi_status) ||
             (SAM_STAT_COMMAND_TERMINATED == ptp->scsi_status)) {
+            int len;
+
             if (ptp->sense_resid > ptp->sense_len)
                 len = ptp->sense_len;   /* crazy; ignore sense_resid */
             else
@@ -1343,7 +1343,7 @@ mk_sense_invalid_fld(struct sg_pt_freebsd_scsi * ptp, bool in_cdb,
                      int in_byte, int in_bit, int vb)
 {
     bool ds = ptp->mchanp ? ptp->mchanp->dev_stat.scsi_dsense : false;
-    int sl, asc, n;
+    int asc, n;
     uint8_t * sbp = (uint8_t *)ptp->sense;
     uint8_t sks[4];
 
@@ -1369,7 +1369,8 @@ mk_sense_invalid_fld(struct sg_pt_freebsd_scsi * ptp, bool in_cdb,
     }
     sg_put_unaligned_be16(in_byte, sks + 1);
     if (ds) {
-        sl = sbp[7] + 8;
+        int sl = sbp[7] + 8;
+
         sbp[7] = sl;
         sbp[sl] = 0x2;
         sbp[sl + 1] = 0x6;
@@ -1402,7 +1403,6 @@ nvme_pt_low(struct sg_pt_freebsd_scsi * ptp, void * dxferp, uint32_t len,
     uint16_t sct_sc;
     uint8_t opcode;
     struct freebsd_dev_channel *fdc_p = ptp->mchanp;
-    char b[80];
 
     if (vb > 6)
         pr2ws("%s: is_read=%d, time_secs=%d, is_cam_nvme=%d, is_admin=%d\n",
@@ -1480,6 +1480,7 @@ nvme_pt_low(struct sg_pt_freebsd_scsi * ptp, void * dxferp, uint32_t len,
                           ptp->cq_dw0_3 + SG_NVME_PT_CQ_STATUS_P);
     if (sct_sc && (vb > 1)) {
         char nam[64];
+        char b[80];
 
         sg_get_nvme_opcode_name(opcode, is_admin, sizeof(nam), nam);
         pr2ws("%s: %s [0x%x], status: %s\n", __func__, nam, opcode,
@@ -1577,6 +1578,7 @@ cam_nvme:
                               ptp->cq_dw0_3 + SG_NVME_PT_CQ_STATUS_P);
         if (sct_sc && (vb > 1)) {
             char nam[64];
+            char b[80];
 
             sg_get_nvme_opcode_name(opcode, is_admin, sizeof(nam),
                                     nam);
@@ -1603,7 +1605,7 @@ sntl_check_enclosure_override(struct freebsd_dev_channel * fdc_p, int vb)
     fdc_p->dev_stat.id_ctl253 = nvmsr;
     switch (fdc_p->dev_stat.enclosure_override) {
     case 0x0:       /* no override */
-        if (0x3 & nvmsr) {
+        if (0x3 == (0x3 & nvmsr)) {
             fdc_p->dev_stat.pdt = PDT_DISK;
             fdc_p->dev_stat.enc_serv = 1;
         } else if (0x2 & nvmsr) {
@@ -1704,7 +1706,6 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int time_secs,
          int vb)
 {
     bool evpd;
-    bool cp_id_ctl = false;
     int res;
     uint16_t n, alloc_len, pg_cd;
     uint32_t pg_sz = sg_get_page_size();
@@ -1739,6 +1740,8 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int time_secs,
     evpd = !!(0x1 & cdbp[1]);
     pg_cd = cdbp[2];
     if (evpd) {         /* VPD page responses */
+        bool cp_id_ctl = false;
+
         switch (pg_cd) {
         case 0:         /* Supported VPD pages VPD page */
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
@@ -1942,7 +1945,7 @@ sntl_rluns(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
 static int
 sntl_tur(struct sg_pt_freebsd_scsi * ptp, int time_secs, int vb)
 {
-    int res, err;
+    int err;
     uint32_t pow_state;
     struct nvme_pt_command npc;
     uint8_t * npc_up = (uint8_t *)&npc;
@@ -1957,7 +1960,8 @@ sntl_tur(struct sg_pt_freebsd_scsi * ptp, int time_secs, int vb)
         return -EINVAL;
     }
     if (NULL == fdc_p->nvme_id_ctlp) {
-        res = sntl_cache_identity(ptp, time_secs, vb);
+        int res = sntl_cache_identity(ptp, time_secs, vb);
+
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, ptp->nvme_status, vb);
             return 0;
@@ -1998,7 +2002,7 @@ sntl_req_sense(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
                int time_secs, int vb)
 {
     bool desc;
-    int res, err;
+    int err;
     uint32_t pow_state, alloc_len, n;
     struct nvme_pt_command npc;
     uint8_t * npc_up = (uint8_t *)&npc;
@@ -2014,7 +2018,8 @@ sntl_req_sense(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
         return -EINVAL;
     }
     if (NULL == fdc_p->nvme_id_ctlp) {
-        res = sntl_cache_identity(ptp, time_secs, vb);
+        int res = sntl_cache_identity(ptp, time_secs, vb);
+
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, ptp->nvme_status, vb);
             return 0;
@@ -2065,7 +2070,7 @@ sntl_mode_ss(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
              int time_secs, int vb)
 {
     bool is_msense = (SCSI_MODE_SENSE10_OPC == cdbp[0]);
-    int res, n, len;
+    int n, len;
     uint8_t * bp;
     struct freebsd_dev_channel * fdc_p;
     struct sg_sntl_result_t sntl_result;
@@ -2079,7 +2084,8 @@ sntl_mode_ss(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
         return -EINVAL;
     }
     if (NULL == fdc_p->nvme_id_ctlp) {
-        res = sntl_cache_identity(ptp, time_secs, vb);
+        int res = sntl_cache_identity(ptp, time_secs, vb);
+
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, ptp->nvme_status, vb);
             return 0;
@@ -2365,10 +2371,10 @@ sntl_rep_opcodes(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
 {
     bool rctd;
     uint8_t reporting_opts, req_opcode, supp;
-    uint16_t req_sa, u;
+    uint16_t req_sa;
     uint32_t alloc_len, offset, a_len;
     uint32_t pg_sz = sg_get_page_size();
-    int k, len, count, bump;
+    int len, count, bump;
     const struct sg_opcode_info_t *oip;
     uint8_t *arr;
     uint8_t *free_arr;
@@ -2445,7 +2451,9 @@ sntl_rep_opcodes(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp,
             else
                 supp = 3;
             if (3 == supp) {
-                u = oip->len_mask[0];
+                uint16_t u = oip->len_mask[0];
+                int k;
+
                 sg_put_unaligned_be16(u, arr + 2);
                 arr[4] = oip->opcode;
                 for (k = 1; k < u; ++k)

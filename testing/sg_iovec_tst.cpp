@@ -151,8 +151,7 @@ sg_read(int sg_fd, uint8_t * buff, int num_blocks, int from_block, int bs,
     struct sg_io_hdr io_hdr;
     struct pollfd a_poll;
     int dxfer_len = bs * num_blocks;
-    int k, pos, rem, res;
-    char b[128];
+    int k, pos, rem;
 
     sg_put_unaligned_be32((uint32_t)from_block, rdCmd + 2);
     sg_put_unaligned_be16((uint16_t)num_blocks, rdCmd + 7);
@@ -185,12 +184,16 @@ sg_read(int sg_fd, uint8_t * buff, int num_blocks, int from_block, int bs,
     io_hdr.sbp = senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
     io_hdr.pack_id = from_block;
-    if (verbose)
+    if (verbose) {
+        char b[128];
+
         fprintf(stderr, "cdb: %s\n", sg_get_command_str(rdCmd, 10, true,
                 sizeof(b), b));
+    }
 
     if (async) {
-        res = write(sg_fd, &io_hdr, sizeof(io_hdr));
+        int res = write(sg_fd, &io_hdr, sizeof(io_hdr));
+
         if (res < 0) {
             perror("write(<sg_device>), error");
             return -1;
@@ -253,7 +256,6 @@ sg_read_v4(int sg_fd, uint8_t * buff, int num_blocks, int from_block, int bs,
     struct pollfd a_poll;
     int dxfer_len = bs * num_blocks;
     int k, pos, rem, res;
-    char b[128];
 
     sg_put_unaligned_be32((uint32_t)from_block, rdCmd + 2);
     sg_put_unaligned_be16((uint16_t)num_blocks, rdCmd + 7);
@@ -285,10 +287,12 @@ sg_read_v4(int sg_fd, uint8_t * buff, int num_blocks, int from_block, int bs,
     io_hdr.response = (uint64_t)(uintptr_t)senseBuff;
     io_hdr.timeout = DEF_TIMEOUT;
     io_hdr.request_extra = from_block;   /* pack_id */
-    if (verbose)
+    if (verbose) {
+        char b[128];
+
         fprintf(stderr, "cdb: %s\n", sg_get_command_str(rdCmd, 10, true,
                 sizeof(b), b));
-
+    }
     if (async) {
         res = ioctl(sg_fd, SG_IOSUBMIT, &io_hdr);
         if (res < 0) {

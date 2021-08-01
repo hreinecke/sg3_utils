@@ -105,7 +105,7 @@ private:
 
 class scat_gath_iter {
 public:
-    scat_gath_iter(const scat_gath_list & my_scat_gath_list);
+    explicit scat_gath_iter(const scat_gath_list & my_scat_gath_list);
     scat_gath_iter(const scat_gath_iter & src) = default;
     scat_gath_iter&  operator=(const scat_gath_iter&) = delete;
     ~scat_gath_iter() = default;
