@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "May 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG3_UTILS "8" "August 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -618,6 +618,11 @@ techniques are imperfect and in the presence of faulty SCSI targets can
 cause problems (e.g. some USB mass storage devices freeze if they receive
 an INQUIRY allocation length other than 36). Also use of this option
 disables any "double fetch" strategy that may have otherwise been used.
+.br
+To head off a class of degenerate bugs, if \fILEN\fR is less than 16 then
+it is ignored (usually with a warning message) and the default value is
+used instead. Some utilities use 4 (bytes), rather than 16, as the cutoff
+value.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 for SCSI commands that yield a non\-trivial response, output that response

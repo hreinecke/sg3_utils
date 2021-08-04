@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.65 20210630";  /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.66 20210702";  /* spc6r05 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -95,6 +95,7 @@ static const char * version_str = "1.65 20210630";  /* spc6r05 + sbc5r01 */
 #define VPD_DI_SEL_AS_IS 32
 
 #define DEF_ALLOC_LEN 252
+#define MIN_MAXLEN 16
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 #define VPD_ATA_INFO_LEN  572
 
@@ -3824,6 +3825,11 @@ main(int argc, char * argv[])
                         MX_ALLOC_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
+	    if ((op->maxlen > 0) && (op->maxlen < MIN_MAXLEN)) {
+                pr2serr("Warning: overriding '--maxlen' < %d, using "
+			"default\n", MIN_MAXLEN);
+		op->maxlen = 0;
+	    }
             break;
         case 'M':
             if (op->vend_prod) {

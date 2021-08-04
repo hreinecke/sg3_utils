@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.33 20210730";
+static const char * version_str = "1.34 20210801";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -1002,7 +1002,9 @@ calc_duration_throughput(int contin)
 static void
 print_stats(const char * str)
 {
-    bool show_slice = (gcoll.cp_ver_arr.size() > 1);
+    bool show_slice = ((gcoll.cp_ver_arr.size() > 1) &&
+                       (gcoll.cp_ver_arr[1].state !=
+                        cp_ver_pair_t::my_state::empty));
     int k = 0;
     int64_t infull, outfull;
 
@@ -1060,6 +1062,7 @@ siginfo_handler(int sig)
     print_stats("  ");
 }
 
+#if 0
 static void
 siginfo2_handler(int sig)
 {
@@ -1069,6 +1072,7 @@ siginfo2_handler(int sig)
         calc_duration_throughput(1);
     print_stats("  ");
 }
+#endif
 
 static void
 install_handler(int sig_num, void (*sig_handler) (int sig))
@@ -1502,10 +1506,12 @@ sig_listen_thread(struct global_collection * clp)
             raise(SIGINT);
             break;
         }
+	if (SIGUSR2 == sig_number)
+	    break;
         if (shutting_down)
             break;
     }           /* end of while loop */
-    if (clp->verbose > 1)
+    if (clp->verbose > 3)
         pr2serr_lk("%s: exiting\n", __func__);
 }
 
@@ -4200,7 +4206,7 @@ main(int argc, char * argv[])
     install_handler(SIGQUIT, interrupt_handler);
     install_handler(SIGPIPE, interrupt_handler);
     install_handler(SIGUSR1, siginfo_handler);
-    install_handler(SIGUSR2, siginfo2_handler);
+    // install_handler(SIGUSR2, siginfo2_handler);
 
     num_ifiles = clp->inf_v.size();
     num_ofiles = clp->outf_v.size();
@@ -4462,6 +4468,7 @@ main(int argc, char * argv[])
 
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGINT);
+    sigaddset(&signal_set, SIGUSR2);
 
     res = sigprocmask(SIG_BLOCK, &signal_set, &orig_signal_set);
     if (res < 0) {

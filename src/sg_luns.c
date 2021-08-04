@@ -34,7 +34,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.47 20210616";      /* spc6r05 */
+static const char * version_str = "1.48 20210804";      /* spc6r05 */
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
@@ -428,6 +428,9 @@ main(int argc, char * argv[])
                 pr2serr("argument to '--maxlen' should be %d or less\n",
                         MAX_RLUNS_BUFF_LEN);
                 return SG_LIB_SYNTAX_ERROR;
+            } else if (maxlen < 4) {
+                pr2serr("Warning: setting '--maxlen' to 4\n");
+                maxlen = 4;
             }
             break;
         case 'q':

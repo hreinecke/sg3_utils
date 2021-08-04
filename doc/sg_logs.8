@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_LOGS "8" "August 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -177,6 +177,9 @@ values and 1 for \fILEN\fR are not accepted. \fILEN\fR cannot exceed
 65535 (0xffff).  Responses can be quite large (e.g. the background scan
 results log page) and this option can be used to limit the amount of
 information returned.
+.br
+If \fILEN\fR is less than 2 of greater than 65,535 an error is generated.
+Otherwise if \fILEN\fR is less than 4 then 4 is used instead.
 .TP
 \fB\-n\fR, \fB\-\-name\fR
 decode some log pages into 'name=value' entries, one per line. The name

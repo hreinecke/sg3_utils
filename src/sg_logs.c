@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.84 20210731";    /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.85 20210802";    /* spc6r05 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -990,6 +990,9 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                         "(inclusive) expected\n");
                 usage(2);
                 return SG_LIB_SYNTAX_ERROR;
+            } else if (n < 4) {
+                pr2serr("Warning: setting '--maxlen' to 4\n");
+                n = 4;
             }
             op->maxlen = n;
             break;

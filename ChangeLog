@@ -2,16 +2,19 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20210731] [svn: r907]
+Changelog for pre-release sg3_utils-1.47 [20210804] [svn: r908]
   - sg_rep_zones: add support for REPORT ZONE DOMAINS and
     REPORT REALMS in this utility
   - sg_raw: fix prints of NVMe NVM command names
   - sg_ses: fix Windows problem "No command (cdb) given"
-    - fix crash when 'm LEN' < 252
+    - fix crash when '-m LEN' < 252
+    - guard against smaller '--maxlen=' values
   - sg_logs: additions to Volume statistics lpage [ssc5r05c]
   - sg_vpd: fix do_hex type on some recent pages
   - sg_read_buffer: fix --length= problem
   - sg_dd, sgm_dd, sgp_dd: don't close negative file descriptors
+  - several utilities: override '--maxlen=LEN' when LEN
+    is < 16 (or 4), take default (or 4) instead
   - sg_lib: add sg_scsi_status_is_good(),
     sg_scsi_status_is_bad() and sg_get_zone_type_str()
   - pt_linux: fix verify(BytChk=0) which Linux SNTL translated

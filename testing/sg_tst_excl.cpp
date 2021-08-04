@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 Douglas Gilbert.
+ * Copyright (c) 2013-2021 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -73,7 +73,7 @@
 #include "sg_io_linux.h"
 #include "sg_unaligned.h"
 
-static const char * version_str = "1.12 20190917";
+static const char * version_str = "1.13 20210801";
 static const char * util_name = "sg_tst_excl";
 
 /* This is a test program for checking O_EXCL on open() works. It uses
@@ -117,7 +117,7 @@ using namespace std::chrono;
 #define DEF_WAIT_MS 0          /* 0: yield; -1: don't wait; -2: sleep(0) */
 
 
-#define DEF_LBA 1000
+#define DEF_LBA 1000U
 
 #define EBUFF_SZ 256
 
@@ -185,9 +185,8 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
                       int excl, int wait_ms, int id, unsigned int & ebusy,
                       unsigned int & eagains)
 {
-    int k, sg_fd, ok, res;
-    int odd = 0;
-    unsigned int u = 0;
+    bool odd = false;
+    int k, sg_fd;
     struct sg_io_hdr pt, pt2;
     unsigned char r16CmdBlk [READ16_CMD_LEN] =
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
@@ -195,7 +194,6 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
                 {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     unsigned char sense_buffer[64];
     unsigned char lb[READ16_REPLY_LEN];
-    char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;
 
     sg_put_unaligned_be64(lba, r16CmdBlk + 2);
@@ -216,6 +214,8 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
             sleep(0);                   // process yield ??
     }
     if (sg_fd < 0) {
+        char ebuff[EBUFF_SZ];
+
         snprintf(ebuff, EBUFF_SZ, "%s: error opening file: %s", __func__,
                  dev_name);
         perror(ebuff);
@@ -223,6 +223,10 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
     }
 
     for (k = 0; k < 2; ++k) {
+        bool ok = false;
+        int res;
+        unsigned int u = 0;
+
         /* Prepare READ_16 command */
         memset(&pt, 0, sizeof(pt));
         pt.interface_id = 'S';
@@ -277,10 +281,9 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
             return -1;
         }
         /* now for the error processing */
-        ok = 0;
         switch (sg_err_category3(&pt)) {
         case SG_LIB_CAT_CLEAN:
-            ok = 1;
+            ok = true;
             break;
         case SG_LIB_CAT_RECOVERED:
             {
@@ -288,7 +291,7 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
 
                 fprintf(stderr, "Recovered error on READ_16, continuing\n");
             }
-            ok = 1;
+            ok = true;
             break;
         default: /* won't bother decoding other categories */
             {
@@ -320,10 +323,10 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
             }
             pt = pt2;
             /* now for the error processing */
-            ok = 0;
+            ok = false;
             switch (sg_err_category3(&pt)) {
             case SG_LIB_CAT_CLEAN:
-                ok = 1;
+                ok = true;
                 break;
             case SG_LIB_CAT_RECOVERED:
                 {
@@ -332,7 +335,7 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
                     fprintf(stderr, "%s: Recovered error on READ_16, "
                             "continuing 2\n", __func__);
                 }
-                ok = 1;
+                ok = true;
                 break;
             default: /* won't bother decoding other categories */
                 {
@@ -385,10 +388,10 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
             return -1;
         }
         /* now for the error processing */
-        ok = 0;
+        ok = false;
         switch (sg_err_category3(&pt)) {
         case SG_LIB_CAT_CLEAN:
-            ok = 1;
+            ok = true;
             break;
         case SG_LIB_CAT_RECOVERED:
             {
@@ -397,7 +400,7 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
                 fprintf(stderr, "%s: Recovered error on WRITE_16, "
                         "continuing\n", __func__);
             }
-            ok = 1;
+            ok = true;
             break;
         default: /* won't bother decoding other categories */
             {
@@ -413,7 +416,7 @@ do_rd_inc_wr_twice_v3(const char * dev_name, unsigned int lba, int block,
         }
     }
     close(sg_fd);
-    return odd;
+    return (int)odd;
 }
 
 /* Opens dev_name and spins if busy (i.e. gets EBUSY), sleeping for
@@ -427,9 +430,8 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
                       int excl, int wait_ms, int id, unsigned int & ebusy,
                       unsigned int & eagains)
 {
-    int k, sg_fd, ok, res;
-    int odd = 0;
-    unsigned int u = 0;
+    bool odd = false;
+    int k, sg_fd;
     struct sg_io_v4 pt, pt2;
     unsigned char r16CmdBlk [READ16_CMD_LEN] =
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
@@ -437,7 +439,6 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
                 {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     unsigned char sense_buffer[64];
     unsigned char lb[READ16_REPLY_LEN];
-    char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;
 
     sg_put_unaligned_be64(lba, r16CmdBlk + 2);
@@ -458,6 +459,8 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
             sleep(0);                   // process yield ??
     }
     if (sg_fd < 0) {
+        char ebuff[EBUFF_SZ];
+
         snprintf(ebuff, EBUFF_SZ, "%s: error opening file: %s", __func__,
                  dev_name);
         perror(ebuff);
@@ -465,6 +468,10 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
     }
 
     for (k = 0; k < 2; ++k) {
+        bool ok = false;
+        int res;
+        unsigned int u = 0;
+
         /* Prepare READ_16 command */
         memset(&pt, 0, sizeof(pt));
         pt.guard = 'Q';
@@ -519,11 +526,10 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
             return -1;
         }
         /* now for the error processing */
-        ok = 0;
         switch (sg_err_category_new(pt.device_status, pt.transport_status,
                 pt.driver_status, sense_buffer, pt.response_len)) {
         case SG_LIB_CAT_CLEAN:
-            ok = 1;
+            ok = true;
             break;
         case SG_LIB_CAT_RECOVERED:
             {
@@ -531,7 +537,7 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
 
                 fprintf(stderr, "Recovered error on READ_16, continuing\n");
             }
-            ok = 1;
+            ok = true;
             break;
         default: /* won't bother decoding other categories */
             {
@@ -567,11 +573,11 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
             }
             pt = pt2;
             /* now for the error processing */
-            ok = 0;
+            ok = false;
             switch (sg_err_category_new(pt.device_status, pt.transport_status,
                     pt.driver_status, sense_buffer, pt.response_len)) {
             case SG_LIB_CAT_CLEAN:
-                ok = 1;
+                ok = true;
                 break;
             case SG_LIB_CAT_RECOVERED:
                 {
@@ -580,7 +586,7 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
                     fprintf(stderr, "%s: Recovered error on READ_16, "
                             "continuing 2\n", __func__);
                 }
-                ok = 1;
+                ok = true;
                 break;
             default: /* won't bother decoding other categories */
                 {
@@ -638,11 +644,11 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
             return -1;
         }
         /* now for the error processing */
-        ok = 0;
+        ok = false;
         switch (sg_err_category_new(pt.device_status, pt.transport_status,
                 pt.driver_status, sense_buffer, pt.response_len)) {
         case SG_LIB_CAT_CLEAN:
-            ok = 1;
+            ok = true;
             break;
         case SG_LIB_CAT_RECOVERED:
             {
@@ -651,7 +657,7 @@ do_rd_inc_wr_twice_v4(const char * dev_name, unsigned int lba, int block,
                 fprintf(stderr, "%s: Recovered error on WRITE_16, "
                         "continuing\n", __func__);
             }
-            ok = 1;
+            ok = true;
             break;
         default: /* won't bother decoding other categories */
             {
@@ -691,7 +697,6 @@ do_inquiry_prod_id(const char * dev_name, int block, int wait_ms,
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     unsigned char inqBuff[INQ_REPLY_LEN];
     unsigned char sense_buffer[64];
-    char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;    /* O_EXCL | O_RDONLY fails with EPERM */
 
     if (! block)
@@ -707,6 +712,8 @@ do_inquiry_prod_id(const char * dev_name, int block, int wait_ms,
             sleep(0);                   // process yield ??
     }
     if (sg_fd < 0) {
+        char ebuff[EBUFF_SZ];
+
         snprintf(ebuff, EBUFF_SZ,
                  "do_inquiry_prod_id: error opening file: %s", dev_name);
         perror(ebuff);
@@ -821,7 +828,7 @@ work_thread(const char * dev_name, unsigned int lba, int id, int block,
 int
 main(int argc, char * argv[])
 {
-    int k, res;
+    int k;
     int block = 0;
     int force = 0;
     unsigned int lba = DEF_LBA;
@@ -830,7 +837,6 @@ main(int argc, char * argv[])
     int wait_ms = DEF_WAIT_MS;
     int no_o_excl = 0;
     char * dev_name = NULL;
-    char b[64];
 
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-b", argv[k], 2))
@@ -914,8 +920,10 @@ main(int argc, char * argv[])
             return 1;
         }
         if (! force) {
-            res = do_inquiry_prod_id(dev_name, block, wait_ms, ebusy_count,
-                                     b, sizeof(b));
+            char b[64];
+            int res = do_inquiry_prod_id(dev_name, block, wait_ms,
+                                         ebusy_count, b, sizeof(b));
+
             if (res) {
                 fprintf(stderr, "INQUIRY failed on %s\n", dev_name);
                 return 1;
@@ -923,7 +931,7 @@ main(int argc, char * argv[])
             // For safety, since <lba> written to, only permit scsi_debug
             // devices. Bypass this with '-f' option.
             if (0 != memcmp("scsi_debug", b, 10)) {
-                fprintf(stderr, "Since this utility writes to LBA %d, only "
+                fprintf(stderr, "Since this utility writes to LBA %u, only "
                         "devices with scsi_debug\nproduct ID accepted.\n",
                         lba);
                 return 2;

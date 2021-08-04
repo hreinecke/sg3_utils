@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 Douglas Gilbert.
+ * Copyright (c) 2019-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.03 20200423";      /* sbc4r19 */
+static const char * version_str = "1.04 20210803";      /* sbc4r19 */
 
 
 #ifndef UINT32_MAX
@@ -49,6 +49,7 @@ static const char * version_str = "1.03 20200423";      /* sbc4r19 */
 #define MAX_GPES_BUFF_LEN ((1024 * 1024) + DEF_GPES_BUFF_LEN)
 #define GPES_DESC_OFFSET 32     /* descriptors starts at this byte offset */
 #define GPES_DESC_LEN 32
+#define MIN_MAXLEN 16
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
@@ -291,6 +292,11 @@ main(int argc, char * argv[])
             }
             if (0 == maxlen)
                 maxlen = DEF_GPES_BUFF_LEN;
+            else if (n < MIN_MAXLEN) {
+                pr2serr("Warning: --maxlen=LEN less than %d ignored\n",
+                        MIN_MAXLEN);
+                maxlen = DEF_GPES_BUFF_LEN;
+            }
             break;
         case 'r':
             do_raw = true;

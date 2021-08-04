@@ -38,12 +38,13 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.51 20210730";    /* ses4r04 */
+static const char * version_str = "2.52 20210802";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define REQUEST_SENSE_RESP_SZ 252
 #define DATA_IN_OFF 4
+#define MIN_MAXLEN 16
 #define MIN_DATA_IN_SZ 8192     /* use max(MIN_DATA_IN_SZ, op->maxlen) for
                                  * the size of data_arr */
 #define MX_DATA_IN_LINES (16 * 1024)
@@ -1281,9 +1282,11 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             }
             if (0 == n)
                 op->maxlen = MX_ALLOC_LEN;
-            else if (n < 4)
-                pr2serr("Warning: --maxlen=LEN less than 4 ignored\n");
-            else
+            else if (n < MIN_MAXLEN) {
+                pr2serr("Warning: --maxlen=LEN less than %d ignored\n",
+                        MIN_MAXLEN);
+                op->maxlen = MX_ALLOC_LEN;
+            } else
                 op->maxlen = n;
             break;
         case 'M':
@@ -5724,7 +5727,10 @@ main(int argc, char * argv[])
             goto err_out;
         }
         if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
-            if ((ret = sg_ll_inquiry_pt(ptvp, false, 0, enc_stat_rsp, 36,
+            uint8_t inq_rsp[36];
+
+            memset(inq_rsp, 0, sizeof(inq_rsp));
+            if ((ret = sg_ll_inquiry_pt(ptvp, false, 0, inq_rsp, 36,
                                         0, &resid, ! op->quiet, vb))) {
                 pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
                         op->dev_name);
@@ -5732,23 +5738,21 @@ main(int argc, char * argv[])
             } else {
                 if (resid > 0)
                     pr2serr("Short INQUIRY response, not looking good\n");
-                printf("  %.8s  %.16s  %.4s\n", enc_stat_rsp + 8,
-                       enc_stat_rsp + 16, enc_stat_rsp + 32);
-                pd_type = 0x1f & enc_stat_rsp[0];
+                printf("  %.8s  %.16s  %.4s\n", inq_rsp + 8, inq_rsp + 16,
+                       inq_rsp + 32);
+                pd_type = 0x1f & inq_rsp[0];
                 cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
                 if (0xd == pd_type) {
                     if (vb)
                         printf("    enclosure services device\n");
-                } else if (0x40 & enc_stat_rsp[6])
+                } else if (0x40 & inq_rsp[6])
                     printf("    %s device has EncServ bit set\n", cp);
                 else {
-                    if (0 != memcmp("NVMe", enc_stat_rsp + 8, 4))
+                    if (0 != memcmp("NVMe", inq_rsp + 8, 4))
                         printf("    %s device (not an enclosure)\n", cp);
                 }
             }
             clear_scsi_pt_obj(ptvp);
-            /* finished using enc_stat_rsp so clear back to zero */
-            memset(enc_stat_rsp, 0, enc_stat_rsp_sz);
         }
     } else if (op->do_control) {
         pr2serr("Cannot do SCSI Send diagnostic command without a DEVICE\n");

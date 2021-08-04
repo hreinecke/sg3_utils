@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.12 20210610";  /* spc6r05 */
+static const char * version_str = "2.13 20210803";  /* spc6r05 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -549,6 +549,10 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 usage_for(op);
                 return SG_LIB_SYNTAX_ERROR;
             }
+            if ((n > 0) && (n < 4)) {
+                pr2serr("Changing that '--maxlen=' value to 4\n");
+                n = 4;
+            }
             op->resp_len = n;
             break;
         case 'L':
@@ -761,6 +765,10 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 } else if (n > MX_ALLOC_LEN) {
                     pr2serr("value after 'l=' option too large\n");
                     return SG_LIB_SYNTAX_ERROR;
+                }
+                if ((n > 0) && (n < 4)) {
+                    pr2serr("Changing that '-l=' value to 4\n");
+                    n = 4;
                 }
                 op->resp_len = n;
             } else if (0 == strncmp("p=", cp, 2)) {

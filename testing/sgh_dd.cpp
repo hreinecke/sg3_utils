@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.13 20210730";
+static const char * version_str = "2.14 20210801";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -1260,10 +1260,12 @@ sig_listen_thread(void * v_clp)
             raise(SIGINT);
             break;
         }
+        if (SIGUSR2 == sig_number)
+            break;
         if (shutting_down)
             break;
     }           /* end of while loop */
-    if (clp->verbose > 1)
+    if (clp->verbose > 3)
         pr2serr_lk("%s: exiting\n", __func__);
 
     return NULL;
@@ -4841,6 +4843,7 @@ main(int argc, char * argv[])
 
     sigemptyset(&signal_set);
     sigaddset(&signal_set, SIGINT);
+    sigaddset(&signal_set, SIGUSR2);
     status = pthread_sigmask(SIG_BLOCK, &signal_set, &orig_signal_set);
     if (0 != status) err_exit(status, "pthread_sigmask");
     status = pthread_create(&sig_listen_thread_id, NULL,
@@ -4897,7 +4900,7 @@ main(int argc, char * argv[])
 
     shutting_down = true;
     /* pthread_cancel() has issues and is not supported in Android */
-    status = pthread_kill(sig_listen_thread_id, SIGINT);
+    status = pthread_kill(sig_listen_thread_id, SIGUSR2);
     if (0 != status) err_exit(status, "pthread_kill");
 
     if (do_time && (start_tm.tv_sec || start_tm.tv_usec))

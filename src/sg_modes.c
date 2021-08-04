@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.73 20210610";
+static const char * version_str = "1.74 20210803";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -499,6 +499,10 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 usage();
                 return SG_LIB_SYNTAX_ERROR;
             }
+            if ((n > 0) && (n < 4)) {
+                pr2serr("Changing that '--maxlen=' value to 4\n");
+                n = 4;
+            }
             op->maxlen = n;
             break;
         case 'N':
@@ -683,6 +687,10 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     pr2serr("Bad argument after 'm=' option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
+                }
+                if ((n > 0) && (n < 4)) {
+                    pr2serr("Changing that '-m=' value to 4\n");
+                    n = 4;
                 }
                 op->maxlen = n;
             } else if (0 == strncmp("p=", cp, 2)) {

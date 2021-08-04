@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2019 Douglas Gilbert.
+ * Copyright (c) 2009-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.21 20190913";      /* sbc4r15 */
+static const char * version_str = "1.22 20210803";      /* sbc4r15 */
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -43,6 +43,7 @@ static const char * version_str = "1.21 20190913";      /* sbc4r15 */
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
 #define DEF_GLBAS_BUFF_LEN 24
+#define MIN_MAXLEN 16
 
 static uint8_t glbasFixedBuff[DEF_GLBAS_BUFF_LEN];
 
@@ -237,6 +238,11 @@ main(int argc, char * argv[])
             }
             if (0 == maxlen)
                 maxlen = DEF_GLBAS_BUFF_LEN;
+            else if (maxlen < MIN_MAXLEN) {
+                pr2serr("Warning: --maxlen=LEN less than %d ignored\n",
+                        MIN_MAXLEN);
+                maxlen = DEF_GLBAS_BUFF_LEN;
+            }
             break;
         case 'r':
             do_raw = true;
