@@ -1,4 +1,4 @@
-.TH SG_DD "8" "April 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_DD "8" "August 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -394,7 +394,7 @@ random
 this flag is only active with \fIiflag=\fR and when given replaces
 \fIif=IFILE\fR. If both are given an error is generated. The input will
 be a stream of pseudo random bytes. The Linux getrandom(2) system call is
-used to create a seed and thereadter mrand48_r(3) is used to generate a
+used to create a seed and thereadter mrand48(3) is used to generate a
 pseudo random sequence, 4 bytes at a time. The quality of the randomness
 can be viewed with the ent(1) utility. This is not a high quality random
 number generator, it is built for speed, not quality. One application is

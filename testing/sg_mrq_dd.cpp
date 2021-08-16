@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.34 20210801";
+static const char * version_str = "1.35 20210816";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -348,7 +348,6 @@ typedef struct request_element
     int out_local_partial;
     int in_resid_bytes;
     long seed;
-    struct drand48_data drand; /* opaque, used by srand48_r and mrand48_r */
 } Rq_elem;
 
 /* Additional parameters for sg_start_io() and sg_finish_io() */
@@ -1506,8 +1505,8 @@ sig_listen_thread(struct global_collection * clp)
             raise(SIGINT);
             break;
         }
-	if (SIGUSR2 == sig_number)
-	    break;
+        if (SIGUSR2 == sig_number)
+            break;
         if (shutting_down)
             break;
     }           /* end of while loop */
@@ -1657,7 +1656,7 @@ read_write_thread(struct global_collection * clp, int thr_idx, int slice_idx,
 #endif
         if (vb > 1)
             pr2serr_lk("[%d] %s: seed=%ld\n", thr_idx, __func__, rep->seed);
-        srand48_r(rep->seed, &rep->drand);
+        srand48(rep->seed);
     }
 
     if (in_is_sg && inf.size()) {
@@ -1897,7 +1896,7 @@ normal_in_rd(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
             for (k = 0; k < blocks; ++k, bp += clp->bs) {
                 for (j = 0; j < clp->bs; j += jbump) {
                    /* mrand48 takes uniformly from [-2^31, 2^31) */
-                    mrand48_r(&rep->drand, &rn);
+                    rn = mrand48();
                     *((uint32_t *)(bp + j)) = (uint32_t)rn;
                 }
             }
