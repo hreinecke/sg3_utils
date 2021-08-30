@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.62 20201223";
+static const char * version_str = "1.63 20210830";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -308,9 +308,12 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
         ret = sg_cmds_process_resp(ptvp, fm_s, res, noisy, verbose,
                                    &sense_cat);
-        if (-1 == ret)
+        if (-1 == ret) {
+            if (get_scsi_pt_transport_err(ptvp))
+                ret = SG_LIB_TRANSPORT_ERROR;
+            else
                 ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-        else if (-2 == ret) {
+        } else if (-2 == ret) {
                 switch (sense_cat) {
                 case SG_LIB_CAT_RECOVERED:
                 case SG_LIB_CAT_NO_SENSE:
@@ -367,9 +370,12 @@ sg_ll_format_with_preset(int sg_fd, bool immed, bool fmtmaxlba,
         res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
         ret = sg_cmds_process_resp(ptvp, fwp_s, res, noisy, verbose,
                                    &sense_cat);
-        if (-1 == ret)
+        if (-1 == ret) {
+            if (get_scsi_pt_transport_err(ptvp))
+                ret = SG_LIB_TRANSPORT_ERROR;
+            else
                 ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-        else if (-2 == ret) {
+        } else if (-2 == ret) {
                 switch (sense_cat) {
                 case SG_LIB_CAT_RECOVERED:
                 case SG_LIB_CAT_NO_SENSE:

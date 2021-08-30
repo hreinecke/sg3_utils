@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.70 20210610";    /* spc6r05 */
+static const char * version_str = "0.71 20210830";    /* spc6r05 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -222,9 +222,12 @@ do_rsoc(struct sg_pt_base * ptvp, bool rctd, int rep_opts, int rq_opcode,
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, -1, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, rsoc_s, res, noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -278,9 +281,12 @@ do_rstmf(struct sg_pt_base * ptvp, bool repd, void * resp, int mx_resp_len,
     res = do_scsi_pt(ptvp, -1, DEF_TIMEOUT_SECS, verbose);
     ret = sg_cmds_process_resp(ptvp, rstmf_s, res, noisy, verbose,
                                &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

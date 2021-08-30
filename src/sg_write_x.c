@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.26 20210630";
+static const char * version_str = "1.27 20210830";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1333,9 +1333,12 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
     res = do_scsi_pt(ptvp, sg_fd, op->timeout, vb);
     ret = sg_cmds_process_resp(ptvp, op->cdb_name, res, true /*noisy */, vb,
                                &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

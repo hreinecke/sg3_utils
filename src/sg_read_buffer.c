@@ -39,7 +39,7 @@
  * device.
  */
 
-static const char * version_str = "1.31 20210608";      /* spc6r05 */
+static const char * version_str = "1.32 20210830";      /* spc6r05 */
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -194,9 +194,12 @@ sg_ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "Read buffer(10)", res, noisy, verbose,
                                &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
@@ -259,9 +262,12 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, "Read buffer(16)", res, noisy, verbose,
                                &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

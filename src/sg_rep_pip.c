@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020 Douglas Gilbert.
+ * Copyright (c) 2014-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * sbc4r21.pdf
  */
 
-static const char * version_str = "1.01 20200605";
+static const char * version_str = "1.02 20210830";
 
 #define MAX_RPIP_BUFF_LEN (1024 * 1024)
 #define DEF_RPIP_BUFF_LEN 512
@@ -123,9 +123,12 @@ sg_ll_report_pip(int sg_fd, void * resp, int mx_resp_len, int * residp,
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
     ret = sg_cmds_process_resp(ptvp, rpip_s, res, noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

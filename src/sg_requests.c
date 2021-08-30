@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.36 20210610";
+static const char * version_str = "1.37 20210830";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -331,7 +331,10 @@ main(int argc, char * argv[])
                                          verbose, &sense_cat);
             }
             if (-1 == n) {
-                ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+                if (get_scsi_pt_transport_err(ptvp))
+                    ret = SG_LIB_TRANSPORT_ERROR;
+                else
+                    ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
                 goto finish;
             } else if (-2 == n) {
                 switch (sense_cat) {
@@ -424,7 +427,10 @@ main(int argc, char * argv[])
                                      verbose, &sense_cat);
         }
         if (-1 == n) {
-            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+            if (get_scsi_pt_transport_err(ptvp))
+                ret = SG_LIB_TRANSPORT_ERROR;
+            else
+                ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
             goto finish;
         } else if (-2 == n) {
             switch (sense_cat) {

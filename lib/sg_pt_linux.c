@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.52 20210423 */
+/* sg_pt_linux version 1.53 20210830 */
 
 
 #include <stdio.h>
@@ -71,8 +71,11 @@ static const char * linux_host_bytes[] = {
     "DID_NEXUS_FAILURE (reservation conflict)",
     "DID_ALLOC_FAILURE",
     "DID_MEDIUM_ERROR",
+    "DID_TRANSPORT_MARGINAL",	/*0x14 */
 };
 
+/* These where made obsolete around lk 5.12.0 . Only DRIVER_SENSE [0x8] is
+ * defined in scsi/sg.h for backward comaptibility */
 static const char * linux_driver_bytes[] = {
     "DRIVER_OK", "DRIVER_BUSY", "DRIVER_SOFT", "DRIVER_MEDIA",
     "DRIVER_ERROR", "DRIVER_INVALID", "DRIVER_TIMEOUT", "DRIVER_HARD",

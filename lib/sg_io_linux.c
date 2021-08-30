@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2020 Douglas Gilbert.
+ * Copyright (c) 1999-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -24,7 +24,7 @@
 #include "sg_pr2serr.h"
 
 
-/* Version 1.11 20200401 */
+/* Version 1.12 20210830 */
 
 
 void
@@ -43,7 +43,7 @@ static const char * linux_host_bytes[] = {
     "DID_RESET", "DID_BAD_INTR", "DID_PASSTHROUGH", "DID_SOFT_ERROR",
     "DID_IMM_RETRY", "DID_REQUEUE", "DID_TRANSPORT_DISRUPTED",
     "DID_TRANSPORT_FAILFAST", "DID_TARGET_FAILURE", "DID_NEXUS_FAILURE",
-    "DID_ALLOC_FAILURE", "DID_MEDIUM_ERROR",
+    "DID_ALLOC_FAILURE", "DID_MEDIUM_ERROR", "DID_TRANSPORT_MARGINAL",
 };
 
 void
@@ -57,8 +57,9 @@ sg_print_host_status(int host_status)
         pr2ws("[%s] ", linux_host_bytes[host_status]);
 }
 
-/* DRIVER_* are Linux SCSI result (a 32 bit variable) bits 24:27 */
-
+/* DRIVER_* are Linux SCSI result (a 32 bit variable) bits 24:27 .
+ * These where made obsolete around lk 5.12.0 . Only DRIVER_SENSE [0x8] is
+ * defined in scsi/sg.h for backward comaptibility */
 static const char * linux_driver_bytes[] = {
     "DRIVER_OK", "DRIVER_BUSY", "DRIVER_SOFT", "DRIVER_MEDIA",
     "DRIVER_ERROR", "DRIVER_INVALID", "DRIVER_TIMEOUT", "DRIVER_HARD",

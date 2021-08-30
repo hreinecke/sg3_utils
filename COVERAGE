@@ -46,8 +46,8 @@ ORWRITE(32)         sg_write_x
 PERSISTENT RESERVE IN       sg_persist, ++
 PERSISTENT RESERVE OUT      sg_persist, ++
 POPULATE TOKEN      ddpt, ddptctl, ++
-PRE-FETCH(10)	    sg_seek
-PRE-FETCH(16)	    sg_seek
+PRE-FETCH(10)       sg_seek
+PRE-FETCH(16)       sg_seek
 PREVENT ALLOW MEDIUM REMOVAL        sg_prevent, ++
 READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
@@ -76,18 +76,18 @@ REPORT ALL ROD TOKENS    ddptctl ++
 REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
 REPORT LUNS         sg_luns, ++
 REPORT PROVISIONING INITIALIZATION PATTERN    sg_rep_pip, ++
+REPORT REALMS       sg_rep_zones
 REPORT REFERRALS    sg_referrals, ++
 REPORT SUPPORTED OPERATION CODES              sg_opcodes
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes
 REPORT TARGET PORT GROUPS       sg_rtpg, sg_stpg ++
 REPORT TIMESTAMP    sg_timestamp
-REPORT ZONE DOMAINS  sg_rep_zones
-REPORT REALMS       sg_rep_zones
 REPORT ZONES        sg_rep_zones
+REPORT ZONE DOMAINS  sg_rep_zones
 REQUEST SENSE       sg_requests, ++
 RESET WRITE POINTER sg_reset_wp
 SANITIZE            sg_sanitize
-SEEK(10)	    sg_seek ++
+SEEK(10)            sg_seek ++
 SEND DIAGNOSTIC     sg_senddiag, sg_ses, sg_ses_microcode ++
 SEQUENTIALIZE ZONE  sg_zone
 SET IDENTIFYING INFORMATION  sg_ident, ++ (3)
@@ -156,7 +156,7 @@ Write zeroes        [SCSI WRITE SAME(10,zeros) -->SNTL--> Write zeroes]
                     [SCSI WRITE SAME(16,zeros) -->SNTL--> Write zeroes]
 Flush               [SCSI SYNCHRONIZE CACHE -->SNTL--> Flush]
 Set Features        [SCSI MODE SELECT(10) -->SNTL--> Set Features]
-		       only for WCE in Caching page
+                       only for WCE in Caching page
 
 The following SCSI commands do nothing (currently) in the SNTL but
 do return GOOD status: TEST UNIT READY, START STOP UNIT, REPORT LUNS
@@ -180,4 +180,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-7th June 2021
+30th August 2021

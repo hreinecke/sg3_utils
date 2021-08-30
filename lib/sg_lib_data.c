@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.81 20210526";
+const char * sg_lib_version_str = "2.82 20210830";
 /* spc6r05, sbc5r01, zbc2r10 */
 
 
@@ -32,6 +32,22 @@ int sg_lib_pdt_decay_arr[32] = {
     PDT_BCC, PDT_OSD, PDT_TAPE /* adc */, PDT_SMD,
     PDT_DISK /* zbc */, 0x15, 0x16, 0x17,
     0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, PDT_WLUN, PDT_UNKNOWN
+};
+
+/* SCSI Status values */
+struct sg_lib_simple_value_name_t sg_lib_sstatus_str_arr[] = {
+    {0x0,  "Good"},
+    {0x2,  "Check Condition"},
+    {0x4,  "Condition Met"},
+    {0x8,  "Busy"},
+    {0x10, "Intermediate (obsolete)"},
+    {0x14, "Intermediate-Condition Met (obsolete)"},
+    {0x18, "Reservation Conflict"},
+    {0x22, "Command terminated (obsolete)"},
+    {0x28, "Task Set Full"},
+    {0x30, "ACA Active"},
+    {0x40, "Task Aborted"},
+    {0xffff, NULL},
 };
 
 #ifdef SG_SCSI_STRINGS
@@ -1805,6 +1821,8 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
     {31, "Contradict", "command line options contradict or select bad mode"},
     {32, "Logic error", "unexpected situation, contact author"},
     {33, "SCSI command timeout", NULL},         /* OS timed out command */
+    {34, "Windows error number", "doesn't fit in 7 bits"},
+    {35, "Transport error", "driver or interconnect error"}, 
     {36, "No errors (false)", NULL},
     {40, "Aborted command, protection error", NULL},
     {41, "Aborted command, protection error with Info field", NULL},

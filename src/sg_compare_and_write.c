@@ -1,5 +1,5 @@
 /*
-*  Copyright (c) 2012-2020, Kaminario Technologies LTD
+*  Copyright (c) 2012-2021, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -56,7 +56,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.29 20200509";
+static const char * version_str = "1.30 20210830";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -292,8 +292,8 @@ parse_args(int argc, char* argv[], struct opts_t * op)
                         goto out_err;
                 }
         }
-	if (op->version_given && (! op->verbose_given))
-		return 0;
+        if (op->version_given && (! op->verbose_given))
+                return 0;
         if (NULL == op->device_name) {
                 pr2serr("missing device name!\n");
                 goto out_err;
@@ -385,9 +385,12 @@ sg_ll_compare_and_write(int sg_fd, uint8_t * buff, int blocks,
         res = do_scsi_pt(ptvp, sg_fd, DEF_TIMEOUT_SECS, verbose);
         ret = sg_cmds_process_resp(ptvp, "COMPARE AND WRITE", res,
                                    noisy, verbose, &sense_cat);
-        if (-1 == ret)
+        if (-1 == ret) {
+            if (get_scsi_pt_transport_err(ptvp))
+                ret = SG_LIB_TRANSPORT_ERROR;
+            else
                 ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-        else if (-2 == ret) {
+        } else if (-2 == ret) {
                 switch (sense_cat) {
                 case SG_LIB_CAT_RECOVERED:
                 case SG_LIB_CAT_NO_SENSE:

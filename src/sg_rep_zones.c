@@ -39,7 +39,7 @@
  * Based on zbc2r10.pdf
  */
 
-static const char * version_str = "1.26 20210726";
+static const char * version_str = "1.27 20210830";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -216,9 +216,12 @@ sg_ll_report_zzz(int sg_fd, int serv_act, uint64_t zs_lba, bool partial,
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, vb);
     ret = sg_cmds_process_resp(ptvp, "report zone/domain/realm", res, noisy,
                                vb, &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

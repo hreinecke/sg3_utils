@@ -441,6 +441,12 @@ this is a Windows only exit status and indicates that the Windows error
 number (32 bits) cannot meaningfully be mapped to an equivalent Unix error
 number returned as the exit status (7 bits).
 .TP
+.B 35
+a transport error has occurred. This will either be in the driver (e.g. HBA
+driver) or in the interconnect between the host (initiator) and the
+device (target).  For example in SAS an expander can run out of paths and
+thus be unable to return the user data for a READ command.
+.TP
 .B 36
 no error has occurred plus the utility wants to convey a boolean value
 of false. The corresponding true value is conveyed by a 0 exit status.

@@ -245,22 +245,6 @@ sg_print_command(const uint8_t * cdbp)
     sg_print_command_len(cdbp, 0);
 }
 
-/* SCSI Status values */
-static const struct sg_lib_simple_value_name_t sstatus_str_arr[] = {
-    {0x0,  "Good"},
-    {0x2,  "Check Condition"},
-    {0x4,  "Condition Met"},
-    {0x8,  "Busy"},
-    {0x10, "Intermediate (obsolete)"},
-    {0x14, "Intermediate-Condition Met (obsolete)"},
-    {0x18, "Reservation Conflict"},
-    {0x22, "Command terminated (obsolete)"},
-    {0x28, "Task Set Full"},
-    {0x30, "ACA Active"},
-    {0x40, "Task Aborted"},
-    {0xffff, NULL},
-};
-
 bool
 sg_scsi_status_is_good(int sstatus)
 {
@@ -299,7 +283,7 @@ sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
         return;
     }
     scsi_status &= 0x7e; /* sanitize as much as possible */
-    for (sstatus_p = sstatus_str_arr; sstatus_p->name; ++sstatus_p) {
+    for (sstatus_p = sg_lib_sstatus_str_arr; sstatus_p->name; ++sstatus_p) {
         if (scsi_status == sstatus_p->value)
             break;
     }

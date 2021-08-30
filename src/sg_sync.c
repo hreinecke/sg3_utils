@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2019 Douglas Gilbert.
+ * Copyright (c) 2004-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.25 20191220";
+static const char * version_str = "1.26 20210830";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -129,9 +129,12 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
     res = do_scsi_pt(ptvp, sg_fd, to_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, "synchronize cache(16)", res,
                                noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:

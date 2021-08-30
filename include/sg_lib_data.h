@@ -120,6 +120,7 @@ extern struct sg_lib_value_name_t sg_lib_zoning_in_arr[];
 extern struct sg_lib_value_name_t sg_lib_read_attr_arr[];
 extern struct sg_lib_value_name_t sg_lib_read_pos_arr[];
 extern struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[];
+extern struct sg_lib_simple_value_name_t sg_lib_sstatus_str_arr[];
 extern struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];
 extern struct sg_lib_value_name_t sg_lib_scsi_feature_sets[];
 extern const char * sg_lib_sense_key_desc[];

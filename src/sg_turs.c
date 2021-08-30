@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.48 20210102";
+static const char * version_str = "3.49 20210830";
 
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
@@ -389,7 +389,10 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
             n = sg_cmds_process_resp(ptvp, "Test unit ready", rs, (0 == k),
                                      vb, &sense_cat);
             if (-1 == n) {
-                resp->ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+                if (get_scsi_pt_transport_err(ptvp))
+                    resp->ret = SG_LIB_TRANSPORT_ERROR;
+                else
+                    resp->ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
                 return k;
             } else if (-2 == n) {
                 switch (sense_cat) {
@@ -441,7 +444,7 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                     if (SG_LIB_CAT_NOT_READY == res) {
                         if (! check_for_lu_becoming(ptvp))
                             printf("device not ready\n");
-			continue;
+                        continue;
                     } else {
                         sg_get_category_sense_str(res, sizeof(b), b, vb);
                         printf("%s\n", b);

@@ -2,7 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20210816] [svn: r909]
+Changelog for pre-release sg3_utils-1.47 [20210830] [svn: r910]
+  - transport error handling improved. To fix report of a
+    BAD_TARGET transport error but the utility still continued.
+    - introduce SG_LIB_TRANSPORT_ERROR [35] exit status
   - sg_rep_zones: add support for REPORT ZONE DOMAINS and
     REPORT REALMS in this utility
   - sg_raw: fix prints of NVMe NVM command names

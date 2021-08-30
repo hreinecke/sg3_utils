@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020 Douglas Gilbert
+ * Copyright (c) 2014-2021 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.18 20200430";
+static const char * version_str = "1.19 20210830";
 
 
 #define ME "sg_write_verify: "
@@ -153,9 +153,12 @@ run_scsi_transaction(int sg_fd, const uint8_t *cdbp, int cdb_len,
     set_scsi_pt_data_out(ptvp, dop, do_len);
     res = do_scsi_pt(ptvp, sg_fd, timeout, verbose);
     ret = sg_cmds_process_resp(ptvp, b, res, noisy, verbose, &sense_cat);
-    if (-1 == ret)
-        ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
-    else if (-2 == ret) {
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
         switch (sense_cat) {
         case SG_LIB_CAT_RECOVERED:
         case SG_LIB_CAT_NO_SENSE:
