@@ -24,7 +24,7 @@
 #include "sg_pr2serr.h"
 
 
-/* Version 1.12 20210830 */
+/* Version 1.13 20210831 */
 
 
 void
@@ -87,11 +87,6 @@ sg_print_driver_status(int driver_status)
     driv = driver_status & SG_LIB_DRIVER_MASK;
     if (driv < (int)SG_ARRAY_SIZE(linux_driver_bytes))
         driv_cp = linux_driver_bytes[driv];
-#if 0
-    sugg = (driver_status & SG_LIB_SUGGEST_MASK) >> 4;
-    if (sugg < (int)SG_ARRAY_SIZE(linux_driver_suggests))
-        sugg_cp = linux_driver_suggests[sugg];
-#endif
     pr2ws("Driver_status=0x%02x", driver_status);
     pr2ws(" [%s] ", driv_cp);
 }

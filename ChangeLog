@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20210830] [svn: r910]
+Changelog for pre-release sg3_utils-1.47 [20210831] [svn: r911]
   - transport error handling improved. To fix report of a
     BAD_TARGET transport error but the utility still continued.
     - introduce SG_LIB_TRANSPORT_ERROR [35] exit status
@@ -18,6 +18,8 @@ Changelog for pre-release sg3_utils-1.47 [20210830] [svn: r910]
   - sg_dd, sgm_dd, sgp_dd: don't close negative file descriptors
   - sg_dd: don't use srand48_r() and mrand48_r() as they are
     GNU extensions. Use the non-reentrant versions instead
+  - sg_get_elem_status: fix issue with '--maxlen=' option
+    - add 2 depopulation revocation health attributes [sbc5r01]
   - several utilities: override '--maxlen=LEN' when LEN
     is < 16 (or 4), take default (or 4) instead
   - sg_lib: add sg_scsi_status_is_good(),

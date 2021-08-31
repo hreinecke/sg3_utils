@@ -71,7 +71,7 @@ static const char * linux_host_bytes[] = {
     "DID_NEXUS_FAILURE (reservation conflict)",
     "DID_ALLOC_FAILURE",
     "DID_MEDIUM_ERROR",
-    "DID_TRANSPORT_MARGINAL",	/*0x14 */
+    "DID_TRANSPORT_MARGINAL",   /*0x14 */
 };
 
 /* These where made obsolete around lk 5.12.0 . Only DRIVER_SENSE [0x8] is
@@ -956,16 +956,13 @@ get_scsi_pt_transport_err_str(const struct sg_pt_base * vp, int max_b_len,
         return b;
     }
     cp += n;
-    driv = ds & SG_LIB_DRIVER_MASK;
-    if (driv < (int)SG_ARRAY_SIZE(linux_driver_bytes))
-        driv_cp = linux_driver_bytes[driv];
-#if 0
-    sugg = (ds & SG_LIB_SUGGEST_MASK) >> 4;
-    if (sugg < SG_ARRAY_SIZE(linux_driver_suggests)
-        sugg_cp = linux_driver_suggests[sugg];
-#endif
-    n = snprintf(cp, m, "Driver_status=0x%02x [%s]\n", ds, driv_cp);
-    m -= n;
+    if (ds) {
+        driv = ds & SG_LIB_DRIVER_MASK;
+        if (driv < (int)SG_ARRAY_SIZE(linux_driver_bytes))
+            driv_cp = linux_driver_bytes[driv];
+        n = snprintf(cp, m, "Driver_status=0x%02x [%s]\n", ds, driv_cp);
+        m -= n;
+    }
     if (m < 1)
         b[max_b_len - 1] = '\0';
     return b;

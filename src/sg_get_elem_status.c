@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.05 20210830";      /* sbc4r19 */
+static const char * version_str = "1.06 20210831";      /* sbc5r01 */
 
 
 #ifndef UINT32_MAX
@@ -295,7 +295,7 @@ main(int argc, char * argv[])
             }
             if (0 == maxlen)
                 maxlen = DEF_GPES_BUFF_LEN;
-            else if (n < MIN_MAXLEN) {
+            else if (maxlen < MIN_MAXLEN) {
                 pr2serr("Warning: --maxlen=LEN less than %d ignored\n",
                         MIN_MAXLEN);
                 maxlen = DEF_GPES_BUFF_LEN;
@@ -550,8 +550,12 @@ start_response:
                 printf("at manufacturer's specification limits <%d>", j);
             else if (j < 0xd0)
                 printf("outside manufacturer's specification limits <%d>", j);
-            else if (j < 0xfd)
+            else if (j < 0xfb)
                 printf("reserved [0x%x]", j);
+            else if (0xfb == j)
+                printf("depopulation revocation completed, errors detected");
+            else if (0xfc == j)
+                printf("depopulation revocation in progress");
             else if (0xfd == j)
                 printf("depopulation completed, errors detected");
             else if (0xfe == j)
