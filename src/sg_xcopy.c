@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2020 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2021 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -69,7 +69,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.71 20200510";
+static const char * version_str = "0.72 20210902";
 
 #define ME "sg_xcopy: "
 
@@ -1075,27 +1075,27 @@ desc_from_vpd_id(int sg_fd, uint8_t *desc, int desc_len,
         if (verbose > 2)
             pr2serr("    Desc %d: assoc %u desig %u len %d\n", off, assoc,
                     desig, i_len);
-        /* Descriptor must be less than 16 bytes */
-        if (i_len > 16)
+        /* Identification descriptor's Designator length must be <= 20. */
+        if (i_len > 20)
             continue;
-        if (desig == 3) {
+        if (desig == /*NAA=*/3) {
             best = bp;
             best_len = i_len;
             break;
         }
-        if (desig == 2) {
+        if (desig == /*EUI64=*/2) {
             if (!best || f_desig < 2) {
                 best = bp;
                 best_len = i_len;
                 f_desig = 2;
             }
-        } else if (desig == 1) {
+        } else if (desig == /*T10*/1) {
             if (!best || f_desig == 0) {
                 best = bp;
                 best_len = i_len;
                 f_desig = desig;
             }
-        } else if (desig == 0) {
+        } else if (desig == /*vend.spec.=*/0) {
             if (!best) {
                 best = bp;
                 best_len = i_len;
@@ -1108,9 +1108,10 @@ desc_from_vpd_id(int sg_fd, uint8_t *desc, int desc_len,
             decode_designation_descriptor(best, best_len);
         if (best_len + 4 < desc_len) {
             memset(desc, 0, 32);
-            desc[0] = 0xe4;
+            desc[0] = 0xe4; /* Identification Descriptor */
             memcpy(desc + 4, best, best_len + 4);
-            desc[4] &= 0x1f;
+            desc[4] &= 0x0f; /* code set */
+            desc[5] &= 0x3f; /* association and designator type */
             if (pad)
                 desc[28] = 0x4;
             sg_put_unaligned_be24((uint32_t)block_size, desc + 29);

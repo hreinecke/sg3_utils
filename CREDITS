@@ -10,6 +10,8 @@ Bart Van Assche <bart dot vanassche at sandisk dot com>
         harden (improve) code in rescan-scsi-bus.sh [20160224]
         configure.ac and Makefile.am cleanup plus sgp_dd code
         to replace pthread_cancel with pthread_kill [20180102]
+        sg_xcopy: fix identification CSCD descriptor's designator
+        length, fix CSCD descriptor mask [20210902]
 
 Bean Huo <beanhuo dot micron dot com>
         sg_write_buffer: patch to allow comma or period separated bytes
@@ -146,7 +148,7 @@ Trent Piepho <xyzzy at speakeasy dot org> print out some "sense key specific"
         data and "-6" switch for sg_modes
 
 Xose Vazquez Perez <xose dot vazquez at gmail dot com>
-	documentation corrections [20200117]
+        documentation corrections [20200117]
 
 
 Douglas Gilbert
