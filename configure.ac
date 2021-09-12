@@ -27,6 +27,7 @@ AC_CHECK_FUNCS(posix_memalign)
 AC_CHECK_FUNCS(gettimeofday)
 AC_CHECK_FUNCS(sysconf)
 AC_CHECK_FUNCS(lseek64)
+AC_CHECK_FUNCS(srand48_r)
 SAVED_LIBS=$LIBS
 AC_SEARCH_LIBS([pthread_create], [pthread])
 # AC_SEARCH_LIBS adds libraries at the start of $LIBS so remove $SAVED_LIBS

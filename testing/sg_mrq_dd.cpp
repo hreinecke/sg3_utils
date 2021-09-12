@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.35 20210816";
+static const char * version_str = "1.36 20210906";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -348,6 +348,9 @@ typedef struct request_element
     int out_local_partial;
     int in_resid_bytes;
     long seed;
+#ifdef HAVE_SRAND48_R   /* gcc extension. N.B. non-reentrant version slower */
+    struct drand48_data drand;/* opaque, used by srand48_r and mrand48_r */
+#endif
 } Rq_elem;
 
 /* Additional parameters for sg_start_io() and sg_finish_io() */
@@ -1656,7 +1659,11 @@ read_write_thread(struct global_collection * clp, int thr_idx, int slice_idx,
 #endif
         if (vb > 1)
             pr2serr_lk("[%d] %s: seed=%ld\n", thr_idx, __func__, rep->seed);
+#ifdef HAVE_SRAND48_R
+        srand48_r(rep->seed, &rep->drand);
+#else
         srand48(rep->seed);
+#endif
     }
 
     if (in_is_sg && inf.size()) {
@@ -1895,8 +1902,12 @@ normal_in_rd(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
             bp = rep->buffp + d_boff;
             for (k = 0; k < blocks; ++k, bp += clp->bs) {
                 for (j = 0; j < clp->bs; j += jbump) {
-                   /* mrand48 takes uniformly from [-2^31, 2^31) */
+                    /* mrand48 takes uniformly from [-2^31, 2^31) */
+#ifdef HAVE_SRAND48_R
+                    mrand48_r(&rep->drand, &rn);
+#else
                     rn = mrand48();
+#endif
                     *((uint32_t *)(bp + j)) = (uint32_t)rn;
                 }
             }
@@ -3385,6 +3396,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))
             ++fp->mmap;         /* mmap > 1 stops munmap() being called */
+        else if (0 == strcmp(cp, "nocreat"))
+            fp->nocreat = true;
         else if (0 == strcmp(cp, "nodur"))
             fp->no_dur = true;
         else if (0 == strcmp(cp, "no_dur"))

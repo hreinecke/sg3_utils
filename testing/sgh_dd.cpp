@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.15 20210816";
+static const char * version_str = "2.16 20210906";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -317,6 +317,9 @@ typedef struct request_element
     uint32_t in_mrq_q_blks;
     uint32_t out_mrq_q_blks;
     long seed;
+#ifdef HAVE_SRAND48_R   /* gcc extension. N.B. non-reentrant version slower */
+    struct drand48_data drand;/* opaque, used by srand48_r and mrand48_r */
+#endif
     pthread_t mrq_abort_thread_id;
     Mrq_abort_info mai;
 } Rq_elem;
@@ -1536,7 +1539,11 @@ read_write_thread(void * v_tip)
 #endif
         if (vb > 1)
             pr2serr_lk("thread=%d: seed=%ld\n", rep->id, rep->seed);
+#ifdef HAVE_SRAND48_R
+        srand48_r(rep->seed, &rep->drand);
+#else
         srand48(rep->seed);
+#endif
     }
     if (clp->in_flags.same_fds || clp->out_flags.same_fds)
         ;
@@ -1857,7 +1864,11 @@ normal_in_rd(Rq_elem * rep, int blocks)
             for (k = 0, bp = rep->buffp; k < blocks; ++k, bp += clp->bs) {
                 for (j = 0; j < clp->bs; j += jbump) {
                     /* mrand48 takes uniformly from [-2^31, 2^31) */
+#ifdef HAVE_SRAND48_R
+                    mrand48_r(&rep->drand, &rn);
+#else
                     rn = mrand48();
+#endif
                     *((uint32_t *)(bp + j)) = (uint32_t)rn;
                 }
             }

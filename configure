@@ -12863,6 +12863,13 @@ then :
 
 fi
 
+ac_fn_c_check_func "$LINENO" "srand48_r" "ac_cv_func_srand48_r"
+if test "x$ac_cv_func_srand48_r" = xyes
+then :
+  printf "%s\n" "#define HAVE_SRAND48_R 1" >>confdefs.h
+
+fi
+
 SAVED_LIBS=$LIBS
 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for library containing pthread_create" >&5
 printf %s "checking for library containing pthread_create... " >&6; }

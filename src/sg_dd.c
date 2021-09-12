@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.28 20210816";
+static const char * version_str = "6.29 20210906";
 
 
 #define ME "sg_dd: "
@@ -176,6 +176,9 @@ static uint8_t * free_zeros_buff = NULL;
 static int read_long_blk_inc = READ_LONG_DEF_BLK_INC;
 
 static long seed;
+#ifdef HAVE_SRAND48_R   /* gcc extension. N.B. non-reentrant version slower */
+static struct drand48_data drand;/* opaque, used by srand48_r and mrand48_r */
+#endif
 
 static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
@@ -2123,7 +2126,11 @@ main(int argc, char * argv[])
 #endif
         if (verbose > 1)
             pr2serr("seed=%ld\n", seed);
+#ifdef HAVE_SRAND48_R
+        srand48_r(seed, &drand);
+#else
         srand48(seed);
+#endif
     } else if (iflag.zero) {
        ccp = "<zero bytes>";
        cc2p = "00";
@@ -2400,7 +2407,11 @@ main(int argc, char * argv[])
                 for (kk = 0; kk < blocks; ++kk, bp += blk_sz) {
                     for (j = 0; j < blk_sz; j += jbump) {
                        /* mrand48 takes uniformly from [-2^31, 2^31) */
+#ifdef HAVE_SRAND48_R
+                        mrand48_r(&drand, &rn);
+#else
                         rn = mrand48();
+#endif
                         *((uint32_t *)(bp + j)) = (uint32_t)rn;
                     }
                 }

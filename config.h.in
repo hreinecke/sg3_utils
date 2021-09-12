@@ -54,6 +54,9 @@
 /* Define to 1 if you have the `pthread_kill' function. */
 #undef HAVE_PTHREAD_KILL
 
+/* Define to 1 if you have the `srand48_r' function. */
+#undef HAVE_SRAND48_R
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 

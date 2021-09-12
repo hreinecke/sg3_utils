@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.45 20210731 */
+/* sg_pt_freebsd version 1.46 20210912 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -318,9 +318,12 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
         case PROTO_ATAPI:
         case PROTO_SATAPM:
         case PROTO_SEMB:  /* SATA Enclosure Management bridge */
-            if (vb)
+            if (vb) {
                 pr2ws("%s: ATA and derivative devices not supported\n",
                       __func__);
+                if (vb > 2)
+                    pr2ws("  ... FreeBSD doesn't have a SAT in its kernel\n");
+            }
             ret = -EINVAL;
             break;
 #if __FreeBSD_version > 1200058
