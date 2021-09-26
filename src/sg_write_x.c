@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.27 20210830";
+static const char * version_str = "1.28 20210923";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -803,6 +803,7 @@ build_t10_scat(const char * scat_fname, bool do_16, bool parse_one,
                uint32_t * sum_num, uint32_t max_list_blen)
 {
     bool have_stdin = false;
+    bool del_fp = false;
     bool bit0, ok;
     int off = 0;
     int in_len, k, j, m, n, res, err;
@@ -833,6 +834,7 @@ build_t10_scat(const char * scat_fname, bool do_16, bool parse_one,
                     safe_strerror(err));
             return sg_convert_errno(err);
         }
+        del_fp = true;
     }
     for (j = 0; j < 1024; ++j) {/* loop over lines in file */
         if ((max_list_blen > 0) && ((n + lbard_sz) > max_list_blen))
@@ -927,15 +929,15 @@ build_t10_scat(const char * scat_fname, bool do_16, bool parse_one,
     }
 fini:
     *num_scat_elems = (n / lbard_sz) - 1;
-    if (fp && (stdin != fp))
+    if (del_fp)
         fclose(fp);
     return 0;
 bad_exit:
-    if (fp && (stdin != fp))
+    if (del_fp)
         fclose(fp);
     return SG_LIB_SYNTAX_ERROR;
 bad_mem_exit:
-    if (fp && (stdin != fp))
+    if (del_fp)
         fclose(fp);
     return SG_LIB_CAT_NOT_READY;        /* flag output buffer too small */
 }

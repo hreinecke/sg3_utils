@@ -583,7 +583,7 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
     if ((ptp = &vp->impl)) {
         if (ptp->ccb)
             cam_freeccb(ptp->ccb);
-        free(ptp);
+        free(vp);
     }
 }
 

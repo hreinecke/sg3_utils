@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.53 20210830 */
+/* sg_pt_linux version 1.54 20210923 */
 
 
 #include <stdio.h>
@@ -439,8 +439,8 @@ destruct_scsi_pt_obj(struct sg_pt_base * vp)
             ptp->free_nvme_id_ctlp = NULL;
             ptp->nvme_id_ctlp = NULL;
         }
-        if (ptp)
-            free(ptp);
+        if (vp)
+            free(vp);
     }
 }
 

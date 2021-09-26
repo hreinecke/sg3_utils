@@ -1,0 +1,25 @@
+# Zoned block device characteristics VPD page [0xb6]
+# Host managed zoned block device model; pdt=0x14
+14 b6 00 3c
+# ZBD extension=0; AAORb=0; URSWRZ=0
+00 00 00 00
+ 
+# Optimal # of open sequential write preferred
+00 00 00 00
+ 
+# Optimal # of open non-sequentailly written sequential write preferred
+00 00 00 00
+ 
+# maximum # of open sequential write required
+00 00 00 08
+ 
+# Zone alignment mode=0 (therefore no gaps)
+00 00 00 00
+ 
+# Zone starting LBA granularity
+00 00 00 02  00 00 00 00
+
+
+# pad to total length of 64 bytes
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00

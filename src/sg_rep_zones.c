@@ -39,7 +39,7 @@
  * Based on zbc2r10.pdf
  */
 
-static const char * version_str = "1.27 20210830";
+static const char * version_str = "1.28 20210922";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -160,6 +160,7 @@ h_twoormore:
             "    0x10   list zones with RWP Recommended set to true\n"
             "    0x11   list zones with Non-sequential write resources "
             "active set to true\n"
+            "    0x3e   list zones except those with zone type: GAP\n"
             "    0x3f   list zones with a zone condition of NOT WRITE "
             "POINTER\n\n");
     pr2serr("Reporting options for REPORT ZONE DOMAINS:\n"

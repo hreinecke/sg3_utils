@@ -2,7 +2,7 @@
         ========================================
 
 The files in this folder contain hexadecimal data (in ASCII) and associated
-comments (prefixed with the hash mark symbol ('#')).
+comments (prefixed with the hash mark symbol: '#' ).
 
 The utility that each hex file is associated with can be determined by
 prepending "sg_" to these filenames then going to the 'src' folder (a
@@ -47,4 +47,4 @@ that support --inhex and don't have hex data already. Special cases are
 also welcome. They help the author test this code.
 
 Douglas Gilbert
-28th August 2019
+25th September 2021

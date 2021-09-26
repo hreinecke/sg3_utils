@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20210912] [svn: r913]
+Changelog for pre-release sg3_utils-1.47 [20210924] [svn: r914]
   - transport error handling improved. To fix report of a
     BAD_TARGET transport error but the utility still continued.
     - introduce SG_LIB_TRANSPORT_ERROR [35] exit status
@@ -14,6 +14,8 @@ Changelog for pre-release sg3_utils-1.47 [20210912] [svn: r913]
     - guard against smaller '--maxlen=' values
   - sg_logs: additions to Volume statistics lpage [ssc5r05c]
   - sg_vpd: fix do_hex type on some recent pages
+    - zoned block dev char vpd: add zone alignment mode and
+      zone starting LBA granularity [zbc2r11]
   - sg_read_buffer: fix --length= problem
   - sg_dd, sgm_dd, sgp_dd: don't close negative file descriptors
   - sg_dd: srand48_r() and mrand48_r() are GNU libc specific,
@@ -34,6 +36,7 @@ Changelog for pre-release sg3_utils-1.47 [20210912] [svn: r913]
     library with sg_pt_dummy.c instead of OS specific code.
     For experimenting with --inhex= decoding on netbsd
   - pt: add Haiku OS support
+  - gcc -fanalyzer fixes: in sg_pt_linux.c + sg_write_x.c
   - sg_pt_dummy.c: add list of functions that a new pt
     needs to define
   - move some hex files from examples to inhex directory

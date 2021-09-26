@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.85 20210802";    /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.86 20210924";    /* spc6r05 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -4861,8 +4861,8 @@ static const char * bms_status[] = {
     "background scan halted due to medium formatted without P-List",
     "background scan halted - vendor specific cause",
     "background scan halted due to temperature out of range",
-    "background scan enabled, none active (waiting for BMS interval timer "
-        "to expire)", /* 8 */
+    ("background scan enabled, none active (waiting for BMS interval timer "
+        "to expire)"),  /* clang warns about this, add parens to quieten */
     "background scan halted - scan results list full",
     "background scan halted - pre-scan time limit timer expired" /* 10 */,
 };

@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.66 20210702";  /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.66 20210923";  /* spc6r05 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2549,6 +2549,7 @@ static void
 decode_zbdch_vpd(uint8_t * b, int len, int do_hex)
 {
     uint32_t u;
+    char d[32];
 
     if (do_hex) {
         hex2stdout(b, len, (1 == do_hex) ? 0 : -1);
@@ -2559,10 +2560,12 @@ decode_zbdch_vpd(uint8_t * b, int len, int do_hex)
                 "short=%d\n", len);
         return;
     }
+    printf("  Peripheral device type: %s\n",
+           sg_get_pdt_str(0x1f & b[0], sizeof(d), d));
     printf("  Zoned block device extension: ");
     switch ((b[4] >> 4) & 0xf) {
     case 0:
-        printf("not reported\n");
+        printf("not reported [0]\n");
         break;
     case 1:
         printf("host aware zone block device model\n");
@@ -2596,6 +2599,23 @@ decode_zbdch_vpd(uint8_t * b, int len, int do_hex)
         printf("no limit\n");
     else
         printf("%" PRIu32 "\n", u);
+    printf("  Zone alignment mode: ");  /* zbc2r11 */
+    switch (b[23] & 0xf) {
+    case 0:
+        printf("not reported [0]\n");
+        break;
+    case 1:
+        printf("use constant zone lengths\n");
+        break;
+    case 0x8:
+        printf("zone length given by REPORT ZONES\n");
+        break;
+    default:
+        printf("Unknown [0x%x]\n", (b[23] & 0xf));
+        break;
+    }
+    printf("  Zone starting LBA granularity: 0x%" PRIx64 "\n",
+           sg_get_unaligned_be64(b + 24));
 }
 
 /* VPD_BLOCK_LIMITS_EXT [0xb7] sbc */
@@ -3733,8 +3753,8 @@ svpd_examine_all(int sg_fd, struct opts_t * op)
         }
         if (op->do_long)
             snprintf(b, sizeof(b), "[0x%x] ", k);
-	else
-	    b[0] = '\0';
+        else
+            b[0] = '\0';
         res = svpd_decode_t10(sg_fd, op, 0, 0, b);
         if (SG_LIB_CAT_OTHER == res) {
             res = svpd_decode_vendor(sg_fd, op, 0);
@@ -3825,11 +3845,11 @@ main(int argc, char * argv[])
                         MX_ALLOC_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
-	    if ((op->maxlen > 0) && (op->maxlen < MIN_MAXLEN)) {
+            if ((op->maxlen > 0) && (op->maxlen < MIN_MAXLEN)) {
                 pr2serr("Warning: overriding '--maxlen' < %d, using "
-			"default\n", MIN_MAXLEN);
-		op->maxlen = 0;
-	    }
+                        "default\n", MIN_MAXLEN);
+                op->maxlen = 0;
+            }
             break;
         case 'M':
             if (op->vend_prod) {
