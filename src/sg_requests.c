@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.37 20210830";
+static const char * version_str = "1.38 20211001";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -478,7 +478,7 @@ main(int argc, char * argv[])
 
                     sg_get_sense_str(NULL, rsBuff, act_din_len,
                                      false, sizeof(bb), bb);
-                    pr2serr("data-in decoded as sense:\n%s\n", b);
+                    pr2serr("data-in decoded as sense:\n%s\n", bb);
                 }
             }
         }

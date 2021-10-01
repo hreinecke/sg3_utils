@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.22 20210610";
+static const char * version_str = "1.23 20211001";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 255+8 */
 
@@ -282,7 +282,7 @@ write2wfn(FILE * fp, struct opts_t * op)
 int
 main(int argc, char *argv[])
 {
-    int k, err;
+    int k, err, blen;
     int ret = 0;
     unsigned int ui;
     size_t s;
@@ -293,8 +293,9 @@ main(int argc, char *argv[])
     struct opts_t opts;
 
     op = &opts;
+    blen = sizeof(b);
     memset(op, 0, sizeof(opts));
-    memset(b, 0, sizeof(b));
+    memset(b, 0, blen);
     ret = parse_cmd_line(op, argc, argv);
 
 #ifdef DEBUG
@@ -339,7 +340,7 @@ main(int argc, char *argv[])
     }
 
     if (op->do_status) {
-        sg_get_scsi_status_str(op->sstatus, sizeof(b) - 1, b);
+        sg_get_scsi_status_str(op->sstatus, blen, b);
         printf("SCSI status: %s\n", b);
     }
 
@@ -421,10 +422,10 @@ main(int argc, char *argv[])
                 sa = op->sense[1] & 0x1f;
             else
                 sa = 0;
-            sg_get_opcode_sa_name(opcode, sa, 0, sizeof(b), b);
+            sg_get_opcode_sa_name(opcode, sa, 0, blen, b);
         } else
             sg_get_sense_str(NULL, op->sense, op->sense_len,
-                             op->verbose, sizeof(b) - 1, b);
+                             op->verbose, blen, b);
         printf("%s\n", b);
     }
 fini:
