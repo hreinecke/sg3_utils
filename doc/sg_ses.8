@@ -1,14 +1,15 @@
-.TH SG_SES "8" "May 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_SES "8" "October 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
 .B sg_ses
-[\fI\-\-all\fR] [\fI\-\-descriptor=DES\fR] [\fI\-\-dev\-slot\-num=SN\fR]
-[\fI\-\-eiioe=A_F\fR] [\fI\-\-filter\fR] [\fI\-\-get=STR\fR] [\fI\-\-hex\fR]
-[\fI\-\-index=IIA\fR | \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR]
-[\fI\-\-join\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR]
-[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR]
-[\fI\-\-status\fR] [\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
+[\fI\-\-all\fR] [\fI\-\-ALL\fR] [\fI\-\-descriptor=DES\fR]
+[\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-filter\fR]
+[\fI\-\-get=STR\fR] [\fI\-\-hex\fR] [\fI\-\-index=IIA\fR |
+\fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR] [\fI\-\-join\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR]
+[\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
 .PP
 .B sg_ses
 \fI\-\-control\fR [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR]
@@ -92,6 +93,15 @@ shows (almost) all status dpages, following references and presenting
 the information as a long list whose indentation indicates the level
 of nesting. This option is actually the same as \fI\-\-join\fR, see its
 description for more information.
+.br
+If used twice, adds threshold elements to output (if they are available).
+So it is the same as using \fI\-\-join\fRtwice.
+.TP
+\fB\-z\fR, \fB\-\-ALL\fR
+shows (almost) all status dpages, following references and presenting
+the information as a long list whose indentation indicates the level
+of nesting. Also shows the threshold elements if they are available.
+This option is the same as using  \fI\-\-join\fR rwice.
 .TP
 \fB\-b\fR, \fB\-\-byte1\fR=\fIB1\fR
 some modifiable dpages may need byte 1 (i.e. the second byte) set. In the

@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.82 20210830";
+const char * sg_lib_version_str = "2.83 20211007";
 /* spc6r05, sbc5r01, zbc2r10 */
 
 
@@ -1822,7 +1822,7 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
     {32, "Logic error", "unexpected situation, contact author"},
     {33, "SCSI command timeout", NULL},         /* OS timed out command */
     {34, "Windows error number", "doesn't fit in 7 bits"},
-    {35, "Transport error", "driver or interconnect error"}, 
+    {35, "Transport error", "driver or interconnect error"},
     {36, "No errors (false)", NULL},
     {40, "Aborted command, protection error", NULL},
     {41, "Aborted command, protection error with Info field", NULL},

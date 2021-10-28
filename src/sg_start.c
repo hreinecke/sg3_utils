@@ -7,8 +7,8 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
 
-    Start/Stop parameter by Kurt Garloff <garloff at suse dot de>, 6/2000
-    Sync cache parameter by Kurt Garloff <garloff at suse dot de>, 1/2001
+    Start/Stop parameter by Kurt Garloff, 6/2000
+    Sync cache parameter by Kurt Garloff, 1/2001
     Guard block device answering sg's ioctls.
                      <dgilbert at interlog dot com> 12/2002
     Convert to SG_IO ioctl so can use sg or block devices in 2.6.* 3/2003

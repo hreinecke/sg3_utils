@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.29 20210906";
+static const char * version_str = "6.30 20211027";
 
 
 #define ME "sg_dd: "
@@ -2105,11 +2105,13 @@ main(int argc, char * argv[])
     outfd = STDOUT_FILENO;
     iflag.pdt = -1;
     oflag.pdt = -1;
-    if (iflag.ff) {
+    if (iflag.zero && iflag.ff) {
+        ccp = "<addr_as_data>";
+        cc2p = "addr_as_data";
+    } else if (iflag.ff) {
         ccp = "<0xff bytes>";
         cc2p = "ff";
     } else if (iflag.random) {
-
         ccp = "<random>";
         cc2p = "random";
 #ifdef HAVE_GETRANDOM
@@ -2392,8 +2394,18 @@ main(int argc, char * argv[])
                     dio_incomplete_count++;
             }
         } else if (FT_RANDOM_0_FF == in_type) {
+            int j;
+
             res = blocks * blk_sz;
-            if (iflag.zero)
+            if (iflag.zero && iflag.ff && (blk_sz >= 4)) {
+                uint32_t pos = (uint32_t)skip;
+                uint off;
+
+                for (k = 0, off = 0; k < blocks; ++k, off += blk_sz, ++pos) {
+                    for (j = 0; j < (blk_sz - 3); j += 4)
+                        sg_put_unaligned_be32(pos, wrkPos + off + j);
+                }
+            } else if (iflag.zero)
                 memset(wrkPos, 0, res);
             else if (iflag.ff)
                 memset(wrkPos, 0xff, res);

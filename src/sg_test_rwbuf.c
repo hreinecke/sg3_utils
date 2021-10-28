@@ -1,5 +1,5 @@
 /*
- * (c) 2000 Kurt Garloff <garloff at suse dot de>
+ * (c) 2000 Kurt Garloff
  * heavily based on Douglas Gilbert's sg_rbuf program.
  * (c) 1999-2019 Douglas Gilbert
  *

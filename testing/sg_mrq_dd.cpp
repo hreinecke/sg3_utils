@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.36 20210906";
+static const char * version_str = "1.38 20211028";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -46,6 +46,7 @@ static const char * version_str = "1.36 20210906";
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>       /* for nanosleep() */
 #include <poll.h>
 #include <limits.h>
 // #include <pthread.h>
@@ -69,7 +70,8 @@ static const char * version_str = "1.36 20210906";
 #include <random>
 #include <thread>       // needed for std::this_thread::yield()
 #include <mutex>
-#include <condition_variable>
+#include <condition_variable>   // for infant_cv: copy/verify first segment
+                                // single threaded
 #include <chrono>
 
 #ifdef HAVE_CONFIG_H
@@ -286,8 +288,8 @@ struct global_collection        /* one instance visible to all threads */
     atomic<int> most_recent_pack_id;
     uint32_t sdt_ict; /* stall detection; initial check time (milliseconds) */
     uint32_t sdt_crt; /* check repetition time (seconds), after first stall */
-    int verbose;
     int dry_run;
+    int verbose;
     bool mrq_eq_0;              /* true when user gives mrq=0 */
     bool processed;
     bool cdbsz_given;
@@ -319,6 +321,7 @@ typedef struct request_element
     bool stop_after_write;
     bool stop_now;
     int id;
+    int bs;
     int infd;
     int outfd;
     int outregfd;
@@ -419,6 +422,7 @@ static struct global_collection gcoll;
 static struct timeval start_tm;
 static int num_threads = DEF_NUM_THREADS;
 static bool after1 = false;
+static int listen_t_tid;
 
 static const char * my_name = "sg_mrq_dd: ";
 
@@ -576,6 +580,8 @@ page3:
             "below:\n\n"
             "    00          use all zeros instead of if=IFILE (only in "
             "iflag)\n"
+            "    00,ff       generates blocks that contain own (32 bit be) "
+            "blk addr\n"
             "    append      append output to OFILE (assumes OFILE is "
             "regular file)\n"
             "    coe         continue of error (reading, fills with zeros)\n"
@@ -1051,7 +1057,7 @@ interrupt_handler(int sig)
     if (do_time > 0)
         calc_duration_throughput(0);
     print_stats("");
-    kill(getpid (), sig);
+    kill(getpid(), sig);
 }
 
 static void
@@ -1388,11 +1394,11 @@ static int
 scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int res;
-    uint8_t rcBuff[RCAP16_REPLY_LEN];
+    uint8_t rcBuff[RCAP16_REPLY_LEN] = {};
 
     res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, false, 0);
     if (0 != res)
-        return res;
+        goto bad;
 
     if ((0xff == rcBuff[0]) && (0xff == rcBuff[1]) && (0xff == rcBuff[2]) &&
         (0xff == rcBuff[3])) {
@@ -1400,7 +1406,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         res = sg_ll_readcap_16(sg_fd, 0, 0, rcBuff, RCAP16_REPLY_LEN, false,
                                0);
         if (0 != res)
-            return res;
+            goto bad;
         *num_sect = sg_get_unaligned_be64(rcBuff + 0) + 1;
         *sect_sz = sg_get_unaligned_be32(rcBuff + 8);
     } else {
@@ -1409,6 +1415,10 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         *sect_sz = sg_get_unaligned_be32(rcBuff + 4);
     }
     return 0;
+bad:
+    *num_sect = 0;
+    *sect_sz = 0;
+    return res;
 }
 
 /* Return of 0 -> success, -1 -> failure. BLKGETSIZE64, BLKGETSIZE and */
@@ -1476,6 +1486,7 @@ sig_listen_thread(struct global_collection * clp)
 
     tsp->tv_sec = ict_ms / 1000;
     tsp->tv_nsec = (ict_ms % 1000) * 1000 * 1000;   /* DEF_SDT_ICT_MS */
+    listen_t_tid = gettid();    // to facilitate sending SIGUSR2 to exit
     while (1) {
         sig_number = sigtimedwait(&signal_set, NULL, tsp);
         if (sig_number < 0) {
@@ -1508,9 +1519,11 @@ sig_listen_thread(struct global_collection * clp)
             raise(SIGINT);
             break;
         }
-        if (SIGUSR2 == sig_number)
+        if (SIGUSR2 == sig_number) {
+            if (clp->verbose > 2)
+                pr2serr_lk("%s: SIGUSR2 received\n", __func__);
             break;
-        if (shutting_down)
+        } if (shutting_down)
             break;
     }           /* end of while loop */
     if (clp->verbose > 3)
@@ -1589,6 +1602,7 @@ read_write_thread(struct global_collection * clp, int thr_idx, int slice_idx,
     out_mmap = (out_is_sg && (clp->out_flags.mmap > 0));
     rep->clp = clp;
     rep->id = thr_idx;
+    rep->bs = clp->bs;
 
     if (in_is_sg && out_is_sg)
         rep->both_sg = true;
@@ -1894,14 +1908,22 @@ normal_in_rd(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
         long rn;
         uint8_t * bp;
 
-        if (clp->in_flags.zero)
-            memset(rep->buffp + d_boff, 0, blocks * clp->bs);
+        if (clp->in_flags.zero && clp->in_flags.ff && (rep->bs >= 4)) {
+            uint32_t pos = (uint32_t)lba;
+            uint off;
+
+            for (k = 0, off = 0; k < blocks; ++k, off += rep->bs, ++pos) {
+                for (j = 0; j < (rep->bs - 3); j += 4)
+                    sg_put_unaligned_be32(pos, rep->buffp + off + j);
+            }
+        } else if (clp->in_flags.zero)
+            memset(rep->buffp + d_boff, 0, blocks * rep->bs);
         else if (clp->in_flags.ff)
-            memset(rep->buffp + d_boff, 0xff, blocks * clp->bs);
+            memset(rep->buffp + d_boff, 0xff, blocks * rep->bs);
         else {
             bp = rep->buffp + d_boff;
-            for (k = 0; k < blocks; ++k, bp += clp->bs) {
-                for (j = 0; j < clp->bs; j += jbump) {
+            for (k = 0; k < blocks; ++k, bp += rep->bs) {
+                for (j = 0; j < rep->bs; j += jbump) {
                     /* mrand48 takes uniformly from [-2^31, 2^31) */
 #ifdef HAVE_SRAND48_R
                     mrand48_r(&rep->drand, &rn);
@@ -1916,7 +1938,7 @@ normal_in_rd(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
     }
 
     if (clp->in_type != FT_FIFO) {
-        int64_t pos = lba * clp->bs;
+        int64_t pos = lba * rep->bs;
 
         if (rep->in_follow_on != pos) {
             if (lseek64(rep->infd, pos, SEEK_SET) < 0) {
@@ -1929,18 +1951,18 @@ normal_in_rd(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
         }
     }
     bp = rep->buffp + d_boff;
-    while (((res = read(rep->infd, bp, blocks * clp->bs)) < 0) &&
+    while (((res = read(rep->infd, bp, blocks * rep->bs)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
         err = errno;
         if (clp->in_flags.coe) {
-            memset(bp, 0, blocks * clp->bs);
+            memset(bp, 0, blocks * rep->bs);
             pr2serr_lk("[%d] %s : >> substituted zeros for in blk=%" PRId64
                       " for %d bytes, %s\n", id, __func__, lba,
-                       blocks * clp->bs,
+                       blocks * rep->bs,
                        tsafe_strerror(err, strerr_buff));
-            res = blocks * clp->bs;
+            res = blocks * rep->bs;
         } else {
             pr2serr_lk("[%d] %s: error in normal read, %s\n", id, __func__,
                        tsafe_strerror(err, strerr_buff));
@@ -1948,11 +1970,11 @@ normal_in_rd(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
         }
     }
     rep->in_follow_on += res;
-    if (res < blocks * clp->bs) {
-        blocks = res / clp->bs;
-        if ((res % clp->bs) > 0) {
+    if (res < blocks * rep->bs) {
+        blocks = res / rep->bs;
+        if ((res % rep->bs) > 0) {
             rep->in_local_partial++;
-            rep->in_resid_bytes = res % clp->bs;
+            rep->in_resid_bytes = res % rep->bs;
         }
     }
     return blocks;
@@ -1974,7 +1996,7 @@ normal_out_wr(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
                     __func__, lba, blocks, d_boff);
 
     if (clp->in_type != FT_FIFO) {
-        int64_t pos = lba * clp->bs;
+        int64_t pos = lba * rep->bs;
 
         if (rep->out_follow_on != pos) {
             if (lseek64(rep->outfd, pos, SEEK_SET) < 0) {
@@ -1986,7 +2008,7 @@ normal_out_wr(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
             rep->out_follow_on = pos;
         }
     }
-    while (((res = write(rep->outfd, bp, blocks * clp->bs))
+    while (((res = write(rep->outfd, bp, blocks * rep->bs))
             < 0) && ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
@@ -1994,8 +2016,8 @@ normal_out_wr(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
         if (clp->out_flags.coe) {
             pr2serr_lk("[%d] %s: >> ignored error for out lba=%" PRId64
                        " for %d bytes, %s\n", id, __func__, lba,
-                       blocks * clp->bs, tsafe_strerror(err, strerr_buff));
-            res = blocks * clp->bs;
+                       blocks * rep->bs, tsafe_strerror(err, strerr_buff));
+            res = blocks * rep->bs;
         }
         else {
             pr2serr_lk("[%d] %s: error normal write, %s\n", id, __func__,
@@ -2004,9 +2026,9 @@ normal_out_wr(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
         }
     }
     rep->out_follow_on += res;
-    if (res < blocks * clp->bs) {
-        blocks = res / clp->bs;
-        if ((res % clp->bs) > 0) {
+    if (res < blocks * rep->bs) {
+        blocks = res / rep->bs;
+        if ((res % rep->bs) > 0) {
             blocks++;
             rep->out_local_partial++;
         }
@@ -2236,12 +2258,12 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
             cat = SG_LIB_CAT_OTHER;
         if (ok && f1) {
             ++n_good;
-            if (a_v4p->dout_xfer_len >= (uint32_t)clp->bs)
+            if (a_v4p->dout_xfer_len >= (uint32_t)rep->bs)
                 good_outblks += (a_v4p->dout_xfer_len - a_v4p->dout_resid) /
-                                clp->bs;
-            if (a_v4p->din_xfer_len >= (uint32_t)clp->bs)
+                                rep->bs;
+            if (a_v4p->din_xfer_len >= (uint32_t)rep->bs)
                 good_inblks += (a_v4p->din_xfer_len - a_v4p->din_resid) /
-                               clp->bs;
+                               rep->bs;
         }
         if (! ok) {
             if ((a_v4p->dout_xfer_len > 0) || (! clp->in_flags.coe))
@@ -2333,12 +2355,12 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         t_v4p->flags = rflags;
         t_v4p->request_len = cdbsz;
         if (is_wr) {
-            t_v4p->dout_xfer_len = num * clp->bs;
-            t_v4p->dout_xferp = (uint64_t)(dp + (q_blks * clp->bs));
+            t_v4p->dout_xfer_len = num * rep->bs;
+            t_v4p->dout_xferp = (uint64_t)(dp + (q_blks * rep->bs));
             t_v4p->din_xfer_len = 0;
         } else {
-            t_v4p->din_xfer_len = num * clp->bs;
-            t_v4p->din_xferp = (uint64_t)(dp + (q_blks * clp->bs));
+            t_v4p->din_xfer_len = num * rep->bs;
+            t_v4p->din_xferp = (uint64_t)(dp + (q_blks * rep->bs));
             t_v4p->dout_xfer_len = 0;
         }
         t_v4p->timeout = clp->cmd_timeout;
@@ -2457,13 +2479,13 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
         if (is_wr) {
             rep->a_mrq_dout_blks += num;
-            t_v4p->dout_xfer_len = num * clp->bs;
-            t_v4p->dout_xferp = (uint64_t)(dp + (mrq_q_blks * clp->bs));
+            t_v4p->dout_xfer_len = num * rep->bs;
+            t_v4p->dout_xferp = (uint64_t)(dp + (mrq_q_blks * rep->bs));
             t_v4p->din_xfer_len = 0;
         } else {
             rep->a_mrq_din_blks += num;
-            t_v4p->din_xfer_len = num * clp->bs;
-            t_v4p->din_xferp = (uint64_t)(dp + (mrq_q_blks * clp->bs));
+            t_v4p->din_xfer_len = num * rep->bs;
+            t_v4p->din_xferp = (uint64_t)(dp + (mrq_q_blks * rep->bs));
             t_v4p->dout_xfer_len = 0;
         }
         t_v4p->timeout = clp->cmd_timeout;
@@ -2621,7 +2643,7 @@ do_normal_normal_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         kk = min<int>(seg_blks, clp->bpt);
         num = i_sg_it.linear_for_n_blks(kk);
         res = normal_in_rd(rep, i_sg_it.current_lba(), num,
-                           d_off * clp->bs);
+                           d_off * rep->bs);
         if (res < 0) {
             pr2serr_lk("[%d] %s: normal in failed d_off=%d, err=%d\n",
                        id, __func__, d_off, -res);
@@ -2644,7 +2666,7 @@ do_normal_normal_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         kk = min<int>(seg_blks, clp->bpt);
         num = o_sg_it.linear_for_n_blks(kk);
         res = normal_out_wr(rep, o_sg_it.current_lba(), num,
-                            d_off * clp->bs);
+                            d_off * rep->bs);
         if (res < num) {
             if (res < 0) {
                 pr2serr_lk("[%d] %s: normal out failed d_off=%d, err=%d\n",
@@ -2660,7 +2682,7 @@ do_normal_normal_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         }
     }
     if (rep->in_resid_bytes > 0) {
-        res = extra_out_wr(rep, rep->in_resid_bytes, d_off * clp->bs);
+        res = extra_out_wr(rep, rep->in_resid_bytes, d_off * rep->bs);
         if (res < 0)
             pr2serr_lk("[%d] %s: extr out failed d_off=%d, err=%d\n", id,
                        __func__, d_off, -res);
@@ -2710,7 +2732,7 @@ do_normal_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
             kk = min<int>(seg_blks, clp->bpt);
             num = i_sg_it.linear_for_n_blks(kk);
             res = normal_in_rd(rep, i_sg_it.current_lba(), num,
-                               d_off * clp->bs);
+                               d_off * rep->bs);
             if (res < 0) {
                 pr2serr_lk("[%d] %s: normal in failed d_off=%d, err=%d\n",
                            id, __func__, d_off, -res);
@@ -2774,7 +2796,7 @@ do_normal_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
             kk = min<int>(seg_blks, clp->bpt);
             num = o_sg_it.linear_for_n_blks(kk);
             res = normal_out_wr(rep, o_sg_it.current_lba(), num,
-                                d_off * clp->bs);
+                                d_off * rep->bs);
             if (res < num) {
                 if (res < 0) {
                     pr2serr_lk("[%d] %s: normal out failed d_off=%d, err=%d\n",
@@ -2888,7 +2910,7 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->flags = iflags;
         t_v4p->request_len = cdbsz;
-        t_v4p->din_xfer_len = num * clp->bs;
+        t_v4p->din_xfer_len = num * rep->bs;
         t_v4p->dout_xfer_len = 0;
         t_v4p->timeout = clp->cmd_timeout;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
@@ -2940,7 +2962,7 @@ mrq0_again:
         t_v4p->flags = oflags;
         t_v4p->request_len = cdbsz;
         t_v4p->din_xfer_len = 0;
-        t_v4p->dout_xfer_len = num * clp->bs;
+        t_v4p->dout_xfer_len = num * rep->bs;
         t_v4p->timeout = clp->cmd_timeout;
         t_v4p->request_extra = pack_id_base + ++rep->mrq_pack_id_off;
         clp->most_recent_pack_id.store(t_v4p->request_extra);
@@ -3072,7 +3094,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->response = (uint64_t)rep->sb;
         t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
-        t_v4p->din_xfer_len = num * clp->bs;
+        t_v4p->din_xfer_len = num * rep->bs;
         rep->a_mrq_din_blks += num;
         t_v4p->dout_xfer_len = 0;
         t_v4p->timeout = clp->cmd_timeout;
@@ -3100,7 +3122,7 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         t_v4p->max_response_len = sizeof(rep->sb);
         t_v4p->usr_ptr = (uint64_t)&a_cdb[a_cdb.size() - 1];
         t_v4p->din_xfer_len = 0;
-        t_v4p->dout_xfer_len = num * clp->bs;
+        t_v4p->dout_xfer_len = num * rep->bs;
         rep->a_mrq_dout_blks += num;
         t_v4p->timeout = clp->cmd_timeout;
         out_mrq_q_blks += num;
@@ -4100,6 +4122,9 @@ do_count_work(struct global_collection * clp, const char * inf,
             return SG_LIB_CAT_OTHER;
         }
     } else if (clp->dd_count != 0) { /* and both input and output are soft */
+        int64_t iposs = INT64_MAX;
+        int64_t oposs = INT64_MAX;
+
         if (clp->dd_count > 0) {
             if (isglp->sum > clp->dd_count) {
                 pr2serr("%sskip sgl sum [%" PRId64 "] exceeds COUNT\n",
@@ -4115,9 +4140,6 @@ do_count_work(struct global_collection * clp, const char * inf,
         }
 
         /* clp->dd_count == SG_COUNT_INDEFINITE */
-        int64_t iposs = INT64_MAX;
-        int64_t oposs = INT64_MAX;
-
         if (in_num_sect > 0)
             iposs = in_num_sect + isglp->sum - isglp->high_lba_p1;
         if (out_num_sect > 0)
@@ -4166,8 +4188,8 @@ main(int argc, char * argv[])
     const char * cc2p;
     struct global_collection * clp = &gcoll;
     thread sig_listen_thr;
-    vector<thread> work_thr;
-    vector<thread> listen_thr;
+    vector<thread> work_thr_v;
+    vector<thread> listen_thr_v;
     char ebuff[EBUFF_SZ];
 #if 0   /* SG_LIB_ANDROID */
     struct sigaction actions;
@@ -4277,7 +4299,10 @@ main(int argc, char * argv[])
     }
     clp->in0fd = STDIN_FILENO;
     clp->out0fd = STDOUT_FILENO;
-    if (clp->in_flags.ff) {
+    if (clp->in_flags.ff && clp->in_flags.zero) {
+        ccp = "<addr_as_data>";
+        cc2p = "addr_as_data";
+    } else if (clp->in_flags.ff) {
         ccp = "<0xff bytes>";
         cc2p = "ff";
     } else if (clp->in_flags.random) {
@@ -4488,7 +4513,7 @@ main(int argc, char * argv[])
         goto fini;
     }
 
-    listen_thr.emplace_back(sig_listen_thread, clp);
+    listen_thr_v.emplace_back(sig_listen_thread, clp);
 
     if (do_time) {
         start_tm.tv_sec = 0;
@@ -4504,14 +4529,14 @@ main(int argc, char * argv[])
         cvp.out_fd = clp->out0fd;
 
         /* launch "infant" thread to catch early mortality, if any */
-        work_thr.emplace_back(read_write_thread, clp, 0, 0, true);
+        work_thr_v.emplace_back(read_write_thread, clp, 0, 0, true);
         {
             unique_lock<mutex> lk(clp->infant_mut);
             clp->infant_cv.wait(lk, []{ return gcoll.processed; });
         }
         if (clp->cp_ver_arr[0].next_count_pos.load() < 0) {
             /* infant thread error-ed out, join with it */
-            for (auto & t : work_thr) {
+            for (auto & t : work_thr_v) {
                 if (t.joinable())
                     t.join();
             }
@@ -4520,15 +4545,15 @@ main(int argc, char * argv[])
 
         /* now start the rest of the threads */
         for (k = 1; k < num_threads; ++k)
-            work_thr.emplace_back(read_write_thread, clp, k,
+            work_thr_v.emplace_back(read_write_thread, clp, k,
                                   k % (int)num_slices, false);
 
         /* now wait for worker threads to finish */
-        for (auto & t : work_thr) {
+        for (auto & t : work_thr_v) {
             if (t.joinable())
                 t.join();
         }
-    }   /* started worker threads and hereafter they have all exited */
+    }   /* worker threads hereafter have all exited */
 jump:
     if (do_time && (start_tm.tv_sec || start_tm.tv_usec))
         calc_duration_throughput(0);
@@ -4549,15 +4574,22 @@ jump:
     }
 
     shutting_down = true;
-    for (auto & t : listen_thr) {
+    for (auto & t : listen_thr_v) {
         if (t.joinable()) {
             t.detach();
-            t.~thread();        /* kill listening thread */
+            if (listen_t_tid > 0)
+                kill(listen_t_tid, SIGUSR2);
+            // t.~thread();        /* kill listening thread; doesn't work */
+        }
+        std::this_thread::yield();      // not enough it seems
+        {   /* allow time for SIGUSR2 signal to get through */
+            struct timespec tspec = {0, 400000}; /* 400 usecs */
+
+            nanosleep(&tspec, NULL);
         }
     }
 
 fini:
-
     if ((STDIN_FILENO != clp->in0fd) && (clp->in0fd >= 0))
         close(clp->in0fd);
     if ((STDOUT_FILENO != clp->out0fd) && (FT_DEV_NULL != clp->out_type) &&

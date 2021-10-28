@@ -78,9 +78,9 @@
  *                    sg device)
  *
  *      001208   Add Kurt Garloff's "-uno" flag for displaying info
- *               from a page number. <garloff at suse dot de> [version 1.90]
+ *               from a page number. [version 1.90]
  *
- * Kurt Garloff <garloff at suse dot de>
+ * Kurt Garloff
  *    20000715  allow displaying and modification of vendor specific pages
  *                      (unformatted - @ hexdatafield)
  *              accept vendor lengths for those pages

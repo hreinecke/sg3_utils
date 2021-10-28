@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.52 20210802";    /* ses4r04 */
+static const char * version_str = "2.53 20211022";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -742,6 +742,7 @@ static bool active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
 /* Command line long option names with corresponding short letter. */
 static struct option long_options[] = {
     {"all", no_argument, 0, 'a'},
+    {"ALL", no_argument, 0, 'z'},
     {"byte1", required_argument, 0, 'b'},
     {"clear", required_argument, 0, 'C'},
     {"control", no_argument, 0, 'c'},
@@ -1149,7 +1150,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         int option_index = 0;
 
         c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:qrRs"
-                        "S:vVwx:", long_options, &option_index);
+                        "S:vVwx:z", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1367,6 +1368,10 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'X':       /* --inhex=FN for compatibility with other utils */
             inhex_arg = optarg;
             op->do_data = true;
+            break;
+        case 'z':       /* --ALL and -z are synonyms for '--join --join' */
+            /* -A already used for --sas-addr=SA shortened form */
+            op->do_join += 2;
             break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
@@ -3040,10 +3045,14 @@ threshold_helper(const char * header, const char * pad,
     case 0x4:  /*temperature */
         if (header)
             printf("%s", header);
-        printf("%shigh critical=%s, high warning=%s\n", pad,
+        printf("%shigh critical=%s, high warning=%s", pad,
                reserved_or_num(b, 128, tp[0] - TEMPERAT_OFF, -TEMPERAT_OFF),
                reserved_or_num(b2, 128, tp[1] - TEMPERAT_OFF, -TEMPERAT_OFF));
-        printf("%slow warning=%s, low critical=%s (in Celsius)\n", pad,
+        if (op->do_filter && (0 == tp[2]) && (0 == tp[3])) {
+            printf(" (in Celsius)\n");
+            break;
+        }
+        printf("\n%slow warning=%s, low critical=%s (in Celsius)\n", pad,
                reserved_or_num(b, 128, tp[2] - TEMPERAT_OFF, -TEMPERAT_OFF),
                reserved_or_num(b2, 128, tp[3] - TEMPERAT_OFF, -TEMPERAT_OFF));
         break;

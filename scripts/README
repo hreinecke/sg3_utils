@@ -6,9 +6,8 @@ This directory contains bash shell scripts. Most of them call one or
 more utilities from the sg3_utils package. They assume the sg3_utils
 package utilities are on the PATH of the user.
 
-rescan-scsi-bus.sh is written by Kurt Garloff (see
-http://www.garloff.de/kurt/linux/ under the "Rescan SCSI bus" heading)
-with patches from Hannes Reinecke.
+rescan-scsi-bus.sh is written by Kurt Garloff (formerly from Suse Labs)
+with patches from Hannes Reinecke (Suse) and Redhat.
 
 scsi_logging_level is written by Andreas Herrmann <aherrman at de dot ibm
 dot com>. It sets the logging level of the SCSI subsystem in the Linux
@@ -53,4 +52,4 @@ the sdparm package in its scripts directory.
 /dev/disk/by-id/wwn-0x5001501234567890-part1.
 
 Douglas Gilbert
-8th March 2014
+4th October 2021

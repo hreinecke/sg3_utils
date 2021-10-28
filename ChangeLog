@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20211001] [svn: r915]
+Changelog for pre-release sg3_utils-1.47 [20211028] [svn: r916]
   - transport error handling improved. To fix report of a
     BAD_TARGET transport error but the utility still continued.
     - introduce SG_LIB_TRANSPORT_ERROR [35] exit status
@@ -20,6 +20,10 @@ Changelog for pre-release sg3_utils-1.47 [20211001] [svn: r915]
   - sg_dd, sgm_dd, sgp_dd: don't close negative file descriptors
   - sg_dd: srand48_r() and mrand48_r() are GNU libc specific,
     put conditional in so non-reentrant version used otherwise
+    - 'iflag=00,ff' places the 32 bit block address (big endian)
+      into each block
+  - sgp_dd: major rework
+    - new: --chkaddr which checks for block address in each block
   - sg_xcopy: tweak CSCD identification descriptor
   - sg_get_elem_status: fix issue with '--maxlen=' option
     - add 2 depopulation revocation health attributes [sbc5r01]

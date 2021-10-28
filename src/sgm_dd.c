@@ -69,7 +69,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.68 20210601";
+static const char * version_str = "1.17 20211024";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -116,6 +116,7 @@ static int64_t out_full = 0;
 static int out_partial = 0;
 static int verbose = 0;
 static int dry_run = 0;
+static int progress = 0;        /* accept --progress or -p, does nothing */
 
 static bool do_time = false;
 static bool start_tm_valid = false;
@@ -338,7 +339,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         *num_sect = (int64_t)ui + 1;
         *sect_sz = sg_get_unaligned_be32(rcBuff + 4);
     }
-    if (verbose)
+    if (verb)
         pr2serr("      number of blocks=%" PRId64 " [0x%" PRIx64 "], block "
                 "size=%d\n", *num_sect, *num_sect, *sect_sz);
     return 0;
@@ -363,7 +364,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
             return -1;
         }
         *num_sect = ((int64_t)ull / (int64_t)*sect_sz);
-        if (verbose)
+        if (verbose > 1)
             pr2serr("      [bgs64] number of blocks=%" PRId64 " [0x%" PRIx64
                     "], logical block size=%d\n", *num_sect, *num_sect,
                     *sect_sz);
@@ -375,7 +376,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
             return -1;
         }
         *num_sect = (int64_t)ul;
-        if (verbose)
+        if (verbose > 1)
             pr2serr("      [bgs] number of blocks=%" PRId64 " [0x%" PRIx64
                     "], logical block size=%d\n", *num_sect, *num_sect,
                     *sect_sz);
@@ -881,6 +882,9 @@ main(int argc, char * argv[])
                 usage();
                 return 0;
             }
+            n = num_chs_in_str(key + 1, keylen - 1, 'p');
+            progress += n;
+            res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'v');
             verbose += n;
             res += n;
@@ -900,7 +904,9 @@ main(int argc, char * argv[])
                  (0 == strcmp(key, "-?"))) {
             usage();
             return 0;
-        } else if (0 == strncmp(key, "--verb", 6))
+        } else if (0 == strncmp(key, "--prog", 6))
+            ++progress;
+        else if (0 == strncmp(key, "--verb", 6))
             ++verbose;
         else if (0 == strncmp(key, "--vers", 6))
             version_given = true;
@@ -972,7 +978,7 @@ main(int argc, char * argv[])
     outfd = STDOUT_FILENO;
     if (inf[0] && ('-' != inf[0])) {
         in_type = dd_filetype(inf);
-        if (verbose)
+        if (verbose > 1)
             pr2serr(" >> Input file type: %s\n",
                     dd_filetype_str(in_type, ebuff));
 
@@ -1054,7 +1060,7 @@ main(int argc, char * argv[])
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
-                if (verbose)
+                if (verbose > 1)
                     pr2serr("  >> skip: lseek64 SEEK_SET, byte offset=0x%"
                             PRIx64 "\n", (uint64_t)offset);
             }
@@ -1063,7 +1069,7 @@ main(int argc, char * argv[])
 
     if (outf[0] && ('-' != outf[0])) {
         out_type = dd_filetype(outf);
-        if (verbose)
+        if (verbose > 1)
             pr2serr(" >> Output file type: %s\n",
                     dd_filetype_str(out_type, ebuff));
 
@@ -1159,7 +1165,7 @@ main(int argc, char * argv[])
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
-                if (verbose)
+                if (verbose > 1)
                     pr2serr("   >> seek: lseek64 SEEK_SET, byte offset=0x%"
                             PRIx64 "\n", (uint64_t)offset);
             }

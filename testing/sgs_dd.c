@@ -84,7 +84,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.20 20210727";
+static const char * version_str = "4.21 20211006";
 static const char * my_name = "sgs_dd";
 
 #ifndef SGV4_FLAG_HIPRI
@@ -1201,8 +1201,10 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->tag = true;
         else if (0 == strcmp(cp, "v3")) {
             fp->v3 = true;
+            fp->v4 = false;
             fp->given_v3v4 = true;
         } else if (0 == strcmp(cp, "v4")) {
+            fp->v3 = false;
             fp->v4 = true;
             fp->given_v3v4 = true;
         } else {
@@ -1251,6 +1253,8 @@ main(int argc, char * argv[])
     clp->bpt = 0;
     clp->in_evfd = -1;
     clp->out_evfd = -1;
+    clp->iflag.v3 = true;
+    clp->oflag.v3 = true;
     inf[0] = '\0';
     outf[0] = '\0';
     if (argc < 2) {
@@ -1288,7 +1292,9 @@ main(int argc, char * argv[])
                 pr2serr("%s: bad argument to 'iflag='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key,"no_sig")) { /* default changes */
+        } else if (strcmp(key,"mrq") == 0)
+            ;           /* do nothing */
+        else if (0 == strcmp(key,"no_sig")) { /* default changes */
             clp->no_sig = !!sg_get_num(buf);
             no_sig_given = true;
         } else if (0 == strcmp(key,"obs"))
@@ -1309,6 +1315,8 @@ main(int argc, char * argv[])
             seek = sg_get_num(buf);
         else if (0 == strcmp(key,"skip"))
             skip = sg_get_num(buf);
+        else if (0 == strcmp(key,"time"))
+            ;           /* do nothing */
         else if ((0 == strcmp(key,"-V")) || (0 == strcmp(key,"--version"))) {
             pr2serr("%s: version: %s\n", my_name, version_str);
             return 0;
@@ -1499,9 +1507,11 @@ main(int argc, char * argv[])
         }
     }
     if ((clp->in_is_sg || clp->out_is_sg) && !clp->iflag.given_v3v4 &&
-        !clp->oflag.given_v3v4 && (clp->debug > 0))
+        !clp->oflag.given_v3v4 && (clp->debug > 0)) {
+        clp->iflag.v3 = true;
         pr2serr("using sg driver version 3 interface on %s\n",
                 clp->in_is_sg ? inf : outf);
+    }
 
     if (0 == count)
         return 0;

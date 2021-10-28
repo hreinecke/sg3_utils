@@ -1796,7 +1796,7 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
 {
     bool descriptor_format = false;
     bool sdat_ovfl = false;
-    bool valid;
+    bool valid_info_fld;
     int len, progress, n, r, pr, rem, blen;
     unsigned int info;
     uint8_t resp_code;
@@ -1820,7 +1820,7 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
             return n;
     }
     resp_code = 0x7f & sbp[0];
-    valid = !!(sbp[0] & 0x80);
+    valid_info_fld = !!(sbp[0] & 0x80);
     len = sb_len;
     if (sg_scsi_normalize_sense(sbp, sb_len, &ssh)) {
         switch (ssh.response_code) {
@@ -1882,7 +1882,7 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
                 r += sg_scnpr(b + r, blen - r, "%s", lip);
             if (len > 6) {
                 info = sg_get_unaligned_be32(sbp + 3);
-                if (valid)
+                if (valid_info_fld)
                     r += sg_scnpr(b + r, blen - r, "  Info fld=0x%x [%u] ",
                                   info, info);
                 else if (info > 0)
@@ -1901,7 +1901,7 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
                    r += sg_scnpr(b + r, blen - r, " ILI");
                             /* incorrect block length requested */
                 r += sg_scnpr(b + r, blen - r, "\n");
-            } else if (valid || (info > 0))
+            } else if (valid_info_fld || (info > 0))
                 r += sg_scnpr(b + r, blen - r, "\n");
             if ((len >= 14) && sbp[14])
                 r += sg_scnpr(b + r, blen - r, "%s  Field replaceable unit "
@@ -1984,16 +1984,16 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
         r += sg_scnpr(b + r, blen - r, "Probably uninitialized data.\n%s  "
                       "Try to view as SCSI-1 non-extended sense:\n", lip);
         r += sg_scnpr(b + r, blen - r, "  AdValid=%d  Error class=%d  Error "
-                      "code=%d\n", valid, ((sbp[0] >> 4) & 0x7),
+                      "code=%d\n", valid_info_fld, ((sbp[0] >> 4) & 0x7),
                       (sbp[0] & 0xf));
-        if (valid)
+        if (valid_info_fld)
             sg_scnpr(b + r, blen - r, "%s  lba=0x%x\n", lip,
                      sg_get_unaligned_be24(sbp + 1) & 0x1fffff);
         n += sg_scnpr(cbp + n, cblen - n, "%s\n", b);
     }
 check_raw:
     if (raw_sinfo) {
-        int embed_len;
+        int calculated_len;
         char z[64];
 
         n += sg_scnpr(cbp + n, cblen - n, "%s Raw sense data (in hex), "
@@ -2001,18 +2001,18 @@ check_raw:
         if (n >= (cblen - 1))
             return n;
         if ((sb_len > 7) && (sbp[0] >= 0x70) && (sbp[0] < 0x74)) {
-            embed_len = sbp[7] + 8;
-            n += sg_scnpr(cbp + n, cblen - n, ", embedded_len=%d\n",
-                          embed_len);
+            calculated_len = sbp[7] + 8;
+            n += sg_scnpr(cbp + n, cblen - n, ", calculated_len=%d\n",
+                          calculated_len);
         } else {
-            embed_len = sb_len;
+            calculated_len = sb_len;
             n += sg_scnpr(cbp + n, cblen - n, "\n");
         }
         if (n >= (cblen - 1))
             return n;
 
         sg_scnpr(z, sizeof(z), "%.50s        ", lip);
-        n += hex2str(sbp, embed_len, z,  -1, cblen - n, cbp + n);
+        n += hex2str(sbp, calculated_len, z,  -1, cblen - n, cbp + n);
     }
     return n;
 }

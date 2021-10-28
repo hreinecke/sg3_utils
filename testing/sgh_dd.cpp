@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.16 20210906";
+static const char * version_str = "2.18 20211027";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -253,6 +253,7 @@ struct global_collection
     int fail_mask;
     int verbose;
     int dry_run;
+    int chkaddr;
     bool aen_given;
     bool cdbsz_given;
     bool is_mrq_i;
@@ -292,6 +293,7 @@ typedef struct request_element
     bool only_out_sg;
     // bool mrq_abort_thread_active;
     int id;
+    int bs;
     int infd;
     int outfd;
     int out2fd;
@@ -509,7 +511,6 @@ usage(int pg_num)
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
             "    --help|-h      output this usage message then exit\n"
-            "    --prefetch|-p    with verify: do pre-fetch first\n"
             "    --verify|-x    do a verify (compare) operation [def: do a "
             "copy]\n"
             "    --version|-V   output version string then exit\n\n"
@@ -576,7 +577,12 @@ page2:
             "close do\n"
             "                file unshare (default)\n"
             "    verbose     increase verbosity\n"
+            "    --chkaddr|-c    exits if read block does not contain "
+            "32 bit block\n"
+            "                    address, used once only checks first "
+            "address in block\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
+            "    --prefetch|-p    with verify: do pre-fetch first\n"
             "    --verbose|-v   increase verbosity of utility\n\n"
             "Use '-hhh' or '-hhhh' for more information about flags.\n"
            );
@@ -587,6 +593,8 @@ page3:
             "below:\n\n"
             "    00          use all zeros instead of if=IFILE (only in "
             "iflags)\n"
+            "    00,ff       generates blocks that contain own (32 bit be) "
+            "blk address\n"
             "    append      append output to OFILE (assumes OFILE is "
             "regular file)\n"
             "    coe         continue of error (reading, fills with zeros)\n"
@@ -1138,7 +1146,7 @@ static int
 scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 {
     int res;
-    uint8_t rcBuff[RCAP16_REPLY_LEN];
+    uint8_t rcBuff[RCAP16_REPLY_LEN] = {};
 
     res = sg_ll_readcap_10(sg_fd, 0, 0, rcBuff, READ_CAP_REPLY_LEN, false, 0);
     if (0 != res)
@@ -1262,8 +1270,11 @@ sig_listen_thread(void * v_clp)
             raise(SIGINT);
             break;
         }
-        if (SIGUSR2 == sig_number)
+        if (SIGUSR2 == sig_number) {
+            if (clp->verbose > 2)
+                pr2serr_lk("%s: interrupted by SIGUSR2\n", __func__);
             break;
+        }
         if (shutting_down)
             break;
     }           /* end of while loop */
@@ -1474,7 +1485,7 @@ read_write_thread(void * v_tip)
     struct global_collection * clp;
     Rq_elem rel {};
     Rq_elem * rep = &rel;
-    int n, sz, blocks, status, vb, err, res, wr_blks;
+    int n, sz, blocks, status, vb, err, res, wr_blks, c_addr;
     int num_sg = 0;
     int64_t my_index;
     volatile bool stop_after_write = false;
@@ -1488,7 +1499,9 @@ read_write_thread(void * v_tip)
     tip = (Thread_info *)v_tip;
     clp = tip->gcp;
     vb = clp->verbose;
-    sz = clp->bpt * clp->bs;
+    rep->bs = clp->bs;
+    sz = clp->bpt * rep->bs;
+    c_addr = clp->chkaddr;
     in_is_sg = (FT_SG == clp->in_type);
     in_mmap = (in_is_sg && (clp->in_flags.mmap > 0));
     out_is_sg = (FT_SG == clp->out_type);
@@ -1664,6 +1677,26 @@ read_write_thread(void * v_tip)
             status = pthread_mutex_unlock(&clp->in_mutex);
             if (0 != status) err_exit(status, "unlock in_mutex");
         }
+        if (c_addr && (rep->bs > 3)) {
+            int k, j, off, num;
+            uint32_t addr = (uint32_t)rep->iblk;
+
+            num = (1 == c_addr) ? 4 : (rep->bs - 3);
+            for (k = 0, off = 0; k < blocks; ++k, ++addr, off += rep->bs) {
+                for (j = 0; j < num; j += 4) {
+                    if (addr != sg_get_unaligned_be32(rep->buffp + off + j))
+                        break;
+                }
+                if (j < num)
+                    break;
+            }
+            if (k < blocks) {
+                pr2serr("%s: chkaddr failure at addr=0x%x\n", __func__, addr);
+                exit_status = SG_LIB_CAT_MISCOMPARE;
+                ++num_miscompare;
+                stop_both(clp);
+            }
+        }
         pthread_cleanup_pop(0);
         ++rep->rep_count;
 
@@ -1705,7 +1738,7 @@ skip_force_out_sequence:
         pthread_cleanup_push(cleanup_out, (void *)clp);
         if (rep->outregfd >= 0) {
             res = write(rep->outregfd, get_buffp(rep),
-                        rep->clp->bs * rep->num_blks);
+                        rep->bs * rep->num_blks);
             err = errno;
             if (res < 0)
                 pr2serr_lk("%s: tid=%d: write(outregfd) failed: %s\n",
@@ -1856,13 +1889,21 @@ normal_in_rd(Rq_elem * rep, int blocks)
         long rn;
         uint8_t * bp;
 
-        if (clp->in_flags.zero)
-            memset(rep->buffp, 0, blocks * clp->bs);
+        if (clp->in_flags.zero && clp->in_flags.ff && (rep->bs >= 4)) {
+            uint32_t pos = (uint32_t)rep->iblk;
+            uint off;
+
+            for (k = 0, off = 0; k < blocks; ++k, off += rep->bs, ++pos) {
+                for (j = 0; j < (rep->bs - 3); j += 4)
+                    sg_put_unaligned_be32(pos, rep->buffp + off + j);
+            }
+        } else if (clp->in_flags.zero)
+            memset(rep->buffp, 0, blocks * rep->bs);
         else if (clp->in_flags.ff)
-            memset(rep->buffp, 0xff, blocks * clp->bs);
+            memset(rep->buffp, 0xff, blocks * rep->bs);
         else {
-            for (k = 0, bp = rep->buffp; k < blocks; ++k, bp += clp->bs) {
-                for (j = 0; j < clp->bs; j += jbump) {
+            for (k = 0, bp = rep->buffp; k < blocks; ++k, bp += rep->bs) {
+                for (j = 0; j < rep->bs; j += jbump) {
                     /* mrand48 takes uniformly from [-2^31, 2^31) */
 #ifdef HAVE_SRAND48_R
                     mrand48_r(&rep->drand, &rn);
@@ -1877,7 +1918,7 @@ normal_in_rd(Rq_elem * rep, int blocks)
         return stop_after_write;
     }
     if (! same_fds) {   /* each has own file pointer, so we need to move it */
-        int64_t pos = rep->iblk * clp->bs;
+        int64_t pos = rep->iblk * rep->bs;
 
         if (lseek64(rep->infd, pos, SEEK_SET) < 0) {    /* problem if pipe! */
             pr2serr_lk("%s: tid=%d: >> lseek64(%" PRId64 "): %s\n", __func__,
@@ -1887,19 +1928,19 @@ normal_in_rd(Rq_elem * rep, int blocks)
         }
     }
     /* enters holding in_mutex */
-    while (((res = read(clp->infd, rep->buffp, blocks * clp->bs)) < 0) &&
+    while (((res = read(clp->infd, rep->buffp, blocks * rep->bs)) < 0) &&
            ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
         char strerr_buff[STRERR_BUFF_LEN + 1];
 
         if (clp->in_flags.coe) {
-            memset(rep->buffp, 0, rep->num_blks * clp->bs);
+            memset(rep->buffp, 0, rep->num_blks * rep->bs);
             pr2serr_lk("tid=%d: >> substituted zeros for in blk=%" PRId64
                       " for %d bytes, %s\n", rep->id, rep->iblk,
-                       rep->num_blks * clp->bs,
+                       rep->num_blks * rep->bs,
                        tsafe_strerror(errno, strerr_buff));
-            res = rep->num_blks * clp->bs;
+            res = rep->num_blks * rep->bs;
         }
         else {
             pr2serr_lk("tid=%d: error in normal read, %s\n", rep->id,
@@ -1908,12 +1949,12 @@ normal_in_rd(Rq_elem * rep, int blocks)
             return true;
         }
     }
-    if (res < blocks * clp->bs) {
+    if (res < blocks * rep->bs) {
         // int o_blocks = blocks;
 
         stop_after_write = true;
-        blocks = res / clp->bs;
-        if ((res % clp->bs) > 0) {
+        blocks = res / rep->bs;
+        if ((res % rep->bs) > 0) {
             blocks++;
             clp->in_partial++;
         }
@@ -1938,7 +1979,7 @@ normal_out_wr(Rq_elem * rep, int blocks)
     if (clp->verbose > 4)
         pr2serr_lk("%s: tid=%d: oblk=%" PRIu64 ", blocks=%d\n", __func__,
                    rep->id, rep->oblk, blocks);
-    while (((res = write(clp->outfd, rep->buffp, blocks * clp->bs))
+    while (((res = write(clp->outfd, rep->buffp, blocks * rep->bs))
             < 0) && ((EINTR == errno) || (EAGAIN == errno)))
         std::this_thread::yield();/* another thread may be able to progress */
     if (res < 0) {
@@ -1947,9 +1988,9 @@ normal_out_wr(Rq_elem * rep, int blocks)
         if (clp->out_flags.coe) {
             pr2serr_lk("tid=%d: >> ignored error for out blk=%" PRId64
                        " for %d bytes, %s\n", rep->id, rep->oblk,
-                       rep->num_blks * clp->bs,
+                       rep->num_blks * rep->bs,
                        tsafe_strerror(errno, strerr_buff));
-            res = rep->num_blks * clp->bs;
+            res = rep->num_blks * rep->bs;
         }
         else {
             pr2serr_lk("tid=%d: error normal write, %s\n", rep->id,
@@ -1958,9 +1999,9 @@ normal_out_wr(Rq_elem * rep, int blocks)
             return;
         }
     }
-    if (res < blocks * clp->bs) {
-        blocks = res / clp->bs;
-        if ((res % clp->bs) > 0) {
+    if (res < blocks * rep->bs) {
+        blocks = res / rep->bs;
+        if ((res % rep->bs) > 0) {
             blocks++;
             clp->out_partial++;
         }
@@ -2095,10 +2136,10 @@ sg_in_rd_cmd(struct global_collection * clp, Rq_elem * rep,
                 stop_both(clp);
                 return;
             } else {
-                memset(get_buffp(rep), 0, rep->num_blks * clp->bs);
+                memset(get_buffp(rep), 0, rep->num_blks * rep->bs);
                 pr2serr_lk("tid=%d: >> substituted zeros for in blk=%" PRId64
                            " for %d bytes\n", rep->id, rep->iblk,
-                           rep->num_blks * clp->bs);
+                           rep->num_blks * rep->bs);
             }
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
@@ -2284,7 +2325,7 @@ split_upper:
                 goto fini;
             } else
                 pr2serr_lk(">> ignored error for %s blk=%" PRId64 " for %d "
-                           "bytes\n", wr_or_ver, rep->oblk, nblks * clp->bs);
+                           "bytes\n", wr_or_ver, rep->oblk, nblks * rep->bs);
 #if defined(__GNUC__)
 #if (__GNUC__ >= 7)
             __attribute__((fallthrough));
@@ -2420,12 +2461,12 @@ process_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
         }
         if (ok && f1) {
             ++n_good;
-            if (a_v4p->dout_xfer_len >= (uint32_t)clp->bs)
+            if (a_v4p->dout_xfer_len >= (uint32_t)rep->bs)
                 good_outblks += (a_v4p->dout_xfer_len - a_v4p->dout_resid) /
-                                clp->bs;
-            if (a_v4p->din_xfer_len >= (uint32_t)clp->bs)
+                                rep->bs;
+            if (a_v4p->din_xfer_len >= (uint32_t)rep->bs)
                 good_inblks += (a_v4p->din_xfer_len - a_v4p->din_resid) /
-                               clp->bs;
+                               rep->bs;
         }
     }   /* end of request array scan loop */
     if ((n_subm == num_mrq) || (vb < 3))
@@ -2536,12 +2577,12 @@ chk_mrq_response(Rq_elem * rep, const struct sg_io_v4 * ctl_v4p,
         }
         if (ok) {
             ++n_good;
-            if (a_np->dout_xfer_len >= (uint32_t)clp->bs)
+            if (a_np->dout_xfer_len >= (uint32_t)rep->bs)
                 good_outblks += (a_np->dout_xfer_len - a_np->dout_resid) /
-                                clp->bs;
-            if (a_np->din_xfer_len >= (uint32_t)clp->bs)
+                                rep->bs;
+            if (a_np->din_xfer_len >= (uint32_t)rep->bs)
                 good_inblks += (a_np->din_xfer_len - a_np->din_resid) /
-                               clp->bs;
+                               rep->bs;
         }
     }
     if ((n_subm == nrq) || (vb < 3))
@@ -3478,7 +3519,7 @@ sg_finish_io(bool wr, Rq_elem * rep, int pack_id, struct sg_io_extra *xtrp)
             char ebuff[EBUFF_SZ];
 
             snprintf(ebuff, EBUFF_SZ, "%s blk=%" PRId64, cp, blk);
-            lk_chk_n_print3(ebuff, hp, false);
+            lk_chk_n_print3(ebuff, hp, clp->verbose > 1);
             return res;
         }
     }
@@ -3554,7 +3595,7 @@ do_v4:
 
             snprintf(ebuff, EBUFF_SZ, "%s rq_id=%d, blk=%" PRId64, cp,
                      pack_id, blk);
-            lk_chk_n_print4(ebuff, h4p, false);
+            lk_chk_n_print4(ebuff, h4p, clp->verbose > 1);
             if ((clp->verbose > 4) && h4p->info)
                 pr2serr_lk(" info=0x%x sg_info_check=%d direct=%d "
                            "detaching=%d aborted=%d\n", h4p->info,
@@ -4200,6 +4241,9 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->verbose = sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
+            n = num_chs_in_str(key + 1, keylen - 1, 'c');
+            clp->chkaddr += n;
+            res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'd');
             clp->dry_run += n;
             res += n;
@@ -4229,8 +4273,10 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                         key);
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if ((0 == strncmp(key, "--dry-run", 9)) ||
-                   (0 == strncmp(key, "--dry_run", 9)))
+        } else if (0 == strncmp(key, "--chkaddr", 9))
+            ++clp->chkaddr;
+        else if ((0 == strncmp(key, "--dry-run", 9)) ||
+                 (0 == strncmp(key, "--dry_run", 9)))
             ++clp->dry_run;
         else if ((0 == strncmp(key, "--help", 6)) ||
                    (0 == strcmp(key, "-?")))
@@ -4418,18 +4464,20 @@ main(int argc, char * argv[])
     out2f[0] = '\0';
     outregf[0] = '\0';
     fetch_sg_version();
-    if (sg_version > 40000) {
-        clp->in_flags.v4 = true;
-        clp->out_flags.v4 = true;
-        if (sg_version >= 40045)
-            sg_version_ge_40045 = true;
-    }
+    if (sg_version >= 40045)
+        sg_version_ge_40045 = true;
 
     res = parse_cmdline_sanity(argc, argv, clp, inf, outf, out2f, outregf);
     if (SG_LIB_OK_FALSE == res)
         return 0;
     if (res)
         return res;
+    if (sg_version > 40000) {
+        if (! clp->in_flags.v3)
+            clp->in_flags.v4 = true;
+        if (! clp->out_flags.v3)
+            clp->out_flags.v4 = true;
+    }
 
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
@@ -4439,7 +4487,10 @@ main(int argc, char * argv[])
 
     clp->infd = STDIN_FILENO;
     clp->outfd = STDOUT_FILENO;
-    if (clp->in_flags.ff) {
+    if (clp->in_flags.ff && clp->in_flags.zero) {
+        ccp = "<addr_as_data>";
+        cc2p = "addr_as_data";
+    } else if (clp->in_flags.ff) {
         ccp = "<0xff bytes>";
         cc2p = "ff";
     } else if (clp->in_flags.random) {
@@ -4471,6 +4522,9 @@ main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
         } else if (FT_SG == clp->in_type) {
             clp->infd = sg_in_open(clp, inf, NULL, NULL);
+            if (clp->verbose > 2)
+                pr2serr("using sg v%c interface on %s\n",
+                        (clp->in_flags.v4 ? '4' : '3'), inf);
             if (clp->infd < 0)
                 return -clp->infd;
         } else {
@@ -4528,6 +4582,9 @@ main(int argc, char * argv[])
             return SG_LIB_FILE_ERROR;
         } else if (FT_SG == clp->out_type) {
             clp->outfd = sg_out_open(clp, outf, NULL, NULL);
+            if (clp->verbose > 2)
+                pr2serr("using sg v%c interface on %s\n",
+                        (clp->out_flags.v4 ? '4' : '3'), outf);
             if (clp->outfd < 0)
                 return -clp->outfd;
         } else if (FT_DEV_NULL == clp->out_type)
@@ -4908,13 +4965,23 @@ main(int argc, char * argv[])
         }
     }   /* started worker threads and here after they have all exited */
 
+    if (do_time && (start_tm.tv_sec || start_tm.tv_usec))
+        calc_duration_throughput(0);
+
     shutting_down = true;
+    status = pthread_join(sig_listen_thread_id, &vp);
+    if (0 != status) err_exit(status, "pthread_join");
+#if 0
     /* pthread_cancel() has issues and is not supported in Android */
     status = pthread_kill(sig_listen_thread_id, SIGUSR2);
     if (0 != status) err_exit(status, "pthread_kill");
+    std::this_thread::yield();      // not enough it seems
+    {   /* allow time for SIGUSR2 signal to get through */
+        struct timespec tspec = {0, 400000}; /* 400 usecs */
 
-    if (do_time && (start_tm.tv_sec || start_tm.tv_usec))
-        calc_duration_throughput(0);
+        nanosleep(&tspec, NULL);
+    }
+#endif
 
     if (do_sync) {
         if (FT_SG == clp->out_type) {

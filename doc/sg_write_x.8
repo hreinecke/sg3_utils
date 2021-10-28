@@ -1,4 +1,4 @@
-.TH SG_WRITE_X "8" "June 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_WRITE_X "8" "October 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_write_x \- SCSI WRITE normal/ATOMIC/SAME/SCATTERED/STREAM, ORWRITE commands
 .SH SYNOPSIS
@@ -133,11 +133,12 @@ range descriptors which is required by the WRITE SCATTERED cdb. In the
 absence of other information the logic will take a degenerate LBA range
 descriptor as a terminator of the scatter list.
 .PP
-The current reference for these commands is draft SBC\-4 (T10/BSR INCITS
-506) revision 15 dated 9 November 2017. All six SCSI commands are described
-in that document. WRITE ATOMIC was added in SBC\-4 revision 3; WRITE STREAM
-was added in SBC\-4 revision 7; WRITE SCATTERED was added in SBC\-4
-revision 11 while the others are in the SBC\-3 standard.
+The reference for these commands is SBC\-4 (T10/BSR INCITS 506\-2021)
+and draft SBC\-5 INCITS 571 revision 1 dated 21 May 2021. All six SCSI
+commands are described in those documents. WRITE ATOMIC was added in
+SBC\-4 revision 3; WRITE STREAM was added in SBC\-4 revision 7; WRITE
+SCATTERED was added in SBC\-4 revision 11 while the others are in the
+previous SBC\-3 standard.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -591,7 +592,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2017\-2020 Douglas Gilbert
+Copyright \(co 2017\-2021 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

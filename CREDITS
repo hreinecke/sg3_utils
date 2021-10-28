@@ -89,7 +89,7 @@ Joe Krahn <krahn at niehs dot nih dot gov> help with int64_t cleanup
 Kai Makisara <Kai dot Makisara at kolumbus dot fi> help with tape
         minor numbers in lk 2.6 plus earlier advice [20081008]
 
-Kurt Garloff <garloff at suse dot de> original sg_start and sg_test_rwbuf.
+Kurt Garloff: original sg_start and sg_test_rwbuf.
         Additions to sginfo and sg_map. Author of rescan-scsi-bus.sh with
         latest update to v1.57 [20130331]
 

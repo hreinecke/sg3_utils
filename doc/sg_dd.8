@@ -293,7 +293,13 @@ Here is a list of flags and their meanings:
 this flag is only active with \fIiflag=\fR and when given replaces
 \fIif=IFILE\fR. If both are given an error is generated. The input will
 be a stream of zeros, similar to using "if=/dev/zero" alone (but a little
-quicker).
+quicker), apart from the following case.
+.br
+If 'iflag=00,ff' is given then the block address (lower 32 bits, in 4
+bytes, big endian) is placed, multiple times, in each block. The block
+address takes into account the \fIskip=SKIP\fR setting. The
+.B sgp_dd
+utility has a \fI\-\-chkaddr\fR option that complements this option.
 .TP
 append
 causes the O_APPEND flag to be added to the open of \fIOFILE\fR. For regular
@@ -356,8 +362,12 @@ causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
 .TP
 ff
 this flag is only active with \fIiflag=\fR and when given replaces
-\fIif=IFILE\fR. If both are given an error is generated. The input will
-be a stream of 0xff bytes (or all bits set).
+\fIif=IFILE\fR. If both are given an error is generated. The input will be
+a stream of 0xff bytes (or all bits set), apart from the following case.
+.br
+If 'iflag=00,ff' is given then the block address (lower 32 bits, in 4
+bytes, big endian) is placed, multiple times, in each block. The block
+address takes into account the \fIskip=SKIP\fR setting.
 .TP
 flock
 after opening the associated file (i.e. \fIIFILE\fR and/or \fIOFILE\fR)
