@@ -25,7 +25,7 @@ ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id
 # 5: SCSI name identifier (prefix 8)
 ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-8$env{SCSI_IDENT_LUN_NAME}"
 ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-8$env{SCSI_IDENT_LUN_NAME}-part%n"
-# 6: T10 Vendor identifer (prefix 1)
+# 6: T10 Vendor identifier (prefix 1)
 ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}"
 ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}-part%n"
 # 7: IEEE Locally assigned

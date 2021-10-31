@@ -123,7 +123,7 @@ esac
 
 # Define platform-specific symbol.
 AM_CONDITIONAL(OS_FREEBSD, [echo $host_os | grep 'freebsd' > /dev/null])
-AM_CONDITIONAL(OS_LINUX, [echo $host_os | grep '^linux' > /dev/null])
+AM_CONDITIONAL(OS_LINUX, [echo $host_os | grep -E '^(uc)?linux' > /dev/null])
 AM_CONDITIONAL(OS_OSF, [echo $host_os | grep '^osf' > /dev/null])
 AM_CONDITIONAL(OS_SOLARIS, [echo $host_os | grep '^solaris' > /dev/null])
 AM_CONDITIONAL(OS_WIN32_MINGW, [echo $host_os | grep '^mingw' > /dev/null])

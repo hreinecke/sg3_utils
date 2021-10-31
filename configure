@@ -13335,7 +13335,7 @@ else
   OS_FREEBSD_FALSE=
 fi
 
- if echo $host_os | grep '^linux' > /dev/null; then
+ if echo $host_os | grep -E '^(uc)?linux' > /dev/null; then
   OS_LINUX_TRUE=
   OS_LINUX_FALSE='#'
 else

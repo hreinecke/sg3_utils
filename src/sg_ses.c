@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.53 20211022";    /* ses4r04 */
+static const char * version_str = "2.54 20211028";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -827,15 +827,15 @@ usage(int help_num)
 {
     if (2 != help_num) {
         pr2serr(
-            "Usage: sg_ses [--all] [--descriptor=DES] [--dev-slot-num=SN] "
-            "[--eiioe=A_F]\n"
-            "              [--filter] [--get=STR] [--hex] "
-            "[--index=IIA | =TIA,II]\n"
-            "              [--inner-hex] [--join] [--maxlen=LEN] "
-            "[--page=PG] [--quiet]\n"
-            "              [--raw] [--readonly] [--sas-addr=SA] [--status] "
-            "[--verbose]\n"
-            "              [--warn] DEVICE\n\n"
+            "Usage: sg_ses [--all] [--ALL] [--descriptor=DES] "
+            "[--dev-slot-num=SN]\n"
+            "              [--eiioe=A_F] [--filter] [--get=STR] "
+            "[--hex]\n"
+            "              [--index=IIA | =TIA,II] [--inner-hex] [--join] "
+            "[--maxlen=LEN]\n"
+            "              [--page=PG] [--quiet] [--raw] [--readonly] "
+            "[--sas-addr=SA]\n"
+            "              [--status] [--verbose] [--warn] DEVICE\n\n"
             "       sg_ses --control [--byte1=B1] [--clear=STR] "
             "[--data=H,H...]\n"
             "              [--descriptor=DES] [--dev-slot-num=SN] "
@@ -927,6 +927,7 @@ usage(int help_num)
     } else {    /* for '-hh' or '--help --help' */
         pr2serr(
             "  where the remaining sg_ses options are:\n"
+            "    --ALL|-z            same as --all twice (adds thresholds)\n"
             "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
             "to B1\n"
             "    --data=H,H...|-d H,H...    string of ASCII hex bytes to "

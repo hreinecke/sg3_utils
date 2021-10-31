@@ -50,6 +50,13 @@ most recent reference for this utility is the draft SCSI Enclosure Services
 standards for SES, SES\-2 and SES\-3 are ANSI INCITS 305\-1998 and ANSI
 INCITS 448\-2008 and ANSI INCITS 518\-2017 respectively.
 .PP
+SAS expanders typically have a SES device attached via a virtual port.
+Some HBAs (SCSI initiators) choose to expose a SES device internally. That
+means the SCSI subsystem on the host machine can see the SES device, but
+devices connected to that HBA (e.g. a SAS expander) cannot see the HBA's
+SES device. That internal SES device might report on the temperature(s)
+of the HBA and whether anything is connected to its SCSI ports.
+.PP
 The first form shown in the synopsis is for fetching and decoding dpages or
 fields from the SES \fIDEVICE\fR. A SCSI RECEIVE DIAGNOSTIC RESULTS command
 is sent to the \fIDEVICE\fR to obtain each dpage response.  Rather than

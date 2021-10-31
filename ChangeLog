@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20211028] [svn: r916]
+Changelog for pre-release sg3_utils-1.47 [20211030] [svn: r917]
   - transport error handling improved. To fix report of a
     BAD_TARGET transport error but the utility still continued.
     - introduce SG_LIB_TRANSPORT_ERROR [35] exit status
@@ -13,6 +13,8 @@ Changelog for pre-release sg3_utils-1.47 [20211028] [svn: r916]
     - fix crash when '-m LEN' < 252
     - guard against smaller '--maxlen=' values
   - sg_logs: additions to Volume statistics lpage [ssc5r05c]
+    - additions to Command duration limits statistics log
+      page [spc6r06]
   - sg_vpd: fix do_hex type on some recent pages
     - zoned block dev char vpd: add zone alignment mode and
       zone starting LBA granularity [zbc2r11]
@@ -43,6 +45,7 @@ Changelog for pre-release sg3_utils-1.47 [20211028] [svn: r916]
   - gcc -fanalyzer fixes: in sg_pt_linux.c + sg_write_x.c
   - sg_pt_dummy.c: add list of functions that a new pt
     needs to define
+  - configure.ac: tweak to accept uclinux as linux
   - move some hex files from examples to inhex directory
   - major rework of lib/sg_pt_freebsd.c; make SNTL as similar
     as feasible to the Linux implementation

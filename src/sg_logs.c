@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.86 20210924";    /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.87 20211030";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -2107,7 +2107,7 @@ show_cmd_dur_limits_page(const uint8_t * resp, int len,
     bp = &resp[0] + 4;
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
-        pl = bp[3] + 4;
+        pl = bp[3] + 4;         /* parameter length */
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
@@ -2157,6 +2157,33 @@ show_cmd_dur_limits_page(const uint8_t * resp, int len,
                    "errors = %u\n", sg_get_unaligned_be32(bp + 28));
             printf("  Number of latency misses attributable to background "
                    "operations = %u\n", sg_get_unaligned_be32(bp + 32));
+            break;
+        case 0x31:
+        case 0x32:
+        case 0x33:
+        case 0x34:
+        case 0x35:
+        case 0x36:
+        case 0x37:
+        case 0x41:
+        case 0x42:
+        case 0x43:
+        case 0x44:
+        case 0x45:
+        case 0x46:
+        case 0x47:
+            /* This short form introduced in draft spc6r06 */
+            printf(" Command duration limit T2%s %d [Parameter code 0x%x]:\n",
+                   ((pc > 0x40) ? "B" : "A"),
+                   ((pc > 0x40) ? (pc - 0x40) : (pc - 0x30)), pc);
+            printf("  Number of inactive target miss commands = %u\n",
+                   sg_get_unaligned_be32(bp + 4));
+            printf("  Number of active target miss commands = %u\n",
+                   sg_get_unaligned_be32(bp + 8));
+            printf("  Number of inactive+active target miss commands = %u\n",
+                   sg_get_unaligned_be32(bp + 12));
+            printf("  Number of commands = %u\n",
+                   sg_get_unaligned_be32(bp + 16));
             break;
         default:
             printf("  <<unexpected parameter code 0x%x\n", pc);
