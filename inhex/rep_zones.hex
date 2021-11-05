@@ -7,6 +7,9 @@
 #     sg_rep_zones /dev/sg1 -HHH > /tmp/rep_zones.hex
 # where /dev/sg1 was a scsi_debug device.
 
+# An example invocation:
+#    sg_rep_zones --inhex=rep_zones.hex
+
 
 # parameter data header (64 bytes)
 00 00 01 00 00 00 00 00  00 00 00 00 00 0f ff ff

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20211030] [svn: r917]
+Changelog for pre-release sg3_utils-1.47 [20211105] [svn: r918]
   - transport error handling improved. To fix report of a
     BAD_TARGET transport error but the utility still continued.
     - introduce SG_LIB_TRANSPORT_ERROR [35] exit status
@@ -26,11 +26,13 @@ Changelog for pre-release sg3_utils-1.47 [20211030] [svn: r917]
       into each block
   - sgp_dd: major rework
     - new: --chkaddr which checks for block address in each block
+    - add check for stdatomic.h presence in configure.ac
   - sg_xcopy: tweak CSCD identification descriptor
   - sg_get_elem_status: fix issue with '--maxlen=' option
     - add 2 depopulation revocation health attributes [sbc5r01]
   - several utilities: override '--maxlen=LEN' when LEN
     is < 16 (or 4), take default (or 4) instead
+  - scripts: 55-scsi-sg3_id.rules remove outdated rule
   - sg_lib: add sg_scsi_status_is_good(),
     sg_scsi_status_is_bad() and sg_get_zone_type_str()
   - pt_linux: fix verify(BytChk=0) which Linux SNTL translated

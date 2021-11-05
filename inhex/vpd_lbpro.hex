@@ -1,3 +1,6 @@
+#
+# An example invocation:
+#    sg_vpd --inhex=vpd_lbpro.hex
 
 01 b5 00 10 00 00 00 00
 03 01 20 e0

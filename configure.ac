@@ -16,7 +16,7 @@ AC_PROG_LIBTOOL
 
 # check for headers
 AC_HEADER_STDC
-AC_CHECK_HEADERS([byteswap.h], [], [], [])
+AC_CHECK_HEADERS([byteswap.h stdatomic.h], [], [], [])
 
 # check for functions
 AC_CHECK_FUNCS(getopt_long,

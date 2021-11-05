@@ -1,3 +1,8 @@
+#
+# An example invocation:
+#    sg_vpd --inhex=vpd_consistuents.hex
+
+
 00 8b 00 c6
 
 00 03 00 00

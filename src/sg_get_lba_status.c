@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.22 20210803";      /* sbc4r15 */
+static const char * version_str = "1.23 20211104";      /* sbc4r15 */
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -94,9 +94,9 @@ usage()
             "(def: 0)\n"
             "    --help|-h         print out usage message\n"
             "    --hex|-H          output in hexadecimal\n"
-            "    --inhex=FN        input taken from file FN rather than "
+            "    --inhex=FN|-i FN    input taken from file FN rather than "
             "DEVICE,\n"
-            "                      assumed to be ASCII hex or, if --raw, "
+            "                        assumed to be ASCII hex or, if --raw, "
             "in binary\n"
             "    --lba=LBA|-l LBA    starting LBA (logical block address) "
             "(def: 0)\n"

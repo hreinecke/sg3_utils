@@ -2,6 +2,9 @@
 # This page is constructed from the command description in zbc2r10
 # with three realms, and two zone domains
 
+# A typical example:
+#    sg_rep_zones --realm --inhex=rep_realms.hex
+
 
 # parameter data header (64 bytes)
 00 00 00 90 00 00 00 03  00 00 00 30 00 00 00 00

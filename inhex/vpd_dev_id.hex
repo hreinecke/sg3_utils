@@ -1,3 +1,7 @@
+#
+# An example invocation:
+#    sg_vpd --inhex=vpd_dev_id.hex
+
 00 83 00 48 01 03 00 08  50 00 c5 00 30 11 cb 2b
 61 93 00 08 50 00 c5 00  30 11 cb 29 61 94 00 04
 00 00 00 01 61 a3 00 08  50 00 c5 00 30 11 cb 28

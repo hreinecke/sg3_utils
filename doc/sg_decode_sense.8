@@ -1,12 +1,12 @@
-.TH SG_DECODE_SENSE "8" "June 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "November 2021" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense and related data
 .SH SYNOPSIS
 .B sg_decode_sense
 [\fI\-\-binary=BFN\fR] [\fI\-\-cdb\fR] [\fI\-\-err=ES\fR] [\fI\-\-file=HFN\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-nospace\fR] [\fI\-\-status=SS\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write=WFN\fR]
-[H1 H2 H3 ...]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=HFN\fR] [\fI\-\-nospace\fR]
+[\fI\-\-status=SS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This utility takes SCSI sense data in binary or as a sequence of
@@ -44,7 +44,9 @@ are ignored apart from \fI\-\-verbose\fR.
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-b\fR, \fB\-\-binary\fR=\fIBFN\fR
-the sense data is read in binary from a file called \fIBFN\fR.
+the sense data is read in binary from a file called \fIBFN\fR. The option
+cannot be given with \fI\-\-file=HFN\fR or \fI\-\-inhex=HFN\fR as they
+contradict.
 .TP
 \fB\-c\fR, \fB\-\-cdb\fR
 treat the given string of hex arguments as bytes in a SCSI CDB and
@@ -76,6 +78,10 @@ this option is used in conjunction with \fI\-\-write=WFN\fR in order to
 change the output written to \fIWFN\fR to lines of ASCII hex bytes suitable
 for a C language compiler. Each line contains up to 16 bytes (e.g. a line
 starting with "0x3b,0x07,0x00,0xff").
+.TP
+\fB\-i\fR, \fB\-\-inhex\fR=\fIHFN\fR
+same action as \fI\-\-file=HFN\fR. This option was added for compatibility
+with other utilities in this package that have a \fI\-\-inhex=\fR option.
 .TP
 \fB\-n\fR, \fB\-\-nospace\fR
 expect ASCII hexadecimal to be a string of hexadecimal digits with no
@@ -148,7 +154,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2010\-2019 Douglas Gilbert
+Copyright \(co 2010\-2021 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

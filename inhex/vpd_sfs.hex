@@ -1,3 +1,7 @@
+#
+# An example invocation:
+#    sg_vpd --inhex=vpd_sfs.hex
+
 00 92 00 0e 00 00 00 00
 00 01 01 01 01 02 02 01
 09 09

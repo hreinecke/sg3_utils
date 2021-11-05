@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.06 20210831";      /* sbc5r01 */
+static const char * version_str = "1.07 20211104";      /* sbc5r01 */
 
 
 #ifndef UINT32_MAX
@@ -101,9 +101,9 @@ usage()
             "elements\n"
             "    --help|-h         print out usage message\n"
             "    --hex|-H          output in hexadecimal\n"
-            "    --inhex=FN        input taken from file FN rather than "
+            "    --inhex=FN|-i FN    input taken from file FN rather than "
             "DEVICE,\n"
-            "                      assumed to be ASCII hex or, if --raw, "
+            "                        assumed to be ASCII hex or, if --raw, "
             "in binary\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"

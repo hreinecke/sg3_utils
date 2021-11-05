@@ -2,6 +2,8 @@
 # This page is constructed from the command description in zbc2r10
 # with two zone domains.
 
+# A typical example:
+#    sg_rep_zones --domain --inhex=rep_zdomains.hex
 
 # parameter data header (64 bytes)
 00 00 00 c0 00 00 00 c0  02 02 00 30 00 00 00 00

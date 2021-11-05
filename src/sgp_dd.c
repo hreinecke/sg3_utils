@@ -59,8 +59,12 @@
 #include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
 #include <linux/fs.h>           /* for BLKSSZGET and friends */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #ifdef __STDC_VERSION__
-#if __STDC_VERSION__ >= 201112L
+#if __STDC_VERSION__ >= 201112L && defined(HAVE_STDATOMIC_H)
 #ifndef __STDC_NO_ATOMICS__
 
 #define HAVE_C11_ATOMICS
@@ -74,9 +78,6 @@
 #warning "Don't have C11 Atomics, using mutex with pack_id"
 #endif
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
@@ -84,7 +85,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.82 20211027";
+static const char * version_str = "5.83 20211105";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -175,12 +176,11 @@ struct opts_t
     int dry_run;
 };
 
-typedef struct thread_arg
+struct thread_arg
 {       /* pointer to this argument passed to thread */
     int id;
     int64_t seek_skip;
-    struct opts_t * clp;
-} Thread_arg;
+};
 
 typedef struct request_element
 {       /* one instance per worker thread */
@@ -188,6 +188,7 @@ typedef struct request_element
     bool in_stop;
     bool in_err;
     bool out_err;
+    bool use_no_dxfer;
     int infd;
     int outfd;
     int64_t blk;
@@ -215,10 +216,11 @@ static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
 
 static void sg_in_operation(struct opts_t * clp, Rq_elem * rep);
 static void sg_out_operation(struct opts_t * clp, Rq_elem * rep,
-			     bool bump_out_blk);
-static void normal_in_operation(struct opts_t * clp, Rq_elem * rep, int blocks);
-static void normal_out_operation(struct opts_t * clp, Rq_elem * rep, int blocks,
-                                 bool bump_out_blk);
+                             bool bump_out_blk);
+static void normal_in_operation(struct opts_t * clp, Rq_elem * rep,
+                                int blocks);
+static void normal_out_operation(struct opts_t * clp, Rq_elem * rep,
+                                 int blocks, bool bump_out_blk);
 static int sg_start_io(Rq_elem * rep);
 static int sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
 
@@ -259,7 +261,7 @@ GET_NEXT_PACK_ID(unsigned int val)
 static pthread_mutex_t strerr_mut = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_t threads[MAX_NUM_THREADS];
-static Thread_arg thr_arg_a[MAX_NUM_THREADS];
+static struct thread_arg thr_arg_a[MAX_NUM_THREADS];
 
 static bool shutting_down = false;
 static bool do_sync = false;
@@ -681,11 +683,11 @@ sg_out_open(const char * fnp, struct flags_t * flagp, int bs, int bpt)
 static void *
 read_write_thread(void * v_tap)
 {
-    Thread_arg * tap = (Thread_arg *)v_tap;
-    struct opts_t * clp;
+    struct thread_arg * tap = (struct thread_arg *)v_tap;
+    struct opts_t * clp = &my_opts;
     Rq_elem rel;
     Rq_elem * rep = &rel;
-    volatile bool stop_after_write, b;
+    volatile bool stop_after_write, bb;
     bool enforce_write_ordering;
     int sz, c_addr;
     int64_t out_blk, out_count;
@@ -693,7 +695,6 @@ read_write_thread(void * v_tap)
     int blocks, status;
 
     stop_after_write = false;
-    clp = tap->clp;
     enforce_write_ordering = (FT_DEV_NULL != clp->out_type) &&
                              (FT_SG != clp->out_type);
     c_addr = clp->chkaddr;
@@ -724,6 +725,7 @@ read_write_thread(void * v_tap)
     rep->cdbsz_out = clp->cdbsz_out;
     rep->in_flags = clp->in_flags;
     rep->out_flags = clp->out_flags;
+    rep->use_no_dxfer = (FT_DEV_NULL == clp->out_type);
     if (clp->mmap_active) {
         int fd = clp->in_flags.mmap ? rep->infd : rep->outfd;
 
@@ -742,11 +744,11 @@ read_write_thread(void * v_tap)
         status = pthread_mutex_lock(&clp->inout_mutex);
         if (0 != status) err_exit(status, "lock inout_mutex");
 #ifdef HAVE_C11_ATOMICS
-        b = atomic_load(&exit_threads);
+        bb = atomic_load(&exit_threads);
 #else
-        b = exit_threads;
+        bb = exit_threads;
 #endif
-        if (b || (clp->in_count <= 0)) {
+        if (bb || (clp->in_count <= 0)) {
             /* no more to do, exit loop then thread */
             status = pthread_mutex_unlock(&clp->inout_mutex);
             if (0 != status) err_exit(status, "unlock inout_mutex");
@@ -807,11 +809,11 @@ read_write_thread(void * v_tap)
             status = pthread_mutex_lock(&clp->inout_mutex);
             if (0 != status) err_exit(status, "lock inout_mutex");
 #ifdef HAVE_C11_ATOMICS
-            b = atomic_load(&exit_threads);
+            bb = atomic_load(&exit_threads);
 #else
-            b = exit_threads;
+            bb = exit_threads;
 #endif
-            while ((! b) && (out_blk != clp->out_blk)) {
+            while ((! bb) && (out_blk != clp->out_blk)) {
                 /* if write would be out of sequence then wait */
                 pthread_cleanup_push(cleanup_out, (void *)clp);
                 status = pthread_cond_wait(&clp->out_sync_cv,
@@ -824,11 +826,11 @@ read_write_thread(void * v_tap)
         }
 
 #ifdef HAVE_C11_ATOMICS
-        b = atomic_load(&exit_threads);
+        bb = atomic_load(&exit_threads);
 #else
-        b = exit_threads;
+        bb = exit_threads;
 #endif
-        if (b || (out_count <= 0))
+        if (bb || (out_count <= 0))
             break;
 
         rep->wr = true;
@@ -1174,6 +1176,7 @@ sg_start_io(Rq_elem * rep)
     bool dpo = rep->wr ? rep->out_flags.dpo : rep->in_flags.dpo;
     bool dio = rep->wr ? rep->out_flags.dio : rep->in_flags.dio;
     bool mmap = rep->wr ? rep->out_flags.mmap : rep->in_flags.mmap;
+    bool no_dxfer = rep->wr ? false : rep->use_no_dxfer;
     int cdbsz = rep->wr ? rep->cdbsz_out : rep->cdbsz_in;
     int res;
 
@@ -1200,6 +1203,8 @@ sg_start_io(Rq_elem * rep)
         hp->flags |= SG_FLAG_DIRECT_IO;
     if (mmap)
         hp->flags |= SG_FLAG_MMAP_IO;
+    if (no_dxfer)
+        hp->flags |= SG_FLAG_NO_DXFER;
     if (rep->debug > 8) {
         pr2serr("%s: SCSI %s, blk=%" PRId64 " num_blks=%d\n", __func__,
                 rep->wr ? "WRITE" : "READ", rep->blk, rep->num_blks);
@@ -1285,8 +1290,8 @@ sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp)
                 sg_chk_n_print3(ebuff, hp, false);
                 status = pthread_mutex_unlock(a_mutp);
                 if (0 != status) err_exit(status, "unlock inout_mutex");
-                return res;
             }
+            return res;
     }
 #if 0
     if (0 == (++testing % 100)) return -1;
@@ -1878,7 +1883,6 @@ main(int argc, char * argv[])
         seek_skip = clp->seek - clp->skip;
         thr_arg_a[0].id = 0;
         thr_arg_a[0].seek_skip = seek_skip;
-        thr_arg_a[0].clp = clp;
         status = pthread_create(&threads[0], NULL, read_write_thread,
                                 (void *)(thr_arg_a + 0));
         if (0 != status) err_exit(status, "pthread_create");
@@ -1898,7 +1902,6 @@ main(int argc, char * argv[])
 
             thr_arg_a[k].id = k;
             thr_arg_a[k].seek_skip = seek_skip;
-            thr_arg_a[k].clp = clp;
             status = pthread_create(&threads[k], NULL, read_write_thread,
                                     (void *)(thr_arg_a + k));
             if (0 != status) err_exit(status, "pthread_create");

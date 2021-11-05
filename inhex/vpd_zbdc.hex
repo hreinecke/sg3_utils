@@ -1,3 +1,7 @@
+#
+# An example invocation:
+#    sg_vpd --inhex=vpd_zbdc.hex
+
 # Zoned block device characteristics VPD page [0xb6]
 # Host managed zoned block device model; pdt=0x14
 14 b6 00 3c

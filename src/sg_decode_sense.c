@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.23 20211001";
+static const char * version_str = "1.24 20211104";
 
 #define MAX_SENSE_LEN 1024 /* max descriptor format actually: 255+8 */
 
@@ -43,6 +43,8 @@ static struct option long_options[] = {
     {"file", required_argument, 0, 'f'},
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
+    {"in", required_argument, 0, 'i'},          /* don't advertise */
+    {"inhex", required_argument, 0, 'i'},       /* same as --file */
     {"nospace", no_argument, 0, 'n'},
     {"status", required_argument, 0, 's'},
     {"verbose", no_argument, 0, 'v'},
@@ -80,9 +82,10 @@ usage()
 {
   pr2serr("Usage: sg_decode_sense [--binary=BFN] [--cdb] [--err=ES] "
           "[--file=HFN]\n"
-          "                       [--help] [--hex] [--nospace] [--status=SS] "
-          "[--verbose]\n"
-          "                       [--version] [--write=WFN] H1 H2 H3 ...\n"
+          "                       [--help] [--hex] [--inhex=HFN] [--nospace] "
+          "[--status=SS]\n"
+          "                       [--verbose] [--version] [--write=WFN] H1 "
+          "H2 H3 ...\n"
           "  where:\n"
           "    --binary=BFN|-b BFN    BFN is a file name to read sense "
           "data in\n"
@@ -101,6 +104,7 @@ usage()
           "write out\n"
           "                          C language style ASCII hex (instead "
           "of binary)\n"
+          "    --inhex=HFN|-i HFN    same as action as --file=HFN\n"
           "    --nospace|-n          no spaces or other separators between "
           "pairs of\n"
           "                          hex digits (e.g. '3132330A')\n"
@@ -129,15 +133,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     char *endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:ce:f:hHns:vVw:", long_options, NULL);
+        c = getopt_long(argc, argv, "b:ce:f:hHi:ns:vVw:", long_options, NULL);
         if (c == -1)
             break;
 
         switch (c) {
         case 'b':
             if (op->fname) {
-                pr2serr("expect only one '--binary=BFN' or '--file=BFN' "
-                        "option\n");
+                pr2serr("expect only one '--binary=BFN', '--file=HFN' or "
+                        "'--inhex=HFN' option\n");
                 return SG_LIB_CONTRADICT;
             }
             op->do_binary = true;
@@ -157,8 +161,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'f':
             if (op->fname) {
-                pr2serr("expect only one '--binary=HFN' or '--file=HFN' "
-                        "option\n");
+                pr2serr("expect only one '--binary=BFN', '--file=HFN' or "
+                        "'--inhex=HFN' option\n");
                 return SG_LIB_CONTRADICT;
             }
             op->file_given = true;
@@ -168,6 +172,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case '?':
             op->do_help = true;
             return 0;
+        case 'i':
+            if (op->fname) {
+                pr2serr("expect only one '--binary=BFN', '--file=HFN' or "
+                        "'--inhex=HFN' option\n");
+                return SG_LIB_CONTRADICT;
+            }
+            op->file_given = true;
+            op->fname = optarg;
+            break;
         case 'H':
             op->do_hex = true;
             break;

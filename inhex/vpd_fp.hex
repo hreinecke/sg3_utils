@@ -1,3 +1,7 @@
+#
+# An example invocation:
+#    sg_vpd --inhex=vpd_fp.hex
+
 # Dummy data for Format presets VPD page
 00 b8 00 80
 
