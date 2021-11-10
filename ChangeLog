@@ -2,10 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.47 [20211105] [svn: r918]
-  - transport error handling improved. To fix report of a
-    BAD_TARGET transport error but the utility still continued.
-    - introduce SG_LIB_TRANSPORT_ERROR [35] exit status
+Changelog for released sg3_utils-1.47 [20211110] [svn: r919]
   - sg_rep_zones: add support for REPORT ZONE DOMAINS and
     REPORT REALMS in this utility
   - sg_raw: fix prints of NVMe NVM command names
@@ -24,12 +21,15 @@ Changelog for pre-release sg3_utils-1.47 [20211105] [svn: r918]
     put conditional in so non-reentrant version used otherwise
     - 'iflag=00,ff' places the 32 bit block address (big endian)
       into each block
-  - sgp_dd: major rework
+  - sgp_dd: major rework, fix issue with error being ignored
     - new: --chkaddr which checks for block address in each block
     - add check for stdatomic.h presence in configure.ac
   - sg_xcopy: tweak CSCD identification descriptor
   - sg_get_elem_status: fix issue with '--maxlen=' option
     - add 2 depopulation revocation health attributes [sbc5r01]
+  - transport error handling improved. To fix report of a
+    BAD_TARGET transport error but the utility still continued.
+    - introduce SG_LIB_TRANSPORT_ERROR [35] exit status
   - several utilities: override '--maxlen=LEN' when LEN
     is < 16 (or 4), take default (or 4) instead
   - scripts: 55-scsi-sg3_id.rules remove outdated rule
@@ -41,8 +41,8 @@ Changelog for pre-release sg3_utils-1.47 [20211105] [svn: r918]
   - pt: check_pt_file_handle() add return value of 5 for
     FreeBSD for nvme(cam)
   - pt: new configure option --enable-pt_dummy builds the
-    library with sg_pt_dummy.c instead of OS specific code.
-    For experimenting with --inhex= decoding on netbsd
+    library with sg_pt_dummy.c instead of OS specific code;
+    for experimenting with --inhex= decoding on netbsd
   - pt: add Haiku OS support
   - gcc -fanalyzer fixes: in sg_pt_linux.c + sg_write_x.c
   - sg_pt_dummy.c: add list of functions that a new pt
@@ -50,7 +50,7 @@ Changelog for pre-release sg3_utils-1.47 [20211105] [svn: r918]
   - configure.ac: tweak to accept uclinux as linux
   - move some hex files from examples to inhex directory
   - major rework of lib/sg_pt_freebsd.c; make SNTL as similar
-    as feasible to the Linux implementation
+    as practical to the Linux implementation
   - add testing/sg_take_snap
   - change links to http://sg.danny/cz/sg/* to https
 
