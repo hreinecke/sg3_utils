@@ -1,4 +1,4 @@
-AC_INIT(sg3_utils, 1.47, dgilbert@interlog.com)
+AC_INIT(sg3_utils, 1.48, dgilbert@interlog.com)
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AM_MAINTAINER_MODE
@@ -100,7 +100,7 @@ case "${host}" in
 		AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])
 		check_for_getrandom
                 CFLAGS="$CFLAGS -Wno-char-subscripts";;
-        *-*-mingw*)
+        *-*-mingw* | *-*-msys*)
 		AC_DEFINE_UNQUOTED(SG_LIB_WIN32, 1, [sg3_utils on Win32])
 		AC_DEFINE_UNQUOTED(SG_LIB_MINGW, 1, [also MinGW environment])
 		# AC_CHECK_HEADERS([nvme.h], [AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])], [], [])

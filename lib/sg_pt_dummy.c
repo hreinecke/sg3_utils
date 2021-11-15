@@ -11,7 +11,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/ioctl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -23,7 +22,7 @@
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
 
-/* Version 1.02 20210618 */
+/* Version 1.03 20211115 */
 
 /* List of function names with external linkage that need to be defined
  *
