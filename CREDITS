@@ -45,6 +45,9 @@ Eric Seppanen <eric @ purestorage dot com> borrowed ideas from alternate
 Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
         is based.
 
+Fabrice Fontaine <fontaine dot fabrice at gmail dot com>
+	various build fixes [20211116]
+
 Frank Jansen <fjansen at egenera dot com>: additions to sg_scan; contributed
         code for '--alloc-length=' option in sg_persist [20090402]
 

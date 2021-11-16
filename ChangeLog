@@ -2,9 +2,10 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20211115] [svn: r921]
-  - rev 921 is a bugfix rev on release 1.47 [r919,920]
+Changelog for pre-release sg3_utils-1.48 [20211116] [svn: r922]
+  - rev 921+922 are bugfix revs on release 1.47 [r919,920]
   - configure.ac: map msys to mingw
+    - repeat tweak to accept uclinux as linux
   - sg_dd: change uint type to uint32_t
   - sg_pt_dummy.c: remove problematic include
 

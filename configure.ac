@@ -107,7 +107,7 @@ case "${host}" in
 		AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])
 		check_for_getrandom
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
-        *-*-linux-gnu* | *-*-linux*)
+        *-*-linux-gnu* | *-*-linux* | *-*-uclinux-gnu* | *-*-uclinux*)
                 AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
 		check_for_linux_sg_v4_hdr
 		check_for_getrandom
