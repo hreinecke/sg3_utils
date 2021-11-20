@@ -2,7 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20211116] [svn: r922]
+Changelog for pre-release sg3_utils-1.48 [20211120] [svn: r923]
+  - sg_z_act_query: new utility for sending either a
+    Zone activate or Zone query command
+  - sg_rep_zones: add Report zone starting LBA granularity
+    field in REPORT ZONES response [zbc2r12]
+  - sg_decode_sense: add --nodecode option
+  - initialize all sense buffers to 0
+  - rework main README file
   - rev 921+922 are bugfix revs on release 1.47 [r919,920]
   - configure.ac: map msys to mingw
     - repeat tweak to accept uclinux as linux

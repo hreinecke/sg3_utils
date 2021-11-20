@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2020 Douglas Gilbert.
+ * Copyright (c) 2005-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -11,7 +11,7 @@
  *
  *
  * This program maps a primary SCSI device node name to the corresponding
- * SCSI generic device node name (or vice versa). Targets linux
+ * SCSI generic device node name (or vice versa). Targets Linux
  * kernel 2.6, 3 and 4 series. Sysfs device names can also be mapped.
  */
 
@@ -47,7 +47,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.17 20200501";
+static const char * version_str = "1.18 20211118";
 
 #define ME "sg_map26: "
 

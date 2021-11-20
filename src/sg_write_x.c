@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.28 20210923";
+static const char * version_str = "1.29 20211114";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -1053,7 +1053,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
 {
     int k, ret, res, sense_cat, cdb_len, vb, err;
     uint8_t x_cdb[WRITE_X_32_LEN];        /* use for both lengths */
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     memset(x_cdb, 0, sizeof(x_cdb));

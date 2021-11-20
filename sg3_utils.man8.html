@@ -1,75 +1,99 @@
-.TH SG3_UTILS "8" "November 2021" "sg3_utils\-1.48" SG3_UTILS
-.SH NAME
-sg3_utils \- a package of utilities for sending SCSI commands
-.SH SYNOPSIS
-.B sg_*
-[\fI\-\-dry\-run\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-in=FN\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
-[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
-.SH DESCRIPTION
-.\" Add any additional description here
-.PP
+Content-type: text/html; charset=UTF-8
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML><HEAD><TITLE>Man page of SG3_UTILS</TITLE>
+</HEAD><BODY>
+<H1>SG3_UTILS</H1>
+Section: SG3_UTILS (8)<BR>Updated: November 2021<BR><A HREF="#index">Index</A>
+<A HREF="../index.html">Return to Main Contents</A><HR>
+
+<A NAME="lbAB">&nbsp;</A>
+<H2>NAME</H2>
+
+sg3_utils - a package of utilities for sending SCSI commands
+<A NAME="lbAC">&nbsp;</A>
+<H2>SYNOPSIS</H2>
+
+<B>sg_*</B>
+
+[<I>--dry-run</I>] [<I>--enumerate</I>] [<I>--help</I>] [<I>--hex</I>]
+[<I>--in=FN</I>] [<I>--inhex=FN</I>] [<I>--maxlen=LEN</I>] [<I>--raw</I>]
+[<I>--timeout=SECS</I>] [<I>--verbose</I>] [<I>--version</I>]
+[<I>OTHER_OPTIONS</I>] <I>DEVICE</I>
+<A NAME="lbAD">&nbsp;</A>
+<H2>DESCRIPTION</H2>
+
+
+<P>
+
 sg3_utils is a package of utilities that send SCSI commands to the given
-\fIDEVICE\fR via a SCSI pass through interface provided by the host
+<I>DEVICE</I> via a SCSI pass through interface provided by the host
 operating system.
-.PP
-The names of all utilities start with "sg" and most start with "sg_" often
+<P>
+
+The names of all utilities start with &quot;sg&quot; and most start with &quot;sg_&quot; often
 followed by the name, or a shortening of the name, of the SCSI command that
-they send. For example the "sg_verify" utility sends the SCSI VERIFY
+they send. For example the &quot;sg_verify&quot; utility sends the SCSI VERIFY
 command. A mapping between SCSI commands and the sg3_utils utilities that
 issue them is shown in the COVERAGE file. The sg_raw utility can be used to
 send an arbitrary SCSI command (supplied on the command line) to the
-given \fIDEVICE\fR.
-.PP
+given <I>DEVICE</I>.
+<P>
+
 sg_decode_sense can be used to decode SCSI sense data given on the command
-line or in a file. sg_raw \-vvv will output the T10 name of a given SCSI
+line or in a file. sg_raw -vvv will output the T10 name of a given SCSI
 CDB which is most often 16 bytes or less in length.
-.PP
-SCSI draft standards can be found at https://www.t10.org . The standards
+<P>
+
+SCSI draft standards can be found at <A HREF="https://www.t10.org">https://www.t10.org</A> . The standards
 themselves can be purchased from ANSI and other standards organizations.
 A good overview of various SCSI standards can be seen in
-https://www.t10.org/scsi\-3.htm with the SCSI command sets in the upper part
+<A HREF="https://www.t10.org/scsi-3.htm">https://www.t10.org/scsi-3.htm</A> with the SCSI command sets in the upper part
 of the diagram. The highest level (i.e. most abstract) document is the SCSI
-Architecture Model (SAM) with SAM\-5 being the most recent standard (ANSI
-INCITS 515\-2016) with the most recent draft being SAM\-6 revision 4 . SCSI
+Architecture Model (SAM) with SAM-5 being the most recent standard (ANSI
+INCITS 515-2016) with the most recent draft being SAM-6 revision 4 . SCSI
 commands in common with all device types can be found in SCSI Primary
-Commands (SPC) of which SPC\-5 is the most recent standard (ANSI INCITS
-502-2020). The most recent SPC draft is SPC\-6 revision 6. Block device
+Commands (SPC) of which SPC-4 is the most recent standard (ANSI INCITS
+513-2015). The most recent SPC draft is SPC-5 revision 21. Block device
 specific commands (e.g. as used by disks) are in SBC, those for tape drives
 in SSC, those for SCSI enclosures in SES and those for CD/DVD/BD drives in
 MMC.
-.PP
+<P>
+
 It is becoming more common to control ATA disks with the SCSI command set.
 This involves the translation of SCSI commands to their corresponding ATA
 equivalents (and that is an imperfect mapping in some cases). The relevant
-standard is called SCSI to ATA Translation (SAT, SAT\-2 and SAT\-3) are
-now standards at INCITS(ANSI) and ISO while SAT\-4 is at the draft stage.
+standard is called SCSI to ATA Translation (SAT, SAT-2 and SAT-3) are
+now standards at INCITS(ANSI) and ISO while SAT-4 is at the draft stage.
 The logic to perform the command translation is often called a SAT Layer or
 SATL and may be within an operating system, in host bus adapter firmware or
 in an external device (e.g. associated with a SAS expander). See
-https://www.t10.org for more information.
-.PP
+<A HREF="https://www.t10.org">https://www.t10.org</A> for more information.
+<P>
+
 There is some support for SCSI tape devices but not for their basic
-operation. The reader is referred to the "mt" utility.
-.PP
+operation. The reader is referred to the &quot;mt&quot; utility.
+<P>
+
 There are two generations of command line option usage. The newer
 utilities (written since July 2004) use the getopt_long() function to parse
 command line options. With that function, each option has two representations:
-a short form (e.g. '\-v') and a longer form (e.g. '\-\-verbose'). If an
+a short form (e.g. '-v') and a longer form (e.g. '--verbose'). If an
 argument is required then it follows a space (optionally) in the short form
-and a "=" in the longer form (e.g. in the sg_verify utility '\-l 2a6h'
-and '\-\-lba=2a6h' are equivalent). Note that with getopt_long(), short form
-options can be elided, for example: '\-all' is equivalent to '\-a \-l \-l'.
-The \fIDEVICE\fR argument may appear after, between or prior to any options.
-.PP
+and a &quot;=&quot; in the longer form (e.g. in the sg_verify utility '-l 2a6h'
+and '--lba=2a6h' are equivalent). Note that with getopt_long(), short form
+options can be elided, for example: '-all' is equivalent to '-a -l -l'.
+The <I>DEVICE</I> argument may appear after, between or prior to any options.
+<P>
+
 The older utilities, including as sg_inq, sg_logs, sg_modes, sg_opcode,
-sg_rbuff, sg_readcap, sg_senddiag, sg_start and sg_turs had individual
-command line processing code typically based on a single "\-" followed by one
-or more characters. If an argument is needed then it follows a "=" (
-e.g. '\-p=1f' in sg_modes with its older interface). Various options can be
-elided as long as it is not ambiguous (e.g. '\-vv' to increase the verbosity).
-.PP
+sg_rbuff,  sg_readcap, sg_senddiag, sg_start and sg_turs had individual
+command line processing code typically based on a single &quot;-&quot; followed by one
+or more characters. If an argument is needed then it follows a &quot;=&quot; (
+e.g. '-p=1f' in sg_modes with its older interface). Various options can be
+elided as long as it is not ambiguous (e.g. '-vv' to increase the verbosity).
+<P>
+
 Over time the command line interface of these older utilities became messy
 and overloaded with options. So in sg3_utils version 1.23 the command line
 interface of these older utilities was altered to have both a cleaner
@@ -77,412 +101,492 @@ getopt_long() interface and their older interface for backward compatibility.
 By default these older utilities use their getopt_long() based interface.
 The getopt_long() is a GNU extension (i.e. not yet POSIX certified) but
 more recent command line utilities tend to use it. That can be overridden
-by defining the SG3_UTILS_OLD_OPTS environment variable or using '\-O'
-or '\-\-old' as the first command line option. The man pages of the older
+by defining the SG3_UTILS_OLD_OPTS environment variable or using '-O'
+or '--old' as the first command line option. The man pages of the older
 utilities documents the details.
-.PP
+<P>
+
 Several sg3_utils utilities are based on the Unix dd command (e.g. sg_dd)
 and permit copying data at the level of SCSI READ and WRITE commands. sg_dd
 is tightly bound to Linux and hence is not ported to other OSes. A more
 generic utility (than sg_dd) called ddpt in a package of the same name has
 been ported to other OSes.
-.SH ENVIRONMENT VARIABLES
+<A NAME="lbAE">&nbsp;</A>
+<H2>ENVIRONMENT VARIABLES</H2>
+
 The SG3_UTILS_OLD_OPTS environment variable is explained in the previous
 section. It is only for backward compatibility of the command line options
 for older utilities.
-.PP
+<P>
+
 The SG3_UTILS_DSENSE environment variable may be set to a number. It is
 only used by the embedded SNTL within the library used by the utilities in
 this library. SNTL is a SCSI to NVMe Translation Layer. This environment
 variable defaults to 0 which will lead to any utility that issues a SCSI
 command that is translated to a NVMe command (by the embedded SNTL) that
 fails at the NVMe dvice, to return SCSI sense in 'fixed' format. If this
-variable is non\-zero then then the returned SCSI sense will be in 'descriptor'
+variable is non-zero then then the returned SCSI sense will be in 'descriptor'
 format.
-.PP
+<P>
+
 Several utilities have their own environment variable setting (e.g.
 sg_persist has SG_PERSIST_IN_RDONLY). See individual utility man pages
 for more information.
-.PP
+<P>
+
 There is a Linux specific environment variable called SG3_UTILS_LINUX_NANO
 that if defined and the sg driver in the system is 4.0.30 or later, will
 show command durations in nanoseconds rather than the default milliseconds.
-Command durations are typically only shown if \-\-verbose is used 3 or more
+Command durations are typically only shown if --verbose is used 3 or more
 times. Due to an interface problem (a 32 bit integer that should be 64 bits
 with the benefit of hindsight) the maximum duration that can be represented
 in nanoseconds is about 4.2 seconds. If longer durations may occur then
 don't define this environment variable (or undefine it).
-.SH LINUX DEVICE NAMING
+<A NAME="lbAF">&nbsp;</A>
+<H2>LINUX DEVICE NAMING</H2>
+
 Most disk block devices have names like /dev/sda, /dev/sdb, /dev/sdc, etc.
 SCSI disks in Linux have always had names like that but in recent Linux
 kernels it has become more common for many other disks (including SATA
 disks and USB storage devices) to be named like that. Partitions within a
 disk are specified by a number appended to the device name, starting at
 1 (e.g. /dev/sda1 ).
-.PP
-Tape drives are named /dev/st<num> or /dev/nst<num> where <num> starts
-at zero. Additionally one letter from this list: "lma" may be appended to
-the name. CD, DVD and BD readers (and writers) are named /dev/sr<num>
-where <num> start at zero. There are less used SCSI device type names,
+<P>
+
+Tape drives are named /dev/st&lt;num&gt; or /dev/nst&lt;num&gt; where &lt;num&gt; starts
+at zero. Additionally one letter from this list: &quot;lma&quot; may be appended to
+the name. CD, DVD and BD readers (and writers) are named /dev/sr&lt;num&gt;
+where &lt;num&gt; start at zero. There are less used SCSI device type names,
 the dmesg and the lsscsi commands may help to find if any are attached to
 a running system.
-.PP
+<P>
+
 There is also a SCSI device driver which offers alternate generic access
-to SCSI devices. It uses names of the form /dev/sg<num> where <num> starts
-at zero. The "lsscsi \-g" command may be useful in finding these and which
+to SCSI devices. It uses names of the form /dev/sg&lt;num&gt; where &lt;num&gt; starts
+at zero. The &quot;lsscsi -g&quot; command may be useful in finding these and which
 generic name corresponds to a device type name (e.g. /dev/sg2 may
 correspond to /dev/sda). In the lk 2.6 series a block SCSI generic
 driver was introduced and its names are of the form
-/dev/bsg/<h:c:t:l> where h, c, t and l are numbers. Again see the lsscsi
-command to find the correspondence between that SCSI tuple (i.e. <h:c:t:l>)
+/dev/bsg/&lt;h:c:t:l&gt; where h, c, t and l are numbers. Again see the lsscsi
+command to find the correspondence between that SCSI tuple (i.e. &lt;h:c:t:l&gt;)
 and alternate device names.
-.PP
+<P>
+
 Prior to the Linux kernel 2.6 series these utilities could only use
 generic device names (e.g. /dev/sg1 ). In almost all cases in the Linux
 kernel 2.6 series, any device name can be used by these utilities.
-.PP
+<P>
+
 Very little has changed in Linux device naming in the Linux kernel 3
 and 4 series.
-.SH WINDOWS DEVICE NAMING
+<A NAME="lbAG">&nbsp;</A>
+<H2>WINDOWS DEVICE NAMING</H2>
+
 Storage and related devices can have several device names in Windows.
-Probably the most common in the volume name (e.g. "D:"). There are also
-a "class" device names such as "PhysicalDrive<n>", "CDROM<n>"
-and "TAPE<n>". <n> is an integer starting at 0 allocated in ascending
+Probably the most common in the volume name (e.g. &quot;D:&quot;). There are also
+a &quot;class&quot; device names such as &quot;PhysicalDrive&lt;n&gt;&quot;, &quot;CDROM&lt;n&gt;&quot;
+and &quot;TAPE&lt;n&gt;&quot;. &lt;n&gt; is an integer starting at 0 allocated in ascending
 order as devices are discovered (and sometimes rediscovered).
-.PP
+<P>
+
 Some storage devices have a SCSI lower level device name which starts
-with a SCSI (pseudo) adapter name of the form "SCSI<n>:". To this is added
-sub\-addressing in the form of a "bus" number, a "target" identifier and
-a LUN (Logical Unit Number). The "bus" number is also known as a "PathId".
+with a SCSI (pseudo) adapter name of the form &quot;SCSI&lt;n&gt;:&quot;. To this is added
+sub-addressing in the form of a &quot;bus&quot; number, a &quot;target&quot; identifier and
+a LUN (Logical Unit Number). The &quot;bus&quot; number is also known as a &quot;PathId&quot;.
 These are assembled to form a device name of the
-form: "SCSI<n>:<bus>,<target>,<lun>". The trailing ",<lun>" may be omitted
+form: &quot;SCSI&lt;n&gt;:&lt;bus&gt;,&lt;target&gt;,&lt;lun&gt;&quot;. The trailing &quot;,&lt;lun&gt;&quot; may be omitted
 in which case a LUN of zero is assumed. This lower level device name cannot
 often be used directly since Windows blocks attempts to use it if a class
-driver has "claimed" the device. There are SCSI device types (e.g.
+driver has &quot;claimed&quot; the device. There are SCSI device types (e.g.
 Automation/Drive interface type) for which there is no class driver. At
-least two transports ("bus types" in Windows jargon): USB and IEEE 1394 do
-not have a "scsi" device names of this form.
-.PP
+least two transports (&quot;bus types&quot; in Windows jargon): USB and IEEE 1394 do
+not have a &quot;scsi&quot; device names of this form.
+<P>
+
 In keeping with DOS file system conventions, the various device names
-can be given in upper, lower or mixed case. Since "PhysicalDrive<n>" is
-tedious to write, a shortened form of "PD<n>" is permitted by all
+can be given in upper, lower or mixed case. Since &quot;PhysicalDrive&lt;n&gt;&quot; is
+tedious to write, a shortened form of &quot;PD&lt;n&gt;&quot; is permitted by all
 utilities in this package.
-.PP
+<P>
+
 A single device (e.g. a disk) can have many device names. For
-example: "PD0" can also be "C:", "D:" and "SCSI0:0,1,0". The two volume names
+example: &quot;PD0&quot; can also be &quot;C:&quot;, &quot;D:&quot; and &quot;SCSI0:0,1,0&quot;. The two volume names
 reflect that the disk has two partitions on it. Disk partitions that are
 not recognized by Windows are not usually given a volume name. However
 Vista does show a volume name for a disk which has no partitions recognized
 by it and when selected invites the user to format it (which may be rather
 unfriendly to other OSes).
-.PP
+<P>
+
 These utilities assume a given device name is in the Win32 device namespace.
-To make that explicit "\\\\.\\" can be prepended to the device names mentioned
+To make that explicit &quot;\\.\&quot; can be prepended to the device names mentioned
 in this section. Beware that backslash is an escape character in Unix like
 shells and the C programming language. In a shell like Msys (from MinGW)
 each backslash may need to be typed twice.
-.PP
+<P>
+
 The sg_scan utility within this package lists out Windows device names in
 a form that is suitable for other utilities in this package to use.
-.SH FREEBSD DEVICE NAMING
-SCSI disks have block names of the form /dev/da<num> where <num> is an
-integer starting at zero. The "da" is replaced by "sa" for SCSI tape
-drives and "cd" for SCSI CD/DVD/BD drives. Each SCSI device has a
-corresponding pass\-through device name of the form /dev/pass<num>
-where <num> is an integer starting at zero. The "camcontrol devlist"
+<A NAME="lbAH">&nbsp;</A>
+<H2>FREEBSD DEVICE NAMING</H2>
+
+SCSI disks have block names of the form /dev/da&lt;num&gt; where &lt;num&gt; is an
+integer starting at zero. The &quot;da&quot; is replaced by &quot;sa&quot; for SCSI tape
+drives and &quot;cd&quot; for SCSI CD/DVD/BD drives. Each SCSI device has a
+corresponding pass-through device name of the form /dev/pass&lt;num&gt;
+where &lt;num&gt; is an integer starting at zero. The &quot;camcontrol devlist&quot;
 command may be useful for finding out which SCSI device names are
-available and the correspondence between class and pass\-through names.
-.PP
-FreeBSD allows device names to be given without the leading "/dev/" (e.g.
+available and the correspondence between class and pass-through names.
+<P>
+
+FreeBSD allows device names to be given without the leading &quot;/dev/&quot; (e.g.
 da0 instead of /dev/da0). That worked in this package up until version
-1.43 when the unadorned device name (e.g. "da0") gave an error. The
+1.43 when the unadorned device name (e.g. &quot;da0&quot;) gave an error. The
 original action (i.e. allowing unadorned device names) has been restored
 in version 1.46 . Also note that symlinks (to device names) are followed
-before prepending "/dev/" if the resultant name doesn't start with a "/".
-.PP
+before prepending &quot;/dev/&quot; if the resultant name doesn't start with a &quot;/&quot;.
+<P>
+
 FreeBSD's NVMe naming has been evolving. The controller naming is the
-same as Linux: "/dev/nvme<n>" but the namespaces have an
-extra "s" (e.g. "/dev/nvme0ns1"). The latter is not a block (GEOM)
+same as Linux: &quot;/dev/nvme&lt;n&gt;&quot; but the namespaces have an
+extra &quot;s&quot; (e.g. &quot;/dev/nvme0ns1&quot;). The latter is not a block (GEOM)
 device (strictly speaking FreeBSD does not have block devices). Initially
-FreeBSD had "/dev/nvd<m>" GEOM devices that were not based on the CAM
+FreeBSD had &quot;/dev/nvd&lt;m&gt;&quot; GEOM devices that were not based on the CAM
 subsystem. Then in FreeBSD release 12 a new nda driver was added that is
-CAM (and GEOM) based for NVMe namespaces; it has names like "/dev/nda0".
-The preferred device nodes for this package are "/dev/nvme0" for NVMe
-controllers and "/dev/nda0" for NVMe namespaces.
-.SH SOLARIS DEVICE NAMING
+CAM (and GEOM) based for NVMe namespaces; it has names like &quot;/dev/nda0&quot;.
+The preferred device nodes for this package are &quot;/dev/nvme0&quot; for NVMe
+controllers and &quot;/dev/nda0&quot; for NVMe namespaces.
+<A NAME="lbAI">&nbsp;</A>
+<H2>SOLARIS DEVICE NAMING</H2>
+
 SCSI device names below the /dev directory have a form like: c5t4d3s2
-where the number following "c" is the controller (HBA) number, the number
-following "t" is the target number (from the SCSI parallel interface days)
-and the number following "d" is the LUN. Following the "s" is the slice
-number which is related to a partition and by convention "s2" is the whole
+where the number following &quot;c&quot; is the controller (HBA) number, the number
+following &quot;t&quot; is the target number (from the SCSI parallel interface days)
+and the number following &quot;d&quot; is the LUN. Following the &quot;s&quot; is the slice
+number which is related to a partition and by convention &quot;s2&quot; is the whole
 disk.
-.PP
-OpenSolaris also has a c5t4d3p2 form where the number following the "p" is
-the partition number apart from "p0" which is the whole disk. So a whole
+<P>
+
+OpenSolaris also has a c5t4d3p2 form where the number following the &quot;p&quot; is
+the partition number apart from &quot;p0&quot; which is the whole disk. So a whole
 disk may be referred to as either c5t4d3, c5t4d3s2 or c5t4d3p0 .
-.PP
+<P>
+
 And these device names are duplicated in the /dev/dsk and /dev/rdsk
 directories. The former is the block device name and the latter is
-for "raw" (or char device) access which is what sg3_utils needs. So in
+for &quot;raw&quot; (or char device) access which is what sg3_utils needs. So in
 OpenSolaris something of the form 'sg_inq /dev/rdsk/c5t4d3p0' should work.
-If it doesn't work then add a '\-vvv' option for more debug information.
-Trying this form 'sg_inq /dev/dsk/c5t4d3p0' (note "rdsk" changed to "dsk")
-will result in an "inappropriate ioctl for device" error.
-.PP
+If it doesn't work then add a '-vvv' option for more debug information.
+Trying this form 'sg_inq /dev/dsk/c5t4d3p0' (note &quot;rdsk&quot; changed to &quot;dsk&quot;)
+will result in an &quot;inappropriate ioctl for device&quot; error.
+<P>
+
 The device names within the /dev directory are typically symbolic links to
 much longer topological names in the /device directory. In Solaris cd/dvd/bd
 drives seem to be treated as disks and so are found in the /dev/rdsk
 directory. Tape drives appear in the /dev/rmt directory.
-.PP
+<P>
+
 There is also a sgen (SCSI generic) driver which by default does not attach
 to any device. See the /kernel/drv/sgen.conf file to control what is
 attached. Any attached device will have a device name of the
 form /dev/scsi/c5t4d3 .
-.PP
-Listing available SCSI devices in Solaris seems to be a challenge. "Use
-the 'format' command" advice works but seems a very dangerous way to list
-devices. [It does prompt again before doing any damage.] 'devfsadm \-Cv'
+<P>
+
+Listing available SCSI devices in Solaris seems to be a challenge. &quot;Use
+the 'format' command&quot; advice works but seems a very dangerous way to list
+devices. [It does prompt again before doing any damage.] 'devfsadm -Cv'
 cleans out the clutter in the /dev/rdsk directory, only leaving what
-is "live". The "cfgadm \-v" command looks promising.
-.SH NVME SUPPORT
+is &quot;live&quot;. The &quot;cfgadm -v&quot; command looks promising.
+<A NAME="lbAJ">&nbsp;</A>
+<H2>NVME SUPPORT</H2>
+
 NVMe (or NVM Express) is a relatively new storage transport and command
 set. The level of abstraction of the NVMe command set is somewhat lower
 the SCSI command sets, closer to the level of abstraction of ATA (and SATA)
-command sets. NVMe claims to be designed with flash and modern "solid
-state" storage in mind, something unheard of when SCSI was originally
+command sets. NVMe claims to be designed with flash and modern &quot;solid
+state&quot; storage in mind, something unheard of when SCSI was originally
 developed in the 1980s.
-.PP
+<P>
+
 The SCSI command sets' advantage is the length of time they have been in
 place and the existing tools (like these) to support it. Plus SCSI command
 sets level of abstraction is both and advantage and disadvantage. Recently
-the NVME\-MI (Management Interface) designers decide to use the SCSI
-Enclosure Services (SES\-3) standard "as is" with the addition of two
-tunnelling NVME\-MI commands: SES Send and SES Receive. This means after the
+the NVME-MI (Management Interface) designers decide to use the SCSI
+Enclosure Services (SES-3) standard &quot;as is&quot; with the addition of two
+tunnelling NVME-MI commands: SES Send and SES Receive. This means after the
 OS interface differences are taken into account, the sg_ses, sg_ses_microcode
 and sg_senddiag utilities can be used on a NVMe device that supports a newer
-version of NVME\-MI.
-.PP
-The NVME\-MI SES Send and SES Receive commands correspond to the SCSI
+version of NVME-MI.
+<P>
+
+The NVME-MI SES Send and SES Receive commands correspond to the SCSI
 SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS commands respectively.
 There are however a few other commands that need to be translated, the
 most important of which is the SCSI INQUIRY command to the NVMe Identify
 controller/namespace. Starting in version 1.43 these utilities contain a
 small SNTL (SCSI to NVMe Translation Layer) to take care of these details.
-.PP
-As a side effect of this "juggling" if the sg_inq utility is used (without
-the \-\-page= option) on a NVMe \fIDEVICE\fR then the actual NVMe
+<P>
+
+As a side effect of this &quot;juggling&quot; if the sg_inq utility is used (without
+the --page= option) on a NVMe <I>DEVICE</I> then the actual NVMe
 Identifier (controller and possibly namespace) responses are decoded and
-output. However if 'sg_inq \-\-page=sinq <device>' is given for the
-same \fIDEVICE\fR then parts of the NVMe Identify controller and namespace
+output. However if 'sg_inq --page=sinq &lt;device&gt;' is given for the
+same <I>DEVICE</I> then parts of the NVMe Identify controller and namespace
 response are translated to a SCSI standard INQUIRY response which is then
 decoded and output.
-.PP
+<P>
+
 Apart from the special case with the sg_inq, all other utilities in the
 package assume they are talking to a SCSI device and decode any response
 accordingly. One easy way for users to see the underlying device is a
 NVMe device is the standard INQUIRY response Vendor Identification field
-of "NVMe    " (an 8 character long string with 4 spaces to the right).
-.PP
+of &quot;NVMe    &quot; (an 8 character long string with 4 spaces to the right).
+<P>
+
 The following SCSI commands are currently supported by the SNTL library:
 INQUIRY, MODE SELECT(10), MODE SENSE(10), READ(10,16), READ CAPACITY(10,16),
 RECEIVE DIAGNOSTIC RESULTS, REQUEST SENSE, REPORT LUNS, REPORT SUPPORTED
 OPERATION CODES, REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS, SEND
 DIAGNOSTICS, START STOP UNIT, SYNCHRONIZE CACHE(10,16), TEST UNIT READY,
 VERIFY(10,16), WRITE(10,16) and WRITE SAME(10,16).
-.SH EXIT STATUS
+<A NAME="lbAK">&nbsp;</A>
+<H2>EXIT STATUS</H2>
+
 To aid scripts that call these utilities, the exit status is set to indicate
 success (0) or failure (1 or more). Note that some of the lower values
 correspond to the SCSI sense key values.
-.PP
+<P>
+
 The exit status values listed below can be given to the sg_decode_sense
 utility (which is found in this package) as follows:
-.br
-  sg_decode_sense \-\-err=<exit_status>
-.br
+<BR>
+
+<BR>&nbsp;&nbsp;sg_decode_sense&nbsp;--err=&lt;exit_status&gt;
+<BR>
+
 and a short explanatory string will be output to stdout.
-.PP
+<P>
+
 The exit status values are:
-.TP
-.B 0
+<DL COMPACT>
+<DT><B>0</B>
+
+<DD>
 success. Also used for some utilities that wish to return a boolean value
-for the "true" case (and that no error has occurred). The false case is
+for the &quot;true&quot; case (and that no error has occurred). The false case is
 conveyed by exit status 36.
-.TP
-.B 1
+<DT><B>1</B>
+
+<DD>
 syntax error. Either illegal command line options, options with bad
 arguments or a combination of options that is not permitted.
-.TP
-.B 2
-the \fIDEVICE\fR reports that it is not ready for the operation requested.
-The \fIDEVICE\fR may be in the process of becoming ready (e.g.  spinning up
+<DT><B>2</B>
+
+<DD>
+the <I>DEVICE</I> reports that it is not ready for the operation requested.
+The <I>DEVICE</I> may be in the process of becoming ready (e.g.  spinning up
 but not at speed) so the utility may work after a wait. In Linux the
-\fIDEVICE\fR may be temporarily blocked while error recovery is taking place.
-.TP
-.B 3
-the \fIDEVICE\fR reports a medium or hardware error (or a blank check). For
+<I>DEVICE</I> may be temporarily blocked while error recovery is taking place.
+<DT><B>3</B>
+
+<DD>
+the <I>DEVICE</I> reports a medium or hardware error (or a blank check). For
 example an attempt to read a corrupted block on a disk will yield this value.
-.TP
-.B 5
-the \fIDEVICE\fR reports an "illegal request" with an additional sense code
-other than "invalid command operation code". This is often a supported
+<DT><B>5</B>
+
+<DD>
+the <I>DEVICE</I> reports an &quot;illegal request&quot; with an additional sense code
+other than &quot;invalid command operation code&quot;. This is often a supported
 command with a field set requesting an unsupported capability. For commands
-that require a "service action" field this value can indicate that the
+that require a &quot;service action&quot; field this value can indicate that the
 command with that service action value is not supported.
-.TP
-.B 6
-the \fIDEVICE\fR reports a "unit attention" condition. This usually indicates
+<DT><B>6</B>
+
+<DD>
+the <I>DEVICE</I> reports a &quot;unit attention&quot; condition. This usually indicates
 that something unrelated to the requested command has occurred (e.g. a device
 reset) potentially before the current SCSI command was sent. The requested
 command has not been executed by the device. Note that unit attention
 conditions are usually only reported once by a device.
-.TP
-.B 7
-the \fIDEVICE\fR reports a "data protect" sense key. This implies some
+<DT><B>7</B>
+
+<DD>
+the <I>DEVICE</I> reports a &quot;data protect&quot; sense key. This implies some
 mechanism has blocked writes (or possibly all access to the media).
-.TP
-.B 9
-the \fIDEVICE\fR reports an illegal request with an additional sense code
-of "invalid command operation code" which means that it doesn't support the
+<DT><B>9</B>
+
+<DD>
+the <I>DEVICE</I> reports an illegal request with an additional sense code
+of &quot;invalid command operation code&quot; which means that it doesn't support the
 requested command.
-.TP
-.B 10
-the \fIDEVICE\fR reports a "copy aborted". This implies another command or
+<DT><B>10</B>
+
+<DD>
+the <I>DEVICE</I> reports a &quot;copy aborted&quot;. This implies another command or
 device problem has stopped a copy operation. The EXTENDED COPY family of
 commands (including WRITE USING TOKEN) may return this sense key.
-.TP
-.B 11
-the \fIDEVICE\fR reports an aborted command. In some cases aborted
+<DT><B>11</B>
+
+<DD>
+the <I>DEVICE</I> reports an aborted command. In some cases aborted
 commands can be retried immediately (e.g. if the transport aborted
 the command due to congestion).
-.TP
-.B 14
-the \fIDEVICE\fR reports a miscompare sense key. VERIFY and COMPARE AND
+<DT><B>14</B>
+
+<DD>
+the <I>DEVICE</I> reports a miscompare sense key. VERIFY and COMPARE AND
 WRITE commands may report this.
-.TP
-.B 15
-the utility is unable to open, close or use the given \fIDEVICE\fR or some
+<DT><B>15</B>
+
+<DD>
+the utility is unable to open, close or use the given <I>DEVICE</I> or some
 other file. The given file name could be incorrect or there may be
-permission problems. Adding the '\-v' option may give more information.
-.TP
-.B 17
-a SCSI "Illegal request" sense code received with a flag indicating the
+permission problems. Adding the '-v' option may give more information.
+<DT><B>17</B>
+
+<DD>
+a SCSI &quot;Illegal request&quot; sense code received with a flag indicating the
 Info field is valid. This is often a LBA but its meaning is command specific.
-.TP
-.B 18
-the \fIDEVICE\fR reports a medium or hardware error (or a blank check)
+<DT><B>18</B>
+
+<DD>
+the <I>DEVICE</I> reports a medium or hardware error (or a blank check)
 with a flag indicating the Info field is valid. This is often a LBA (of
 the first encountered error) but its meaning is command specific.
-.TP
-.B 20
-the \fIDEVICE\fR reports it has a check condition but "no sense"
-and non\-zero information in its additional sense codes. Some polling
+<DT><B>20</B>
+
+<DD>
+the <I>DEVICE</I> reports it has a check condition but &quot;no sense&quot;
+and non-zero information in its additional sense codes. Some polling
 commands (e.g. REQUEST SENSE) can receive this response. There may
 be useful information in the sense data such as a progress indication.
-.TP
-.B 21
-the \fIDEVICE\fR reports a "recovered error". The requested command
+<DT><B>21</B>
+
+<DD>
+the <I>DEVICE</I> reports a &quot;recovered error&quot;. The requested command
 was successful. Most likely a utility will report a recovered error
 to stderr and continue, probably leaving the utility with an exit
 status of 0 .
-.TP
-.B 22
-the \fIDEVICE\fR reports that the current command or its parameters imply
+<DT><B>22</B>
+
+<DD>
+the <I>DEVICE</I> reports that the current command or its parameters imply
 a logical block address (LBA) that is out of range. This happens surprisingly
 often when trying to access the last block on a storage device; either a
-classic "off by one" logic error or a misreading of the response from READ
+classic &quot;off by one&quot; logic error or a misreading of the response from READ
 CAPACITY(10 or 16) in which the address of the last block rather than the
-number of blocks on the \fIDEVICE\fR is returned. Since LBAs are origin zero
-they range from 0 to n\-1 where n is the number of blocks on the \fIDEVICE\fR,
+number of blocks on the <I>DEVICE</I> is returned. Since LBAs are origin zero
+they range from 0 to n-1 where n is the number of blocks on the <I>DEVICE</I>,
 so the LBA of the last block is one less than the total number of blocks.
-.TP
-.B 24
-the \fIDEVICE\fR reports a SCSI status of "reservation conflict". This
-means access to the \fIDEVICE\fR with the current command has been blocked
-because another machine (HBA or SCSI "initiator") holds a reservation on
-this \fIDEVICE\fR. On modern SCSI systems this is related to the use of
+<DT><B>24</B>
+
+<DD>
+the <I>DEVICE</I> reports a SCSI status of &quot;reservation conflict&quot;. This
+means access to the <I>DEVICE</I> with the current command has been blocked
+because another machine (HBA or SCSI &quot;initiator&quot;) holds a reservation on
+this <I>DEVICE</I>. On modern SCSI systems this is related to the use of
 the PERSISTENT RESERVATION family of commands.
-.TP
-.B 25
-the \fIDEVICE\fR reports a SCSI status of "condition met". Currently only
-the PRE\-FETCH command (see SBC\-4) yields this status.
-.TP
-.B 26
-the \fIDEVICE\fR reports a SCSI status of "busy". SAM\-6 defines this status
+<DT><B>25</B>
+
+<DD>
+the <I>DEVICE</I> reports a SCSI status of &quot;condition met&quot;. Currently only
+the PRE-FETCH command (see SBC-4) yields this status.
+<DT><B>26</B>
+
+<DD>
+the <I>DEVICE</I> reports a SCSI status of &quot;busy&quot;. SAM-6 defines this status
 as the logical unit is temporarily unable to process a command. It is
-recommended to re\-issue the command.
-.TP
-.B 27
-the \fIDEVICE\fR reports a SCSI status of "task set full".
-.TP
-.B 28
-the \fIDEVICE\fR reports a SCSI status of "ACA active". ACA is "auto
-contingent allegiance" and is seldom used.
-.TP
-.B 29
-the \fIDEVICE\fR reports a SCSI status of "task aborted". SAM\-5 says:
-"This status shall be returned if a command is aborted by a command or task
+recommended to re-issue the command.
+<DT><B>27</B>
+
+<DD>
+the <I>DEVICE</I> reports a SCSI status of &quot;task set full&quot;.
+<DT><B>28</B>
+
+<DD>
+the <I>DEVICE</I> reports a SCSI status of &quot;ACA active&quot;. ACA is &quot;auto
+contingent allegiance&quot; and is seldom used.
+<DT><B>29</B>
+
+<DD>
+the <I>DEVICE</I> reports a SCSI status of &quot;task aborted&quot;. SAM-5 says:
+&quot;This status shall be returned if a command is aborted by a command or task
 management function on another I_T nexus and the Control mode page TAS bit
-is set to one".
-.TP
-.B 31
+is set to one&quot;.
+<DT><B>31</B>
+
+<DD>
 error involving two or more command line options. They may be contradicting,
 select an unsupported mode, or a required option (given the context) is
 missing.
-.TP
-.B 32
+<DT><B>32</B>
+
+<DD>
 there is a logic error in the utility. It corresponds to code comments
-like "shouldn't/can't get here". Perhaps the author should be informed.
-.TP
-.B 33
-the command sent to \fIDEVICE\fR has timed out.
-.TP
-.B 34
+like &quot;shouldn't/can't get here&quot;. Perhaps the author should be informed.
+<DT><B>33</B>
+
+<DD>
+the command sent to <I>DEVICE</I> has timed out.
+<DT><B>34</B>
+
+<DD>
 this is a Windows only exit status and indicates that the Windows error
 number (32 bits) cannot meaningfully be mapped to an equivalent Unix error
 number returned as the exit status (7 bits).
-.TP
-.B 35
+<DT><B>35</B>
+
+<DD>
 a transport error has occurred. This will either be in the driver (e.g. HBA
 driver) or in the interconnect between the host (initiator) and the
 device (target).  For example in SAS an expander can run out of paths and
 thus be unable to return the user data for a READ command.
-.TP
-.B 36
+<DT><B>36</B>
+
+<DD>
 no error has occurred plus the utility wants to convey a boolean value
 of false. The corresponding true value is conveyed by a 0 exit status.
-.TP
-.B 40
-the command sent to \fIDEVICE\fR has received an "aborted command" sense
+<DT><B>40</B>
+
+<DD>
+the command sent to <I>DEVICE</I> has received an &quot;aborted command&quot; sense
 key with an additional sense code of 0x10. This value is related to
 problems with protection information (PI or DIF). For example this error
 may occur when reading a block on a drive that has never been written (or
 is unmapped) if that drive was formatted with type 1, 2 or 3 protection.
-.TP
-.B 41
-the command sent to \fIDEVICE\fR has received an "aborted command" sense
+<DT><B>41</B>
+
+<DD>
+the command sent to <I>DEVICE</I> has received an &quot;aborted command&quot; sense
 key with an additional sense code of 0x10 (as with error code) plus a flag
 indicating the Info field is valid.
-.TP
-.B 48
+<DT><B>48</B>
+
+<DD>
 this is an internal message indicating a NVMe status field (SF) is other
 than zero after a command has been executed (i.e. something went wrong).
 Work in this area is currently experimental.
-.TP
-.B 49
+<DT><B>49</B>
+
+<DD>
 low level driver reports a response's residual count (i.e. number of bytes
-actually received by HBA is 'requested_bytes \- residual_count') that is
+actually received by HBA is 'requested_bytes - residual_count') that is
 nonsensical.
-.TP
-.B 50
+<DT><B>50</B>
+
+<DD>
 OS system calls that fail often return a small integer number to help. In
-Unix these are called "errno" values where 0 implies no error. These error
+Unix these are called &quot;errno&quot; values where 0 implies no error. These error
 codes set aside 51 to 96 for mapping these errno values but that may not be
 sufficient. Higher errno values that cannot be mapped are all mapped to
 this value (i.e. 50).
-.br
+<BR>
+
 Note that an errno value of 0 is mapped to error code 0.
-.TP
-.B 50 + <os_error_number>
+<DT><B>50 + &lt;os_error_number&gt;</B>
+
+<DD>
 OS system calls that fail often return a small integer number to help
 indicate what the error is. For example in Unix the inability of a system
 call to allocate memory returns (in 'errno') ENOMEM which often is
@@ -492,254 +596,285 @@ package reports 50+ENOMEM when it can't allocate memory, not necessarily
 from an OS system call. In recent versions of Linux the file showing the
 mapping between symbolic constants (e.g. ENOMEM) and the corresponding
 integer is in the kernel source code file:
-include/uapi/asm\-generic/errno\-base.h
-.br
+include/uapi/asm-generic/errno-base.h
+<BR>
+
 Note that errno values that are greater than or equal to 47 cannot fit in
 range provided. Instead they are all mapped to 50 as discussed in the
 previous entry.
-.TP
-.B 97
+<DT><B>97</B>
+
+<DD>
 a SCSI command response failed sanity checks.
-.TP
-.B 98
-the \fIDEVICE\fR reports it has a check condition but the error
+<DT><B>98</B>
+
+<DD>
+the <I>DEVICE</I> reports it has a check condition but the error
 doesn't fit into any of the above categories.
-.TP
-.B 99
+<DT><B>99</B>
+
+<DD>
 any errors that can't be categorized into values 1 to 98 may yield
 this value. This includes transport and operating system errors
 after the command has been sent to the device.
-.TP
-.B 100\-125
+<DT><B>100-125</B>
+
+<DD>
 these error codes are used by the ddpt utility which uses the sg3_utils
 library. They are mainly specialized error codes associated with offloaded
 copies.
-.TP
-.B 126
+<DT><B>126</B>
+
+<DD>
 the utility was found but could not be executed. That might occur if the
 executable does not have execute permissions.
-.TP
-.B 127
+<DT><B>127</B>
+
+<DD>
 This is the exit status for utility not found. That might occur when a
 script calls a utility in this package but the PATH environment variable
 has not been properly set up, so the script cannot find the executable.
-.TP
-.B 128 + <signum>
+<DT><B>128 + &lt;signum&gt;</B>
+
+<DD>
 If a signal kills a utility then the exit status is 128 plus the signal
 number. For example if a segmentation fault occurs then a utility is
 typically killed by SIGSEGV which according to 'man 7 signal' has an
 associated signal number of 11; so the exit status will be 139 .
-.TP
-.B 255
+<DT><B>255</B>
+
+<DD>
 the utility tried to yield an exit status of 255 or larger. That should
 not happen; given here for completeness.
-.PP
+</DL>
+<P>
+
 Most of the error conditions reported above will be repeatable (an example
-of one that is not is "unit attention") so the utility can be run again with
-the '\-v' option (or several) to obtain more information.
-.SH COMMON OPTIONS
+of one that is not is &quot;unit attention&quot;) so the utility can be run again with
+the '-v' option (or several) to obtain more information.
+<A NAME="lbAL">&nbsp;</A>
+<H2>COMMON OPTIONS</H2>
+
 Arguments to long options are mandatory for short options as well. In the
 short form an argument to an option uses zero or more spaces as a
-separator (i.e. the short form does not use "=" as a separator).
-.PP
+separator (i.e. the short form does not use &quot;=&quot; as a separator).
+<P>
+
 If an option takes a numeric argument then that argument is assumed to
-be decimal unless otherwise indicated (e.g. with a leading "0x", a
-trailing "h" or as noted in the usage message).
-.PP
+be decimal unless otherwise indicated (e.g. with a leading &quot;0x&quot;, a
+trailing &quot;h&quot; or as noted in the usage message).
+<P>
+
 Some options are used uniformly in most of the utilities in this
 package. Those options are listed below. Note that there are some
 exceptions.
-.TP
-\fB\-d\fR, \fB\-\-dry\-run\fR
+<DL COMPACT>
+<DT><B>-d</B>, <B>--dry-run</B><DD>
 utilities that can cause lots of user data to be lost or overwritten
-sometimes have a \fI\-\-dry\-run\fR option. Device modifying actions are
-typically bypassed (or skipped) to implement a policy of "do no harm".
+sometimes have a <I>--dry-run</I> option. Device modifying actions are
+typically bypassed (or skipped) to implement a policy of &quot;do no harm&quot;.
 This allows complex command line invocations to be tested before the
-action required (e.g. format a disk) is performed. The \fI\-\-dry\-run\fR
+action required (e.g. format a disk) is performed. The <I>--dry-run</I>
 option has become a common feature of many command line utilities (e.g.
 the Unix 'patch' command), not just those from this package.
-.br
+<BR>
+
 Note that most hyphenated option names in this package also can be given
-with an underscore rather than a hyphen (e.g.  \fI\-\-dry_run\fR).
-.TP
-\fB\-e\fR, \fB\-\-enumerate\fR
+with an underscore rather than a hyphen (e.g.  <I>--dry_run</I>).
+<DT><B>-e</B>, <B>--enumerate</B><DD>
 some utilities (e.g. sg_ses and sg_vpd) store a lot of information in
 internal tables. This option will output that information in some readable
 form (e.g. sorted by an acronym or by page number) then exit. Note that
-with this option \fIDEVICE\fR is ignored (as are most other options) and no
+with this option <I>DEVICE</I> is ignored (as are most other options) and no
 SCSI IO takes place, so the invoker does not need any elevated permissions.
-.TP
-\fB\-h\fR, \fB\-?\fR, \fB\-\-help\fR
-output the usage message then exit. In a few older utilities the '\-h'
-option requests hexadecimal output. In these cases the '\-?' option will
+<DT><B>-h</B>, <B>-?</B>, <B>--help</B><DD>
+output the usage message then exit. In a few older utilities the '-h'
+option requests hexadecimal output. In these cases the '-?' option will
 output the usage message then exit.
-.TP
-\fB\-H\fR, \fB\-\-hex\fR
-for SCSI commands that yield a non\-trivial response, print out that response
-in ASCII hexadecimal. When used once, 16 bytes are printed on each line,
-prefixed by an relative address, starting at 0 (hex). When used twice, an
-ASCII rendering of the 16 bytes is appended to each line, with non printeble
-characters replaced by a '.' . When used three times only the 16 hex bytes
-are printed on each line (hence no address prefix nor ASCII appended). To
-produce hexadecimal that can be parsed by other utilities use this option
-three or four times.
-.TP
-\fB\-i\fR, \fB\-\-in\fR=\fIFN\fR
+<DT><B>-H</B>, <B>--hex</B><DD>
+for SCSI commands that yield a non-trivial response, print out that
+response in ASCII hexadecimal. To produce hexadecimal that can be parsed
+by other utilities (e.g. without a relative address to the left and without
+trailing ASCII) use this option three or four times.
+<DT><B>-i</B>, <B>--in</B>=<I>FN</I><DD>
 many SCSI commands fetch a significant amount of data (returned in the
-data\-in buffer) which several of these utilities decode (e.g. sg_vpd and
+data-in buffer) which several of these utilities decode (e.g. sg_vpd and
 sg_logs). To separate the two steps of fetching the data from a SCSI device
 and then decoding it, this option has been added. The first step (fetching
-the data) can be done using the \fI\-\-hex\fR or \fI\-\-raw\fR option and
-redirecting the command line output to a file (often done with ">" in Unix
-based operating systems). The difference between \fI\-\-hex\fR and
-\fI\-\-raw\fR is that the former produces output in ASCII hexadecimal
-while \fI\-\-raw\fR produces its output in "raw" binary.
-.br
+the data) can be done using the <I>--hex</I> or <I>--raw</I> option and
+redirecting the command line output to a file (often done with &quot;&gt;&quot; in Unix
+based operating systems). The difference between <I>--hex</I> and
+<I>--raw</I> is that the former produces output in ASCII hexadecimal
+while <I>--raw</I> produces its output in &quot;raw&quot; binary.
+<BR>
+
 The second step (i.e. decoding the SCSI response data now held in a file)
-can be done using this \fI\-\-in=FN\fR option where the file name is
-\fIFN\fR. If "\-" is used for \fIFN\fR then stdin is assumed, again this
+can be done using this <I>--in=FN</I> option where the file name is
+<I>FN</I>. If &quot;-&quot; is used for <I>FN</I> then stdin is assumed, again this
 allows for command line redirection (or piping). That file (or stdin)
-is assumed to contain ASCII hexadecimal unless the \fI\-\-raw\fR option is
+is assumed to contain ASCII hexadecimal unless the <I>--raw</I> option is
 also given in which case it is assumed to be binary. Notice that the meaning
-of the \fI\-\-raw\fR option is "flipped" when used with \fI\-\-in=FN\fR to
+of the <I>--raw</I> option is &quot;flipped&quot; when used with <I>--in=FN</I> to
 act on the input, typically it acts on the output data.
-.br
+<BR>
+
 Since the structure of the data returned by SCSI commands varies
 considerably then the usage information or the manpage of the utility being
-used should be checked. In some cases \fI\-\-hex\fR may need to be used
-multiple times (and is more conveniently given as '\-HH' or '\-HHH).
-.TP
-\fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
-This option has the same or similar functionality as \fI\-\-in=FN\fR. And
+used should be checked. In some cases <I>--hex</I> may need to be used
+multiple times (and is more conveniently given as '-HH' or '-HHH).
+<DT><B>-i</B>, <B>--inhex</B>=<I>FN</I><DD>
+This option has the same or similar functionality as <I>--in=FN</I>. And
 perhaps 'inhex' is more descriptive since by default, ASCII hexadecimal is
-expected in the contents of file: \fIFN\fR. Alternatively the short form
-option may be \fI\-I\fR or \fI\-X\fR. See the "FORMAT OF FILES CONTAINING
-ASCII HEX" section below for more information.
-.TP
-\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+expected in the contents of file: <I>FN</I>. Alternatively the short form
+option may be <I>-I</I> or <I>-X</I>. See the &quot;FORMAT OF FILES CONTAINING
+ASCII HEX&quot; section below for more information.
+<DT><B>-m</B>, <B>--maxlen</B>=<I>LEN</I><DD>
 several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
 lengths that vary depending on many factors, only some of which these
 utilities take into account. The maximum response length is typically
 specified in the 'allocation length' field of the cdb. In the absence of
 this option, several utilities use a default allocation length (sometimes
-recommended in the SCSI draft standards) or a "double fetch" strategy.
-See sg_logs(8) for its description of a "double fetch" strategy. These
+recommended in the SCSI draft standards) or a &quot;double fetch&quot; strategy.
+See <A HREF="../man8/sg_logs.8.html">sg_logs</A>(8) for its description of a &quot;double fetch&quot; strategy. These
 techniques are imperfect and in the presence of faulty SCSI targets can
 cause problems (e.g. some USB mass storage devices freeze if they receive
 an INQUIRY allocation length other than 36). Also use of this option
-disables any "double fetch" strategy that may have otherwise been used.
-.br
-To head off a class of degenerate bugs, if \fILEN\fR is less than 16 then
+disables any &quot;double fetch&quot; strategy that may have otherwise been used.
+<BR>
+
+To head off a class of degenerate bugs, if <I>LEN</I> is less than 16 then
 it is ignored (usually with a warning message) and the default value is
 used instead. Some utilities use 4 (bytes), rather than 16, as the cutoff
 value.
-.TP
-\fB\-r\fR, \fB\-\-raw\fR
-for SCSI commands that yield a non\-trivial response, output that response
+<DT><B>-r</B>, <B>--raw</B><DD>
+for SCSI commands that yield a non-trivial response, output that response
 in binary to stdout. If any error messages or warning are produced they are
 usually sent to stderr so as to not interfere with the output from this
 option.
-.br
-Some utilities that consume data to send to the \fIDEVICE\fR along with the
-SCSI command, use this option. Alternatively the \fI\-\-in=FN\fR option causes
-\fIDEVICE\fR to be ignored and the response data (to be decoded) fetched
-from a file named \fIFN\fR. In these cases this option may indicate that
-binary data can be read from stdin or from a nominated file (e.g. \fIFN\fR).
-.TP
-\fB\-t\fR, \fB\-\-timeout\fR=\fISECS\fR
-utilities that issue potentially long\-running SCSI commands often have a
-\fI\-\-timeout=SECS\fR option. This typically instructs the operating system
+<BR>
+
+Some utilities that consume data to send to the <I>DEVICE</I> along with the
+SCSI command, use this option. Alternatively the <I>--in=FN</I> option causes
+<I>DEVICE</I> to be ignored and the response data (to be decoded) fetched
+from a file named <I>FN</I>. In these cases this option may indicate that
+binary data can be read from stdin or from a nominated file (e.g. <I>FN</I>).
+<DT><B>-t</B>, <B>--timeout</B>=<I>SECS</I><DD>
+utilities that issue potentially long-running SCSI commands often have a
+<I>--timeout=SECS</I> option. This typically instructs the operating system
 to abort the SCSI command in question once the timeout expires. Aborting
 SCSI commands is typically a messy business and in the case of format like
-commands may leave the device in a "format corrupt" state requiring another
-long\-running re\-initialization command to be sent. The argument, \fISECS\fR,
+commands may leave the device in a &quot;format corrupt&quot; state requiring another
+long-running re-initialization command to be sent. The argument, <I>SECS</I>,
 is usually in seconds and the short form of the option may be something
-other than \fI\-t\fR since the timeout option was typically added later as
+other than <I>-t</I> since the timeout option was typically added later as
 storage devices grew in size and initialization commands took longer. Since
 many utilities had relatively long internal command timeouts before this
 option was introduced, the actual command timeout given to the operating
-systems is the higher of the internal timeout and \fISECS\fR.
-.br
+systems is the higher of the internal timeout and <I>SECS</I>.
+<BR>
+
 Many long running SCSI commands have an IMMED bit which causes the command
 to finish relatively quickly but the initialization process to continue. In
 such cases the REQUEST SENSE command can be used to monitor progress with
 its progress indication field (see the sg_requests and sg_turs utilities).
-Utilities that send such SCSI command either have an \fI\-\-immed\fR option
-or a \fI\-\-wait\fR option which is the logical inverse of the "immediate"
+Utilities that send such SCSI command either have an <I>--immed</I> option
+or a <I>--wait</I> option which is the logical inverse of the &quot;immediate&quot;
 action.
-.TP
-\fB\-v\fR, \fB\-\-verbose\fR
+<DT><B>-v</B>, <B>--verbose</B><DD>
 increase the level of verbosity, (i.e. debug output). Can be used multiple
 times to further increase verbosity. The additional output caused by this
 option is almost always sent to stderr.
-.TP
-\fB\-V\fR, \fB\-\-version\fR
+<DT><B>-V</B>, <B>--version</B><DD>
 print the version string and then exit. Each utility has its own version
 number and date of last code change.
-.SH NUMERIC ARGUMENTS
+</DL>
+<A NAME="lbAM">&nbsp;</A>
+<H2>NUMERIC ARGUMENTS</H2>
+
 Many utilities have command line options that take numeric arguments. These
 numeric arguments can be large values (e.g. a logical block address (LBA) on
 a disk) and can be inconvenient to enter in the default decimal
 representation. So various other representations are permitted.
-.PP
+<P>
+
 Multiplicative suffixes are accepted. They are one, two or three letter
 strings appended directly after the number to which they apply:
-.PP
-   c C         *1
-.br
-   w W         *2
-.br
-   b B         *512
-.br
-   k K KiB     *1024
-.br
-   KB kB       *1000
-.br
-   m M MiB     *1048576
-.br
-   MB mB       *1000000
-.br
-   g G GiB     *(2^30)
-.br
-   GB gB       *(10^9)
-.br
-   t T TiB     *(2^40)
-.br
-   TB          *(10^12)
-.br
-   p P PiB     *(2^50)
-.br
-   PB          *(10^15)
-.PP
-An example is "2k" for 2048. The large tera and peta suffixes are only
+<P>
+
+<BR>&nbsp;&nbsp;&nbsp;c&nbsp;C&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;w&nbsp;W&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*2
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;b&nbsp;B&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*512
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;k&nbsp;K&nbsp;KiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1024
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;KB&nbsp;kB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1000
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;m&nbsp;M&nbsp;MiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1048576
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;MB&nbsp;mB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1000000
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;g&nbsp;G&nbsp;GiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(2^30)
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;GB&nbsp;gB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(10^9)
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;t&nbsp;T&nbsp;TiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(2^40)
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;TB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(10^12)
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;p&nbsp;P&nbsp;PiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(2^50)
+<BR>
+
+<BR>&nbsp;&nbsp;&nbsp;PB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(10^15)
+<P>
+
+An example is &quot;2k&quot; for 2048. The large tera and peta suffixes are only
 available for numeric arguments that might require 64 bits to represent
 internally.
-.PP
+<P>
+
 These multiplicative suffixes are compatible with GNU's dd command (since
-2002) which claims compliance with SI and with IEC 60027\-2.
-.PP
-A suffix of the form "x<n>" multiplies the preceding number by <n>. An
-example is "2x33" for "66". The left argument cannot be '0' as '0x' will
+2002) which claims compliance with SI and with IEC 60027-2.
+<P>
+
+A suffix of the form &quot;x&lt;n&gt;&quot; multiplies the preceding number by &lt;n&gt;. An
+example is &quot;2x33&quot; for &quot;66&quot;. The left argument cannot be '0' as '0x' will
 be interpreted as hexadecimal number prefix (see below). The left
 argument to the multiplication must end in a hexadecimal digit (i.e.
 0 to f) and the whole expression cannot have any embedded whitespace (e.g.
-spaces). An ugly example: "0xfx0x2" for 30.
-.PP
-A suffix of the form "+<n>" adds the preceding number to <n>. An example
-is "3+1k" for "1027". The left argument to the addition must end in a
+spaces). An ugly example: &quot;0xfx0x2&quot; for 30.
+<P>
+
+A suffix of the form &quot;+&lt;n&gt;&quot; adds the preceding number to &lt;n&gt;. An example
+is &quot;3+1k&quot; for &quot;1027&quot;. The left argument to the addition must end in a
 hexadecimal digit (i.e. 0 to f) and the whole expression cannot have any
-embedded whitespace (e.g. spaces). Another example: "0xf+0x2" for 17.
-.PP
+embedded whitespace (e.g. spaces). Another example: &quot;0xf+0x2&quot; for 17.
+<P>
+
 Alternatively numerical arguments can be given in hexadecimal. There are
-two syntaxes. The number can be preceded by either "0x" or "0X" as found
+two syntaxes. The number can be preceded by either &quot;0x&quot; or &quot;0X&quot; as found
 in the C programming language. The second hexadecimal representation is a
-trailing "h" or "H" as found in (storage) standards. When hex numbers are
-given, multipliers cannot be used. For example the decimal value "256" can
-be given as "0x100" or "100h".
-.SH FORMAT OF FILES CONTAINING ASCII HEX
+trailing &quot;h&quot; or &quot;H&quot; as found in (storage) standards. When hex numbers are
+given, multipliers cannot be used. For example the decimal value &quot;256&quot; can
+be given as &quot;0x100&quot; or &quot;100h&quot;.
+<A NAME="lbAN">&nbsp;</A>
+<H2>FORMAT OF FILES CONTAINING ASCII HEX</H2>
+
 Such a file is assumed to contain a sequence of one or two digit ASCII
-hexadecimal values separated by whitespace. "Whitespace consists of either
-spaces, tabs, blank lines, or any combination thereof". Each one or two digit
+hexadecimal values separated by whitespace. &quot;Whitespace consists of either
+spaces, tabs, blank lines, or any combination thereof&quot;. Each one or two digit
 ASCII hex pair is decoded into a byte (i.e. 8 bits). The following will be
 decoded to valid (ascending valued)
 bytes: '0', '01', '3', 'c', 'F', '4a', 'cC', 'ff'.
@@ -748,19 +883,17 @@ containing a hash mark ('#') is ignored from that point until the end of that
 line. Users are encouraged to use hash marks to introduce comments in hex
 files. The author uses the extension'.hex' on such files. Examples can be
 found in the 'inhex' directory.
-.PP
-The hexadecimal format described in the previous paragraph can be converted
-to binary using the sg_decode_sense utility with these
-options: "\fI\-\-inhex=HFN \-\-nodecode \-\-write=WFN\fR". The input (in
-hex) is in the \fIHFN\fR file while the output is placed in the \fIWFN\fR
-file.
-.SH MICROCODE AND FIRMWARE
+<A NAME="lbAO">&nbsp;</A>
+<H2>MICROCODE AND FIRMWARE</H2>
+
 There are two standardized methods for downloading microcode (i.e. device
 firmware) to a SCSI device. The more general way is with the SCSI WRITE
 BUFFER command, see the sg_write_buffer utility. SCSI enclosures have
 their own method based on the Download microcode control/status diagnostic
 page, see the sg_ses_microcode utility.
-.SH SCRIPTS, EXAMPLES and UTILS
+<A NAME="lbAP">&nbsp;</A>
+<H2>SCRIPTS, EXAMPLES and UTILS</H2>
+
 There are several bash shell scripts in the 'scripts' subdirectory that
 invoke compiled utilities (e.g. sg_readcap). Several of the scripts start
 with 'scsi_' rather than 'sg_'. One purpose of these scripts is to call the
@@ -769,42 +902,88 @@ compiled utilities only allow one device as an argument. Some distributions
 install these scripts in a more visible directory (e.g. /usr/bin). Some of
 these scripts have man page entries. See the README file in the 'scripts'
 subdirectory.
-.PP
+<P>
+
 There is some example C code plus examples of complex invocations in
 the 'examples' subdirectory. There is also a README file. The example C
-may be a simpler example of how to use a SCSI pass\-through in Linux
+may be a simpler example of how to use a SCSI pass-through in Linux
 than the main utilities (found in the 'src' subdirectory). This is due
 to the fewer abstraction layers (e.g. they don't worry the MinGW in
 Windows may open a file in text rather than binary mode).
-.PP
+<P>
+
 Some utilities that the author has found useful have been placed in
 the 'utils' subdirectory.
-.SH WEB SITE
+<A NAME="lbAQ">&nbsp;</A>
+<H2>WEB SITE</H2>
+
 There is a web page discussing this package at
-https://sg.danny.cz/sg/sg3_utils.html . The device naming used by this
+<A HREF="https://sg.danny.cz/sg/sg3_utils.html">https://sg.danny.cz/sg/sg3_utils.html</A> . The device naming used by this
 package on various operating systems is discussed at:
-https://sg.danny.cz/sg/device_name.html . There is a git code mirror at
-https://github.com/hreinecke/sg3_utils . The principle code repository
+<A HREF="https://sg.danny.cz/sg/device_name.html">https://sg.danny.cz/sg/device_name.html</A> . There is a git code mirror at
+<A HREF="https://github.com/hreinecke/sg3_utils">https://github.com/hreinecke/sg3_utils</A> . The principle code repository
 uses subversion and is on the author's equipment. The author keeps track
 of this via the subversion revision number which is an ascending integer
-(currently at 922 for this package). The github mirror gets updated
+(currently at 774 for this package). The github mirror gets updated
 periodically from the author's repository. Depending on the time of
 update, the above Downloads section at sg.danny.cz may be more up to
 date than the github mirror.
-.SH AUTHORS
+<A NAME="lbAR">&nbsp;</A>
+<H2>AUTHORS</H2>
+
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).
-.SH "REPORTING BUGS"
-Report bugs to <dgilbert at interlog dot com>.
-.SH COPYRIGHT
-Copyright \(co 1999\-2021 Douglas Gilbert
-.br
+<A NAME="lbAS">&nbsp;</A>
+<H2>REPORTING BUGS</H2>
+
+Report bugs to &lt;dgilbert at interlog dot com&gt;.
+<A NAME="lbAT">&nbsp;</A>
+<H2>COPYRIGHT</H2>
+
+Copyright &#169; 1999-2021 Douglas Gilbert
+<BR>
+
 Some utilities are distributed under a GPL version 2 license while
 others, usually more recent ones, are under a FreeBSD license. The files
 that are common to almost all utilities and thus contain the most reusable
 code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
 under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
-.SH "SEE ALSO"
-.B sg_decode_sense(sg3_utils), sdparm(sdparm), ddpt(ddpt), lsscsi(lsscsi),
-.B dmesg(1), mt(1)
+<A NAME="lbAU">&nbsp;</A>
+<H2>SEE ALSO</H2>
+
+<B>sdparm(sdparm), ddpt(ddpt), lsscsi(lsscsi), <A HREF="../man1/dmesg.1.html">dmesg</A>(1), <A HREF="../man1/mt.1.html">mt</A>(1)</B>
+
+<P>
+
+<HR>
+<A NAME="index">&nbsp;</A><H2>Index</H2>
+<DL>
+<DT><A HREF="#lbAB">NAME</A><DD>
+<DT><A HREF="#lbAC">SYNOPSIS</A><DD>
+<DT><A HREF="#lbAD">DESCRIPTION</A><DD>
+<DT><A HREF="#lbAE">ENVIRONMENT VARIABLES</A><DD>
+<DT><A HREF="#lbAF">LINUX DEVICE NAMING</A><DD>
+<DT><A HREF="#lbAG">WINDOWS DEVICE NAMING</A><DD>
+<DT><A HREF="#lbAH">FREEBSD DEVICE NAMING</A><DD>
+<DT><A HREF="#lbAI">SOLARIS DEVICE NAMING</A><DD>
+<DT><A HREF="#lbAJ">NVME SUPPORT</A><DD>
+<DT><A HREF="#lbAK">EXIT STATUS</A><DD>
+<DT><A HREF="#lbAL">COMMON OPTIONS</A><DD>
+<DT><A HREF="#lbAM">NUMERIC ARGUMENTS</A><DD>
+<DT><A HREF="#lbAN">FORMAT OF FILES CONTAINING ASCII HEX</A><DD>
+<DT><A HREF="#lbAO">MICROCODE AND FIRMWARE</A><DD>
+<DT><A HREF="#lbAP">SCRIPTS, EXAMPLES and UTILS</A><DD>
+<DT><A HREF="#lbAQ">WEB SITE</A><DD>
+<DT><A HREF="#lbAR">AUTHORS</A><DD>
+<DT><A HREF="#lbAS">REPORTING BUGS</A><DD>
+<DT><A HREF="#lbAT">COPYRIGHT</A><DD>
+<DT><A HREF="#lbAU">SEE ALSO</A><DD>
+</DL>
+<HR>
+This document was created by
+<A HREF="/cgi-bin/man/man2html">man2html</A>,
+using the manual pages.<BR>
+Time: 03:12:28 GMT, November 11, 2021
+</BODY>
+</HTML>

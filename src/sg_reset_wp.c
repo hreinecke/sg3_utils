@@ -37,7 +37,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.15 20210830";
+static const char * version_str = "1.16 20211114";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -88,7 +88,7 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, uint16_t zc, bool all,
     int ret, res, sense_cat;
     uint8_t rwp_cdb[SG_ZONING_OUT_CMDLEN] = {SG_ZONING_OUT,
          RESET_WRITE_POINTER_SA, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be64(zid, rwp_cdb + 2);

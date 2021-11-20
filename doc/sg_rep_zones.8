@@ -1,13 +1,13 @@
-.TH SG_REP_ZONES "8" "June 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_REP_ZONES "8" "November 2021" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_rep_zones \- send SCSI REPORT ZONES, REALMS or ZONE DOMAINS command
 .SH SYNOPSIS
 .B sg_rep_zones
-[\fI\-\-domain\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR]
-[\fI\-\-locator=LBA\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR]
-[\fI\-\-partial\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-realm\fR]
-[\fI\-\-report=OPT\fR] [\fI\-\-start=LBA\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-wp\fR] \fIDEVICE\fR
+[\fI\-\-domain\fR] [\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-inhex=FN\fR] [\fI\-\-locator=LBA\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-num=NUM\fR] [\fI\-\-partial\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-realm\fR] [\fI\-\-report=OPT\fR] [\fI\-\-start=LBA\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wp\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -32,6 +32,12 @@ Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-d\fR, \fB\-\-domain\fR
 send or decode the SCSI REPORT ZONE DOMAINS command.
+.TP
+\fB\-f\fR, \fB\-\-force\fR
+when decoding the response to this command, certain sanity checks are
+done and if they fail a message is sent to stderr and a non\-zero
+exit status is set. If this option is given those sanity checks are
+bypassed.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.

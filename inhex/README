@@ -41,10 +41,42 @@ Device Identification VPD page:
       SCSI name string:
       naa.5000C5003011CB28
 
+Binary <--> Hexadecimal
+-----------------------
+The vpd_zbdc.raw file is binary and was created by:
+    sg_decode_sense --inhex=vpd_zbdc.hex --nodecode --write=vpd_zbdc.raw
+as an example of converting a file in ASCII hexadecimal byte oriented
+format to binary.
 
+Turning binary output into hexadecimal can be done several ways. For
+viewing in byte oriented ASCII hex these Unix commands can be used:
+    od -t x1 vpd_zbdc.raw
+    hexdump -C vpd_zbdc.raw
+
+Each line starting with a "input offset" which is a running count of
+bytes, starting at zero. The hexdump examples shows an ASCII rendering
+of those 16 bytes to the right of each line. The sg_decode_sense utility
+may also be used:
+    sg_decode_sense --binary=vpd_zbdc.raw -H 
+    sg_decode_sense --binary=vpd_zbdc.raw -HH 
+
+The second form of sg_decode_sense appends an ASCII rendering of the 16
+bytes to the right of each line.
+
+When ASCII hexadecimal is being used as input to a utility in this
+package, the "input offset" at the start of each line must (and the
+optional ASCII rendering to the right of each line, must not be given.
+That can be done with hexdump:
+   hexdump -An -C -v vpd_zbdc.raw
+
+And the sg_decode_sense utility can do it with:
+   sg_decode_sense --binary=vpd_zbdc.raw -HHH
+
+Conclusion
+----------
 Users are encouraged to send the author any ASCII hex files for utilities
 that support --inhex and don't have hex data already. Special cases are
 also welcome. They help the author test this code.
 
 Douglas Gilbert
-25th September 2021
+20th November 2021

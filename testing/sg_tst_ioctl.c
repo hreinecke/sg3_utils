@@ -635,7 +635,7 @@ do_mrqs(int sg_fd, int sg_fd2, int mrqs)
     struct sg_io_v4 * h4p;
     struct sg_io_v4 * mrq_h4p;
     struct sg_io_v4 mrq_h4;
-    uint8_t sense_buffer[SENSE_BUFFER_LEN];
+    uint8_t sense_buffer[SENSE_BUFFER_LEN] = {0};
     uint8_t inq_cdb[INQ_CMD_LEN] =      /* Device Id VPD page */
                                 {0x12, 0x1, 0x83, 0, INQ_REPLY_LEN, 0};
     uint8_t sdiag_cdb[SDIAG_CMD_LEN] =
@@ -786,7 +786,7 @@ main(int argc, char * argv[])
     sg_io_hdr_t rio_hdr;
     char ebuff[EBUFF_SZ];
     char dname[256];
-    uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
+    uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN] = {0};
     const char * second_fname = NULL;
     const char * cp;
     char * chp;

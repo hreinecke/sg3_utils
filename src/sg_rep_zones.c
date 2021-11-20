@@ -39,7 +39,7 @@
  * Based on zbc2r10.pdf
  */
 
-static const char * version_str = "1.28 20210922";
+static const char * version_str = "1.29 20211117";
 
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
@@ -105,7 +105,8 @@ usage(int h)
 {
     if (h > 1) goto h_twoormore;
     pr2serr("Usage: "
-            "sg_rep_zones  [--domain] [--help] [--hex] [--inhex=FN]\n"
+            "sg_rep_zones  [--domain] [--force] [--help] [--hex] "
+            "[--inhex=FN]\n"
             "                     [--locator=LBA] [--maxlen=LEN] "
             "[--partial] [--raw]\n"
             "                     [--readonly] [--realm] [--report=OPT] "
@@ -113,6 +114,8 @@ usage(int h)
             "                     [--verbose] [--version] DEVICE\n");
     pr2serr("  where:\n"
             "    --domain|-d        sends a REPORT ZONE DOMAINS command\n"
+            "    --force|-f         bypass some sanity checks when decoding "
+            "response\n"
             "    --help|-h          print out usage message, use twice for "
             "more help\n"
             "    --hex|-H           output response in hexadecimal; used "
@@ -140,7 +143,7 @@ usage(int h)
             "    --version|-V       print version string and exit\n"
             "    --wp|-w            output write pointer only\n\n"
             "Sends a SCSI REPORT ZONES, REPORT ZONE DOMAINS or REPORT REALMS "
-            "command.\n By default sends a REPORT ZONES command. Give help "
+            "command.\nBy default sends a REPORT ZONES command. Give help "
             "option twice\n(e.g. '-hh') to see reporting options "
             "enumerated.\n");
     return;
@@ -191,7 +194,7 @@ sg_ll_report_zzz(int sg_fd, int serv_act, uint64_t zs_lba, bool partial,
     uint8_t rz_cdb[SG_ZONING_IN_CMDLEN] =
           {SG_ZONING_IN, REPORT_ZONES_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     rz_cdb[1] = serv_act;
@@ -313,13 +316,13 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
                  const struct opts_t * op)
 {
     uint8_t zt;
-    int k, same, zc, zones;
+    int k, same, zc, num_zd;
     uint64_t wp;
     const uint8_t * bp;
     char b[80];
 
     if ((uint32_t)act_len < decod_len) {
-        zones = (act_len - 64) / 64;
+        num_zd = (act_len >= 64) ? ((act_len - 64) / 64): 0;
         if (act_len == op->maxlen) {
             if (op->maxlen_given)
                 pr2serr("decode length [%u bytes] may be constrained by "
@@ -329,21 +332,23 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
         } else if (op->in_fn)
             pr2serr("perhaps %s has been truncated\n", op->in_fn);
     } else
-        zones = (decod_len - 64) / 64;
+        num_zd = (decod_len - 64) / 64;
     same = rzBuff[4] & 0xf;
     if (! op->wp_only) {
         printf("  Same=%d: %s\n", same, same_desc_arr[same]);
         printf("  Maximum LBA: 0x%" PRIx64 "\n\n",
                sg_get_unaligned_be64(rzBuff + 8));
+        printf("  Reported zone starting LBA granularity: 0x%" PRIx64 "\n\n",
+               sg_get_unaligned_be64(rzBuff + 16));     /* zbc2r12 */
     }
     if (op->do_num > 0)
-            zones = (zones > op->do_num) ? op->do_num : zones;
-    if (((uint32_t)act_len < decod_len) && ((zones * 64) + 64 > act_len)) {
+            num_zd = (num_zd > op->do_num) ? op->do_num : num_zd;
+    if (((uint32_t)act_len < decod_len) && ((num_zd * 64) + 64 > act_len)) {
         pr2serr("Skip due to truncated response, try using --num= to a "
-                "value less than %d\n", zones);
+                "value less than %d\n", num_zd);
         return SG_LIB_CAT_MALFORMED;
     }
-    for (k = 0, bp = rzBuff + 64; k < zones; ++k, bp += 64) {
+    for (k = 0, bp = rzBuff + 64; k < num_zd; ++k, bp += 64) {
         if (! op->wp_only)
             printf(" Zone descriptor: %d\n", k);
         if (op->do_hex) {
@@ -374,7 +379,7 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
             printf("   Write pointer LBA: 0x%" PRIx64 "\n", wp);
     }
     if ((op->do_num == 0) && (! op->wp_only)) {
-        if ((64 + (64 * (uint32_t)zones)) < decod_len)
+        if ((64 + (64 * (uint32_t)num_zd)) < decod_len)
             printf("\n>>> Beware: Zone list truncated, may need another "
                    "call\n");
     }
@@ -589,6 +594,10 @@ main(int argc, char * argv[])
             break;
         case 's':
         case 'l':       /* --locator= and --start= are interchangeable */
+        if ((2 == strlen(optarg)) && (0 == memcmp("-1", optarg, 2))) {
+                op->st_lba = UINT64_MAX;
+                break;
+            }
             ll = sg_get_llnum(optarg);
             if (-1 == ll) {
                 pr2serr("bad argument to '--start=LBA' or '--locator=LBA\n");

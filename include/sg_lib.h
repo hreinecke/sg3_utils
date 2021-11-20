@@ -567,7 +567,8 @@ char * safe_strerror(int errnum);
 /* Print (to stdout) 'str' of bytes in hex, 16 bytes per line optionally
  * followed at the right hand side of the line with an ASCII interpretation.
  * Each line is prefixed with an address, starting at 0 for str[0]..str[15].
- * All output numbers are in hex. 'no_ascii' allows for 3 output types:
+ * All output numbers are in hex.
+ * 'no_ascii' selects on of  3 output format types:
  *     > 0     each line has address then up to 16 ASCII-hex bytes
  *     = 0     in addition, the bytes are listed in ASCII to the right
  *     < 0     only the ASCII-hex bytes are listed (i.e. without address)
@@ -578,6 +579,12 @@ void dStrHex(const char * str, int len, int no_ascii);
  * line optionally followed at right by its ASCII interpretation. Same
  * logic as dStrHex() with different output stream (i.e. stderr). */
 void dStrHexErr(const char * str, int len, int no_ascii);
+
+/* Read binary starting at 'str' for 'len' bytes and output as ASCII
+ * hexadecinal into file pointer (fp). 16 bytes per line are output with an
+ * additional space between 8th and 9th byte on each line (for readability).
+ * 'no_ascii' selects one of 3 output format types as shown in dStrHex() . */
+void dStrHexFp(const char* str, int len, int no_ascii, FILE * fp);
 
 /* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
  * separated) to 'b' not to exceed 'b_len' characters. Each line

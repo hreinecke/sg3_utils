@@ -2,7 +2,7 @@
 #define SG_LIB_DATA_H
 
 /*
- * Copyright (c) 2007-2019 Douglas Gilbert.
+ * Copyright (c) 2007-2021 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -46,7 +46,9 @@ extern "C" {
 #define SG_VARIABLE_LENGTH_CMD 0x7f
 #define SG_WRITE_BUFFER 0x3b
 #define SG_ZONING_OUT 0x94
+#define SG_ZBC_OUT SG_ZONING_OUT	/* as SPC calls them */
 #define SG_ZONING_IN 0x95
+#define SG_ZBC_IN SG_ZONING_IN		/* as SPC calls them */
 
 
 

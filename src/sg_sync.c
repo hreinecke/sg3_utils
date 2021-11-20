@@ -37,7 +37,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.26 20210830";
+static const char * version_str = "1.27 20211114";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -101,7 +101,7 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
     uint8_t sc_cdb[SYNCHRONIZE_CACHE16_CMDLEN] =
                 {SYNCHRONIZE_CACHE16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (sync_nv)

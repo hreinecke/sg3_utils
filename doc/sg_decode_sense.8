@@ -1,18 +1,18 @@
-.TH SG_DECODE_SENSE "8" "November 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "November 2021" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense and related data
 .SH SYNOPSIS
 .B sg_decode_sense
 [\fI\-\-binary=BFN\fR] [\fI\-\-cdb\fR] [\fI\-\-err=ES\fR] [\fI\-\-file=HFN\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=HFN\fR] [\fI\-\-nospace\fR]
-[\fI\-\-status=SS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=HFN\fR] [\fI\-\-nodecode\fR]
+[\fI\-\-nospace\fR] [\fI\-\-status=SS\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
 .SH DESCRIPTION
 .\" Add any additional description here
-This utility takes SCSI sense data in binary or as a sequence of
-ASCII hexadecimal bytes and decodes it. The primary reference for the
-decoding is SPC\-4 ANSI INCITS 513\-2015 and the most recent draft
-SPC\-5 revision 19 which can be found at https://www.t10.org and other
+This utility takes SCSI sense data in binary or as a sequence of ASCII
+hexadecimal bytes and decodes it. The primary reference for the
+decoding is SPC\-5 ANSI INCITS 502\-2020 and the most recent draft
+SPC\-6 revision 6 which can be found at https://www.t10.org and other
 locations on the internet.
 .PP
 SCSI sense data is often found in kernel log files as a result of
@@ -74,14 +74,22 @@ decoded from pairs of ASCII hexadecimal digits.
 output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-this option is used in conjunction with \fI\-\-write=WFN\fR in order to
+this option is used once in conjunction with \fI\-\-write=WFN\fR in order to
 change the output written to \fIWFN\fR to lines of ASCII hex bytes suitable
 for a C language compiler. Each line contains up to 16 bytes (e.g. a line
 starting with "0x3b,0x07,0x00,0xff").
+.br
+In other cases (i.e. when \fI\-\-write=WFN\fR is not given, or this option
+is given more than once) then the output is as described in the sg3_utils(8)
+manpage.
 .TP
 \fB\-i\fR, \fB\-\-inhex\fR=\fIHFN\fR
 same action as \fI\-\-file=HFN\fR. This option was added for compatibility
 with other utilities in this package that have a \fI\-\-inhex=\fR option.
+.TP
+\fB\-N\fR, \fB\-\-nodecode\fR
+Do not decode the given data as sense or a cdb. Useful when arbitrary data
+is given (e.g. when converting hex to binary).
 .TP
 \fB\-n\fR, \fB\-\-nospace\fR
 expect ASCII hexadecimal to be a string of hexadecimal digits with no
@@ -121,6 +129,15 @@ data.
 The sg_raw utility takes a ASCII hexadecimal sequence representing a SCSI
 CDB. When sg_raw is given the '\-vvv' option, it will attempt to decode the
 CDB name.
+.PP
+Using the option combination: "\fI\-\-inhex=HFN \-\-nodecode \-\-write=WFN\fR"
+may be used to convert hexadecimal (as produced by this and other utilities
+in this package) to binary where the output file is \fIWFN\fR.
+.PP
+Unlike many other utilities there is no \fI\-\-raw\fR option. However binary
+data can be input using the \fI\-\-binary=BFN\fR option while binary data
+can be output using the \fI\-\-write=WFN\fR option (in the absence of the
+\fI\-\-hex\fR option).
 .SH EXAMPLES
 Sense data is often printed out in kernel logs and sometimes on the
 command line when verbose or debug flags are given. It will be at least

@@ -182,7 +182,7 @@ main(int argc, char * argv[])
     uint8_t * doutp;
     uint8_t * free_doutp = NULL;
     char ebuff[EBUFF_SZ];
-    uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN];
+    uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN] = {0};
 
     for (k = 1; k < argc; ++k) {
         if (0 == memcmp("-b=", argv[k], 3)) {

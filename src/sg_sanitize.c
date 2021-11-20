@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.16 20210830";
+static const char * version_str = "1.17 20211114";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -185,7 +185,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     bool immed;
     int ret, res, sense_cat, timeout;
     uint8_t san_cdb[SANITIZE_OP_LEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (op->early || op->wait)

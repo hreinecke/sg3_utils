@@ -1,4 +1,4 @@
-.TH SG_ZONE "8" "January 2021" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_ZONE "8" "November 2021" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_zone \- send a SCSI ZONE modifying command
 .SH SYNOPSIS
@@ -18,6 +18,11 @@ was added in zbc2r01b.
 .PP
 One and only one of the \fI\-\-open\fR, \fI\-\-close\fR, \fI\-\-finish\fR,
 \fI\-\-remove\fR and \fI\-\-sequentialize\fR options can be chosen.
+.PP
+The REPORT ZONES, REPORT REALMS and REPORT ZONE DOMAINS commands may be
+accessed via the sg_rep_zones utility. The ZONE ACTIVATE and ZONE QUERY
+commands may be accessed via the sg_z_act_query utility. The RESET WRITE
+POINTER command may be accessed via the sg_reset_wp utility.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -78,4 +83,4 @@ Copyright \(co 2014\-2021 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_rep_zones,sg_reset_wp(sg3_utils)
+.B sg_rep_zones,sg_reset_wp,sg_z_act_query(sg3_utils)

@@ -1,544 +1,114 @@
-                      README for sg3_utils
-                      ====================
+                        README for sg3_utils
+                        ====================
 Introduction
-============
-This package contains low level command line utilities for devices that use
-the SCSI command set. Originally the SCSI command set was associated
-exclusively with the SCSI Parallel Interface (SPI) transport. SPI has now
-almost been completely replaced by the Serial Attached SCSI (SAS) transport
-which also accepts the SCSI command set. Additionally many other storage
-related transports use the SCSI command set (amongst others); examples are
-ATAPI devices (CD/DVDs and tapes), USB mass storage devices (including those
-using the newer UAS[P]), Fibre Channel disks, IEEE 1394 storage devices (SBP
-protocol), iSCSI, FCoE and SOP devices. Even NVMe which has its own command
-set accepts SCSI commands in some contexts; one example is for enclosure
-management where NVME-MI has SES Send and SES Receive commands. SES refers
-to the SCSI Enclosure Services command set.
+------------
+sg3_utils is a package of utilities originally written to send individual
+SCSI commands to storage devices that used one of the SCSI command sets.
+These utilities can be divided into three groups:
+   - sg_raw: the user supplies the cdb (command descriptor block) and
+     optionally the size of the data-in and data-out buffers
+   - one command utilities: the majority of the utilities in this package
+     send one SCSI command. Their names start with "sg_" while the
+     remaining part of the name alludes to the command which is sent. For
+     example, "sg_inq" sends the SCSI INQUIRY command. Some utilities in
+     this group send one of a selection of commands, typically those
+     commands have a lot it common.
+   - copy type utilities: sg_dd, sgp_dd and sgm_dd use the Unix dd command
+     as a template. sg_xcopy sends the SCSI EXTENDED COPY command which in
+     some cases can do offloaded copies. As well as copying some of these
+     utilities can compare if two data segments are the same.
+
+Platforms
+---------
+These utilities were written on Linux and should work from Linux kernel
+(lk) 2.4 through to the current series 5. The third group ("copy type")
+are only implemented on Linux, but a separate portable package/utility
+called ddpt implements similar functionality. The first two groups are
+implemented (i.e. ported) to Android, FreeBSD, Solaris and Windows. The
+Windows port uses either a Cygwin or MinGW (plus Msys) build environment
+(rather than Visual Studio).
+
+Library
+-------
+Many of these utilities share a lot of code (e.g. SCSI error messages)
+so a lot of repetition (potentially error prone) is saved by having a
+library called libsgutils or some variation on that name. Distributions
+(especially of Linux) have differing policies on how a library (and a
+package) should be named. For that reason this package is sometimes
+known as "sg3-utils" (i.e. the underscore is turned into a hyphen).
+Various other packages use libsgutils. The library interface is not
+altered from one package release, to the next, but the library interface
+may be expanded. If a utility from one release is used with a libsgutils
+from an earlier release, the runtime linking may fail. Typically package
+managers take care of these details so that runtime linking errors
+should be rare.
+
+Command Sets
+------------
+SCSI command sets are not the only storage command sets in wide use, there
+are also ATA and NVMe command sets. There is a SCSI command set to
+translate SCSI commands to ATA commands (called SAT: SCSI to ATA
+Translation). SAT includes an ATA PASS-THROUGH SCSI command and
+sg_sat_* utilities (there are four) are examples of using SAT. The SAS
+transport (Serial Attached SCSI) can convey ATA commands through a
+SCSI/SAS domain via its Serial ATA Tunnelled Protocol (STP).
+
+NVMe command sets (e.g. Admin, NVM and MI) are relatively new. There
+was an early paper on a SCSI to NVMe Translation Layer (SNTL) but it
+hasn't been standardized. The sg_inq utility will send (and decode
+the response of) a SCSI INQUIRY command if the underlying device is
+a SCSI device. If the underlying device is a NVMe controller or
+namespace, then sg_inq will send a NVMe Admin Identify command. The
+sg_ses utility (for SCSI Enclosure Services) also checks whether its
+underlying device is SCSI or NVME. In the NVMe case, sg_ses translates
+the SCSI SEND DIAGNOSTIC and READ DIAGNOSTIC RESULTS commands to the
+NVMe Management Interface (MI) SES Send and SES Receive commands
+respectively. The output of the sg_ses utility should be similar,
+irrespective of whether the "SES" device is SCSI or NVMe.
+
+The sg_raw utility may send NVMe Admin or NVM commands (as well as
+SCSI commands). One difficulty with a command-line utility invoking
+NVME commands is that those commands contain memory addresses for
+data-in (from the storage device) or data-out (toward the storage
+device) transfers. See the sg_raw manpage for how this difficulty is
+addressed.
+
+Documentation
+-------------
+Manual pages ("manpages") are the primary method of utility documentation.
+All utilities and scripts that are installed by this package have a
+manpage. There are utilities in the examples, testing and utils
+directories that are not installed and do not have manpages. Nearly
+all utilities have runtime help, usually invoked with either the '-h'
+short option or the '--help' long option. There is also an overarching
+manpage called "sg3_utils". All manpages are in chapter 8 which is
+for system administration commands/utilities.
+
+The sg3_utils package and some more complex utilities have html pages:
+   sg3_utils: https://sg.danny.cz/sg/sg3_utils.html
+   sg_ses:    https://sg.danny.cz/sg/sg_ses.html
+   sg_dd:     https://sg.danny.cz/sg/sg_dd.html
+
+A tarball (and zip) of all the manpages from the previous release are
+here:
+   https://sg.danny.cz/sg/p/sg3_utils_man_html.tgz
+   https://sg.danny.cz/sg/p/sg3_utils_man_html.zip
+
+There is a html rendering of the sg3_utils manpage in the same directory
+as this README file called sg3_utils.man8.html .
+
+The previous README file is now called README.details plus there are
+these OS specific files: README.freebsd , README.solaris , README.tru64
+and README.win32 . To know the current state of the package the ChangeLog
+file is the good reference.
+
+The author's primary source code repository uses subversion and is on
+the author's equipment (a RPi). One advantage of subversion is its
+revision numbers which are simply integers starting at 1 and ascending.
+For this package the current revision is 922 . The subversion repository
+is mirrored in git (using "git svn" tools) here:
+    https://github.com/doug-gilbert/sg3_utils
 
-This package originally targeted the Linux SCSI subsystem. Since most
-operating systems contain a SCSI command pass-through mechanism, many
-utilities within this package have been ported. This README mainly
-concentrates on Linux: see the README.freebsd file for the FreeBSD port,
-README.solaris for the Solaris port, the README.tru64 file for the Tru64
-(OSF) port and README.win32 for the Windows ports (of which there are two
-variants).
 
-Most utilities within the sg3_utils package work at the SCSI command level.
-For example the sg_inq utility issues a SCSI INQUIRY command and decodes the
-response. The COVERAGE file has a table containing a row for each SCSI
-command issued by this package; to the right of each row is the utility
-(sometimes more than one) that issue that SCSI command. The COVERAGE file
-has a second table for ATA commands usage.
-
-Some utilities interface at a slightly higher level, for example: sg_dd,
-sgm_dd and sgp_dd. These are closely related to the Unix dd command and
-typically issue a sequence of SCSI READ and WRITE commands to copy data.
-These utilities are relatively tightly bound to Linux and are not ported to
-other Operating Systems. A new utility called ddpt (in a package of the same
-name) is more generic while still allowing a copy to be done in terms of
-SCSI READ and WRITE commands. ddpt has been ported to other OSes.
-
-License
-=======
-All utilities and libraries have either a "2 clause" BSD license or are
-"GPL-2ed". The "2 clause" BSD license is taken from the FreeBSD project but
-drops the last paragraph that directly refers to the "FreeBSD project".
-That BSD license was updated from the "3 clause" to the newer "2 clause"
-version on 20180119. To save space various source code files refer to a
-file called "BSD_LICENSE" in the main, src and lib directories. The author's
-intention is that users may incorporate all or part of the code in their work
-as they please. Attribution is encouraged. Please check the code as other
-contributors (apart from the author) may also have copyright notices. For a
-list of contributors see the CREDITS file.
-
-
-Description
-===========
-A web site supporting the sg3_utils package can be found at
-https://sg.danny.cz/sg/sg3_utils.html . That page has a table of released
-versions for download. The most recent release or beta of sg3_utils may
-be found on this page: https://sg.danny.cz/sg in the News section.
-
-The predecessor to this package was called sg_utils. It is described in
-https://sg.danny.cz/sg/uu_index.html and old versions can be downloaded
-from the Downloads section of https://sg.danny.cz/sg .
-
-In the Linux 2.4 kernel series these utilities need to use the SCSI generic
-(sg) driver to access SCSI devices. The name of this package (i.e. sg3_utils)
-refers to version 3 of the SCSI generic (sg) driver which was introduced at
-the beginning of the 2.4 Linux kernel series. Significantly this added a new
-SCSI command interface structure (i.e. struct sg_io_hdr) that is more
-flexible than the older "sg_header" structure found in the sg driver in the
-2.2 and earlier Linux kernel series. The sg_io_hdr structure is also more
-flexible than the awkward (and limiting) interface to the
-SCSI_IOCTL_SEND_COMMAND ioctl supported by the Linux SCSI mid level. The
-version 3 sg driver also added the SG_IO ioctl that is synchronous (i.e. it
-issues the requested SCSI command and waits for the response (or a timeout)
-before the ioctl returns to the user space program that invoked it). The
-SG_IO ioctl is now supported in other parts of the Linux kernel in the 2.6
-series.
-
-In sg3_utils version 1.27 support has been added for the Linux bsg driver
-which use the sg version 4 interface. There seems no point in renaming
-this package sg4_utils. The existing utilities just silently support either.
-Currently the source build must be able to see the /usr/include/linux/bsg.h
-file. Then at run time the /proc/devices pseudo file needs to have an entry
-for the bsg driver (appeared around lk 2.6.28). With this in place each
-utility at run time checks the device it has been given and if it is a char
-device whose major number matches the bsg entry in /proc/devices then the
-sg v4 interface is used. Otherwise the sg v3 interface is used.
-
-Utilities that wish to use the asynchronous SCSI command interface (i.e. via
-a write() read() sequence) or issue special "commands" (e.g. bus and device
-resets) still need to use the Linux sg driver. Note that various
-drivers (e.g. cdrom/sr) have different open() flag and permissions policies
-that the user may need to take into account.
-
-If users have problems or questions about them please contact the author.
-Documentation for the Linux sg device driver can be found at:
-https://sg.danny.cz/sg/p/sg_v3_ho.html . This is written in DocBook and the
-original xml can be found in the same directory with the ".xml" extension.
-Postscript and pdf renderings are also in that directory. Older documentation
-for the sg version 3 driver can be found at:
-https://sg.danny.cz/sg/p/scsi_generic_v3.txt .
-
-To save the repetition of common code (e.g. SCSI error processing) and
-reduce the size of the executable files, a shared library called
-libsgutils<num>.so (its Linux name) is created during the build process.
-That library is built from the contents of the include and lib
-subdirectories. The header files in the include subdirectory can be seen
-as the API of libsgutils and are commented with that in mind. The SCSI
-pass-through code for the supported operating systems is found in the lib
-subdirectory with names like sg_pt_linux.c and sg_pt_win32.c .
-
-Various distributions (of Linux mainly) distribute sg3_utils as 3
-installable packages. One is a package containing the shared library
-discussed above (e.g. libsgutils2-2_1.33-0.1_i386.deb). A second package
-contains the utilities (e.g. sg3-utils_1.33-0.1_i386.deb) and depends on the
-first package). Finally there is an optional package that contains header
-files and a static library (e.g. libsgutils2-dev_1.33-0.1_i386.deb). This
-final package is only needed to build other packages (e.g. sdparm) that
-wish to use the sg3_utils shared library.
-
-All the utilities in the src subdirectory have "man" pages that are
-placed in the doc subdirectory. There is also a sg3_utils (8) man page that
-summarizes common facilities including exit statuses. Additional
-information (including each utility's version number) can be found towards
-the top of each ".c" file corresponding to the utility name.
-
-The sg driver in Linux can be seen as having 3 distinct versions:
-
-   v1   lk < 2.2.6     sg_header based relatively unchanged since 1992
-   v2   lk >= 2.2.6    enhanced sg_header interface structure [1999/4/16]
-   v3   lk >= 2.4      additional sg_io_hdr interface structure [2001/1/4]
-   v3   lk >= 2.6      same interface as found in lk 2.4 [2.6.0: 2003/12/18]
-
-and the bsg driver supports the sg v4 interface and was added around
-lk 2.6.28 . This package is targeted at "v3" and "v4". Another package called
-"sg_utils" is targeted at "v2" and to a lesser extent "v1". The "sg_utils"
-package has a subset of the utilities found in this package.
-
-In Linux some sg driver ioctls (notably SG_IO) are defined for many block
-devices in lk 2.6 series. In practice this means all SCSI block devices,
-ATAPI block devices (mainly CD, DVD and BD optical devices) but _not_ ATA
-disks, depending on which kernel configuration options, can be accessed by
-the utilities in this package. SATA disks that use the libata kernel library
-(or some other SCSI to ATA Translation (SAT) Layer (SATL)) accept SCSI
-commands and thus are supported. Support for the SG_IO as been added to the
-scsi tape driver (st) in lk 2.6.6 .
-
-In the src directory the bulk of the utilities are written in relatively
-clean POSIX compliant C code with Linux specific system calls and structures
-removed and placed in Linux specific files in the lib directory. A small
-number of utilities in the src directory do contain Linux specific logic
-and are not ported to other OSes (e.g. sg_dd). One utility, sg_scan, has
-two separate implementations, one for Linux (sg_scan_linux.c) and one for
-Windows (sg_scan_win32.c). The src-lib directory split approach allows
-FreeBSD, Solaris, Tru64 and Windows specific code to be isolated to a few
-files in the lib directory whose interfaces match those of the Linux
-specific code.
-
-Darwin is not supported because the Apple folks do not want to give their
-users a pass-through SCSI interface. The author has read about creative
-hackers using a VM containing a real OS to circumvent the Apple restriction.
-
-C standard is C11
-==================
-The C code in this package is written for portability rather than speed.
-It assumes a level of C99 compliance (the C standard prior to C11) and
-favours POSIX system and library calls over OS specific calls.
-
-The C code is written in a C++ friendly way and is checked from time to
-time that it compiles clean with C++. To accommodate C++ certain C99
-constructs such as designated initializers cannot be used.
-
-The author has not seriously attempted to build this code on MSVC (aka
-Visual Studio). There are a few roadblocks (that may be overcome in the
-future) that include MSVC being basically a C++ compiler, not a C/C++
-compiler. For some reason MSVC only claims C89 compliance (i.e. the first
-C standard from 1989). MSVC 2013 and 2015 are moving closer to C99
-compliance and may be sufficient to compile this package. Another problem
-is the assumption of the availability of basic Unix system calls such as
-open(). Nearly 20 years ago Microsoft indicated (promised ?) that it
-would move in the direction of POSIX compliance, but very little ever
-happened. "Talk is cheap, there should be a tax on it."
-
-Building
-========
-This package is designed to be built with the usual:
-    "./configure ; make ; make install"
-sequence. In some situations that may need to be prefixed by a call to
-the "./autogen.sh" script which invokes autoconf and automake. That in turn
-may require packages containing those utilities to be installed. The
-libtool utility is also required. Naturally a C compiler is required
-and due to the vagaries of libtool a C++ compiler also.
-
-The "./configure" takes many command line options with the defaults
-being usually sufficient to start with. One quirk is that the location
-of the installation is under the /usr/local directory. So the sg_inq
-utility will be installed at /usr/local/bin/sg_inq . This is controlled
-by the "--prefix=<directory>" option which defaults to
-"--prefix=/usr/local". As an example to install the executables in /usr/bin
-and disable the creation of the shared library (libsgutils<num>.so) this
-invocation could be used: "./configure --prefix=/usr --disable-shared".
-To reduce the size of an executable as well try this:
-"./configure --prefix=/usr --disable-shared --disable-scsistrings".
-Also --disable-shared will produce (relatively) "static" executables in
-the src directory that are easier to debug. And
-"./configure --enable-debug" will compile with more debug type options,
-including more compiler checks and defining "DEBUG" within the src and
-lib source files. Most utilities in the src directory set '-vv' (i.e.
-equivalent to calling "--verbose" twice) when "DEBUG" is set.
-
-In Linux there are package build files for "rpm" based and for "deb" based
-systems. The 'sg3_utils.spec' file in the main directory can be used like
-this: 'rpmbuild -ba sg3_utils.spec' in a rpmbuild tree SPECS directory.
-To cross build or make a more widely distributable package then the --target
-option may be useful: 'rpmbuild --target=i386 -ba sg3_utils.spec' or
-'rpmbuild --target=x86_64 -ba sg3_utils.spec' . The sg3_utils.spec file
-in the main directory targets Red Hat systems, an alternative "spec" file
-for Suse systems has been placed under the 'suse' directory.
-
-The 'build_debian.sh' script should build several "deb" packages and place
-them in the parent directory. In debian based systems doing
-a 'apt-get install build-essential' is one way to get most of build
-environment needed if it has not already been loaded. There are now some
-problems with this script and the superseded Debian 4.0 ("etch"). See
-debian/README.debian4 for a workaround. Amongst other things debian
-builds are sensitive to the value in the debian/compat file. If it
-contains "7" then it works on lenny and gives warning on squeeze (but
-fails on the earlier etch).
-
-Warning
-=======
-Many devices use SCSI command sets over transport protocols not normally
-associated with SCSI (as defined at https://www.t10.org ). Some of these
-devices react poorly (e.g. lock up) when sent SCSI commands that they don't
-support. Even sending a supported SCSI command with a field set to an
-unexpected value can cause problems. [The author is talking about billions
-of USB devices with horrible SCSI implementations.]
-
-For example, all "SCSI" devices must support the INQUIRY command which the
-SCSI-2 standard says should request a 36 byte response. However later SCSI
-standards (e.g. SPC-2) have increased that length but some SCSI devices lock
-up when they receive a request for anything other than a 36 byte response.
-
-Any well implemented "SCSI" device should react sensibly when a utility in
-sg3_utils sends a SCSI command that it doesn't support. Unfortunately this
-cannot be guaranteed.
-
-Prior to lk 2.6.29 USB mass storage limited sense data to 18 bytes which
-caused problems for certain types of descriptor based sense data. An
-example of this is the SCSI ATA PASS-THROUGH command with the CK_COND bit
-set.
-
-
-Utilities
-=========
-Here is list in alphabetical order of utilities found in the 'src'
-subdirectory of the sg3_utils package:
-    sginfo, sg_bt_ctl, sg_compare_and_write, sg_copy_results, sgm_dd, sgp_dd,
-    sg_dd, sg_decode_sense, sg_emc_trespass, sg_format, sg_get_config,
-    sg_get_elem_status, sg_get_lba_status, sg_ident, sg_inq, sg_logs,
-    sg_luns, sg_map, sg_map26, sg_modes, sg_opcodes, sg_persist, sg_prevent,
-    sg_raw, sg_rbuf, sg_rdac, sg_read, sg_read_attr, sg_readcap,
-    sg_read_block_limits, sg_read_buffer, sg_read_long, sg_reassign,
-    sg_referrals, sg_rep_pip, sg_rep_zones, sg_request, sg_reset, sg_rmsn,
-    sg_rtpg, sg_safte, sg_sanitize, sg_sat_identify, sg_sat_phy_event,
-    sg_sat_read_gplog, sg_sat_set_features, sg_scan, sg_seek, sg_senddiag,
-    sg_ses, sg_ses_microcode, sg_start, sg_stpg, sg_stream_ctl, sg_sync,
-    sg_test_rwbuff, sg_timestamp, sg_turs, sg_unmap, sg_verify, sg_vpd,
-    sg_write_buffer, sg_write_long, sg_write_same, sg_write_verify,
-    sg_write_x, sg_wr_mode, sg_xcopy, sg_zone
-
-Each of the above utilities depends on header files found in the 'include'
-subdirectory and library code found in the 'lib' subdirectory. Associated
-man pages are found in the 'doc' subdirectory. Additional programs found
-in the 'archive', 'examples' and 'utils' subdirectories in not build by the
-top level build infrastructure. Linux binary distributions of the sg3_utils
-package (e.g. "rpm" and debian packages) typically contain the shared
-library, the utilities found in the 'src' subdirectory, their associated man
-pages and some documentation files (e.g. README, INSTALL, CREDITS, COPYING
-and COVERAGE). See the INSTALL file for generic instructions about building
-with autotools (e.g. ./configure ).
-
-Man pages can be read (without building and installing the package) by
-going to the 'doc' subdirectory and executing something like this:
- $ man ./sg_dd.8
-
-To see which SCSI commands (and ATA commands) are used by these utilities
-refer to the COVERAGE file.
-
-Here is a list in alphabetical order of utilities found in the 'examples'
-subdirectory:
-  - sg_excl, scsi_inquiry, sg_sat_chk_power, sg__sat_identify,
-    sg__sat_phy_event, sg__sat_set_features, sg_sat_smart_rd_data,
-    sg_simple1, sg_simple2, sg_simple3, sg_simple4, sg_simple5,
-    sg_simple16
-
-Also in that subdirectory is a script to test sg_persist, an example data
-file for sg_persist (called "transport_ids.txt") and an example data file for
-sg_reassign (called "reassign_addr.txt"). There are several scripts
-for 'sg_senddiag -pf -raw=-' that will put some SAS disk phys into
-a "compliant jitter tolerance pattern" (CJTPAT).
-
-The 'testing' subdirectory contains source and a Makefiles to test
-kernel pass-through and associated drivers, mainly for Linux. There is
-both C code (with the extension ".c") and C++ code (with the extension
-".cpp"). There is a "Makefile" to build the C + C++ code. The Makefile
-depends on some object files from the "lib" subdirectory. So a sequence
-like this may be required prior to invoking make: "cd <top_of_package> ;
-./configure ; cd lib ; make ; cd ../testing".
-
-Here is a list in alphabetical order of utilities found in the 'testing'
-subdirectory:
-  - bsg_queue_tst, sgh_dd (C++), sg_iovec_tst, sg_queue_tst, sg_sense_tst,
-    sg_tst_async (C++), sg_tst_context (C++), sg_tst_excl (C++),
-    sg_tst_excl2 (C++), sg_tst_excl3 (C++)
-
-The 'utils' subdirectory contains source and a Makefile to build "hxascdmp"
-which accepts binary data from stdin (or a file on the command line) and
-outputs an ASCII-HEX and ASCII representation of it. It is similar to the
-Unix od command. There is also code to sg_chk_asc.c which checks a given
-text file (typically a copy of https://www.t10.org/lists/asc-num.txt ) and
-checks it against the asc/ascq text strings held in sg_lib_data.c .
-
-The 'doc' subdirectory contains a README file containing the urls of
-various related documents.
-
-The 'scripts' subdirectory contains some Bourne (bash) shell scripts that
-rely on utilities in the main directory. One script uses the sdparm utility.
-These scripts are described in the scripts/README file and have usage
-messages.
-
-
-Notes for utilities without man pages
-=====================================
-These utils are found in the 'examples' subdirectory.
-
-The "scsi_inquiry" program shows the use of the SCSI_IOCTL_SEND_COMMAND
-ioctl to send a SCSI INQUIRY command. That ioctl() is supported by the
-SCSI sub system mid level and so is common to all sd, sr, st and sg devices.
-That ioctl is deprecated in the lk 2.6 series. This program has been placed
-in the "examples" subdirectory.
-
-"sg_simple1" and "sg_simple2" are example programs demonstrating calls
-to the SCSI INQUIRY and TEST UNIT READY commands. They only differ in their
-error processing: sg_simple1 uses sg_lib.[hc] for error processing while
-sg_simple2 does its own more primitive checks.
-
-"sg_simple3" tests out user space scatter gather added to the version 3
-sg driver.
-
-"sg_simple4" shows the INQUIRY command using mmap-ed IO to obtain its
-response buffer.
-
-"sg_simple5" also sends and INQUIRY and TEST UNIT READY commands. It
-uses the generic pass through mechanism based on sg_pt.h . It will
-currently build in Linux and FreeBSD (with "make -f Makefile.freebsd").
-It has extensive error checking code.
-
-"sg_simple16" attempts to send a 16 byte SCSI command, READ_16, to the
-scsi device. This is only supported for lk >= 2.4.15 and for adapter
-drivers that indicate that they have 16 byte CDB capability (otherwise
-DID_ABORT will appear in the host_status).
-
-"sg_sat_chk_power" attempts to push an ATA CHECK POWER MODE command
-through the SAT-defined ATA PASS_THROUGH (16) SCSI command. That
-ATA command needs to read the "FIS" registers after the command is
-completed which involves using the ATA Status Return (sense data)
-descriptor (as defined in SAT).
-
-"sg_sat_smart_rd_data" attempts to push an ATA SMART/READ DATA command
-through the SAT-defined ATA PASS_THROUGH (16) SCSI command. If
-successful, the 256 word (512 byte) response is output.
-
-"sg_tst_excl" and "sg_tst_excl2" use multiple threads to bombard the
-given device with O_EXCL open flags, so only one should succeed at a
-time. While holding O_EXCL control a thread attempts a double increment
-on an integer in the given LBA. If the integer starts even (after the
-first read) then it should remain even if the O_EXCL flag is doing its job.
-The "sg_tst_excl" variant uses the Linux SG_IO v3 interface while the
-"sg_tst_excl2" uses the more generic sg_pt infrastructure.
-
-"sg_tst_excl3" is a variant of "sg_tst_excl2". "sg_tst_excl3" only does
-the double increment from the first thread, each time using O_EXCL on
-open. The remaining threads check the value is even, each time doing
-an open without the O_EXCL flag.
-
-"bsg_queue_tst" sends an INQUIRY command via the Linux SG_IO v4 interface
-which is used by the bsg driver. So it will take device names like
-"/dev/bsg/6:0:0:0". It tests if sending repeated INQUIRYs with
-the BSG_FLAG_Q_AT_HEAD or BSG_FLAG_Q_AT_TAIL flag makes any difference.
-
-"sg_tst_async" is a test harness for the Linux sg driver. It is multi
-threaded, submitting either TEST UNIT READY, READ(16) or WRITE(16) SCSI
-commands asynchronously. Each thread opens a file descriptor and submits
-those commands up to the queue limit (sg driver has a per file descriptor
-queue limit of 16). Multiple threads doing the same thing act as a
-multiplier to that queue limit.
-
-
-NVME Support
-============
-Firstly the author has no intention of extending this package to contain
-general purpose NVMe utilities. That leaves the areas where SCSI overlaps
-with NVMe. There was a SCSI to NVMe Translation Layer (SNTL) driver in the
-Linux kernel based on a white paper from NVM Express. Intel has withdrawn
-that driver and T10 (SCSI) and NVM Express have made no further attempts
-to standardize a SNTL. Given the SCSI to ATA Translation Layer (SATL) which
-is standardized by T10, it is pretty clear what a SNTL should do.
-
-The NVMe Management Interface (NVME-MI) committee have decided to use SES-3
-standard from T10 via the newly added SES Send and SES Receive MI commands.
-So the sg_ses utility and this package's library have been extended to use
-these commands when a NVMe device (typically a disk enclosure) is detected.
-This has been tested by a disk vendor who is happy with the results. Other
-user reports are welcome as the author does not have equipment to test
-this.
-
-Other utilities in this package that use the SES Send and Receive commands,
-or the SNTL in the library are sg_senddiag, sg_inq, sg_raw and sg_readcap.
-
-
-Command line processing
-=======================
-These utilities can be divided into 3 groups when their handling of command
-line arguments is considered:
-  - ad hoc, typically in a short form only, sometimes longer (e.g.
-    "sg_logs -pcb /dev/sdc")
-  - inspired by the dd Unix command (e.g. sg_dd, sgm_dd, sgp_dd, sg_read)
-  - recent utilities use "getopt_long" (see "man getopt_long")
-    type command lines. These have short form (starting with "-")
-    and corresponding longer form (starting with "--") options.
-
-The older utilities that use ad hoc options, in alphabetical order:
-  - sg_emc_trespass, sginfo(1/2), sg_inq, sg_logs, sg_map, sg_modes,
-    sg_opcodes, sg_rbuf, sg_rdac, sg_readcap, sg_reset, sg_scan (Linux),
-    sg_senddiag, sg_start, sg_test_rwbuf, sg_turs
-In sg3_utils version 1.23 the following utilities from this group were
-converted to have a dual getopt_long/ad_hoc interface, defaulting to
-the getop_long interface:
-  - sg_inq, sg_logs, sg_modes, sg_opcodes, sg_rbuf, sg_readcap,
-    sg_senddiag, sg_start, sg_turs
-These can be switched back to the older (backward compatible) ad hoc
-interface by defining the SG3_UTILS_OLD_OPTS environment variable
-or using '-O' as the first command line option.
-
-The more recent utilities that use "getopt_long" only are:
-  - sg_bt_ctl, sg_compare_and_write, sg_decode_sense, sg_format,
-    sg_get_config, sg_get_lba_status, sg_ident, sg_luns, sg_map26,
-    sg_persist, sg_prevent, sg_raw, sg_read_attr, sg_read_block_limits,
-    sg_read_buffer, sg_read_long, sg_reassign, sg_referrals, sg_rep_pip,
-    sg_rep_zones, sg_requests, sg_rmsn, sg_rtpg, sg_safte, sg_sanitize,
-    sg_sat_identify, sg_sat_phy_event, sg_sat_read_gplog,
-    sg_sat_set_features, sg_scan(w), sg_seek, sg_ses, sg_ses_microcode,
-    sg_stpg, sg_stream_ctl, sg_sync, sg_test_rwbuf, sg_timestamp, sg_unmap,
-    sg_verify, sg_vpd, sg_write_buffer, sg_write_long, sg_write_same,
-    sg_write_verify, sg_write_x, sg_wr_mode, sg_zone
-
-
-Dangerous code
-==============
-This C code snippet:
-    unsigned char uc = 0x80;
-    uint64_t ull;
-    ull = (uc << 24);
-Somewhat surprisingly sets ull to:
-    ull: 0xffffffff80000000
-This result is due to the 'unary conversion' of uc to a (32 bit signed)
-'int' before the shift. The resultant type from the shift is also an int
-and it has its top bit set so there is sign extension when it is assigned
-into a 64 bit unsigned integer. Making sure there is no conversion to 'int'
-solves the problem. In this case if uc is declared as unsigned int the
-result will be as expected (i.e. 0x80000000).
-
-
-Bypassing the somewhat dangerous shift operators
-================================================
-The shift operators in C are "<<" and ">>". They can be dangerous (as shown
-in the above section) or tedious and hence error prone to use. However they
-are often needed to cope with the translation of integers on the host OS to
-the corresponding representation within a SCSI command or parameter data
-moved to or from a SCSI device. The Logical Block Address (LBA) is a good
-example; it is either 32 or 64 bits long typically (i.e. 4 or 8 bytes
-respectively). The host machine representation may be big or little endian
-and may prefer or require alignment to a particular memory address boundary
-(e.g. module 4 (or in 'C' code: "(lba % 4) == 0")). For SCSI commands and
-the parameter data moved to or from a SCSI device, the integer
-representation is big endian and it is unaligned.
-
-Recent versions of this package have replaced the explicit use of the C
-shift operators with a group of functions modelled on those found in the
-Linux kernel. These functions contain either "get_unaligned" or
-"put_unaligned" in their names and are found in the asm/unaligned.h
-header. This package contains the sg_unaligned.h header that implements
-a similar set of functions. The current implementation favours correctness
-over speed. The functions in the package use a "sg_" prefix but otherwise
-use the same function name as the Linux kernel for the same action.
-
-An example of the change made to a snippet of sg_write_buffer.c may
-clarify this change. The old code was:
-
-   wbufCmdBlk[3] = (unsigned char)((buffer_offset >> 16) & 0xff);
-   wbufCmdBlk[4] = (unsigned char)((buffer_offset >> 8) & 0xff);
-   wbufCmdBlk[5] = (unsigned char)(buffer_offset & 0xff);
-
-and it has been replaced by:
-
-   sg_put_unaligned_be24(buffer_offset, wbufCmdBlk + 3);
-
-The Linux kernel only supplies "unaligned" functions for 16, 32 and 64
-bit quantities. SCSI commands also have cases of 24 and 48 bit numbers
-so sg_unaligned.h contains support for those plus a variant where the
-byte length is passed as an argument.
-
-The unaligned functions are inlined for speed (at the possible expense of
-space) and now have specializations depending whether the host is big or
-(more likely) little endian. These functions can be broken down to a
-memcpy() and optionally a byte-swap for 16, 32 and 64 bit operations.
-The memcpy() takes care of alignment while the byte-swap (bswap_16(),
-bswap_32() and bswap_64() ) addresses integer endianness. If the host is
-little endian and a little endian variant of the unaligned functions is
-requested, then no byte-swap is required. These specializations can be
-"compiled out" with this configure option: './configure
---disable-fast-lebe' in which case the classic "C shifting" technique is
-used to implement all the unaligned functions.
-
-Associated with the above change, fixed length integer types seem a better
-fit for SCSI command and parameter integers than the traditional integer
-types in the C language. Fixed length integer types were standardized in
-C99 and require the inclusion of <stdint.h>. For example this means for
-an integer that will represent a 64 bit LBA, to favour using "uint64_t"
-over the "unsigned long long" type. Also "unsigned char" has mostly been
-replaced by "uint8_t" as the 8 bit (unsigned) byte type; "char" is still
-used for ASCII text.
-
-
-Other SCSI and storage tools
-============================
-See https://sg.danny.cz/sg/tools.html
-
-
-Douglas Gilbert		dgilbert@interlog.com
-17th June 2021
+Douglas Gilbert
+20th November 2021

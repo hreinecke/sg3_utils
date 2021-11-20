@@ -10,7 +10,7 @@ bin_PROGRAMS = \
 	sg_sat_set_features sg_seek sg_senddiag sg_ses sg_ses_microcode \
 	sg_start sg_stpg sg_stream_ctl sg_sync sg_timestamp sg_turs sg_unmap \
 	sg_verify sg_vpd sg_wr_mode sg_write_buffer sg_write_long \
-	sg_write_same sg_write_verify sg_write_x sg_zone
+	sg_write_same sg_write_verify sg_write_x sg_zone sg_z_act_query
 sg_scan_SOURCES =
 
 
@@ -203,3 +203,5 @@ sg_write_x_LDADD = ../lib/libsgutils2.la
 sg_xcopy_LDADD = ../lib/libsgutils2.la
 
 sg_zone_LDADD = ../lib/libsgutils2.la
+
+sg_z_act_query_LDADD = ../lib/libsgutils2.la

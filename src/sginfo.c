@@ -124,7 +124,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.43 [20190913]";
+static const char * version_str = "2.44 [20211114]";
 
 #include <stdio.h>
 #include <string.h>
@@ -393,7 +393,7 @@ struct scsi_cmnd_io
 static int
 do_scsi_io(struct scsi_cmnd_io * sio)
 {
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_io_hdr io_hdr;
     struct sg_scsi_sense_hdr ssh;
     int res;
@@ -1758,7 +1758,7 @@ trytenbyte:
                     }
                     else if (!sorthead) printf("|");
                 }
-		break;
+                break;
             case 5:     /* physical sector */
                 while (len > 0) {
                     snprintf((char *)cbuffer1, 40, "%6d:%2u:%5d",
@@ -1777,7 +1777,7 @@ trytenbyte:
                     }
                     else if (!sorthead) printf("|");
                 }
-		break;
+                break;
             case 0:     /* lba (32 bit) */
                 while (len > 0) {
                     printf("%10d", getnbyte(df, 4));
@@ -1791,7 +1791,7 @@ trytenbyte:
                     else
                         printf("|");
                 }
-		break;
+                break;
             case 3:     /* lba (64 bit) */
                 while (len > 0) {
                     printf("%15" PRId64 , getnbyte_ll(df, 8));

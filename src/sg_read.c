@@ -1,6 +1,6 @@
 /*
  *  A utility program for the Linux OS SCSI generic ("sg") device driver.
- *    Copyright (C) 2001 - 2019 D. Gilbert
+ *    Copyright (C) 2001 - 2021 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -58,7 +58,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.36 20191220";
+static const char * version_str = "1.37 20211114";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -296,7 +296,7 @@ sg_bread(int sg_fd, uint8_t * buff, int blocks, int64_t from_block, int bs,
          bool no_dxfer)
 {
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
-    uint8_t senseBuff[SENSE_BUFF_LEN];
+    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, false, fua,

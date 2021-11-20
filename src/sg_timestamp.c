@@ -197,7 +197,7 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
     int k, ret, res, sense_cat;
     uint8_t rt_cdb[REP_TIMESTAMP_CMDLEN] =
           {SG_MAINTENANCE_IN, REP_TIMESTAMP_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rt_cdb + 6);
@@ -260,7 +260,7 @@ sg_ll_set_timestamp(int sg_fd, void * paramp, int param_len, bool noisy,
     uint8_t st_cdb[SET_TIMESTAMP_CMDLEN] =
           {SG_MAINTENANCE_OUT, SET_TIMESTAMP_SA, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32(param_len, st_cdb + 6);

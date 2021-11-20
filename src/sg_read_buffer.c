@@ -39,7 +39,7 @@
  * device.
  */
 
-static const char * version_str = "1.32 20210830";      /* spc6r05 */
+static const char * version_str = "1.33 20211114";      /* spc6r05 */
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -166,7 +166,7 @@ sg_ll_read_buffer_10(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     int ret, res, sense_cat;
     uint8_t rb10_cb[SG_READ_BUFFER_10_CMDLEN] =
           {SG_READ_BUFFER_10_CMD, 0, 0, 0,  0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     rb10_cb[1] = (uint8_t)(rb_mode & 0x1f);
@@ -234,7 +234,7 @@ sg_ll_read_buffer_16(int sg_fd, int rb_mode, int rb_mode_sp, int rb_id,
     uint8_t rb16_cb[SG_READ_BUFFER_16_CMDLEN] =
           {SG_READ_BUFFER_16_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     rb16_cb[1] = (uint8_t)(rb_mode & 0x1f);

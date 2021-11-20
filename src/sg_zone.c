@@ -37,7 +37,7 @@
  * to the given SCSI device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.16 20210830";
+static const char * version_str = "1.17 20211114";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -133,7 +133,7 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
     struct sg_pt_base * ptvp;
     uint8_t zo_cdb[SG_ZONING_OUT_CMDLEN] =
           {SG_ZONING_OUT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     char b[64];
 
     zo_cdb[1] = 0x1f & sa;

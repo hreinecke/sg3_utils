@@ -39,7 +39,7 @@
  * sbc4r21.pdf
  */
 
-static const char * version_str = "1.02 20210830";
+static const char * version_str = "1.03 20211114";
 
 #define MAX_RPIP_BUFF_LEN (1024 * 1024)
 #define DEF_RPIP_BUFF_LEN 512
@@ -102,7 +102,7 @@ sg_ll_report_pip(int sg_fd, void * resp, int mx_resp_len, int * residp,
     uint8_t rz_cdb[SG_MAINT_IN_CMDLEN] =
           {SG_MAINTENANCE_IN, REPORT_PROVISIONING_INITIALIZATION_PATTERN_SA,
            0, 0,  0, 0, 0, 0,  0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rz_cdb + 6);

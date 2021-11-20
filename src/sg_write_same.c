@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.33 20210830";
+static const char * version_str = "1.33 20211114";
 
 
 #define ME "sg_write_same: "
@@ -169,8 +169,8 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
 {
     int ret, res, sense_cat, cdb_len;
     uint64_t llba;
-    uint8_t ws_cdb[WRITE_SAME32_LEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t ws_cdb[WRITE_SAME32_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     cdb_len = op->pref_cdb_size;
@@ -194,7 +194,6 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
     }
     if (act_cdb_lenp)
         *act_cdb_lenp = cdb_len;
-    memset(ws_cdb, 0, sizeof(ws_cdb));
     switch (cdb_len) {
     case WRITE_SAME10_LEN:
         ws_cdb[0] = WRITE_SAME10_OP;

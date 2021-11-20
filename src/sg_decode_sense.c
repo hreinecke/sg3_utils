@@ -30,9 +30,9 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.24 20211104";
+static const char * version_str = "1.25 20211119";
 
-#define MAX_SENSE_LEN 1024 /* max descriptor format actually: 255+8 */
+#define MAX_SENSE_LEN 4096 /* max descriptor format actually: 255+8 */
 
 static struct option long_options[] = {
     {"binary", required_argument, 0, 'b'},
@@ -45,6 +45,7 @@ static struct option long_options[] = {
     {"hex", no_argument, 0, 'H'},
     {"in", required_argument, 0, 'i'},          /* don't advertise */
     {"inhex", required_argument, 0, 'i'},       /* same as --file */
+    {"nodecode", no_argument, 0, 'N'},
     {"nospace", no_argument, 0, 'n'},
     {"status", required_argument, 0, 's'},
     {"verbose", no_argument, 0, 'v'},
@@ -57,7 +58,7 @@ struct opts_t {
     bool do_binary;
     bool do_cdb;
     bool do_help;
-    bool do_hex;
+    bool no_decode;
     bool no_space;
     bool do_status;
     bool verbose_given;
@@ -66,6 +67,7 @@ struct opts_t {
     bool file_given;
     const char * fname;
     int es_val;
+    int hex_count;
     int sense_len;
     int sstatus;
     int verbose;
@@ -82,10 +84,11 @@ usage()
 {
   pr2serr("Usage: sg_decode_sense [--binary=BFN] [--cdb] [--err=ES] "
           "[--file=HFN]\n"
-          "                       [--help] [--hex] [--inhex=HFN] [--nospace] "
-          "[--status=SS]\n"
-          "                       [--verbose] [--version] [--write=WFN] H1 "
-          "H2 H3 ...\n"
+          "                       [--help] [--hex] [--inhex=HFN] "
+          "[--nodecode]\n"
+          "                       [--nospace] [--status=SS] [--verbose] "
+          "[--version]\n"
+          "                       [--write=WFN] H1 H2 H3 ...\n"
           "  where:\n"
           "    --binary=BFN|-b BFN    BFN is a file name to read sense "
           "data in\n"
@@ -105,6 +108,8 @@ usage()
           "                          C language style ASCII hex (instead "
           "of binary)\n"
           "    --inhex=HFN|-i HFN    same as action as --file=HFN\n"
+          "    --nodecode|-N         do not decode, may be neither sense "
+          "nor cdb\n"
           "    --nospace|-n          no spaces or other separators between "
           "pairs of\n"
           "                          hex digits (e.g. '3132330A')\n"
@@ -133,7 +138,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     char *endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:ce:f:hHi:ns:vVw:", long_options, NULL);
+        c = getopt_long(argc, argv, "b:ce:f:hHi:nNs:vVw:", long_options,
+                        NULL);
         if (c == -1)
             break;
 
@@ -182,10 +188,13 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->fname = optarg;
             break;
         case 'H':
-            op->do_hex = true;
+            op->hex_count++;
             break;
         case 'n':
             op->no_space = true;
+            break;
+        case 'N':
+            op->no_decode = true;
             break;
         case 's':
             if (1 != sscanf(optarg, "%x", &ui)) {
@@ -257,6 +266,7 @@ the_end:
     return 0;
 }
 
+/* Keep this format (e.g. 0xff,0x12,...) for backward compatibility */
 static void
 write2wfn(FILE * fp, struct opts_t * op)
 {
@@ -264,30 +274,23 @@ write2wfn(FILE * fp, struct opts_t * op)
     size_t s;
     char b[128];
 
-    if (op->do_hex) {
-        for (k = 0, n = 0; k < op->sense_len; ++k) {
-            n += sprintf(b + n, "0x%02x,", op->sense[k]);
-            if (15 == (k % 16)) {
-                b[n] = '\n';
-                s = fwrite(b, 1, n + 1, fp);
-                if ((int)s != (n + 1))
-                    pr2serr("only able to write %d of %d bytes to %s\n",
-                            (int)s, n + 1, op->wfname);
-                n = 0;
-            }
-        }
-        if (n > 0) {
+    for (k = 0, n = 0; k < op->sense_len; ++k) {
+        n += sprintf(b + n, "0x%02x,", op->sense[k]);
+        if (15 == (k % 16)) {
             b[n] = '\n';
             s = fwrite(b, 1, n + 1, fp);
             if ((int)s != (n + 1))
-                pr2serr("only able to write %d of %d bytes to %s\n", (int)s,
-                        n + 1, op->wfname);
+                pr2serr("only able to write %d of %d bytes to %s\n",
+                        (int)s, n + 1, op->wfname);
+            n = 0;
         }
-    } else {
-        s = fwrite(op->sense, 1, op->sense_len, fp);
-        if ((int)s != op->sense_len)
+    }
+    if (n > 0) {
+        b[n] = '\n';
+        s = fwrite(b, 1, n + 1, fp);
+        if ((int)s != (n + 1))
             pr2serr("only able to write %d of %d bytes to %s\n", (int)s,
-                    op->sense_len, op->wfname);
+                    n + 1, op->wfname);
     }
 }
 
@@ -374,7 +377,8 @@ main(int argc, char *argv[])
     if ((0 == op->sense_len) && (! op->do_binary) && (! op->file_given)) {
         if (op->do_status)
             return 0;
-        pr2serr(">> Need sense data on the command line or in a file\n\n");
+        pr2serr(">> Need sense/cdb/arbitrary data on the command line or "
+                "in a file\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -413,19 +417,40 @@ main(int argc, char *argv[])
         }
     }
 
-    if (op->sense_len) {
-        if (op->wfname) {
-            if ((fp = fopen(op->wfname, "w"))) {
+    if (op->sense_len > 0) {
+        if (op->wfname || op->hex_count) {
+            if (op->wfname) {
+                if (NULL == ((fp = fopen(op->wfname, "w")))) {
+                    err =errno;
+                    perror("open");
+                    pr2serr("trying to write to %s\n", op->wfname);
+                    ret = sg_convert_errno(err);
+                    goto fini;
+                }
+            } else
+                fp = stdout;
+
+            if (op->wfname && (1 == op->hex_count))
                 write2wfn(fp, op);
-                fclose(fp);
-            } else {
-                err =errno;
-                perror("open");
-                pr2serr("trying to write to %s\n", op->wfname);
-                ret = sg_convert_errno(err);
+            else if (op->hex_count && (2 != op->hex_count))
+                dStrHexFp((const char *)op->sense, op->sense_len,
+                           ((1 == op->hex_count) ? 1 : -1), fp);
+            else if (op->hex_count)
+                dStrHexFp((const char *)op->sense, op->sense_len, 0, fp);
+            else {
+                size_t s = fwrite(op->sense, 1, op->sense_len, fp);
+
+                if ((int)s != op->sense_len)
+                    pr2serr("only able to write %d of %d bytes to %s\n",
+                            (int)s, op->sense_len, op->wfname);
             }
-        }
-        if (op->do_cdb) {
+            if (op->wfname)
+                fclose(fp);
+        } else if (op->no_decode) {
+            if (op->verbose > 1)
+                pr2serr("Not decoding as %s because --nodecode given\n",
+                        (op->do_cdb ? "cdb" : "sense"));
+        } else if (op->do_cdb) {
             int sa, opcode;
 
             opcode = op->sense[0];
@@ -436,10 +461,12 @@ main(int argc, char *argv[])
             else
                 sa = 0;
             sg_get_opcode_sa_name(opcode, sa, 0, blen, b);
-        } else
+            printf("%s\n", b);
+        } else {
             sg_get_sense_str(NULL, op->sense, op->sense_len,
                              op->verbose, blen, b);
-        printf("%s\n", b);
+            printf("%s\n", b);
+        }
     }
 fini:
     return ret;

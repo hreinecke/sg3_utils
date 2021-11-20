@@ -125,7 +125,7 @@ sg_ll_get_lba_status16(int sg_fd, uint64_t start_llba, uint8_t rt,
     static const char * const cdb_s = "Get LBA status(16)";
     int res, s_cat, ret;
     uint8_t getLbaStatCmd[SERVICE_ACTION_IN_16_CMDLEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     memset(getLbaStatCmd, 0, sizeof(getLbaStatCmd));
@@ -202,7 +202,7 @@ sg_ll_get_lba_status32(int sg_fd, uint64_t start_llba, uint32_t scan_len,
     static const char * const cdb_s = "Get LBA status(32)";
     int res, s_cat, ret;
     uint8_t gls32_cmd[GLS32_CMD_LEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     memset(gls32_cmd, 0, sizeof(gls32_cmd));
@@ -281,7 +281,7 @@ sg_ll_report_tgt_prt_grp2(int sg_fd, void * resp, int mx_resp_len,
     uint8_t rtpg_cdb[MAINTENANCE_IN_CMDLEN] =
                          {MAINTENANCE_IN_CMD, REPORT_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (extended)
@@ -346,7 +346,7 @@ sg_ll_set_tgt_prt_grp(int sg_fd, void * paramp, int param_len, bool noisy,
     uint8_t stpg_cdb[MAINTENANCE_OUT_CMDLEN] =
                          {MAINTENANCE_OUT_CMD, SET_TGT_PRT_GRP_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)param_len, stpg_cdb + 6);
@@ -402,7 +402,7 @@ sg_ll_report_referrals(int sg_fd, uint64_t start_llba, bool one_seg,
     uint8_t repRef_cdb[SERVICE_ACTION_IN_16_CMDLEN] =
                          {SERVICE_ACTION_IN_16_CMD, REPORT_REFERRALS_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be64(start_llba, repRef_cdb + 2);
@@ -475,7 +475,7 @@ sg_ll_send_diag_com(struct sg_pt_base * ptvp, int sg_fd, int st_code,
     int res, ret, s_cat, tmout;
     uint8_t senddiag_cdb[SEND_DIAGNOSTIC_CMDLEN] =
         {SEND_DIAGNOSTIC_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
 
     senddiag_cdb[1] = (uint8_t)(st_code << 5);
     if (pf_bit)
@@ -593,7 +593,7 @@ sg_ll_receive_diag_com(struct sg_pt_base * ptvp, int sg_fd, bool pcv,
     static const char * const cdb_s = "Receive diagnostic results";
     uint8_t rcvdiag_cdb[RECEIVE_DIAGNOSTICS_CMDLEN] =
         {RECEIVE_DIAGNOSTICS_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
 
     if (pcv)
         rcvdiag_cdb[1] = 0x1;
@@ -715,7 +715,7 @@ sg_ll_read_defect10(int sg_fd, bool req_plist, bool req_glist, int dl_format,
     int res, ret, s_cat;
     uint8_t rdef_cdb[READ_DEFECT10_CMDLEN] =
         {READ_DEFECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     rdef_cdb[2] = (dl_format & 0x7);
@@ -787,7 +787,7 @@ sg_ll_read_media_serial_num(int sg_fd, void * resp, int mx_resp_len,
     uint8_t rmsn_cdb[SERVICE_ACTION_IN_12_CMDLEN] =
                          {SERVICE_ACTION_IN_12_CMD, READ_MEDIA_SERIAL_NUM_SA,
                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rmsn_cdb + 6);
@@ -851,7 +851,7 @@ sg_ll_report_id_info(int sg_fd, int itype, void * resp, int max_resp_len,
     uint8_t rii_cdb[MAINTENANCE_IN_CMDLEN] = {MAINTENANCE_IN_CMD,
                         REPORT_IDENTIFYING_INFORMATION_SA,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)max_resp_len, rii_cdb + 6);
@@ -917,7 +917,7 @@ sg_ll_set_id_info(int sg_fd, int itype, void * paramp, int param_len,
     uint8_t sii_cdb[MAINTENANCE_OUT_CMDLEN] = {MAINTENANCE_OUT_CMD,
                          SET_IDENTIFYING_INFORMATION_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)param_len, sii_cdb + 6);
@@ -1000,7 +1000,7 @@ sg_ll_format_unit_v2(int sg_fd, int fmtpinfo, bool longlist, bool fmtdata,
     int res, ret, s_cat, tmout;
     uint8_t fu_cdb[FORMAT_UNIT_CMDLEN] =
                 {FORMAT_UNIT_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (fmtpinfo)
@@ -1069,7 +1069,7 @@ sg_ll_reassign_blocks(int sg_fd, bool longlba, bool longlist, void * paramp,
     int res, ret, s_cat;
     uint8_t reass_cdb[REASSIGN_BLKS_CMDLEN] =
         {REASSIGN_BLKS_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (longlba)
@@ -1128,7 +1128,7 @@ sg_ll_persistent_reserve_in(int sg_fd, int rq_servact, void * resp,
     int res, ret, s_cat;
     uint8_t prin_cdb[PERSISTENT_RESERVE_IN_CMDLEN] =
                  {PERSISTENT_RESERVE_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (rq_servact > 0)
@@ -1195,7 +1195,7 @@ sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
     int res, ret, s_cat;
     uint8_t prout_cdb[PERSISTENT_RESERVE_OUT_CMDLEN] =
                  {PERSISTENT_RESERVE_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (rq_servact > 0)
@@ -1274,7 +1274,7 @@ sg_ll_read_long10(int sg_fd, bool pblock, bool correct, unsigned int lba,
     static const char * const cdb_s = "read long(10)";
     int res, s_cat, ret;
     uint8_t readLong_cdb[READ_LONG10_CMDLEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     memset(readLong_cdb, 0, READ_LONG10_CMDLEN);
@@ -1366,7 +1366,7 @@ sg_ll_read_long16(int sg_fd, bool pblock, bool correct, uint64_t llba,
     static const char * const cdb_s = "read long(16)";
     int res, s_cat, ret;
     uint8_t readLong_cdb[SERVICE_ACTION_IN_16_CMDLEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     memset(readLong_cdb, 0, sizeof(readLong_cdb));
@@ -1459,7 +1459,7 @@ sg_ll_write_long10(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
     static const char * const cdb_s = "write long(10)";
     int res, s_cat, ret;
     uint8_t writeLong_cdb[WRITE_LONG10_CMDLEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     memset(writeLong_cdb, 0, WRITE_LONG10_CMDLEN);
@@ -1541,7 +1541,7 @@ sg_ll_write_long16(int sg_fd, bool cor_dis, bool wr_uncor, bool pblock,
     static const char * const cdb_s = "write long(16)";
     int res, s_cat, ret;
     uint8_t writeLong_cdb[SERVICE_ACTION_OUT_16_CMDLEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     memset(writeLong_cdb, 0, sizeof(writeLong_cdb));
@@ -1628,7 +1628,7 @@ sg_ll_verify10(int sg_fd, int vrprotect, bool dpo, int bytchk,
     int res, ret, s_cat, slen;
     uint8_t v_cdb[VERIFY10_CMDLEN] =
                 {VERIFY10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     /* N.B. BYTCHK field expanded to 2 bits sbc3r34 */
@@ -1709,7 +1709,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
     int res, ret, s_cat, slen;
     uint8_t v_cdb[VERIFY16_CMDLEN] =
                 {VERIFY16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     /* N.B. BYTCHK field expanded to 2 bits sbc3r34 */
@@ -1807,7 +1807,7 @@ sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
     int k, res, slen, duration;
     int ret = -1;
     uint8_t apt_cdb[ATA_PT_32_CMDLEN];
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     uint8_t * sp;
     const uint8_t * bp;
     struct sg_pt_base * ptvp;
@@ -1962,7 +1962,7 @@ sg_ll_read_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     int res, ret, s_cat;
     uint8_t rbuf_cdb[READ_BUFFER_CMDLEN] =
         {READ_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     rbuf_cdb[1] = (uint8_t)(mode & 0x1f);
@@ -2027,7 +2027,7 @@ sg_ll_write_buffer(int sg_fd, int mode, int buffer_id, int buffer_offset,
     int res, ret, s_cat;
     uint8_t wbuf_cdb[WRITE_BUFFER_CMDLEN] =
         {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     wbuf_cdb[1] = (uint8_t)(mode & 0x1f);
@@ -2098,7 +2098,7 @@ sg_ll_write_buffer_v2(int sg_fd, int mode, int m_specific, int buffer_id,
     int res, ret, s_cat;
     uint8_t wbuf_cdb[WRITE_BUFFER_CMDLEN] =
         {WRITE_BUFFER_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (buffer_offset > 0xffffff) {
@@ -2182,7 +2182,7 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
     int res, ret, s_cat, tmout;
     uint8_t u_cdb[UNMAP_CMDLEN] =
                          {UNMAP_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (anchor)
@@ -2240,7 +2240,7 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
     int ret, res, s_cat;
     uint8_t rl_cdb[READ_BLOCK_LIMITS_CMDLEN] =
       {READ_BLOCK_LIMITS_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     if (vb) {
@@ -2301,7 +2301,7 @@ sg_ll_receive_copy_results(int sg_fd, int sa, int list_id, void * resp,
     int res, ret, s_cat;
     uint8_t rcvcopyres_cdb[THIRD_PARTY_COPY_IN_CMDLEN] =
       {THIRD_PARTY_COPY_IN_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
     char b[64];
 
@@ -2364,7 +2364,7 @@ sg_ll_extended_copy(int sg_fd, void * paramp, int param_len, bool noisy,
     int res, ret, s_cat;
     uint8_t xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =
       {THIRD_PARTY_COPY_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
     const char * cdb_s = "Extended copy (LID1)";
 
@@ -2424,7 +2424,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
     int res, ret, s_cat, tmout;
     uint8_t xcopy_cdb[THIRD_PARTY_COPY_OUT_CMDLEN] =
       {THIRD_PARTY_COPY_OUT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
     char cname[80];
 
@@ -2511,7 +2511,7 @@ sg_ll_pre_fetch_x(int sg_fd, bool do_seek10, bool cdb16, bool immed,
     int res, s_cat, ret, cdb_len, tmout;
     const char *cdb_s;
     uint8_t preFetchCdb[PRE_FETCH16_CMDLEN]; /* all use longest cdb */
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
     memset(preFetchCdb, 0, sizeof(preFetchCdb));

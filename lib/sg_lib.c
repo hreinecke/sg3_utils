@@ -2818,13 +2818,14 @@ trimTrailingSpaces(char * b)
         b[k + 1] = '\0';
 }
 
-/* Note the ASCII-hex output goes to stdout. [Most other output from functions
- * in this file go to sg_warnings_strm (default stderr).]
- * 'no_ascii' allows for 3 output types:
+/* Read binary starting at 'str' for 'len' bytes and output as ASCII
+ * hexadecinal into file pointer (fp). 16 bytes per line are output with an
+ * additional space between 8th and 9th byte on each line (for readability).
+ * 'no_ascii' selects one of 3 output format types:
  *     > 0     each line has address then up to 16 ASCII-hex bytes
  *     = 0     in addition, the bytes are listed in ASCII to the right
  *     < 0     only the ASCII-hex bytes are listed (i.e. without address) */
-static void
+void
 dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
 {
     const char * p = str;

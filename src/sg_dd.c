@@ -24,7 +24,7 @@
  * command. The actual size of the SCSI READ or WRITE command block can be
  * selected with the "cdbsz" argument.
  *
- * This version is designed for the linux kernel 2, 3, 4 and 5 series.
+ * This version is designed for the Linux kernel 2, 3, 4 and 5 series.
  */
 
 #define _XOPEN_SOURCE 600
@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.31 20211115";
+static const char * version_str = "6.31 20211114";
 
 
 #define ME "sg_dd: "
@@ -715,7 +715,7 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     int res, slen;
     const uint8_t * sbp;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
-    uint8_t senseBuff[SENSE_BUFF_LEN];
+    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, ifp->cdbsz, blocks, from_block, do_verify,
@@ -1124,7 +1124,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     uint64_t io_addr = 0;
     const char * op_str = do_verify ? "verifying" : "writing";
     uint8_t wrCmd[MAX_SCSI_CDBSZ];
-    uint8_t senseBuff[SENSE_BUFF_LEN];
+    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(wrCmd, ofp->cdbsz, blocks, to_block, do_verify,

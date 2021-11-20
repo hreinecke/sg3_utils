@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.07 20211104";      /* sbc5r01 */
+static const char * version_str = "1.08 20211114";      /* sbc5r01 */
 
 
 #ifndef UINT32_MAX
@@ -144,7 +144,7 @@ sg_ll_get_phy_elem_status(int sg_fd, uint32_t starting_elem, uint8_t filter,
     uint8_t gpesCmd[16] = {SG_SERVICE_ACTION_IN_16,
                            GET_PHY_ELEM_STATUS_SA, 0, 0, 0, 0,
                            0, 0, 0, 0,  0, 0, 0, 0,  0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
     static const char * const cmd_name = "Get physical element status";
 

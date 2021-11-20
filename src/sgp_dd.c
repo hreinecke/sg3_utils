@@ -22,7 +22,7 @@
  * in this case) are transferred to or from the sg device in a single SCSI
  * command.
  *
- * This version is designed for the linux kernel 2.4, 2.6, 3, 4 and 5 series.
+ * This version is designed for the Linux kernel 2.4, 2.6, 3, 4 and 5 series.
  *
  * sgp_dd is a Posix threads specialization of the sg_dd utility. Both
  * sgp_dd and sg_dd only perform special tasks when one or both of the given

@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.66 20210923";  /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.67 20211112";  /* spc6r05 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2599,7 +2599,7 @@ decode_zbdch_vpd(uint8_t * b, int len, int do_hex)
         printf("no limit\n");
     else
         printf("%" PRIu32 "\n", u);
-    printf("  Zone alignment mode: ");  /* zbc2r11 */
+    printf("  Zone alignment method: ");  /* zbc2r11,zbc2r12 */
     switch (b[23] & 0xf) {
     case 0:
         printf("not reported [0]\n");

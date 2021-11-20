@@ -56,7 +56,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.30 20210830";
+static const char * version_str = "1.31 20211114";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -355,7 +355,7 @@ sg_ll_compare_and_write(int sg_fd, uint8_t * buff, int blocks,
         uint64_t ull = 0;
         struct sg_pt_base * ptvp;
         uint8_t cawCmd[COMPARE_AND_WRITE_CDB_SIZE];
-        uint8_t sense_b[SENSE_BUFF_LEN];
+        uint8_t sense_b[SENSE_BUFF_LEN] = {0};
 
         if (sg_build_scsi_cdb(cawCmd, blocks, lba, flags)) {
                 pr2serr(ME "bad cdb build, lba=0x%" PRIx64 ", blocks=%d\n",

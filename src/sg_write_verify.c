@@ -40,7 +40,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.19 20210830";
+static const char * version_str = "1.20 20211114";
 
 
 #define ME "sg_write_verify: "
@@ -129,7 +129,7 @@ run_scsi_transaction(int sg_fd, const uint8_t *cdbp, int cdb_len,
 {
     int res, sense_cat, ret;
     struct sg_pt_base * ptvp;
-    uint8_t sense_b[SENSE_BUFF_LEN];
+    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     char b[32];
 
     snprintf(b, sizeof(b), "Write and verify(%d)", cdb_len);

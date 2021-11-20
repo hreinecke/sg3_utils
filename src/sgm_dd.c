@@ -27,7 +27,7 @@
    then only the read side will be mmap-ed, while the write side will
    use normal IO.
 
-   This version is designed for the linux kernel 2.4, 2.6, 3, 4 and 5 series.
+   This version is designed for the Linux kernel 2.4, 2.6, 3, 4 and 5 series.
 */
 
 #define _XOPEN_SOURCE 600
@@ -69,7 +69,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.17 20211024";
+static const char * version_str = "1.18 20211114";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -471,7 +471,7 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     bool print_cdb_after = false;
     int res;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
-    uint8_t senseBuff[SENSE_BUFF_LEN];
+    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, false, fua,
@@ -568,7 +568,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     bool print_cdb_after = false;
     int res;
     uint8_t wrCmd[MAX_SCSI_CDBSZ];
-    uint8_t senseBuff[SENSE_BUFF_LEN];
+    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, true, fua, dpo)) {

@@ -22,7 +22,7 @@
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
 
-/* Version 1.03 20211115 */
+/* Version 1.02 20210618 */
 
 /* List of function names with external linkage that need to be defined
  *
