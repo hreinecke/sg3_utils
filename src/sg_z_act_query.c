@@ -38,7 +38,7 @@
  * command to the given SCSI device. Based on zbc2r12.pdf .
  */
 
-static const char * version_str = "1.01 20211117";
+static const char * version_str = "1.02 20211203";
 
 #define SG_ZBC_IN_CMDLEN 16
 #define Z_ACTIVATE_SA 0x8
@@ -526,7 +526,7 @@ main(int argc, char * argv[])
             goto start_response;
         } else {
             pr2serr("missing device name!\n\n");
-            usage(1);
+            usage();
             ret = SG_LIB_FILE_ERROR;
             no_final_msg = true;
             goto the_end;

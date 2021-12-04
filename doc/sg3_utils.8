@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "November 2021" "sg3_utils\-1.48" SG3_UTILS
+.TH SG3_UTILS "8" "December 2021" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -779,6 +779,48 @@ Windows may open a file in text rather than binary mode).
 .PP
 Some utilities that the author has found useful have been placed in
 the 'utils' subdirectory.
+.SH DEBUGGING
+Each utility and most scripts have a \fI\-\-verbose\fR option (short
+form: \fI\-v\fR) that can be used multiple times to increase the verbosity
+of the output to aid debugging. Normal output (if any) is sent to stdout
+while verbose output (and error output) is sent to stderr. This may be
+important when the (normal output) of a utility is being piped to another
+command (e.g. the grep command to find a particular field in the output).
+.PP
+The Linux SCSI subsystem has a pseudo file for getting and changing the SCSI
+logging level: /proc/sys/dev/scsi/logging_level . The scsi_logging_level
+script in this package can be used to manipulate the logging level in a
+command line friendly way. See its manpage.
+.PP
+The logging level runs from 0 (no logging and the default) to 7 (lots of
+logging) and applies to all storage devices that use the SCSI subsystem.
+The logging output goes to "the log" which is often the /var/log/syslog
+file.
+.PP
+The Linux SCSI generic (sg) driver is often used under the utilities in
+this package. It uses a seldom (otherwise) used logging type of
+SCSI_LOG_TIMEOUT. An example of its use to turn on full debugging is:
+.PP
+  scsi_logging_level \-s \-T 7
+.PP
+To reduce the amount of output to only error paths, the following is
+suggested:
+.PP
+  scsi_logging_level \-s \-T 3
+.PP
+And to turn off logging in the sg driver:
+.PP
+  scsi_logging_level \-s \-T 0
+.PP
+For analyzing machine crashes associated with a SCSI command, nothing beats
+a real serial port. By "real" means that it is _not_ a USB serial port.
+The reason is that like SCSI, USB needs a functioning software stack within
+the OS kernel, the very thing that may be crippled during a machine crash.
+.PP
+Modern laptops do not have real serial ports and many server machines
+don't either (or it is an optional extra). In Linux the netconsole module
+does a pretty good job by sending log entries to another machine (on the
+same sub\-net)) using the UDP ("fire and forget") network protocol .
 .SH WEB SITE
 There is a web page discussing this package at
 https://sg.danny.cz/sg/sg3_utils.html . The device naming used by this

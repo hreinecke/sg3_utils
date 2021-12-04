@@ -1,4 +1,4 @@
-.TH SG_Z_ACT_QUERY "8" "November 2021" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_Z_ACT_QUERY "8" "December 2021" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_z_act_query \- send a SCSI ZONE ACTIVATE or ZONE QUERY command
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ sg_z_act_query \- send a SCSI ZONE ACTIVATE or ZONE QUERY command
 .PP
 Sends a SCSI ZONE ACTIVATE or ZONE QUERY command to the \fIDEVICE\fR. If the
 \fI\-\-activate\fR option is not given, then a ZONE QUERY command is sent.
-These commands where added in the ZBC\-2 draft revision 4 (zbc2r04.pdf).
+These commands were added in the ZBC\-2 draft revision 4 (zbc2r04.pdf).
 .PP
 Both of these commands have similar cdb_s and responses hence they are both
 placed in this utility. The difference is that only the ZONE ACTIVATE command
@@ -45,8 +45,8 @@ response is output in ASCII hexadecimal with a leading address (starting at
 response is output separately in hexadecimal. When used thrice the whole
 response is output in hexadecimal with no leading address (on each line).
 .br
-The output format when this option is given thrice is suitable contents
-for a later invocation with the \fI\-\-inhex=FN\fR option.
+The output format when this option is given thrice is suitable for a later
+invocation with the \fI\-\-inhex=FN\fR option.
 .TP
 \fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
 where \fIFN\fR is a file name whose contents are assumed to be ASCII

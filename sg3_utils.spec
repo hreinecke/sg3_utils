@@ -84,7 +84,7 @@ fi
 %{_libdir}/*.la
 
 %changelog
-* Sat Nov 20 2021 - dgilbert at interlog dot com
+* Fri Dec 03 2021 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.48
 
