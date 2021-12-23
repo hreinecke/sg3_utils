@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "August 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_LOGS "8" "December 2021" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -54,6 +54,10 @@ SENSE command. The third form shows the options that can be used to send a
 LOG SELECT command. The fourth form groups various management options.
 The last form shows the older, deprecated command line interface which is
 maintained for backward compatibility.
+.PP
+When no options are given, just a \fIDEVICE\fR, that is equivalent to calling
+this utility with the \fI\-\-list\fR option. In that case the names of the
+supported log pages (and not any subpages) are listed out.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -159,14 +163,13 @@ is ignored. If the \fI\-\-raw\fR option is also given then \fIFN\fR is
 treated as binary.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
-lists the names of all logs sense pages supported by this device. This is
-done by reading the "supported log pages" log page. When used
-twice (e.g. '\-ll') lists the names of all logs sense pages and subpages
-supported by this device, excluding pages whose subpage number is
-0xff (apart from page 0x0,0xff). When used three times then all supported
-pages and subpages reported by the device are list. So the page/subpage
-names and not thrie content is shown with this option. There is a list of
-common log page codes below.
+lists the names of the logs sense pages supported by this device. This is
+done by reading the "supported log pages" log page. When used once only
+log pages, but not subpages, are listed. When used two or more
+times (e.g. '\-ll') lists the names of all logs sense pages and subpages
+supported by this device, including pages whose subpage number is
+0xff. So the page/subpage names but not their contents is shown with this
+option.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 sets the "allocation length" field in the LOG SENSE cdb. The is the maximum
@@ -222,7 +225,8 @@ should be selected. The default value is 0.
 .TP
 \fB\-q\fR, \fB\-\-pcb\fR
 show Parameter Control Byte settings (only relevant when log parameters
-being output in ASCII).
+being output in ASCII). This byte includes the DU and TSD bits plus
+the 'Format and linking' field (2 bits wide).
 .TP
 \fB\-Q\fR, \fB\-\-ppc\fR
 sets the Parameter Pointer Control (PPC) bit in the LOG SENSE cdb. Default

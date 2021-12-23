@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.72 20211114";    /* spc6r05 */
+static const char * version_str = "0.72 20211221";    /* spc6r05 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -51,6 +51,7 @@ static const char * version_str = "0.72 20211114";    /* spc6r05 */
 #define SEAGATE_READ_UDS_DATA_CMD 0xf7  /* may start reporting vendor cmds */
 
 static int peri_dtype = -1; /* ugly but not easy to pass to alpha compare */
+static bool no_final_msg = false;
 
 static struct option long_options[] = {
         {"alpha", no_argument, 0, 'a'},
@@ -1075,20 +1076,33 @@ main(int argc, char * argv[])
     if (NULL == rsoc_buff) {
         pr2serr("Unable to allocate memory\n");
         res = sg_convert_errno(ENOMEM);
+        no_final_msg = true;
         goto err_out;
     }
 
     if (op->opcode < 0) {
         /* Try to open read-only */
         if ((sg_fd = scsi_pt_open_device(op->device_name, true, vb)) < 0) {
-            pr2serr("sg_opcodes: error opening file (ro): %s: %s\n",
-                    op->device_name, safe_strerror(-sg_fd));
+            int err = -sg_fd;
+
+            if (op->verbose)
+                pr2serr("sg_opcodes: error opening file (ro): %s: %s\n",
+                        op->device_name, safe_strerror(err));
+#ifndef SG_LIB_WIN32
+            if (ENOENT == err) {
+                /* file or directory in the file's path doesn't exist, no
+                 * point in retrying with read-write flag */
+                res = sg_convert_errno(err);
+                goto err_out;
+            }
+#endif
             goto open_rw;
         }
         ptvp = construct_scsi_pt_obj_with_fd(sg_fd, op->verbose);
         if (NULL == ptvp) {
             pr2serr("Out of memory (ro)\n");
             res = sg_convert_errno(ENOMEM);
+            no_final_msg = true;
             goto err_out;
         }
         if (op->no_inquiry && (peri_dtype < 0))
@@ -1110,6 +1124,7 @@ main(int argc, char * argv[])
             pr2serr("sg_opcodes: %s doesn't respond to a SCSI INQUIRY\n",
                     op->device_name);
             res = SG_LIB_CAT_OTHER;
+            no_final_msg = true;
             goto err_out;
         }
     }
@@ -1121,12 +1136,14 @@ open_rw:                /* if not already open */
             pr2serr("sg_opcodes: error opening file (rw): %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));
             res = sg_convert_errno(-sg_fd);
+            no_final_msg = true;
             goto err_out;
         }
         ptvp = construct_scsi_pt_obj_with_fd(sg_fd, op->verbose);
         if (NULL == ptvp) {
             pr2serr("Out of memory (rw)\n");
             res = sg_convert_errno(ENOMEM);
+            no_final_msg = true;
             goto err_out;
         }
     }
@@ -1144,6 +1161,7 @@ open_rw:                /* if not already open */
     if (res) {
         sg_get_category_sense_str(res, sizeof(b), b, vb);
         pr2serr("%s: %s\n", op_name, b);
+        no_final_msg = true;
         if ((0 == op->servact) && (op->opcode >= 0))
             pr2serr("    >> perhaps try again without a service action "
                     "[SA] of 0\n");
@@ -1153,12 +1171,12 @@ open_rw:                /* if not already open */
     if (op->do_taskman) {
         if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, act_len);
-            goto err_out;
+            goto fini;
         }
         printf("\nTask Management Functions supported by device:\n");
         if (op->do_hex) {
             hex2stdout(rsoc_buff, act_len, 1);
-            goto err_out;
+            goto fini;
         }
         if (rsoc_buff[0] & 0x80)
             printf("    Abort task\n");
@@ -1187,6 +1205,7 @@ open_rw:                /* if not already open */
                 pr2serr("when REPD given, byte 3 of response should be >= "
                         "12\n");
                 res = SG_LIB_CAT_OTHER;
+                no_final_msg = true;
                 goto err_out;
             } else
                 printf("  Extended parameter data:\n");
@@ -1210,11 +1229,11 @@ open_rw:                /* if not already open */
         len = (len < act_len) ? len : act_len;
         if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, len);
-            goto err_out;
+            goto fini;
         }
         if (op->do_hex) {
             hex2stdout(rsoc_buff, len, 1);
-            goto err_out;
+            goto fini;
         }
         list_all_codes(rsoc_buff, len, op, ptvp);
     } else {    /* asked about specific command */
@@ -1224,11 +1243,11 @@ open_rw:                /* if not already open */
         cd_len = (cd_len < act_len) ? cd_len : act_len;
         if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, len);
-            goto err_out;
+            goto fini;
         }
         if (op->do_hex) {
             hex2stdout(rsoc_buff, len, 1);
-            goto err_out;
+            goto fini;
         }
         list_one(rsoc_buff, cd_len, rep_opts, op);
     }
@@ -1242,5 +1261,10 @@ err_out:
         destruct_scsi_pt_obj(ptvp);
     if (sg_fd >= 0)
         scsi_pt_close_device(sg_fd);
-    return res;
+    if ((0 == op->verbose) && (! no_final_msg)) {
+        if (! sg_if_can2stderr("sg_opcodes failed: ", res))
+            pr2serr("Some error occurred, try again with '-v' "
+                    "or '-vv' for more information\n");
+    }
+    return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }

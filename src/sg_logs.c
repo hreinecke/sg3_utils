@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.87 20211030";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.88 20211222";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -1502,7 +1502,7 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
     return outp;
 }
 
-/* SUPP_PAGES_LPAGE [0x0,0x0] */
+/* SUPP_PAGES_LPAGE [0x0,0x0] <sp> */
 static bool
 show_supported_pgs_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
@@ -1534,8 +1534,8 @@ show_supported_pgs_page(const uint8_t * resp, int len,
     return true;
 }
 
-/* SUPP_PAGES_LPAGE,SUPP_SPGS_SUBPG [0x0,0xff] or all subpages of a given
- * page code: [<pg_code>,0xff] */
+/* SUPP_PAGES_LPAGE,SUPP_SPGS_SUBPG [0x0,0xff] <ssp> or all subpages of a
+ * given page code: [<pg_code>,0xff] where <pg_code> > 0 */
 static bool
 show_supported_pgs_sub_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
@@ -1557,28 +1557,31 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
         int pg_code = bp[k];
         int subpg_code = bp[k + 1];
 
-        if ((op->do_list == 2) && (subpg_code == 0xff) && (pg_code > 0))
-            continue;
+        /* formerly ignored [pg, 0xff] when pg > 0, don't know why */
         if (NOT_SPG_SUBPG == subpg_code)
             snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
         else
             snprintf(b, sizeof(b) - 1, "    0x%02x,0x%02x   ", pg_code,
                      subpg_code);
-        lep = pg_subpg_pdt_search(pg_code, subpg_code, op->dev_pdt, -1);
-        if (lep) {
-            if (op->do_brief > 1)
-                printf("    %s\n", lep->name);
-            else if (op->do_brief)
-                printf("%s%s\n", b, lep->name);
-            else
-                printf("%s%s [%s]\n", b, lep->name, lep->acron);
-        } else
+        if ((pg_code > 0) && (subpg_code == 0xff))
             printf("%s\n", b);
+        else {
+            lep = pg_subpg_pdt_search(pg_code, subpg_code, op->dev_pdt, -1);
+            if (lep) {
+                if (op->do_brief > 1)
+                    printf("    %s\n", lep->name);
+                else if (op->do_brief)
+                    printf("%s%s\n", b, lep->name);
+                else
+                    printf("%s%s [%s]\n", b, lep->name, lep->acron);
+            } else
+                printf("%s\n", b);
+        }
     }
     return true;
 }
 
-/* BUFF_OVER_UNDER_LPAGE [0x1]  introduced: SPC-2 */
+/* BUFF_OVER_UNDER_LPAGE [0x1] <bou>  introduced: SPC-2 */
 static bool
 show_buffer_over_under_run_page(const uint8_t * resp, int len,
                                 const struct opts_t * op)
@@ -1703,7 +1706,7 @@ skip:
 }
 
 /* WRITE_ERR_LPAGE; READ_ERR_LPAGE; READ_REV_ERR_LPAGE; VERIFY_ERR_LPAGE */
-/* [0x2, 0x3, 0x4, 0x5]  introduced: SPC-3 */
+/* [0x2, 0x3, 0x4, 0x5] <we, re, rre, ve>  introduced: SPC-3 */
 static bool
 show_error_counter_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
@@ -1781,7 +1784,7 @@ skip:
     return true;
 }
 
-/* NON_MEDIUM_LPAGE [0x6]  introduced: SPC-2 */
+/* NON_MEDIUM_LPAGE [0x6] <nm>  introduced: SPC-2 */
 static bool
 show_non_medium_error_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
@@ -1832,7 +1835,7 @@ skip:
     return true;
 }
 
-/* PCT_LPAGE [0x1a]  introduced: SPC-4 */
+/* PCT_LPAGE [0x1a] <pct>  introduced: SPC-4 */
 static bool
 show_power_condition_transitions_page(const uint8_t * resp, int len,
                                       const struct opts_t * op)
@@ -1916,7 +1919,7 @@ humidity_str(uint8_t h, bool reporting, char * b, int blen)
     return b;
 }
 
-/* ENV_REPORTING_SUBPG [0xd,0x1]  introduced: SPC-5 (rev 02). "mounted"
+/* ENV_REPORTING_SUBPG [0xd,0x1] <env> introduced: SPC-5 (rev 02). "mounted"
  * changed to "other" in spc5r11 */
 static bool
 show_environmental_reporting_page(const uint8_t * resp, int len,
@@ -1998,7 +2001,6 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
             }
         } else
             printf("  <<unexpected parameter code 0x%x\n", pc);
-        printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -2010,7 +2012,7 @@ skip:
     return true;
 }
 
-/* ENV_LIMITS_SUBPG [0xd,0x2]  introduced: SPC-5 (rev 02) */
+/* ENV_LIMITS_SUBPG [0xd,0x2] <enl> introduced: SPC-5 (rev 02) */
 static bool
 show_environmental_limits_page(const uint8_t * resp, int len,
                                const struct opts_t * op)
@@ -2080,7 +2082,6 @@ show_environmental_limits_page(const uint8_t * resp, int len,
                    humidity_str(bp[11], false, b, blen));
         } else
             printf("  <<unexpected parameter code 0x%x\n", pc);
-        printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -2092,7 +2093,7 @@ skip:
     return true;
 }
 
-/* CMD_DUR_LIMITS_SUBPG [0x19,0x21]  introduced: SPC-6 (rev 01) */
+/* CMD_DUR_LIMITS_SUBPG [0x19,0x21] <cdl>  introduced: SPC-6 (rev 01) */
 static bool
 show_cmd_dur_limits_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
@@ -2447,7 +2448,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
 }
 
 /* Data compression: originally vendor specific 0x32 (LTO-5), then
- * ssc-4 standardizes it at 0x1b */
+ * ssc-4 standardizes it at 0x1b <dc> */
 static bool
 show_data_compression_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
@@ -2548,7 +2549,7 @@ skip_para:
     return true;
 }
 
-/* LAST_N_ERR_LPAGE [0x7]  introduced: SPC-2 */
+/* LAST_N_ERR_LPAGE [0x7] <lne>  introduced: SPC-2 */
 static bool
 show_last_n_error_page(const uint8_t * resp, int len,
                        const struct opts_t * op)
@@ -2605,7 +2606,7 @@ show_last_n_error_page(const uint8_t * resp, int len,
     return true;
 }
 
-/* LAST_N_DEFERRED_LPAGE [0xb]  introduced: SPC-2 */
+/* LAST_N_DEFERRED_LPAGE [0xb] <lnd>  introduced: SPC-2 */
 static bool
 show_last_n_deferred_error_page(const uint8_t * resp, int len,
                                 const struct opts_t * op)
@@ -2652,7 +2653,7 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
     return true;
 }
 
-/* LAST_N_INQUIRY_DATA_CH_SUBPG [0xb,0x1]  introduced: SPC-5 (rev 17) */
+/* LAST_N_INQUIRY_DATA_CH_SUBPG [0xb,0x1] <lnic> introduced: SPC-5 (rev 17) */
 static bool
 show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
@@ -2712,7 +2713,7 @@ skip:
     return true;
 }
 
-/* LAST_N_MODE_PG_DATA_CH_SUBPG [0xb,0x2]  introduced: SPC-5 (rev 17) */
+/* LAST_N_MODE_PG_DATA_CH_SUBPG [0xb,0x2] <lnmc> introduced: SPC-5 (rev 17) */
 static bool
 show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
                                  const struct opts_t * op)
@@ -2790,7 +2791,7 @@ static const char * self_test_result[] = {
     "reserved",
     "self test in progress"};
 
-/* SELF_TEST_LPAGE [0x10]  introduced: SPC-3 */
+/* SELF_TEST_LPAGE [0x10] <str>  introduced: SPC-3 */
 static bool
 show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -2859,7 +2860,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* TEMPERATURE_LPAGE [0xd]  introduced: SPC-3 */
+/* TEMPERATURE_LPAGE [0xd] <temp>  introduced: SPC-3 */
 static bool
 show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -2933,7 +2934,7 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* START_STOP_LPAGE [0xe]  introduced: SPC-3 */
+/* START_STOP_LPAGE [0xe] <sscc>  introduced: SPC-3 */
 static bool
 show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -3043,7 +3044,7 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* APP_CLIENT_LPAGE [0xf]  introduced: SPC-3 */
+/* APP_CLIENT_LPAGE [0xf] <ac>  introduced: SPC-3 */
 static bool
 show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -3097,7 +3098,7 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* IE_LPAGE [0x2f] "Informational Exceptions"  introduced: SPC-3 */
+/* IE_LPAGE [0x2f] <ie> "Informational Exceptions"  introduced: SPC-3 */
 static bool
 show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -3646,7 +3647,7 @@ show_sas_port_param(const uint8_t * bp, int param_len,
     }
 }
 
-/* PROTO_SPECIFIC_LPAGE [0x18] */
+/* PROTO_SPECIFIC_LPAGE [0x18] <psp> */
 static bool
 show_protocol_specific_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
@@ -3694,7 +3695,7 @@ skip:
 }
 
 /* Returns true if processed page, false otherwise */
-/* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f  introduced: SPC-4 */
+/* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f <gsp,grsp>  introduced: SPC-4 */
 static bool
 show_stats_perform_pages(const uint8_t * resp, int len,
                          const struct opts_t * op)
@@ -3981,7 +3982,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
 }
 
 /* Returns true if processed page, false otherwise */
-/* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20]  introduced: SPC-4 */
+/* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20] <cms>  introduced: SPC-4 */
 static bool
 show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -4114,7 +4115,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* FORMAT_STATUS_LPAGE [0x8]  introduced: SBC-2 */
+/* FORMAT_STATUS_LPAGE [0x8] <fs>  introduced: SBC-2 */
 static bool
 show_format_status_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
@@ -4202,7 +4203,7 @@ skip:
     return true;
 }
 
-/* Non-volatile cache page [0x17]  introduced: SBC-2 */
+/* Non-volatile cache page [0x17] <nvc>  introduced: SBC-2 */
 static bool
 show_non_volatile_cache_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
@@ -4288,7 +4289,7 @@ skip:
     return true;
 }
 
-/* LB_PROV_LPAGE [0xc]  introduced: SBC-3 */
+/* LB_PROV_LPAGE [0xc] <lbp> introduced: SBC-3 */
 static bool
 show_lb_provisioning_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
@@ -4381,7 +4382,7 @@ skip:
     return true;
 }
 
-/* UTILIZATION_SUBPG [0xe,0x1]  introduced: SBC-4 */
+/* UTILIZATION_SUBPG [0xe,0x1] <util>  introduced: SBC-4 */
 static bool
 show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -4451,7 +4452,7 @@ skip:
     return true;
 }
 
-/* SOLID_STATE_MEDIA_LPAGE [0x11]  introduced: SBC-3 */
+/* SOLID_STATE_MEDIA_LPAGE [0x11] <ssm>  introduced: SBC-3 */
 static bool
 show_solid_state_media_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
@@ -4528,7 +4529,7 @@ static const char * dt_dev_activity[] = {
     "Diagnostic operation in progress", /* 10 */
 };
 
-/* DT device status [0x11] (ssc, adc) */
+/* DT device status [0x11] <dtds> (ssc, adc) */
 static bool
 show_dt_device_status_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
@@ -4666,7 +4667,7 @@ skip:
     return true;
 }
 
-/* TapeAlert response [0x12] (adc,ssc) */
+/* TapeAlert response [0x12] <tar> (adc,ssc) */
 static bool
 show_tapealert_response_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
@@ -4755,7 +4756,7 @@ static const char * req_rec_arr[NUM_REQ_REC_ARR_ELEMS] = {
         "re-insert volume",     /* 0xf */
 };
 
-/* Requested recovery [0x13] (ssc) */
+/* REQ_RECOVERY_LPAGE Requested recovery [0x13] <rr> (ssc) */
 static bool
 show_requested_recovery_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
@@ -4816,7 +4817,7 @@ skip:
     return true;
 }
 
-/* SAT_ATA_RESULTS_LPAGE (SAT-2) [0x16] */
+/* SAT_ATA_RESULTS_LPAGE (SAT-2) [0x16] <aptr> */
 static bool
 show_ata_pt_results_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
@@ -4906,7 +4907,7 @@ static const char * reassign_status[] = {
     "Logical block unsuccessfully reassigned by application client", /* 8 */
 };
 
-/* Background scan results [0x15,0] for disk  introduced: SBC-3 */
+/* Background scan results [0x15,0] <bsr> for disk  introduced: SBC-3 */
 static bool
 show_background_scan_results_page(const uint8_t * resp, int len,
                                   const struct opts_t * op)
@@ -5034,7 +5035,7 @@ skip:
     return true;
 }
 
-/* ZONED_BLOCK_DEV_STATS_SUBPG [0x14,0x1]  introduced: zbc2r01 */
+/* ZONED_BLOCK_DEV_STATS_SUBPG [0x14,0x1] <zbds>  introduced: zbc2r01 */
 static bool
 show_zoned_block_dev_stats(const uint8_t * resp, int len,
                            const struct opts_t * op)
@@ -5234,7 +5235,7 @@ skip:
     return true;
 }
 
-/* PENDING_DEFECTS_SUBPG [0x15,0x1]  introduced: SBC-4 */
+/* PENDING_DEFECTS_SUBPG [0x15,0x1] <pd>  introduced: SBC-4 */
 static bool
 show_pending_defects_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
@@ -5310,7 +5311,7 @@ skip:
     return true;
 }
 
-/* BACKGROUND_OP_SUBPG [0x15,0x2]  introduced: SBC-4 rev 7 */
+/* BACKGROUND_OP_SUBPG [0x15,0x2] <bop>  introduced: SBC-4 rev 7 */
 static bool
 show_background_op_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
@@ -5367,7 +5368,7 @@ skip:
     return true;
 }
 
-/* LPS misalignment page [0x15,0x3]  introduced: SBC-4 rev 10
+/* LPS misalignment page [0x15,0x3] <lps>  introduced: SBC-4 rev 10
    LPS: "Long Physical Sector" a term from an ATA feature set */
 static bool
 show_lps_misalignment_page(const uint8_t * resp, int len,
@@ -5430,7 +5431,7 @@ skip:
     return true;
 }
 
-/* Service buffer information [0x15] (adc) */
+/* Service buffer information [0x15] <sbi> (adc) */
 static bool
 show_service_buffer_info_page(const uint8_t * resp, int len,
                               const struct opts_t * op)
@@ -5485,7 +5486,7 @@ skip:
     return true;
 }
 
-/* Sequential access device page [0xc] for tape */
+/* Sequential access device page [0xc] <sad> for tape */
 static bool
 show_sequential_access_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
@@ -5599,7 +5600,7 @@ skip:
     return true;
 }
 
-/* 0x14 for tape and ADC */
+/* Device statistics 0x14 <ds> for tape and ADC */
 static bool
 show_device_stats_page(const uint8_t * resp, int len,
                        const struct opts_t * op)
@@ -5778,7 +5779,7 @@ skip:
     return true;
 }
 
-/* 0x14 for media changer */
+/* Media changer statistics 0x14 <mcs> for media changer */
 static bool
 show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -5913,7 +5914,7 @@ skip:
     return true;
 }
 
-/* Element statistics page, 0x15 for SMC */
+/* Element statistics page, 0x15 <els> for SMC */
 static bool
 show_element_stats_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
@@ -5965,7 +5966,7 @@ skip:
     return true;
 }
 
-/* 0x16 for tape */
+/* Tape diagnostic data [0x16] <tdd> for tape */
 static bool
 show_tape_diag_data_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
@@ -6051,7 +6052,7 @@ skip:
     return true;
 }
 
-/* 0x16 for media changer */
+/* Media changer diagnostic data [0x16] <mcdd> for media changer */
 static bool
 show_mchanger_diag_data_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
@@ -6214,7 +6215,7 @@ volume_stats_history(const uint8_t * xp, int len)
     }
 }
 
-/* Volume Statistics log page and subpages (ssc-4) [0x17, 0x0-0xf] */
+/* Volume Statistics log page and subpages (ssc-4) [0x17, 0x0-0xf] <vs> */
 static bool
 show_volume_stats_pages(const uint8_t * resp, int len,
                        const struct opts_t * op)
@@ -6513,7 +6514,7 @@ static const char * tape_alert_strs[] = {
     "WORM medium - overwrite attempted",
 };
 
-/* TAPE_ALERT_LPAGE [0x2e] */
+/* TAPE_ALERT_LPAGE [0x2e] <ta> */
 static bool
 show_tape_alert_ssc_page(const uint8_t * resp, int len,
                          const struct opts_t * op)
@@ -6571,8 +6572,14 @@ show_seagate_cache_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Seagate cache page [0x37]\n");
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+        if (resp[1] > 0) {
+            printf("Suspicious page 0x37, SPF=0 but subpage=0x%x\n", resp[1]);
+            if (op->verbose)
+                printf("... try vendor=wdc\n");
+        } else
+            printf("Seagate cache page [0x37]\n");
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
@@ -6772,7 +6779,7 @@ decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
     if (lep && lep->show_pagep)
         done = (*lep->show_pagep)(resp, len, op);
 
- if (! done) {
+    if (! done) {
         if (subpg_code > 0)
             printf("Unable to decode page = 0x%x, subpage = 0x%x, here is "
                    "hex:\n", pg_code, subpg_code);
