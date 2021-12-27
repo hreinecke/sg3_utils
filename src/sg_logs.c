@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.88 20211222";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.89 20211226";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -116,6 +116,7 @@ static const int parr_sz = 4096;
 
 static struct option long_options[] = {
         {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
+        {"ALL", no_argument, 0, 'A'},
         {"all", no_argument, 0, 'a'},
         {"brief", no_argument, 0, 'b'},
         {"control", required_argument, 0, 'c'},
@@ -323,13 +324,13 @@ static struct log_elem log_arr[] = {
      "and subpages", "ssp", show_supported_pgs_sub_page}, /* 0, 0xff */
     {BUFF_OVER_UNDER_LPAGE, 0, 0, -1, MVP_STD, "Buffer over-run/under-run",
      "bou", show_buffer_over_under_run_page},  /* 0x1, 0x0 */
-    {WRITE_ERR_LPAGE, 0, 0, -1, MVP_STD, "Write error", "we",
+    {WRITE_ERR_LPAGE, 0, 0, -1, MVP_STD, "Write error counters", "we",
      show_error_counter_page},          /* 0x2, 0x0 */
-    {READ_ERR_LPAGE, 0, 0, -1, MVP_STD, "Read error", "re",
+    {READ_ERR_LPAGE, 0, 0, -1, MVP_STD, "Read error counters", "re",
      show_error_counter_page},          /* 0x3, 0x0 */
-    {READ_REV_ERR_LPAGE, 0, 0, -1, MVP_STD, "Read reverse error", "rre",
-     show_error_counter_page},          /* 0x4, 0x0 */
-    {VERIFY_ERR_LPAGE, 0, 0, -1, MVP_STD, "Verify error", "ve",
+    {READ_REV_ERR_LPAGE, 0, 0, -1, MVP_STD, "Read reverse error counters",
+     "rre", show_error_counter_page},          /* 0x4, 0x0 */
+    {VERIFY_ERR_LPAGE, 0, 0, -1, MVP_STD, "Verify error counters", "ve",
      show_error_counter_page},          /* 0x5, 0x0 */
     {NON_MEDIUM_LPAGE, 0, 0, -1, MVP_STD, "Non medium", "nm",
      show_non_medium_error_page},       /* 0x6, 0x0 */
@@ -531,10 +532,10 @@ usage(int hval)
            "    --in=FN|-i FN    FN is a filename containing a log page "
            "in ASCII hex\n"
            "                     or binary if --raw also given.\n"
-           "    --list|-l       list supported log pages; twice: list log "
-           "pages and\n"
-           "                    subpages (exclude 0xff subpages); thrice: "
-           "all pg+spgs\n"
+           "    --list|-l       list supported log pages; twice: list "
+           "supported log\n"
+           "                    pages and subpages page; thrice: merge of "
+           "both pages\n"
            "    --page=PG|-p PG    PG is either log page acronym, PGN or "
            "PGN,SPGN\n"
            "                       where (S)PGN is a (sub) page number\n");
@@ -922,7 +923,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         case 'a':
             ++op->do_all;
             break;
-        case 'A':    /* not documented: compatibility with old interface */
+        case 'A':
             op->do_all += 2;
             break;
         case 'b':
@@ -6898,19 +6899,77 @@ decode_pg_arg(struct opts_t * op)
     return 0;
 }
 
+/* Since the Supported subpages page is sitting in the rsp_buff which is
+ * MX_ALLOC_LEN bytes long (~ 64 KB) then move it (from rsp_buff+0 to
+ * rsp_buff+pg_len-1) to the top end of that buffer. Then there is room
+ * to merge supp_pgs_rsp with the supported subpages with the result back
+ * at the bottom of rsp_buff. The new length of the merged subpages page
+ * (excluding its 4 byte header) is returned.
+ * Assumes both pages are in ascending order (as required by SPC-4). */
+static int
+merge_both_supported(const uint8_t * supp_pgs_p, int su_p_pg_len, int pg_len)
+{
+    uint8_t pg;
+    int k, kp, ks;
+    int max_blen = (4 * su_p_pg_len) + pg_len;
+    uint8_t * m_buff = rsp_buff + (rsp_buff_sz - pg_len);
+    uint8_t * r_buff = rsp_buff + 4;
+
+    if (pg_len > 0)
+        memmove(m_buff, rsp_buff + 4, pg_len);
+    for (k = 0, kp = 0, ks = 0; k < max_blen; k += 2) {
+        if (kp < su_p_pg_len)
+            pg = supp_pgs_p[kp];
+        else
+            pg = 0xff;
+        if (ks < pg_len) {
+            if (m_buff[ks] < pg) {
+                r_buff[k] = m_buff[ks];
+                r_buff[k + 1] = m_buff[ks + 1];
+                ks += 2;
+            } else if ((m_buff[ks] == pg) && (m_buff[ks + 1] == 0)) {
+                r_buff[k] = m_buff[ks];
+                r_buff[k + 1] = m_buff[ks + 1];
+                ks += 2;
+                ++kp;
+            } else {
+                r_buff[k] = pg;
+                r_buff[k + 1] = 0;
+                k += 2;
+                r_buff[k] = pg;
+                r_buff[k + 1] = 0xff;
+                ++kp;
+            }
+        } else {
+            if (0xff == pg)
+                break;
+            r_buff[k] = pg;
+            r_buff[k + 1] = 0;
+            k += 2;
+            r_buff[k] = pg;
+            r_buff[k + 1] = 0xff;
+            ++kp;
+        }
+    }
+    sg_put_unaligned_be16(k, rsp_buff + 2);
+    return k;
+}
+
 
 int
 main(int argc, char * argv[])
 {
     int k, pg_len, res, resp_len, vb;
+    int su_p_pg_len = 0;
     int in_len = -1;
     int sg_fd = -1;
     int ret = 0;
     uint8_t * parr;
     uint8_t * free_parr = NULL;
+    struct opts_t * op;
     struct sg_simple_inquiry_resp inq_out;
     struct opts_t opts;
-    struct opts_t * op;
+    uint8_t supp_pgs_rsp[256];
 
     op = &opts;
     memset(op, 0, sizeof(opts));
@@ -7178,6 +7237,22 @@ main(int argc, char * argv[])
         ret = (k >= 0) ?  k : SG_LIB_CAT_OTHER;
         goto err_out;
     }
+    if (op->do_list > 2) {
+        const int supp_pgs_blen = sizeof(supp_pgs_rsp);
+
+        op->subpg_code = 0;
+        res = do_logs(sg_fd, supp_pgs_rsp, supp_pgs_blen, op);
+        if (res != 0)
+            goto bad;
+        su_p_pg_len = sg_get_unaligned_be16(supp_pgs_rsp + 2);
+        if ((su_p_pg_len + 4) > supp_pgs_blen) {
+            pr2serr("Supported log pages log page is too long [%d], exit\n",
+                    su_p_pg_len);
+            res = SG_LIB_CAT_OTHER;
+            goto bad;
+        }
+        op->subpg_code = SUPP_SPGS_SUBPG;
+    }
     resp_len = (op->maxlen > 0) ? op->maxlen : MX_ALLOC_LEN;
     res = do_logs(sg_fd, rsp_buff, resp_len, op);
     if (0 == res) {
@@ -7188,7 +7263,10 @@ main(int argc, char * argv[])
                    resp_len, pg_len + 4);
             pg_len = resp_len - 4;
         }
-    } else if (SG_LIB_CAT_INVALID_OP == res)
+        goto good;
+    }
+bad:
+    if (SG_LIB_CAT_INVALID_OP == res)
         pr2serr("log_sense: not supported\n");
     else if (SG_LIB_CAT_NOT_READY == res)
         pr2serr("log_sense: device not ready\n");
@@ -7198,6 +7276,17 @@ main(int argc, char * argv[])
         pr2serr("log_sense: unit attention\n");
     else if (SG_LIB_CAT_ABORTED_COMMAND == res)
         pr2serr("log_sense: aborted command\n");
+    else if (SG_LIB_TRANSPORT_ERROR == res)
+        pr2serr("log_sense: transport error\n");
+    else
+        pr2serr("log_sense: other error [%d]\n", res);
+    ret = res;
+    goto err_out;
+
+good:
+    if (op->do_list > 2)
+        pg_len = merge_both_supported(supp_pgs_rsp + 4, su_p_pg_len, pg_len);
+
     if (0 == op->do_all) {
         if (op->filter_given) {
             if (op->do_hex > 2)

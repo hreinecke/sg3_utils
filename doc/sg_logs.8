@@ -71,6 +71,11 @@ corresponding log page (or subpage) is fetched and displayed. Note that there
 are many SCSI devices that do not support LOG SENSE subpages and respond
 to this option with an illegal request sense key (or ignored the subpage
 field).
+.br
+Since some vendors don't list all log pages in the "supported log pages and
+subpages" log page, the '\-lll' option can be given in addition. This will
+merge both "supported ..." log pages then, from that resultant merged list,
+fetch page contents.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
 outputs all the log pages supported by the \fIDEVICE\fR. This requires a two
@@ -165,11 +170,17 @@ treated as binary.
 \fB\-l\fR, \fB\-\-list\fR
 lists the names of the logs sense pages supported by this device. This is
 done by reading the "supported log pages" log page. When used once only
-log pages, but not subpages, are listed. When used two or more
-times (e.g. '\-ll') lists the names of all logs sense pages and subpages
-supported by this device, including pages whose subpage number is
-0xff. So the page/subpage names but not their contents is shown with this
-option.
+log pages, but not subpages, are listed. When used twice the "supported
+log pages and subpages" log page is output. Some vendors do not list some
+log pages (e.g. those without any subpages) in the "supported log pages
+and subpages" log page. To get a full overview, this option can be used
+three times (e.g. '\-lll') and the output of the two log pages is merged.
+In the absence of other options, the page/subpage names, but not their
+contents, are shown when this option is given.
+.br
+The '\-lll' form may be useful with the \fI\-\-All\fR option to show the
+contents of all pages referred to in either the "supported log page" or
+the "supported log page and subpage" log pages.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 sets the "allocation length" field in the LOG SENSE cdb. The is the maximum
@@ -364,6 +375,11 @@ The simplest way to find which log pages can be decoded by this utility is
 to use the \fI\-\-enumerate\fR option. Some page names are known but there
 is no decode logic; such cases have "[hex only]" after the log page name
 when the \fI\-\-verbose\fR option is given with \fI\-\-enumerate\fR.
+.PP
+Vendors are specifically permitted by the SPC\-6 to _not_ report all pages
+and subpages supported by a device. That weakens the usefulness of the pages
+that report a list of supported pages and subpages. One guarantee which is
+given is that the pages reported shall be in ascending order.
 .SH EXIT STATUS
 The exit status of sg_logs is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -490,7 +506,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2020 Douglas Gilbert
+Copyright \(co 2002\-2021 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
