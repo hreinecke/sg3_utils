@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.89 20211226";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.90 20211227";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -6911,7 +6911,7 @@ merge_both_supported(const uint8_t * supp_pgs_p, int su_p_pg_len, int pg_len)
 {
     uint8_t pg;
     int k, kp, ks;
-    int max_blen = (4 * su_p_pg_len) + pg_len;
+    int max_blen = (2 * su_p_pg_len) + pg_len;
     uint8_t * m_buff = rsp_buff + (rsp_buff_sz - pg_len);
     uint8_t * r_buff = rsp_buff + 4;
 
@@ -6935,9 +6935,6 @@ merge_both_supported(const uint8_t * supp_pgs_p, int su_p_pg_len, int pg_len)
             } else {
                 r_buff[k] = pg;
                 r_buff[k + 1] = 0;
-                k += 2;
-                r_buff[k] = pg;
-                r_buff[k + 1] = 0xff;
                 ++kp;
             }
         } else {
@@ -6945,9 +6942,6 @@ merge_both_supported(const uint8_t * supp_pgs_p, int su_p_pg_len, int pg_len)
                 break;
             r_buff[k] = pg;
             r_buff[k + 1] = 0;
-            k += 2;
-            r_buff[k] = pg;
-            r_buff[k + 1] = 0xff;
             ++kp;
         }
     }
