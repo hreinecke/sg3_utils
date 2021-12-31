@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.90 20211227";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.91 20211231";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -6953,7 +6953,8 @@ merge_both_supported(const uint8_t * supp_pgs_p, int su_p_pg_len, int pg_len)
 int
 main(int argc, char * argv[])
 {
-    int k, pg_len, res, resp_len, vb;
+    int k, pg_len, res, vb;
+    int resp_len = 0;
     int su_p_pg_len = 0;
     int in_len = -1;
     int sg_fd = -1;
@@ -7264,9 +7265,19 @@ bad:
         pr2serr("log_sense: not supported\n");
     else if (SG_LIB_CAT_NOT_READY == res)
         pr2serr("log_sense: device not ready\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-        pr2serr("log_sense: field in cdb illegal\n");
-    else if (SG_LIB_CAT_UNIT_ATTENTION == res)
+    else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
+        if ((op->do_list > 2) && (SUPP_SPGS_SUBPG == op->subpg_code)) {
+            rsp_buff[0] = 0x40;
+            rsp_buff[1] = SUPP_SPGS_SUBPG;
+            pg_len = 0;
+            res = 0;
+            if (op->verbose)
+                pr2serr("log_sense: field in cdb illegal in [0,0xff], "
+                        "continue with merge\n");
+            goto good;
+        } else
+            pr2serr("log_sense: field in cdb illegal\n");
+    } else if (SG_LIB_CAT_UNIT_ATTENTION == res)
         pr2serr("log_sense: unit attention\n");
     else if (SG_LIB_CAT_ABORTED_COMMAND == res)
         pr2serr("log_sense: aborted command\n");

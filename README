@@ -9,14 +9,14 @@ These utilities can be divided into three groups:
      optionally the size of the data-in and data-out buffers
    - one command utilities: the majority of the utilities in this package
      send one SCSI command. Their names start with "sg_" while the
-     remaining part of the name alludes to the command which is sent. For
+     remaining part of their name alludes to the command which is sent. For
      example, "sg_inq" sends the SCSI INQUIRY command. Some utilities in
      this group send one of a selection of commands, typically those
-     commands have a lot it common.
+     commands have a lot it common (e.g. sg_write_x).
    - copy type utilities: sg_dd, sgp_dd and sgm_dd use the Unix dd command
      as a template. sg_xcopy sends the SCSI EXTENDED COPY command which in
      some cases can do offloaded copies. As well as copying some of these
-     utilities can compare if two data segments are the same.
+     utilities can compare if two data segments held on disks are the same.
 
 Platforms
 ---------
@@ -39,39 +39,38 @@ known as "sg3-utils" (i.e. the underscore is turned into a hyphen).
 Various other packages use libsgutils. The library interface is not
 altered from one package release, to the next, but the library interface
 may be expanded. If a utility from one release is used with a libsgutils
-from an earlier release, the runtime linking may fail. Typically package
-managers take care of these details so that runtime linking errors
-should be rare.
+from an earlier release, then the runtime linking may fail. Typically
+package managers take care of these details so that runtime linking
+errors should be rare.
 
 Command Sets
 ------------
 SCSI command sets are not the only storage command sets in wide use, there
 are also ATA and NVMe command sets. There is a SCSI command set to
 translate SCSI commands to ATA commands (called SAT: SCSI to ATA
-Translation). SAT includes an ATA PASS-THROUGH SCSI command and
-sg_sat_* utilities (there are four) are examples of using SAT. The SAS
-transport (Serial Attached SCSI) can convey ATA commands through a
-SCSI/SAS domain via its Serial ATA Tunnelled Protocol (STP).
+Translation). SAT includes an ATA PASS-THROUGH SCSI command and sg_sat_*
+utilities (there are four) are examples of using SAT. The SAS transport
+(Serial Attached SCSI) can convey ATA commands through a SCSI/SAS domain
+via its Serial ATA Tunnelled Protocol (STP).
 
-NVMe command sets (e.g. Admin, NVM and MI) are relatively new. There
-was an early paper on a SCSI to NVMe Translation Layer (SNTL) but it
-hasn't been standardized. The sg_inq utility will send (and decode
-the response of) a SCSI INQUIRY command if the underlying device is
-a SCSI device. If the underlying device is a NVMe controller or
-namespace, then sg_inq will send a NVMe Admin Identify command. The
-sg_ses utility (for SCSI Enclosure Services) also checks whether its
-underlying device is SCSI or NVME. In the NVMe case, sg_ses translates
-the SCSI SEND DIAGNOSTIC and READ DIAGNOSTIC RESULTS commands to the
-NVMe Management Interface (MI) SES Send and SES Receive commands
-respectively. The output of the sg_ses utility should be similar,
-irrespective of whether the "SES" device is SCSI or NVMe.
+NVMe command sets (e.g. Admin, NVM and MI) are relatively new. There was an
+early paper on a SCSI to NVMe Translation Layer (SNTL) but it hasn't been
+standardized. The sg_inq utility will send (and decode the response of) a
+SCSI INQUIRY command if the underlying device is a SCSI device. If the
+underlying device is a NVMe controller or namespace, then sg_inq will send
+a NVMe Admin Identify command and decode the response. The sg_ses utility
+(for SCSI Enclosure Services) also checks whether its underlying device is
+SCSI or NVME. In the NVMe case, sg_ses translates the SCSI SEND DIAGNOSTIC
+and READ DIAGNOSTIC RESULTS commands to the NVMe Management Interface (MI)
+SES Send and SES Receive commands respectively. The output of the sg_ses
+utility should be similar, irrespective of whether the "SES" device is
+SCSI or NVMe.
 
-The sg_raw utility may send NVMe Admin or NVM commands (as well as
-SCSI commands). One difficulty with a command-line utility invoking
-NVME commands is that those commands contain memory addresses for
-data-in (from the storage device) or data-out (toward the storage
-device) transfers. See the sg_raw manpage for how this difficulty is
-addressed.
+The sg_raw utility may send NVMe Admin or NVM commands (as well as SCSI
+commands). One difficulty with a command-line utility invoking NVME
+commands is that those commands contain memory addresses for data-in (from
+the storage device) or data-out (toward the storage device) transfers. See
+the sg_raw manpage for how this difficulty is addressed.
 
 Documentation
 -------------
@@ -81,8 +80,8 @@ manpage. There are utilities in the examples, testing and utils
 directories that are not installed and do not have manpages. Nearly
 all utilities have runtime help, usually invoked with either the '-h'
 short option or the '--help' long option. There is also an overarching
-manpage called "sg3_utils". All manpages are in chapter 8 which is
-for system administration commands/utilities.
+manpage called "sg3_utils". All manpages are placed in chapter 8 which
+is for system administration commands/utilities.
 
 The sg3_utils package and some more complex utilities have html pages:
    sg3_utils: https://sg.danny.cz/sg/sg3_utils.html
@@ -105,10 +104,10 @@ file is the good reference.
 The author's primary source code repository uses subversion and is on
 the author's equipment (a RPi). One advantage of subversion is its
 revision numbers which are simply integers starting at 1 and ascending.
-For this package the current revision is 922 . The subversion repository
+For this package the current revision is 928 . The subversion repository
 is mirrored in git (using "git svn" tools) here:
     https://github.com/doug-gilbert/sg3_utils
 
 
 Douglas Gilbert
-20th November 2021
+31st December 2021

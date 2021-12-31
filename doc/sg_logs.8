@@ -57,7 +57,7 @@ maintained for backward compatibility.
 .PP
 When no options are given, just a \fIDEVICE\fR, that is equivalent to calling
 this utility with the \fI\-\-list\fR option. In that case the names of the
-supported log pages (and not any subpages) are listed out.
+supported log pages (but not subpages) are listed out.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -173,10 +173,12 @@ done by reading the "supported log pages" log page. When used once only
 log pages, but not subpages, are listed. When used twice the "supported
 log pages and subpages" log page is output. Some vendors do not list some
 log pages (e.g. those without any subpages) in the "supported log pages
-and subpages" log page. To get a full overview, this option can be used
+and subpages" log page. To get a full inventory, this option can be used
 three times (e.g. '\-lll') and the output of the two log pages is merged.
-In the absence of other options, the page/subpage names, but not their
-contents, are shown when this option is given.
+Even if the "supported log pages and subpages" log page is not supported
+using this option three times will yield a list from the "supported log
+pages" log page. In the absence of other options, the page/subpage names,
+but not their contents, are shown when this option is given.
 .br
 The '\-lll' form may be useful with the \fI\-\-All\fR option to show the
 contents of all pages referred to in either the "supported log page" or
@@ -289,8 +291,8 @@ this instructs the device to store the current log page parameters (as
 indicated by the DS and TSD parameter codes) in some non\-volatile location.
 Hence the log parameters will be preserved across power cycles. This option
 is typically not needed, especially if the GLTSD flag is clear in the
-control mode page as this instructs the device to periodically save all
-saveable log parameters to non\-volatile locations.
+control mode page which causes the \fIDEVICE\fR to periodically save all
+saveable log parameters to non\-volatile storage.
 .TP
 \fB\-t\fR, \fB\-\-temperature\fR
 outputs the temperature. First looks in the temperature log page and if
@@ -394,11 +396,11 @@ Options with arguments or with two or more letters can have an extra '\-'
 prepended. For example: both '\-pcb' and '\-\-pcb' are acceptable.
 .TP
 \fB\-a\fR
-outputs all the log pages supported by the device.
+outputs all the log pages supported by the \fIDEVICE\fR.
 Equivalent to \fI\-\-all\fR in the main description.
 .TP
 \fB\-A\fR
-outputs all the log pages and subpages supported by the device.
+outputs all the log pages and subpages supported by the \fIDEVICE\fR.
 Equivalent to '\-\-all \-\-all' in the main description.
 .TP
 \fB\-c\fR=\fIPC\fR
@@ -422,12 +424,12 @@ same action as '\-h' in this section and equivalent to \fI\-\-hex\fR in
 the main description.
 .TP
 \fB\-l\fR
-lists the names of all logs sense pages supported by this device.
+lists the names of all logs sense pages supported by this \fIDEVICE\fR.
 Equivalent to \fI\-\-list\fR in the main description.
 .TP
 \fB\-L\fR
 lists the names of all logs sense pages and subpages supported by this
-device. Equivalent to '\-\-list \-\-list' in the main description.
+\fIDEVICE\fR. Equivalent to '\-\-list \-\-list' in the main description.
 .TP
 \fB\-m\fR=\fILEN\fR
 request only \fILEN\fR bytes of response data. Default is 0 which is
