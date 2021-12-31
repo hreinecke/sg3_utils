@@ -307,7 +307,13 @@ testonline ()
   IPREV=$(echo "$INQ" | grep 'Product revision level:' | sed 's/^[^:]*: \(.*\)$/\1/')
   STR=$(printf "  Vendor: %-08s Model: %-16s Rev: %-4s" "$IVEND" "$IPROD" "$IPREV")
   IPTYPE=$(echo "$INQ" | sed -n 's/.* Device_type=\([0-9]*\) .*/\1/p')
+  if [ -z "$IPTYPE" ]; then
+    IPTYPE=$(echo "$INQ" | sed -n 's/.* PDT=\([0-9]*\) .*/\1/p')
+  fi
   IPQUAL=$(echo "$INQ" | sed -n 's/ *PQual=\([0-9]*\)  Device.*/\1/p')
+  if [ -z "$IPQUAL" ] ; then
+    IPQUAL=$(echo "$INQ" | sed -n 's/ *PQual=\([0-9]*\)  PDT.*/\1/p')
+  fi
   if [ "$IPQUAL" != 0 ] ; then
     [ -z "$IPQUAL" ] && IPQUAL=3
     [ -z "$IPTYPE" ] && IPTYPE=31
@@ -1392,4 +1398,3 @@ fi
 # Local Variables:
 # sh-basic-offset: 2
 # End:
-
