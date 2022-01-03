@@ -46,7 +46,7 @@ Eric Youngdale <eric at andante dot org> author of scsi_info on which sginfo
         is based.
 
 Fabrice Fontaine <fontaine dot fabrice at gmail dot com>
-	various build fixes [20211116]
+        various build fixes [20211116]
 
 Frank Jansen <fjansen at egenera dot com>: additions to sg_scan; contributed
         code for '--alloc-length=' option in sg_persist [20090402]
@@ -117,6 +117,10 @@ Martin Wilck <mwilck at suse dot com> contributed script files [20190425]
 Nate Dailey < Nate dot Dailey at stratus dot com > extended sg_map for sparse
         disk node names (e.g. /dev/sdaaa) [20050511]
 
+Nitin U. Yewale < nyewale at redhat dot com> sent patch via github:
+        https://github.com/doug-gilbert/sg3_utils/pull/10/ to fix crash with
+        rescan-scsi-bus.sh -r due to rev 867 change to sg_inq [20220103]
+
 Pat LaVarre <p.lavarre at ieee dot org> pointed out danger of negative bpt
         values in sg_dd (and friends); also problems when reading /dev/null
 
@@ -155,4 +159,4 @@ Xose Vazquez Perez <xose dot vazquez at gmail dot com>
 
 
 Douglas Gilbert
-17th January 2020
+3rd January 2022
