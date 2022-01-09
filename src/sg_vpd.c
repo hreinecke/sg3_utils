@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2021 Douglas Gilbert.
+ * Copyright (c) 2006-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.67 20211112";  /* spc6r05 + sbc5r01 */
+static const char * version_str = "1.67 20220109";  /* spc6r06 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -2565,13 +2565,16 @@ decode_zbdch_vpd(uint8_t * b, int len, int do_hex)
     printf("  Zoned block device extension: ");
     switch ((b[4] >> 4) & 0xf) {
     case 0:
-        printf("not reported [0]\n");
+        if (PDT_ZBC == (0x1f & b[0]))
+            printf("host managed zoned block device [0, pdt=0x14]\n");
+        else
+            printf("not reported [0]\n");
         break;
     case 1:
-        printf("host aware zone block device model\n");
+        printf("host aware zoned block device model [1]\n");
         break;
     case 2:
-        printf("Domains and realms zone block device model\n");
+        printf("Domains and realms zoned block device model [2]\n");
         break;
     default:
         printf("Unknown [0x%x]\n", (b[4] >> 4) & 0xf);

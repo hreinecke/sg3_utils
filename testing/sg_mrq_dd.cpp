@@ -2,7 +2,7 @@
  * A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 2018-2021 D. Gilbert
+ * Copyright (C) 2018-2022 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.38 20211028";
+static const char * version_str = "1.39 20220103";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -1268,7 +1268,7 @@ sg_in_open(struct global_collection *clp, const string & inf, uint8_t **mmpp,
     int fd, err, n;
     int flags = O_RDWR;
     char ebuff[EBUFF_SZ];
-    const char * fnp = inf.data();
+    const char * fnp = inf.c_str();
 
     if (clp->in_flags.direct)
         flags |= O_DIRECT;
@@ -1301,7 +1301,7 @@ sg_out_open(struct global_collection *clp, const string & outf,
     int fd, err, n;
     int flags = O_RDWR;
     char ebuff[EBUFF_SZ];
-    const char * fnp = outf.data();
+    const char * fnp = outf.c_str();
 
     if (clp->out_flags.direct)
         flags |= O_DIRECT;
@@ -1350,13 +1350,13 @@ reg_file_open(struct global_collection *clp, const string & fn_s,
         flags |= O_SYNC;
 
     if (for_wr)
-        fd = open(fn_s.data(), flags, 0666);
+        fd = open(fn_s.c_str(), flags, 0666);
     else
-        fd = open(fn_s.data(), flags);
+        fd = open(fn_s.c_str(), flags);
     if (fd < 0) {
         int err = errno;
         snprintf(ebuff, EBUFF_SZ, "%scould not open %s for %sing ",
-                 my_name, fn_s.data(), (for_wr ? "writ" : "read"));
+                 my_name, fn_s.c_str(), (for_wr ? "writ" : "read"));
         perror(ebuff);
         return -err;
     }
@@ -1618,7 +1618,7 @@ read_write_thread(struct global_collection * clp, int thr_idx, int slice_idx,
         pr2serr_lk("%d <-- Starting worker thread, slice=%d\n", thr_idx,
                    slice_idx);
         if (vb > 3)
-            pr2serr_lk("   %s ---> %s\n", inf.data(), outf.data());
+            pr2serr_lk("   %s ---> %s\n", inf.c_str(), outf.c_str());
     }
     if (! (rep->both_sg || in_mmap)) {
         rep->buffp = sg_memalign(sz, 0 /* page align */, &rep->alloc_bp,
@@ -4316,7 +4316,7 @@ main(int argc, char * argv[])
     if (ccp) {
         if (ifile_given) {
             pr2serr("%siflag=%s and if=%s contradict\n", my_name, cc2p,
-                    clp->inf_v[0].data());
+                    clp->inf_v[0].c_str());
             return SG_LIB_CONTRADICT;
         }
         for (auto && cvp : clp->cp_ver_arr) {
@@ -4327,9 +4327,9 @@ main(int argc, char * argv[])
         clp->in_type = FT_RANDOM_0_FF;
         clp->infp = ccp;
         clp->in0fd = -1;
-    } else if (inf0_sz && ('-' != clp->inf_v[0].data()[0])) {
+    } else if (inf0_sz && ('-' != clp->inf_v[0].c_str()[0])) {
         const string & inf_s = clp->inf_v[0];
-        const char * infp = inf_s.data();
+        const char * infp = inf_s.c_str();
 
         clp->in_type = dd_filetype(infp, clp->in_st_size);
         if (FT_ERROR == clp->in_type) {
@@ -4371,8 +4371,8 @@ main(int argc, char * argv[])
         (clp->in_flags.no_waitq || clp->out_flags.no_waitq))
         pr2serr("no_waitq=<n> operand is now ignored\n");
     if (clp->outf_v.size()) {
-        const string & outf_s = clp->outf_v[0].data();
-        const char * outfp = outf_s.data();
+        const string & outf_s = clp->outf_v[0].c_str();
+        const char * outfp = outf_s.c_str();
 
         clp->ofile_given = true;
         if ('-' == outfp[0])
@@ -4459,8 +4459,8 @@ main(int argc, char * argv[])
         pr2serr("The seek= argument is not suitable for a pipe\n");
         return SG_LIB_SYNTAX_ERROR;
     }
-    res = do_count_work(clp, clp->inf_v[0].data(), in_num_sect,
-                        clp->outf_v[0].data(), out_num_sect);
+    res = do_count_work(clp, clp->inf_v[0].c_str(), in_num_sect,
+                        clp->outf_v[0].c_str(), out_num_sect);
     if (res)
         return res;
 
@@ -4561,7 +4561,7 @@ jump:
     if (do_sync) {
         if (FT_SG == clp->out_type) {
             pr2serr_lk(">> Synchronizing cache on %s\n",
-                       (clp->outf_v.size() ? clp->outf_v[0].data() : "" ));
+                       (clp->outf_v.size() ? clp->outf_v[0].c_str() : "" ));
             res = sg_ll_sync_cache_10(clp->out0fd, 0, 0, 0, 0, 0, false, 0);
             if (SG_LIB_CAT_UNIT_ATTENTION == res) {
                 pr2serr_lk("Unit attention(out), continuing\n");

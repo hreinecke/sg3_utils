@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- * Copyright (C) 2000-2021 D. Gilbert
+ * Copyright (C) 2000-2022 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.13 20210803";  /* spc6r05 */
+static const char * version_str = "2.14 20220109";  /* spc6r06 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2380,6 +2380,7 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex)
             }
             zoned = (buff[8] >> 4) & 0x3;       /* added sbc4r04 */
             printf("  ZONED=%d%s\n", zoned, zoned_strs[zoned]);
+            /* ZONED field made obsolete in sbc5r01 */
             printf("  FUAB=%d\n", buff[8] & 0x2);
             printf("  VBULS=%d\n", buff[8] & 0x1);
             printf("  DEPOPULATION_TIME=%u (seconds)\n",

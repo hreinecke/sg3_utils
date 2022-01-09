@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220103] [svn: r929]
+Changelog for pre-release sg3_utils-1.48 [20220109] [svn: r930]
   - rescan-scsi-bus.sh: with '-r' it crashed due to change in
     rev 867 in sg_inq.c from Device_type= to PDT= .
     Change script to use either
