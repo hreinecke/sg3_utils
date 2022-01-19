@@ -1,7 +1,7 @@
 /*
  * Test code for the extensions to the Linux OS SCSI generic ("sg")
  * device driver.
- * Copyright (C) 1999-2021 D. Gilbert and P. Allworth
+ * Copyright (C) 1999-2022 D. Gilbert and P. Allworth
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -84,7 +84,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.21 20211006";
+static const char * version_str = "4.22 20220118";
 static const char * my_name = "sgs_dd";
 
 #ifndef SGV4_FLAG_HIPRI
@@ -100,6 +100,8 @@ static const char * my_name = "sgs_dd";
 #define SGQ_MAX_RD_AHEAD 32
 #define SGQ_MAX_WR_AHEAD 32
 #define SGQ_NUM_ELEMS (SGQ_MAX_RD_AHEAD + SGQ_MAX_WR_AHEAD + 1)
+#define MAX_BPT_VALUE (1 << 24)         /* used for maximum bs as well */
+#define MAX_COUNT_SKIP_SEEK (1LL << 48) /* coverity wants upper bound */
 
 #define SGQ_FREE 0
 #define SGQ_IO_STARTED 1
@@ -1274,17 +1276,33 @@ main(int argc, char * argv[])
             buf++;
         if (*buf)
             *buf++ = '\0';
-        if (0 == strcmp(key,"bpt"))
+        if (0 == strcmp(key,"bpt")) {
             clp->bpt = sg_get_num(buf);
-        else if (0 == strcmp(key,"bs"))
+            if ((clp->bpt < 0) || (clp->bpt > MAX_BPT_VALUE)) {
+                pr2serr("%s: bad argument to 'bpt='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key,"bs")) {
             clp->bs = sg_get_num(buf);
-        else if (0 == strcmp(key,"count"))
+            if ((clp->bs < 0) || (clp->bs > MAX_BPT_VALUE)) {
+                pr2serr("%s: bad argument to 'bs='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key,"count")) {
             count = sg_get_num(buf);
-        else if (0 == strcmp(key,"deb"))
+            if (count < 0) {
+                pr2serr("%s: bad argument to 'count='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key,"deb"))
             clp->debug += sg_get_num(buf);
-        else if (0 == strcmp(key,"ibs"))
+        else if (0 == strcmp(key,"ibs")) {
             ibs = sg_get_num(buf);
-        else if (strcmp(key,"if") == 0) {
+            if ((ibs < 0) || (ibs > MAX_BPT_VALUE)) {
+                pr2serr("%s: bad argument to 'ibs='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (strcmp(key,"if") == 0) {
             memcpy(inf, buf, INOUTF_SZ);
             inf[INOUTF_SZ - 1] = '\0';
         } else if (0 == strcmp(key, "iflag")) {
@@ -1297,9 +1315,13 @@ main(int argc, char * argv[])
         else if (0 == strcmp(key,"no_sig")) { /* default changes */
             clp->no_sig = !!sg_get_num(buf);
             no_sig_given = true;
-        } else if (0 == strcmp(key,"obs"))
+        } else if (0 == strcmp(key,"obs")) {
             obs = sg_get_num(buf);
-        else if (strcmp(key,"of") == 0) {
+            if ((obs < 0) || (obs > MAX_BPT_VALUE)) {
+                pr2serr("%s: bad argument to 'obs='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (strcmp(key,"of") == 0) {
             memcpy(outf, buf, INOUTF_SZ);
             outf[INOUTF_SZ - 1] = '\0';
         } else if (0 == strcmp(key, "oflag")) {
@@ -1311,11 +1333,19 @@ main(int argc, char * argv[])
             clp->poll_ms = sg_get_num(buf);
         else if (0 == strcmp(key,"rt_sig"))
             clp->use_rt_sig = !!sg_get_num(buf);
-        else if (0 == strcmp(key,"seek"))
+        else if (0 == strcmp(key,"seek")) {
             seek = sg_get_num(buf);
-        else if (0 == strcmp(key,"skip"))
+            if (seek < 0) {
+                pr2serr("%s: bad argument to 'seek='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_num(buf);
-        else if (0 == strcmp(key,"time"))
+            if (skip < 0) {
+                pr2serr("%s: bad argument to 'skip='\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key,"time"))
             ;           /* do nothing */
         else if ((0 == strcmp(key,"-V")) || (0 == strcmp(key,"--version"))) {
             pr2serr("%s: version: %s\n", my_name, version_str);

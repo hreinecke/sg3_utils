@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2018 Hannes Reinecke, SUSE Linux GmbH.
+ * Copyright (c) 2014-2022 Hannes Reinecke, SUSE Linux GmbH.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -54,7 +54,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.20 20180628";
+static const char * version_str = "1.21 20220118";
 
 struct opts_t {
     bool ck_cond;

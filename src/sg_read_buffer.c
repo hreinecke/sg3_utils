@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2021 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2022 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * device.
  */
 
-static const char * version_str = "1.33 20211114";      /* spc6r05 */
+static const char * version_str = "1.34 20220118";      /* spc6r05 */
 
 
 #ifndef SG_READ_BUFFER_10_CMD
@@ -483,7 +483,10 @@ main(int argc, char * argv[])
             do_long = true;
             break;
         case 'm':
-            if (isdigit((uint8_t)*optarg)) {
+            if (NULL == optarg) {
+                pr2serr("bad argument to '--mode'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            } else if (isdigit((uint8_t)*optarg)) {
                 rb_mode = sg_get_num(optarg);
                 if ((rb_mode < 0) || (rb_mode > 31)) {
                     pr2serr("argument to '--mode' should be in the range 0 "

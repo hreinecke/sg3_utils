@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2021 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2022 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.31 20211114";
+static const char * version_str = "6.32 20220118";
 
 
 #define ME "sg_dd: "
@@ -85,6 +85,8 @@ static const char * version_str = "6.31 20211114";
 #define DEF_BLOCKS_PER_2048TRANSFER 32
 #define DEF_SCSI_CDBSZ 10
 #define MAX_SCSI_CDBSZ 16
+#define MAX_BPT_VALUE (1 << 24)         /* used for maximum bs as well */
+#define MAX_COUNT_SKIP_SEEK (1LL << 48) /* coverity wants upper bound */
 
 #define DEF_MODE_CDB_SZ 10
 #define DEF_MODE_RESP_LEN 252
@@ -1848,15 +1850,16 @@ main(int argc, char * argv[])
             bpt_given = true;
         } else if (0 == strcmp(key, "bs")) {
             blk_sz = sg_get_num(buf);
-            bpt_given = true;
-        } else if (0 == strcmp(key, "bs")) {
-            blk_sz = sg_get_num(buf);
-            if (-1 == blk_sz) {
+            if ((blk_sz < 0) || (blk_sz > MAX_BPT_VALUE)) {
                 pr2serr(ME "bad argument to 'bs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "cdbsz")) {
             iflag.cdbsz = sg_get_num(buf);
+            if ((iflag.cdbsz < 6) || (iflag.cdbsz > 32)) {
+                pr2serr(ME "'cdbsz' expects 6, 10, 12, 16 or 32\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             oflag.cdbsz = iflag.cdbsz;
             cdbsz_given = true;
         } else if (0 == strcmp(key, "cdl")) {
@@ -1894,7 +1897,7 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
-                if (-1LL == dd_count) {
+                if ((dd_count < 0) || (dd_count > MAX_COUNT_SKIP_SEEK)) {
                     pr2serr(ME "bad argument to 'count='\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -1906,9 +1909,13 @@ main(int argc, char * argv[])
             t = sg_get_num(buf);
             oflag.fua = !! (t & 1);
             iflag.fua = !! (t & 2);
-        } else if (0 == strcmp(key, "ibs"))
+        } else if (0 == strcmp(key, "ibs")) {
             ibs = sg_get_num(buf);
-        else if (strcmp(key, "if") == 0) {
+            if ((ibs < 0) || (ibs > MAX_BPT_VALUE)) {
+                pr2serr(ME "bad argument to 'ibs='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (strcmp(key, "if") == 0) {
             if ('\0' != inf[0]) {
                 pr2serr("Second IFILE argument??\n");
                 return SG_LIB_SYNTAX_ERROR;
@@ -1921,9 +1928,13 @@ main(int argc, char * argv[])
                 pr2serr(ME "bad argument to 'iflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key, "obs"))
+        } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
-        else if (0 == strcmp(key, "odir")) {
+            if ((obs < 0) || (obs > MAX_BPT_VALUE)) {
+                pr2serr(ME "bad argument to 'obs='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key, "odir")) {
             iflag.direct = !! sg_get_num(buf);
             oflag.direct = iflag.direct;
         } else if (strcmp(key, "of") == 0) {
@@ -1956,13 +1967,13 @@ main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key, "seek")) {
             seek = sg_get_llnum(buf);
-            if (-1LL == seek) {
+            if ((seek < 0) || (seek > MAX_COUNT_SKIP_SEEK)) {
                 pr2serr(ME "bad argument to 'seek='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "skip")) {
             skip = sg_get_llnum(buf);
-            if (-1LL == skip) {
+            if ((skip < 0) || (skip > MAX_COUNT_SKIP_SEEK)) {
                 pr2serr(ME "bad argument to 'skip='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -2080,8 +2091,8 @@ main(int argc, char * argv[])
         pr2serr("Can't use both append and seek switches\n");
         return SG_LIB_CONTRADICT;
     }
-    if (bpt < 1) {
-        pr2serr("bpt must be greater than 0\n");
+    if ((bpt < 1) || (bpt > MAX_BPT_VALUE)) {
+        pr2serr("bpt must be > 0 and <= %d\n", MAX_BPT_VALUE);
         return SG_LIB_SYNTAX_ERROR;
     }
     if (iflag.sparse)

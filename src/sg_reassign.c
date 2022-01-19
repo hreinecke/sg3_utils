@@ -470,8 +470,8 @@ main(int argc, char * argv[])
                 div = 8;
                 break;
             case 6:     /* vendor specific */
-		if (verbose)
-		    pr2serr("defect list format: vendor specific\n");
+                if (verbose)
+                    pr2serr("defect list format: vendor specific\n");
                 break;
             default:
                 pr2serr("defect list format %d unknown\n", dl_format);

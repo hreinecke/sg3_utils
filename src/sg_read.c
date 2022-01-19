@@ -1,6 +1,6 @@
 /*
  *  A utility program for the Linux OS SCSI generic ("sg") device driver.
- *    Copyright (C) 2001 - 2021 D. Gilbert
+ *    Copyright (C) 2001 - 2022 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -58,12 +58,14 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.37 20211114";
+static const char * version_str = "1.38 20220118";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
 #define DEF_SCSI_CDBSZ 10
 #define MAX_SCSI_CDBSZ 16
+#define MAX_BPT_VALUE (1 << 24)         /* used for maximum bs as well */
+#define MAX_COUNT_SKIP_SEEK (1LL << 48) /* coverity wants upper bound */
 
 #define ME "sg_read: "
 
@@ -456,30 +458,35 @@ main(int argc, char * argv[])
             do_blk_sgio = !! sg_get_num(buf);
         else if (0 == strcmp(key,"bpt")) {
             bpt = sg_get_num(buf);
-            if (-1 == bpt) {
+            if ((bpt < 0) || (bpt > MAX_BPT_VALUE)) {
                 pr2serr( ME "bad argument to 'bpt'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"bs")) {
             bs = sg_get_num(buf);
-            if (-1 == bs) {
+            if ((bs < 0) || (bs > MAX_BPT_VALUE)) {
                 pr2serr( ME "bad argument to 'bs'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if (0 == strcmp(key,"cdbsz"))
+        } else if (0 == strcmp(key,"cdbsz")) {
             scsi_cdbsz = sg_get_num(buf);
-        else if (0 == strcmp(key,"count")) {
+            if ((scsi_cdbsz < 0) || (scsi_cdbsz > 32)) {
+                pr2serr( ME "bad argument to 'cdbsz', expect 6, 10, 12, 16 "
+                        "or 32\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+        } else if (0 == strcmp(key,"count")) {
             count_given = true;
             if ('-' == *buf) {
                 dd_count = sg_get_llnum(buf + 1);
-                if (-1 == dd_count) {
+                if ((dd_count < 0) || (dd_count > MAX_COUNT_SKIP_SEEK)) {
                     pr2serr( ME "bad argument to 'count'\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 dd_count = - dd_count;
             } else {
                 dd_count = sg_get_llnum(buf);
-                if (-1 == dd_count) {
+                if ((dd_count < 0) || (dd_count > MAX_COUNT_SKIP_SEEK)) {
                     pr2serr( ME "bad argument to 'count'\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -504,7 +511,7 @@ main(int argc, char * argv[])
             outf[INF_SZ - 1] = '\0';
         } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
-            if (-1 == skip) {
+            if ((skip < 0) || (skip > MAX_COUNT_SKIP_SEEK)) {
                 pr2serr( ME "bad argument to 'skip'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2021 Douglas Gilbert.
+ * Copyright (c) 2005-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -47,7 +47,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.18 20211118";
+static const char * version_str = "1.19 20220117";
 
 #define ME "sg_map26: "
 
@@ -396,7 +396,7 @@ list_matching_nodes(const char * dir_name, int file_type, int majj, int minn,
 }
 
 struct sg_item_t {
-        char name[NAME_LEN_MAX];
+        char name[NAME_LEN_MAX + 2];
         int ft;
         int nt;
         int d_type;

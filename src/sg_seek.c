@@ -418,9 +418,9 @@ fini:
         }
     }
     if (0 == verbose) {
-	const char * e_str = (SG_LIB_CAT_CONDITION_MET == ret) ?
-			     "sg_seek: " : "sg_seek: failed";
-	
+        const char * e_str = (SG_LIB_CAT_CONDITION_MET == ret) ?
+                             "sg_seek: " : "sg_seek: failed";
+        
         if (! sg_if_can2stderr(e_str, ret))
             pr2serr("Some error occurred, try again with '-v' "
                     "or '-vv' for more information\n");

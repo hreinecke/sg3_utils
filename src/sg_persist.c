@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2021 D. Gilbert
+ *  Copyright (C) 2004-2022 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -35,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.68 20210610";
+static const char * version_str = "0.69 20220118";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -1279,7 +1279,9 @@ main(int argc, char * argv[])
             flagged = true;
             goto fini;
         }
-        sg_cmds_close_device(sg_fd);
+        res = sg_cmds_close_device(sg_fd);
+        if (res < 0)
+            pr2serr("%s: sg_cmds_close_device() failed res=%d\n", ME, res);
     }
 
     if (! op->readwrite_force) {

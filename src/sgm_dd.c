@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2021 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2022 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -69,13 +69,15 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.18 20211114";
+static const char * version_str = "1.19 20220118";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
 #define DEF_BLOCKS_PER_2048TRANSFER 32
 #define DEF_SCSI_CDBSZ 10
 #define MAX_SCSI_CDBSZ 16
+#define MAX_BPT_VALUE (1 << 24)         /* used for maximum bs as well */
+#define MAX_COUNT_SKIP_SEEK (1LL << 48) /* coverity wants upper bound */
 
 #define ME "sgm_dd: "
 
@@ -795,6 +797,10 @@ main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key,"cdbsz")) {
             scsi_cdbsz_in = sg_get_num(buf);
+            if ((scsi_cdbsz_in < 6) || (scsi_cdbsz_in > 32)) {
+                pr2serr(ME "'cdbsz' expects 6, 10, 12, 16 or 32\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             scsi_cdbsz_out = scsi_cdbsz_in;
             cdbsz_given = true;
         } else if (0 == strcmp(key,"coe")) {
@@ -803,7 +809,7 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key,"count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
-                if (-1LL == dd_count) {
+                if ((dd_count < 0) || (dd_count > MAX_COUNT_SKIP_SEEK)) {
                     pr2serr(ME "bad argument to 'count'\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -818,7 +824,7 @@ main(int argc, char * argv[])
                 in_flags.fua = true;
         } else if (0 == strcmp(key,"ibs")) {
             ibs = sg_get_num(buf);
-            if (-1 == ibs) {
+            if ((ibs < 0) || (ibs > MAX_BPT_VALUE)) {
                 pr2serr(ME "bad argument to 'ibs'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -850,19 +856,19 @@ main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key,"obs")) {
             obs = sg_get_num(buf);
-            if (-1 == obs) {
+            if ((obs < 0) || (obs > MAX_BPT_VALUE)) {
                 pr2serr(ME "bad argument to 'obs'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"seek")) {
             seek = sg_get_llnum(buf);
-            if (-1LL == seek) {
+            if ((seek < 0) || (seek > MAX_COUNT_SKIP_SEEK)) {
                 pr2serr(ME "bad argument to 'seek'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
-            if (-1LL == skip) {
+            if ((skip < 0) || (skip > MAX_COUNT_SKIP_SEEK)) {
                 pr2serr(ME "bad argument to 'skip'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -955,8 +961,8 @@ main(int argc, char * argv[])
         pr2serr("Can't use both append and seek switches\n");
         return SG_LIB_CONTRADICT;
     }
-    if (bpt < 1) {
-        pr2serr("bpt must be greater than 0\n");
+    if ((bpt < 1) || (bpt > MAX_BPT_VALUE)) {
+        pr2serr("bpt must be > 0 and <= %d\n", MAX_BPT_VALUE);
         return SG_LIB_SYNTAX_ERROR;
     }
     /* defaulting transfer size to 128*2048 for CD/DVDs is too large

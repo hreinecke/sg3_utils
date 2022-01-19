@@ -790,6 +790,9 @@ dStrRaw(const uint8_t * str, int len)
         printf("%c", str[k]);
 }
 
+/* Note to coverity: this function is safe as long as the page_code_desc
+ * objects pointed to by pcdp have a sentinel object at the end of each
+ * array. And they do by design.*/
 static int
 count_desc_elems(const struct page_code_desc * pcdp)
 {

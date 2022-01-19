@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999 - 2018 D. Gilbert
+ *  Copyright (C) 1999 - 2022 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -53,7 +53,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.17 20180219";
+static const char * version_str = "4.18 20220118";
 
 #define ME "sg_scan: "
 
@@ -203,6 +203,7 @@ int main(int argc, char * argv[])
         printf(ME "Out of memory\n");
         return SG_LIB_CAT_OTHER;
     }
+    strcpy(fname, "<null>");
 
     for (k = 1, j = 0; k < argc; ++k) {
         cp = argv[k];

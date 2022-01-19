@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2021 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2022 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -69,7 +69,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.72 20210902";
+static const char * version_str = "0.73 20220118";
 
 #define ME "sg_xcopy: "
 
@@ -306,7 +306,7 @@ open_sg(struct xcopy_fp_t * fp, int vb)
     int devmajor, devminor, offset;
     struct sg_simple_inquiry_resp sir;
     char ebuff[EBUFF_SZ];
-    int len;
+    int len, res;
 
     devmajor = major(fp->devno);
     devminor = minor(fp->devno);
@@ -344,7 +344,9 @@ open_sg(struct xcopy_fp_t * fp, int vb)
     }
     if (sg_simple_inquiry(fp->sg_fd, &sir, false, vb)) {
         pr2serr("INQUIRY failed on %s\n", ebuff);
-        sg_cmds_close_device(fp->sg_fd);
+        res = sg_cmds_close_device(fp->sg_fd);
+        if (res < 0)
+            pr2serr("sg_cmds_close_device() failed as well\n");
         fp->sg_fd = -1;
         return -1;
     }
@@ -1024,7 +1026,7 @@ desc_from_vpd_id(int sg_fd, uint8_t *desc, int desc_len,
     int res, verb;
     uint8_t rcBuff[256], *bp, *best = NULL;
     unsigned int len = 254;
-    int off = -1, u, i_len, best_len = 0, assoc, desig, f_desig = 0;
+    int off = -1, i_len, best_len = 0, assoc, desig, f_desig = 0;
     char b[80];
 
     verb = (verbose ? verbose - 1: 0);
@@ -1060,8 +1062,7 @@ desc_from_vpd_id(int sg_fd, uint8_t *desc, int desc_len,
         hex2stderr(rcBuff, len, 1);
     }
 
-    while ((u = sg_vpd_dev_id_iter(rcBuff + 4, len - 4, &off, 0, -1, -1)) ==
-           0) {
+    while (sg_vpd_dev_id_iter(rcBuff + 4, len - 4, &off, 0, -1, -1) == 0) {
         bp = rcBuff + 4 + off;
         i_len = bp[3];
         if (((unsigned int)off + i_len + 4) > len) {

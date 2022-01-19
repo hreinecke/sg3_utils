@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2021 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2022 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.37 (2021-06-01)"
+#define SG_RAW_VERSION "0.4.38 (2022-01-18)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -323,7 +323,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
 
-        if (op->cdb_length > MAX_SCSI_CDBSZ) {
+        if (op->cdb_length >= MAX_SCSI_CDBSZ) {
             pr2serr("CDB too long (max. %d bytes)\n", MAX_SCSI_CDBSZ);
             return SG_LIB_SYNTAX_ERROR;
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2021 Douglas Gilbert.
+ * Copyright (c) 1999-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -1807,6 +1807,7 @@ sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
     int k, res, slen, duration;
     int ret = -1;
     uint8_t apt_cdb[ATA_PT_32_CMDLEN];
+    uint8_t incoming_apt_cdb[ATA_PT_32_CMDLEN];
     uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     uint8_t * sp;
     const uint8_t * bp;
@@ -1815,18 +1816,25 @@ sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
     char b[256];
 
     memset(apt_cdb, 0, sizeof(apt_cdb));
+    memset(incoming_apt_cdb, 0, sizeof(incoming_apt_cdb));
+    if (NULL == cdbp) {
+        if (vb)
+            pr2ws("NULL cdb pointer\n");
+        return -1;
+    }
+    memcpy(incoming_apt_cdb, cdbp, cdb_len);
     b[0] = '\0';
     switch (cdb_len) {
     case 12:
         cnamep = "ATA pass-through(12)";
         apt_cdb[0] = ATA_PT_12_CMD;
-        memcpy(apt_cdb + 1, cdbp + 1,  10);
+        memcpy(apt_cdb + 1, incoming_apt_cdb + 1,  10);
         /* control byte at cdb[11] left at zero */
         break;
     case 16:
         cnamep = "ATA pass-through(16)";
         apt_cdb[0] = ATA_PT_16_CMD;
-        memcpy(apt_cdb + 1, cdbp + 1,  14);
+        memcpy(apt_cdb + 1, incoming_apt_cdb + 1,  14);
         /* control byte at cdb[15] left at zero */
         break;
     case 32:
@@ -1835,15 +1843,10 @@ sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
         /* control byte at cdb[1] left at zero */
         apt_cdb[7] = 0x18;    /* length starting at next byte */
         sg_put_unaligned_be16(ATA_PT_32_SA, apt_cdb + 8);
-        memcpy(apt_cdb + 10, cdbp + 10,  32 - 10);
+        memcpy(apt_cdb + 10, incoming_apt_cdb + 10,  32 - 10);
         break;
     default:
         pr2ws("cdb_len must be 12, 16 or 32\n");
-        return -1;
-    }
-    if (NULL == cdbp) {
-        if (vb)
-            pr2ws("%s NULL cdb pointer\n", cnamep);
         return -1;
     }
     if (sensep && (max_sense_len >= (int)sizeof(sense_b))) {

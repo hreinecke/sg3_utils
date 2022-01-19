@@ -2,7 +2,7 @@
  * A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 2018-2021 D. Gilbert
+ * Copyright (C) 2018-2022 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.18 20211027";
+static const char * version_str = "2.19 20220118";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -134,6 +134,8 @@ using namespace std;
 #define DEF_SDT_CRT_SEC 3
 #define DEF_SCSI_CDBSZ 10
 #define MAX_SCSI_CDBSZ 16
+#define MAX_BPT_VALUE (1 << 24)         /* used for maximum bs as well */
+#define MAX_COUNT_SKIP_SEEK (1LL << 48) /* coverity wants upper bound */
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
@@ -4043,19 +4045,23 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->aen_given = true;
         } else if (0 == strcmp(key, "bpt")) {
             clp->bpt = sg_get_num(buf);
-            if (-1 == clp->bpt) {
+            if ((clp->bpt < 0) || (clp->bpt > MAX_BPT_VALUE)) {
                 pr2serr("%sbad argument to 'bpt='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
             bpt_given = true;
         } else if (0 == strcmp(key, "bs")) {
             clp->bs = sg_get_num(buf);
-            if (-1 == clp->bs) {
+            if ((clp->bs < 0) || (clp->bs > MAX_BPT_VALUE)) {
                 pr2serr("%sbad argument to 'bs='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "cdbsz")) {
             clp->cdbsz_in = sg_get_num(buf);
+            if ((clp->cdbsz_in < 6) || (clp->cdbsz_in > 32)) {
+                pr2serr("%s'cdbsz' expects 6, 10, 12, 16 or 32\n", my_name);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             clp->cdbsz_out = clp->cdbsz_in;
             clp->cdbsz_given = true;
         } else if (0 == strcmp(key, "coe")) {
@@ -4069,7 +4075,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         } else if (0 == strcmp(key, "count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
-                if (-1LL == dd_count) {
+                if ((dd_count < 0) || (dd_count > MAX_COUNT_SKIP_SEEK)) {
                     pr2serr("%sbad argument to 'count='\n", my_name);
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -4103,7 +4109,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 clp->in_flags.fua = true;
         } else if (0 == strcmp(key, "ibs")) {
             ibs = sg_get_num(buf);
-            if (-1 == ibs) {
+            if ((ibs < 0) || (ibs > MAX_BPT_VALUE)) {
                 pr2serr("%sbad argument to 'ibs='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -4148,7 +4154,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->noshare = !! sg_get_num(buf);
         } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
-            if (-1 == obs) {
+            if ((obs < 0) || (obs > MAX_BPT_VALUE)) {
                 pr2serr("%sbad argument to 'obs='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -4206,13 +4212,13 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             }
         } else if (0 == strcmp(key, "seek")) {
             clp->seek = sg_get_llnum(buf);
-            if (-1LL == clp->seek) {
+            if (clp->seek < 0) {
                 pr2serr("%sbad argument to 'seek='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "skip")) {
             clp->skip = sg_get_llnum(buf);
-            if (-1LL == clp->skip) {
+            if (clp->skip < 0) {
                 pr2serr("%sbad argument to 'skip='\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }

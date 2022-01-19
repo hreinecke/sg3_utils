@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2021 Douglas Gilbert.
+ * Copyright (c) 2007-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,8 +19,8 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.83 20211007";
-/* spc6r05, sbc5r01, zbc2r10 */
+const char * sg_lib_version_str = "2.84 20220118";
+/* spc6r06, sbc5r01, zbc2r12 */
 
 
 /* indexed by pdt; those that map to own index do not decay */

@@ -4,7 +4,7 @@
 # (c) 2006--2022 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20220103"
+VERSION="20220117"
 SCAN_WILD_CARD=4294967295
 
 setcolor ()
@@ -1384,15 +1384,15 @@ fi
 
 echo "$found new or changed device(s) found.          "
 if [ ! -z "$FOUNDDEVS" ] ; then
-  printf "%s" "$FOUNDDEVS"
+  echo -e "$FOUNDDEVS"
 fi
 echo "$updated remapped or resized device(s) found."
 if [ ! -z "$CHGDEVS" ] ; then
-  printf "%s" "$CHGDEVS"
+  echo -e "$CHGDEVS"
 fi
 echo "$rmvd device(s) removed.                 "
 if [ ! -z "$RMVDDEVS" ] ; then
-  printf "%s" "$RMVDDEVS"
+  echo -e "$RMVDDEVS"
 fi
 
 # Local Variables:

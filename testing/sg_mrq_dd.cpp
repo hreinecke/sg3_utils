@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.39 20220103";
+static const char * version_str = "1.40 20220118";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -141,6 +141,8 @@ using namespace std;
 #define MAX_SCSI_CDB_SZ 16      /* could be 32 */
 #define PACK_ID_TID_MULTIPLIER (0x1000000)      /* 16,777,216 */
 #define MAX_SLICES 16           /* number of IFILE,OFILE pairs */
+#define MAX_BPT_VALUE (1 << 24)         /* used for maximum bs as well */
+#define MAX_COUNT_SKIP_SEEK (1LL << 48) /* coverity wants upper bound */
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define READ_CAP_REPLY_LEN 8
@@ -3361,7 +3363,7 @@ skip_seek(struct global_collection *clp, const char * key, const char * buf,
         }
     } else {    /* single number on command line (e.g. skip=1234) */
         ll = sg_get_llnum(buf);
-        if (-1LL == ll) {
+        if ((ll < 0) || (ll > MAX_COUNT_SKIP_SEEK)) {
             pr2serr("bad argument to '%s='\n", key);
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -3544,14 +3546,14 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
         keylen = strlen(key);
         if (0 == strcmp(key, "bpt")) {
             clp->bpt = sg_get_num(buf);
-            if (-1 == clp->bpt) {
+            if ((clp->bpt < 0) || (clp->bpt > MAX_BPT_VALUE)) {
                 pr2serr("%sbad argument to 'bpt='\n", my_name);
                 goto syn_err;
             }
             bpt_given = true;
         } else if (0 == strcmp(key, "bs")) {
             clp->bs = sg_get_num(buf);
-            if (-1 == clp->bs) {
+            if ((clp->bs < 0) || (clp->bs > MAX_BPT_VALUE)) {
                 pr2serr("%sbad argument to 'bs='\n", my_name);
                 goto syn_err;
             }
@@ -3611,7 +3613,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             }
             if (0 != strcmp("-1", buf)) {
                 clp->dd_count = sg_get_llnum(buf);
-                if (-1LL == clp->dd_count) {
+                if ((clp->dd_count < 0) ||
+                    (clp->dd_count > MAX_COUNT_SKIP_SEEK)) {
                     pr2serr("%sbad argument to 'count='\n", my_name);
                     goto syn_err;
                 }
@@ -3622,7 +3625,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->out_flags.dio = clp->in_flags.dio;
         } else if (0 == strcmp(key, "elemsz_kb")) {
             n = sg_get_num(buf);
-            if (n < 1) {
+            if ((n < 1) || (n > (MAX_BPT_VALUE / 1024))) {
                 pr2serr("elemsz_kb=EKB wants an integer > 0\n");
                 goto syn_err;
             }
@@ -3646,7 +3649,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 clp->in_flags.fua = true;
         } else if (0 == strcmp(key, "ibs")) {
             ibs = sg_get_num(buf);
-            if (-1 == ibs) {
+            if ((ibs < 0) || (ibs > MAX_BPT_VALUE)) {
                 pr2serr("%sbad argument to 'ibs='\n", my_name);
                 goto syn_err;
             }
@@ -3700,7 +3703,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->out_flags.no_waitq = true;
         } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
-            if (-1 == obs) {
+            if ((obs < 0) || (obs > MAX_BPT_VALUE)) {
                 pr2serr("%sbad argument to 'obs='\n", my_name);
                 goto syn_err;
             }
@@ -3769,9 +3772,13 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             memcpy(skip_buf, buf, n + 1);
         } else if (0 == strcmp(key, "sync"))
             do_sync = !! sg_get_num(buf);
-        else if (0 == strcmp(key, "thr"))
+        else if (0 == strcmp(key, "thr")) {
             num_threads = sg_get_num(buf);
-        else if (0 == strcmp(key, "time")) {
+            if ((num_threads < 0) || (num_threads > MAX_BPT_VALUE)) {
+                pr2serr("%sneed argument to 'skip='\n", my_name);
+                goto syn_err;
+            }
+        } else if (0 == strcmp(key, "time")) {
             ccp = strchr(buf, ',');
             do_time = sg_get_num(buf);
             if (do_time < 0) {
@@ -3780,7 +3787,7 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             }
             if (ccp) {
                 n = sg_get_num(ccp + 1);
-                if (n < 0) {
+                if ((n < 0) || (n > (MAX_BPT_VALUE / 1000))) {
                     pr2serr("%sbad argument to 'time=0|1|2,TO'\n", my_name);
                     goto syn_err;
                 }

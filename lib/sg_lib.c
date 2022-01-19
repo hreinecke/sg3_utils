@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2021 Douglas Gilbert.
+ * Copyright (c) 1999-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -3556,16 +3556,15 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
         k = read(fd, mp_arr, max_arr_len);
         if (k <= 0) {
             if (0 == k) {
-                ret = SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_FILE_ERROR;
                 pr2ws("read 0 bytes from binary file %s\n", fname);
             } else {
                 ret = sg_convert_errno(errno);
                 pr2ws("read from binary file %s: %s\n", fname,
                         safe_strerror(errno));
             }
-            goto bin_fini;
-        }
-        if ((0 == fstat(fd, &a_stat)) && S_ISFIFO(a_stat.st_mode)) {
+        } else if ((k < max_arr_len) && (0 == fstat(fd, &a_stat)) &&
+                   S_ISFIFO(a_stat.st_mode)) {
             /* pipe; keep reading till error or 0 read */
             while (k < max_arr_len) {
                 m = read(fd, mp_arr + k, max_arr_len - k);
@@ -3576,13 +3575,13 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                     pr2ws("read from binary pipe %s: %s\n", fname,
                             safe_strerror(err));
                     ret = sg_convert_errno(err);
-                    goto bin_fini;
+                    break;
                 }
                 k += m;
             }
         }
-        *mp_arr_len = k;
-bin_fini:
+        if (k >= 0)
+            *mp_arr_len = k;
         if ((fd >= 0) && (! has_stdin))
             close(fd);
         return ret;
@@ -3623,9 +3622,17 @@ bin_fini:
             if (isxdigit(line[0])) {
                 carry_over[1] = line[0];
                 carry_over[2] = '\0';
-                if (1 == sscanf(carry_over, "%4x", &h))
-                    mp_arr[off - 1] = h;       /* back up and overwrite */
-                else {
+                if (1 == sscanf(carry_over, "%4x", &h)) {
+                    if (off > 0) {
+                        if (off > max_arr_len) {
+                            pr2ws("%s: array length exceeded\n", __func__);
+                            ret = SG_LIB_LBA_OUT_OF_RANGE;
+                            *mp_arr_len = max_arr_len;
+                            goto fini;
+                        } else
+                            mp_arr[off - 1] = h; /* back up and overwrite */
+                    }
+                } else {
                     pr2ws("%s: carry_over error ['%s'] around line %d\n",
                             __func__, carry_over, j + 1);
                     ret = SG_LIB_SYNTAX_ERROR;
@@ -3667,8 +3674,8 @@ bin_fini:
                     *mp_arr_len = max_arr_len;
                     ret = SG_LIB_LBA_OUT_OF_RANGE;
                     goto fini;
-                }
-                mp_arr[off + k] = h;
+                } else
+                    mp_arr[off + k] = h;
             }
             if (isxdigit(*lcp) && (! isxdigit(*(lcp + 1))))
                 carry_over[0] = *lcp;
@@ -3692,8 +3699,8 @@ bin_fini:
                         ret = SG_LIB_LBA_OUT_OF_RANGE;
                         *mp_arr_len = max_arr_len;
                         goto fini;
-                    }
-                    mp_arr[off + k] = h;
+                    } else
+                        mp_arr[off + k] = h;
                     lcp = strpbrk(lcp, " ,\t");
                     if (NULL == lcp)
                         break;
@@ -3766,7 +3773,11 @@ uint32_t
 sg_get_page_size(void)
 {
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
-    return (uint32_t)sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
+    {
+        long res = sysconf(_SC_PAGESIZE);   /* POSIX.1 (was getpagesize()) */
+
+        return (res <= 0) ? 4096 : res;
+    }
 #elif defined(SG_LIB_WIN32)
     static bool got_page_size = false;
     static uint32_t win_page_size;

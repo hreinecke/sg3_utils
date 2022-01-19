@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2021 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
+ * Copyright (c) 2004-2022 Hannes Reinecke, Christophe Varoqui, Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.20 20210610";
+static const char * version_str = "1.21 20220118";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -142,15 +142,14 @@ dStrRaw(const uint8_t * str, int len)
 static int
 decode_target_port(uint8_t * buff, int len, int *d_id, int *d_tpg)
 {
-    int c_set, assoc, desig_type, i_len;
-    int off, u;
+    int c_set, assoc, desig_type, i_len, off;
     const uint8_t * bp;
     const uint8_t * ip;
 
     *d_id = -1;
     *d_tpg = -1;
     off = -1;
-    while ((u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0) {
+    while (sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1) == 0) {
         bp = buff + off;
         i_len = bp[3];
         if ((off + i_len + 4) > len) {

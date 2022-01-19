@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220109] [svn: r930]
+Changelog for pre-release sg3_utils-1.48 [20220119] [svn: r931]
   - rescan-scsi-bus.sh: with '-r' it crashed due to change in
     rev 867 in sg_inq.c from Device_type= to PDT= .
     Change script to use either
@@ -22,6 +22,7 @@ Changelog for pre-release sg3_utils-1.48 [20220109] [svn: r930]
     - repeat tweak to accept uclinux as linux
   - sg_dd: change uint type to uint32_t
   - sg_pt_dummy.c: remove problematic include
+  - round of coverity identified issue fixes (and non-issues)
 
 Changelog for released sg3_utils-1.47 [20211110] [svn: r919]
   - sg_rep_zones: add support for REPORT ZONE DOMAINS and

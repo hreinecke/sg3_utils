@@ -1,7 +1,7 @@
 /*
  * (c) 2000 Kurt Garloff
  * heavily based on Douglas Gilbert's sg_rbuf program.
- * (c) 1999-2019 Douglas Gilbert
+ * (c) 1999-2022 Douglas Gilbert
  *
  * Program to test the SCSI host adapter by issuing
  * write and read operations on a device's buffer
@@ -47,7 +47,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.20 20191220";
+static const char * version_str = "1.21 20220118";
 
 #define BPI (signed)(sizeof(int))
 
@@ -200,22 +200,23 @@ void do_fill_buffer (int *buf, int len)
 {
         int sum;
         int i; int rln = len;
-        srand (time (0));
+
+        srand(time(0));
     retry:
         if (len >= BPI)
-                base = 0x12345678 + rand ();
+                base = 0x12345678 + rand();     /* don't need strong crypto */
         else
-                base = 0x12345678 + (char) rand ();
+                base = 0x12345678 + (char)rand();
         sum = base;
         for (i = 0; i < len/BPI - 1; i++)
         {
                 /* we rely on rand() giving full range of int */
-                buf[i] = rand ();
+                buf[i] = rand();
                 sum += buf[i];
         }
         while (rln%BPI)
         {
-                ((char*)buf)[--rln] = rand ();
+                ((char*)buf)[--rln] = rand();
                 sum += ((char*)buf)[rln];
         }
         if (len >= BPI) buf[len/BPI - 1] = 0x12345678 - sum;

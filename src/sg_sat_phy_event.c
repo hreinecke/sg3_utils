@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Douglas Gilbert.
+ * Copyright (c) 2006-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -28,7 +28,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.13 20180628";
+static const char * version_str = "1.14 20220118";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -154,15 +154,17 @@ dStrRaw(const uint8_t * str, int len)
 }
 
 /* ATA READ LOG EXT command [2Fh, PIO data-in] */
-/* N.B. "log_addr" is the log page number, "page_in_log" is usually false */
+/* N.B. "log_addr" is the log page number, "page_in_log" is usually 0 */
 static int
-do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
+do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                 int blk_count, void * resp, int mx_resp_len, int cdb_len,
                 bool ck_cond, bool extend, int do_hex, bool do_raw,
                 int verbose)
 {
     /* Following for ATA READ/WRITE MULTIPLE (EXT) cmds, normally 0 */
+#if 0
     bool t_type = false;/* false -> 512 byte LBs, true -> device's LB size */
+#endif
     bool t_dir = true;  /* false -> to device, 1 -> from device */
     bool byte_block = true; /* false -> bytes, true -> 512 byte blocks (if
                                t_type=false) */
@@ -205,8 +207,10 @@ do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
         apt_cdb[2] = t_length;
         if (ck_cond)
             apt_cdb[2] |= 0x20;
+#if 0
         if (t_type)
             apt_cdb[2] |= 0x10;
+#endif
         if (t_dir)
             apt_cdb[2] |= 0x8;
         if (byte_block)
@@ -226,8 +230,10 @@ do_read_log_ext(int sg_fd, int log_addr, bool page_in_log, int feature,
         apt12_cdb[2] = t_length;
         if (ck_cond)
             apt12_cdb[2] |= 0x20;
+#if 0
         if (t_type)
             apt12_cdb[2] |= 0x10;
+#endif
         if (t_dir)
             apt12_cdb[2] |= 0x8;
         if (byte_block)
@@ -487,7 +493,7 @@ int main(int argc, char * argv[])
         return sg_convert_errno(err);
     }
     ret = do_read_log_ext(sg_fd, SATA_PHY_EVENT_LPAGE,
-                          false /* page_in_log */,
+                          0 /* page_in_log */,
                           (reset ? 1 : 0) /* feature */,
                           1 /* blk_count */, inBuff,
                           READ_LOG_EXT_RESPONSE_LEN, cdb_len, ck_cond,

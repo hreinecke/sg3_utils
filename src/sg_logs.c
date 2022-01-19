@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2021 D. Gilbert
+ *  Copyright (C) 2000-2022 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.91 20211231";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.92 20220114";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -58,6 +58,7 @@ static const char * version_str = "1.91 20211231";    /* spc6r06 + sbc5r01 */
 #define SELF_TEST_LPAGE 0x10
 #define SOLID_STATE_MEDIA_LPAGE 0x11
 #define REQ_RECOVERY_LPAGE 0x13
+#define DEVICE_STATS_LPAGE 0x14
 #define BACKGROUND_SCAN_LPAGE 0x15
 #define SAT_ATA_RESULTS_LPAGE 0x16
 #define PROTO_SPECIFIC_LPAGE 0x18
@@ -79,7 +80,7 @@ static const char * version_str = "1.91 20211231";    /* spc6r06 + sbc5r01 */
 #define LAST_N_INQUIRY_DATA_CH_SUBPG 0x1        /* page 0xb */
 #define LAST_N_MODE_PG_DATA_CH_SUBPG 0x2        /* page 0xb */
 
-/* Vendor product identifiers followed by associated mask values */
+/* Vendor product numbers/identifiers */
 #define VP_NONE   (-1)
 #define VP_SEAG   0
 #define VP_HITA   1
@@ -90,8 +91,10 @@ static const char * version_str = "1.91 20211231";    /* spc6r06 + sbc5r01 */
 #define VP_ALL    99
 
 #define MVP_OFFSET 8
-/* MVO_STD or-ed with MVP_<vendor> is T10 defined lpage with vendor specific
- * parameter codes */
+
+/* Vendor product masks
+ * MVP_STD OR-ed with MVP_<vendor> is a T10 defined lpage with vendor
+ * specific parameter codes (e.g. Information Exceptions lpage [0x2f]) */
 #define MVP_STD    (1 << (MVP_OFFSET - 1))
 #define MVP_SEAG   (1 << (VP_SEAG + MVP_OFFSET))
 #define MVP_HITA   (1 << (VP_HITA + MVP_OFFSET))
@@ -372,12 +375,13 @@ static struct log_elem log_arr[] = {
      show_tapealert_response_page},      /* 0x12, 0x0  SSC,ADC */
     {REQ_RECOVERY_LPAGE, 0, 0, PDT_TAPE, MVP_STD, "Requested recovery", "rr",
      show_requested_recovery_page},     /* 0x13, 0x0  SSC,ADC */
-    {0x14, 0, 0, PDT_TAPE, MVP_STD, "Device statistics", "ds",
+    {DEVICE_STATS_LPAGE, 0, 0, PDT_TAPE, MVP_STD, "Device statistics", "ds",
      show_device_stats_page},           /* 0x14, 0x0  SSC,ADC */
-    {0x14, 0, 0, PDT_MCHANGER, MVP_STD, "Media changer statistics", "mcs",
-     show_media_stats_page},            /* 0x14, 0x0  SMC */
-    {0x14, ZONED_BLOCK_DEV_STATS_SUBPG, 0, 0, MVP_STD,  /* 0x14,0x1 zbc2r01 */
-     "Zoned block device statistics", "zbds", show_zoned_block_dev_stats},
+    {DEVICE_STATS_LPAGE, 0, 0, PDT_MCHANGER, MVP_STD,   /* 0x14, 0x0  SMC */
+     "Media changer statistics", "mcs", show_media_stats_page},
+    {DEVICE_STATS_LPAGE, ZONED_BLOCK_DEV_STATS_SUBPG,   /* 0x14,0x1 zbc2r01 */
+     0, 0, MVP_STD, "Zoned block device statistics", "zbds",
+     show_zoned_block_dev_stats},
     {BACKGROUND_SCAN_LPAGE, 0, 0, 0, MVP_STD, "Background scan results",
      "bsr", show_background_scan_results_page}, /* 0x15, 0x0  SBC */
     {BACKGROUND_SCAN_LPAGE, BACKGROUND_OP_SUBPG, 0, 0, MVP_STD,
@@ -421,8 +425,8 @@ static struct log_elem log_arr[] = {
      NULL},                             /* 0x2d, 0  SSC */
     {TAPE_ALERT_LPAGE, 0, 0, PDT_TAPE, MVP_STD, "Tape alert", "ta",
      show_tape_alert_ssc_page},         /* 0x2e, 0  SSC */
-    {IE_LPAGE, 0, 0, -1, (MVP_STD | MVP_SMSTR), "Informational exceptions",
-     "ie", show_ie_page},               /* 0x2f, 0  */
+    {IE_LPAGE, 0, 0, -1, (MVP_STD | MVP_SMSTR | MVP_HITA),
+     "Informational exceptions", "ie", show_ie_page},       /* 0x2f, 0  */
 /* vendor specific */
     {0x30, 0, 0, PDT_DISK, MVP_HITA, "Performance counters (Hitachi)",
      "pc_hi", show_hgst_perf_page},     /* 0x30, 0  SBC */
@@ -669,8 +673,8 @@ get_vp_mask(int vpn)
     if (vpn < 0)
         return 0;
     else
-        return (vpn > (32 - MVP_OFFSET)) ?  OVP_ALL :
-                                            (1 << (vpn + MVP_OFFSET));
+        return (vpn >= (32 - MVP_OFFSET)) ?  OVP_ALL :
+                                             (1 << (vpn + MVP_OFFSET));
 }
 
 static int
@@ -3099,7 +3103,8 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* IE_LPAGE [0x2f] <ie> "Informational Exceptions"  introduced: SPC-3 */
+/* IE_LPAGE [0x2f] <ie> "Informational Exceptions"  introduced: SPC-3
+ * Previously known as "SMART Status and Temperature Reading" lpage.  */
 static bool
 show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -5752,12 +5757,10 @@ show_device_stats_page(const uint8_t * resp, int len,
             switch (pc) {
             case 0x1000:
                 printf("  Media motion (head) hours for each medium type:\n");
-                for (k = 0; ((pl - 4) - k) >= 8; k += 8, p += 8) {
-                    printf("    Density code: 0x%x, Medium type: 0x%x\n",
-                           p[2], p[3]);
-                    printf("      Medium motion hours: %u\n",
+                for (k = 0; ((pl - 4) - k) >= 8; k += 8, p += 8)
+                    printf("    [%d] Density code: %u, Medium type: 0x%x, "
+                           "hours: %u\n", ((k / 8) + 1), p[2], p[3],
                            sg_get_unaligned_be32(p + 4));
-                }
                 break;
             default:
                 if (pc >= 0x8000)
