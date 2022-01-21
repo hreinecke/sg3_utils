@@ -73,6 +73,7 @@ RECEIVE DIAGNOSTIC RESULTS  sg_senddiag, sg_ses, sg_ses_microcode ++
 RECEIVE ROD TOKEN INFORMATION    ddpt, ddptctl ++
 REMOVE ELEMENT AND MODIFY ZONES   sg_zone
 REPORT ALL ROD TOKENS    ddptctl ++
+REPORT DENSITY SUPPORT    sg_rep_density
 REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
 REPORT LUNS         sg_luns, ++
 REPORT PROVISIONING INITIALIZATION PATTERN    sg_rep_pip, ++
@@ -182,4 +183,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-20th November 2021
+21st January 2022

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 Douglas Gilbert.
+ * Copyright (c) 2014-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * sbc4r21.pdf
  */
 
-static const char * version_str = "1.03 20211114";
+static const char * version_str = "1.04 20220120";
 
 #define MAX_RPIP_BUFF_LEN (1024 * 1024)
 #define DEF_RPIP_BUFF_LEN 512
@@ -99,18 +99,18 @@ sg_ll_report_pip(int sg_fd, void * resp, int mx_resp_len, int * residp,
                  bool noisy, int verbose)
 {
     int ret, res, sense_cat;
-    uint8_t rz_cdb[SG_MAINT_IN_CMDLEN] =
+    uint8_t rpip_cdb[SG_MAINT_IN_CMDLEN] =
           {SG_MAINTENANCE_IN, REPORT_PROVISIONING_INITIALIZATION_PATTERN_SA,
            0, 0,  0, 0, 0, 0,  0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
-    sg_put_unaligned_be32((uint32_t)mx_resp_len, rz_cdb + 6);
+    sg_put_unaligned_be32((uint32_t)mx_resp_len, rpip_cdb + 6);
     if (verbose) {
         char b[128];
 
         pr2serr("    %s cdb: %s\n", rpip_s,
-                sg_get_command_str(rz_cdb, SG_MAINT_IN_CMDLEN, false,
+                sg_get_command_str(rpip_cdb, SG_MAINT_IN_CMDLEN, false,
                                    sizeof(b), b));
     }
     ptvp = construct_scsi_pt_obj();
@@ -118,7 +118,7 @@ sg_ll_report_pip(int sg_fd, void * resp, int mx_resp_len, int * residp,
         pr2serr("%s: out of memory\n", __func__);
         return -1;
     }
-    set_scsi_pt_cdb(ptvp, rz_cdb, sizeof(rz_cdb));
+    set_scsi_pt_cdb(ptvp, rpip_cdb, sizeof(rpip_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
@@ -166,7 +166,7 @@ main(int argc, char * argv[])
     int res, c, resid, rlen;
     int sg_fd = -1;
     int do_help = 0;
-    int do_hex = 1;
+    int do_hex = 0;
     int maxlen = 0;
     int ret = 0;
     int verbose = 0;
@@ -256,7 +256,7 @@ main(int argc, char * argv[])
         return 0;
     }
     if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+        pr2serr("missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -297,8 +297,15 @@ main(int argc, char * argv[])
             dStrRaw(rpipBuff, rlen);
             goto the_end;
         }
-        if (do_hex && (2 != do_hex)) {
-            hex2stdout(rpipBuff, rlen, ((1 == do_hex) ? 1 : -1));
+        if (do_hex) {
+            if (2 != do_hex)
+                hex2stdout(rpipBuff, rlen, ((1 == do_hex) ? 1 : -1));
+            else
+                hex2stdout(rpipBuff, rlen, 0);
+            goto the_end;
+        } else {
+            printf("Printing response in hex:\n");
+            hex2stdout(rpipBuff, rlen, 1);
             goto the_end;
         }
     } else if (SG_LIB_CAT_INVALID_OP == res)

@@ -4,8 +4,8 @@
 The files in this folder contain hexadecimal data (in ASCII) and associated
 comments (prefixed with the hash mark symbol: '#' ).
 
-The utility that each hex file is associated with can be determined by
-prepending "sg_" to these filenames then going to the 'src' folder (a
+The utility that each hex file is associated with can be determined in most
+case by prepending "sg_" to these filenames. Then go to the 'src' folder (a
 sibling folder to this one) and look for a match or partial match on
 the name.
 
@@ -40,6 +40,10 @@ Device Identification VPD page:
     designator type: SCSI name string,  code set: UTF-8
       SCSI name string:
       naa.5000C5003011CB28
+
+Not all the hex files follow the "prepend sg_" pattern. Those hex files
+starting with 'nvme_' are examples of invoking NVMe commands with the
+sg_raw utility.
 
 Binary <--> Hexadecimal
 -----------------------
@@ -79,4 +83,4 @@ that support --inhex and don't have hex data already. Special cases are
 also welcome. They help the author test this code.
 
 Douglas Gilbert
-20th November 2021
+21st January 2022

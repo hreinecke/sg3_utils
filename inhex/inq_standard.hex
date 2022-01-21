@@ -1,0 +1,23 @@
+# This file contains the ASCII hex of a SCSI INQUIRY command
+# 'standard' response. In this case non-standard responses refers
+# to responses contain VPD page that are also fetched with the
+# SCSI INQUIRY command.
+
+# The response in this file can be decoded with:
+#     sg_inq --inhex=sg_inq_standard.hex
+# or
+#     sg_vpd --inhex=sg_inq_standard.hex --page=sinq
+#
+# The sg_inq utility defaults to the 'standard' INQUIRY while the
+# sg_vpd utility defaults to the "Supported VPD pages" VPD page.
+# Hence sg_vpd needs the extra option '--page=sinq' which says the
+# VPD page is the standard inquiry. Strictly speaking the standard
+# INQUIRY is not a VPD page but probably would be if SCSI was not
+# 40 years old and highly values backward compatibility.
+
+00 00 07 02 5b 00 10 0a  4c 69 6e 75 78 20 20 20
+73 63 73 69 5f 64 65 62  75 67 20 20 20 20 20 20
+30 31 39 31 32 30 32 31  30 35 32 30 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 c0 05 c0 06 00
+21 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00

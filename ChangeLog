@@ -2,12 +2,14 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220119] [svn: r931]
+Changelog for pre-release sg3_utils-1.48 [20220121] [svn: r932]
+  - sg_z_act_query: new utility for sending either a
+    Zone activate or Zone query command
+  - sg_rep_density: new utility for decoding the response of
+    Report density support command [ssc (tape)]
   - rescan-scsi-bus.sh: with '-r' it crashed due to change in
     rev 867 in sg_inq.c from Device_type= to PDT= .
     Change script to use either
-  - sg_z_act_query: new utility for sending either a
-    Zone activate or Zone query command
   - sg_rep_zones: add Report zone starting LBA granularity
     field in REPORT ZONES response [zbc2r12]
   - sg_decode_sense: add --nodecode option

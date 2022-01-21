@@ -2839,6 +2839,7 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     int bpos = bpstart;
     int i, k, blen;
 
+fprintf(stderr, "%s: no_ascii=%d\n", __func__, no_ascii);
     if (len <= 0)
         return;
     blen = (int)sizeof(buff);

@@ -1,0 +1,97 @@
+.TH SG_REP_DENSITY "8" "January 2022" "sg3_utils\-1.48" SG3_UTILS
+.SH NAME
+sg_rep_density \- send SCSI REPORT DENSITY SUPPORT command
+.SH SYNOPSIS
+.B sg_rep_density
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-media\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-typem\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sends a SCSI REPORT DENSITY command to \fIDEVICE\fR and outputs the data
+returned. This command is tape drive specific. This command is found in
+the SSC\-5 draft standard, revision 6 (ssc5r06.pdf). This command was
+present in the SSC\-2 standard (ANSI INCITS 380\-2003).
+.PP
+By default this utility requests the density code descriptors supported by
+the \fIDEVICE\fR (e.g. a tape drive) and decodes the response. If the
+\fI\-\-typem\fR option is given it fetches the medium type descriptors
+supported by the \fIDEVICE\fR and decodes the response. When the
+\fI\-\-media\fR option is given the density code or medium type descriptors
+supported by the media inside the \fIDEVICE\fR (e.g. a tape cartridge) are
+fetched.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output the response in hexadecimal to stdout. When used once the whole
+response is output in ASCII hexadecimal, prefixed by an address (starting at
+0) on each line. When used twice the whole response is output in hexadecimal
+with no leading address (on each line).
+.br
+Using this option three times will produce output that can be redirected to
+a file and later given to another invocation using the \fI\-\-inhex=FN\fR
+option.
+.TP
+\fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
+where \fIFN\fR is a file name whose contents are assumed to be ASCII
+hexadecimal. If \fIDEVICE\fR is also given then \fIDEVICE\fR is ignored,
+a warning is issued and the utility continues, decoding the file named
+\fIFN\fR. See the "FORMAT OF FILES CONTAINING ASCII HEX" section in the
+sg3_utils manpage for more information. If the \fI\-\-raw\fR option is
+also given then the contents of \fIFN\fR are treated as binary.
+.TP
+\fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
+where \fILEN\fR is the (maximum) response length in bytes. It is placed in
+the cdb's "allocation length" field. If not given (or \fILEN\fR is zero)
+then 8192 is used. The maximum allowed value of \fILEN\fR is 65535.
+.TP
+\fB\-M\fR, \fB\-\-media\fR
+sets the MEDIA bit in the cdb which causes the density codes (or medium
+types) supported by the tape cartridge in the drive to be placed in the
+response. The default is to request the density codes (or medium types)
+supported by the tape drive itself.
+.br
+If there is no "medium" (e.g. tape cartridge) present in the drive the SCSI
+command will fail with a "not ready" sense key.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+output the SCSI response (i.e. the data\-out buffer) in binary (to stdout)
+unless the \fI\-\-inhex=FN\fR option is given.
+.br
+When used together with the \fI\-\-inhex=FN\fR option then the contents of
+\fIFN\fR are treated as binary (rather than hexadecimal).
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
+The default is to open it read\-write.
+.TP
+\fB\-t\fR, \fB\-\-typem\fR
+sets the MEDIUM TYPE bit in the cdb which causes the medium types supported
+by the tape drive (or tape cartridge) to be placed in the response. The
+default is to request the density codes.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH EXIT STATUS
+The exit status of sg_rep_density is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2022 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg3_utils(sg3_utils)

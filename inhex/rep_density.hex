@@ -1,0 +1,18 @@
+#
+# This file contains the response to SCSI REPORT DENSITY SUPPORTED command
+# using the sg_rep_density utility. This file was generated with:
+#      sg_rep_density -HHH /dev/sg4 > rep_density.hex
+# where /dev/sg4 was a LTO-4 tape drive. To decode that file containing
+# hexadecimal in ASCII use:
+#      sg_rep_density --inhex=rep_density.hex
+
+00 9e 00 00 44 44 00 00  00 00 25 a6 00 7f 02 c0
+00 06 1a 80 4c 54 4f 2d  43 56 45 20 55 2d 33 31
+36 20 20 20 55 6c 74 72  69 75 6d 20 33 2f 31 36
+54 20 20 20 20 20 20 20  46 46 80 00 00 00 31 b5
+00 7f 03 80 00 0c 35 00  4c 54 4f 2d 43 56 45 20
+55 2d 34 31 36 20 20 20  55 6c 74 72 69 75 6d 20
+34 2f 31 36 54 20 20 20  20 20 20 20 58 58 a0 00
+00 00 3b 26 00 7f 05 00  00 16 e3 60 4c 54 4f 2d
+43 56 45 20 55 2d 35 31  36 20 20 20 55 6c 74 72
+69 75 6d 20 35 2f 31 36  54 20 20 20 20 20 20 20
