@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220121] [svn: r932]
+Changelog for pre-release sg3_utils-1.48 [20220126] [svn: r933]
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
   - sg_rep_density: new utility for decoding the response of
@@ -17,6 +17,8 @@ Changelog for pre-release sg3_utils-1.48 [20220121] [svn: r932]
     reflect the contents of log pages 0x0 and 0x0,0xff
     - make '-lll' set union of log pages 0x0 and 0x0,0xff
   - sg_opcodes: cleanup error reporting
+  - sg_lib: add sg_pdt_s_eq() to cope with ZBC disks which may
+    be either PDT_ZBC (if host managed) or PDT_DISK 
   - initialize all sense buffers to 0
   - rework main README file
   - rev 921+922 are bugfix revs on release 1.47 [r919,920]

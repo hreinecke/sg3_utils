@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2021 Douglas Gilbert.
+ * Copyright (c) 2004-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -62,6 +62,14 @@ extern "C" {
 #define PDT_ZBC 0x14    /* Zoned Block Commands (ZBC) */
 #define PDT_WLUN 0x1e   /* Well known logical unit (WLUN) */
 #define PDT_UNKNOWN 0x1f        /* Unknown or no device type */
+
+/* ZBC disks use either PDT_ZBC (if 'host managed') or PDT_DISK .
+ * So squeeze two PDTs into one integer. Use sg_pdt_s_eq() to compare.
+ * N.B. Must not use PDT_DISK as upper */
+#define PDT_DISK_ZBC (PDT_DISK | (PDT_ZBC << 8))
+#define PDT_ALL (-1)	/* for common to all PDTs */
+#define PDT_LOWER_MASK 0xff
+#define PDT_UPPER_MASK (~PDT_LOWER_MASK)
 
 #ifndef SAM_STAT_GOOD
 /* The SCSI status codes as found in SAM-4 at www.t10.org */
@@ -387,6 +395,15 @@ void sg_nvme_desc2sense(uint8_t * sbp, bool dnr, bool more, uint16_t sct_sc);
  * respectively). sbp should have room for 32 or 18 bytes respectively */
 void sg_build_sense_buffer(bool desc, uint8_t *sbp, uint8_t skey,
                            uint8_t asc, uint8_t ascq);
+
+/* Returns true if left argument is "equal" to the right argument. l_pdt_s
+ * is a compound PDT (SCSI Peripheral Device Type) or a negative number
+ * which represents a wildcard (i.e. match anything). r_pdt_s has a similar
+ * form. PDT values are 5 bits long (0 to 31) and a compound pdt_s is
+ * formed by shifting the second (upper) PDT by eight bits to the left and
+ * OR-ing it with the first PDT. The pdt_s values must be defined so
+ * PDT_DISK (0) is _not_ the upper value in a compound pdt_s. */
+bool sg_pdt_s_eq(int l_pdt_s, int r_pdt_s);
 
 extern FILE * sg_warnings_strm;
 

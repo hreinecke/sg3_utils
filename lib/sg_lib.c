@@ -149,12 +149,12 @@ get_value_name(const struct sg_lib_value_name_t * arr, int value,
         peri_type = 0;
     for (; vp->name; ++vp) {
         if (value == vp->value) {
-            if (peri_type == vp->peri_dev_type)
+            if (sg_pdt_s_eq(peri_type, vp->peri_dev_type))
                 return vp;
             holdp = vp;
             while ((vp + 1)->name && (value == (vp + 1)->value)) {
                 ++vp;
-                if (peri_type == vp->peri_dev_type)
+                if (sg_pdt_s_eq(peri_type, vp->peri_dev_type))
                     return vp;
             }
             return holdp;
@@ -591,6 +591,33 @@ sg_get_pdt_str(int pdt, int buff_len, char * buff)
     else
         sg_scnpr(buff, buff_len, "%s", sg_lib_pdt_strs[pdt]);
     return buff;
+}
+
+/* Returns true if left argument is "equal" to the right argument. l_pdt_s
+ * is a compound PDT (SCSI Peripheral Device Type) or a negative number
+ * which represents a wildcard (i.e. match anything). r_pdt_s has a similar
+ * form. PDT values are 5 bits long (0 to 31) and a compound pdt_s is
+ * formed by shifting the second (upper) PDT by eight bits to the left and
+ * OR-ing it with the first PDT. The pdt_s values must be defined so
+ * PDT_DISK (0) is _not_ the upper value in a compound pdt_s. */
+bool
+sg_pdt_s_eq(int l_pdt_s, int r_pdt_s)
+{
+    bool upper_l = !!(l_pdt_s & PDT_UPPER_MASK);
+    bool upper_r = !!(r_pdt_s & PDT_UPPER_MASK);
+
+    if ((l_pdt_s < 0) || (r_pdt_s < 0))
+        return true;
+    if (!upper_l && !upper_r)
+        return l_pdt_s == r_pdt_s;
+    else if (upper_l && upper_r)
+        return (((PDT_UPPER_MASK & l_pdt_s) == (PDT_UPPER_MASK & r_pdt_s)) ||
+                ((PDT_LOWER_MASK & l_pdt_s) == (PDT_LOWER_MASK & r_pdt_s)));
+    else if (upper_l)
+        return (((PDT_LOWER_MASK & l_pdt_s) == r_pdt_s) ||
+                ((PDT_UPPER_MASK & l_pdt_s) >> 8) == r_pdt_s);
+    return (((PDT_LOWER_MASK & r_pdt_s) == l_pdt_s) ||
+            ((PDT_UPPER_MASK & r_pdt_s) >> 8) == l_pdt_s);
 }
 
 int
@@ -2538,8 +2565,8 @@ sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len, char * buff,
     my_pdt = ((peri_type < -1) || (peri_type > 0x1f)) ? -2 : peri_type;
     vnp = get_value_name(sg_lib_scsi_feature_sets, sfs_code, my_pdt);
     if (vnp && (-2 != my_pdt)) {
-        if (peri_type != vnp->peri_dev_type)
-            vnp = NULL;         /* shouldn't really happen */
+        if (! sg_pdt_s_eq(my_pdt, vnp->peri_dev_type))
+            vnp = NULL;      /* shouldn't really happen */
     }
     if (foundp)
         *foundp = vnp ? true : false;

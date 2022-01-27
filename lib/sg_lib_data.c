@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.84 20220118";
+const char * sg_lib_version_str = "2.85 20220126";
 /* spc6r06, sbc5r01, zbc2r12 */
 
 
@@ -52,232 +52,232 @@ struct sg_lib_simple_value_name_t sg_lib_sstatus_str_arr[] = {
 
 #ifdef SG_SCSI_STRINGS
 struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
-    {0, 0, "Test Unit Ready"},
-    {0x1, 0, "Rezero Unit"},
+    {0, PDT_ALL, "Test Unit Ready"},
+    {0x1, PDT_ALL, "Rezero Unit"},
     {0x1, PDT_TAPE, "Rewind"},
-    {0x3, 0, "Request Sense"},
-    {0x4, 0, "Format Unit"},
+    {0x3, PDT_ALL, "Request Sense"},
+    {0x4, PDT_DISK_ZBC, "Format Unit"},
     {0x4, PDT_TAPE, "Format medium"},
     {0x4, PDT_PRINTER, "Format"},
-    {0x5, 0, "Read Block Limits"},
-    {0x7, 0, "Reassign Blocks"},
+    {0x5, PDT_TAPE, "Read Block Limits"},
+    {0x7, PDT_DISK_ZBC, "Reassign Blocks"},
     {0x7, PDT_MCHANGER, "Initialize element status"},
-    {0x8, 0, "Read(6)"},        /* obsolete in sbc3r30 */
+    {0x8, PDT_DISK_ZBC, "Read(6)"},        /* obsolete in sbc3r30 */
     {0x8, PDT_PROCESSOR, "Receive"},
-    {0xa, 0, "Write(6)"},       /* obsolete in sbc3r30 */
+    {0xa, PDT_DISK_ZBC, "Write(6)"},       /* obsolete in sbc3r30 */
     {0xa, PDT_PRINTER, "Print"},
     {0xa, PDT_PROCESSOR, "Send"},
-    {0xb, 0, "Seek(6)"},
+    {0xb, PDT_ALL, "Seek(6)"},
     {0xb, PDT_TAPE, "Set capacity"},
     {0xb, PDT_PRINTER, "Slew and print"},
-    {0xf, 0, "Read reverse(6)"},
-    {0x10, 0, "Write filemarks(6)"},
+    {0xf, PDT_TAPE, "Read reverse(6)"},
+    {0x10, PDT_TAPE, "Write filemarks(6)"},
     {0x10, PDT_PRINTER, "Synchronize buffer"},
-    {0x11, 0, "Space(6)"},
-    {0x12, 0, "Inquiry"},
-    {0x13, 0, "Verify(6)"},  /* SSC */
-    {0x14, 0, "Recover buffered data"},
-    {0x15, 0, "Mode select(6)"}, /* SBC-3 r31 recommends Mode select(10) */
-    {0x16, 0, "Reserve(6)"},    /* obsolete in SPC-4 r11 */
+    {0x11, PDT_TAPE, "Space(6)"},
+    {0x12, PDT_ALL, "Inquiry"},
+    {0x13, PDT_TAPE, "Verify(6)"},  /* SSC */
+    {0x14, PDT_ALL, "Recover buffered data"},
+    {0x15, PDT_ALL, "Mode select(6)"},/* sbc3r31 recommends Mode select(10) */
+    {0x16, PDT_ALL, "Reserve(6)"},    /* obsolete in SPC-4 r11 */
     {0x16, PDT_MCHANGER, "Reserve element(6)"},
-    {0x17, 0, "Release(6)"},    /* obsolete in SPC-4 r11 */
+    {0x17, PDT_ALL, "Release(6)"},    /* obsolete in SPC-4 r11 */
     {0x17, PDT_MCHANGER, "Release element(6)"},
-    {0x18, 0, "Copy"},          /* obsolete in SPC-4 r11 */
-    {0x19, 0, "Erase(6)"},
-    {0x1a, 0, "Mode sense(6)"}, /* SBC-3 r31 recommends Mode sense(10) */
-    {0x1b, 0, "Start stop unit"},
+    {0x18, PDT_ALL, "Copy"},          /* obsolete in SPC-4 r11 */
+    {0x19, PDT_ALL, "Erase(6)"},
+    {0x1a, PDT_ALL, "Mode sense(6)"},/* sbc3r31 recommends Mode sense(10) */
+    {0x1b, PDT_ALL, "Start stop unit"},
     {0x1b, PDT_TAPE, "Load unload"},
     {0x1b, PDT_ADC, "Load unload"},
     {0x1b, PDT_PRINTER, "Stop print"},
-    {0x1c, 0, "Receive diagnostic results"},
-    {0x1d, 0, "Send diagnostic"},
-    {0x1e, 0, "Prevent allow medium removal"},
-    {0x23, 0, "Read Format capacities"},
-    {0x24, 0, "Set window"},
-    {0x25, 0, "Read capacity(10)"},
-                        /* SBC-3 r31 recommends Read capacity(16) */
+    {0x1c, PDT_ALL, "Receive diagnostic results"},
+    {0x1d, PDT_ALL, "Send diagnostic"},
+    {0x1e, PDT_ALL, "Prevent allow medium removal"},
+    {0x23, PDT_MMC, "Read Format capacities"},
+    {0x24, PDT_ALL, "Set window"},
+    {0x25, PDT_ALL, "Read capacity(10)"},
+                        /* sbc3r31 recommends Read capacity(16) */
     {0x25, PDT_OCRW, "Read card capacity"},
-    {0x28, 0, "Read(10)"},      /* SBC-3 r31 recommends Read(16) */
-    {0x29, 0, "Read generation"},
-    {0x2a, 0, "Write(10)"},     /* SBC-3 r31 recommends Write(16) */
-    {0x2b, 0, "Seek(10)"},
+    {0x28, PDT_ALL, "Read(10)"},      /* sbc3r31 recommends Read(16) */
+    {0x29, PDT_ALL, "Read generation"},
+    {0x2a, PDT_ALL, "Write(10)"},     /* sbc3r31 recommends Write(16) */
+    {0x2b, PDT_ALL, "Seek(10)"},
     {0x2b, PDT_TAPE, "Locate(10)"},
     {0x2b, PDT_MCHANGER, "Position to element"},
-    {0x2c, 0, "Erase(10)"},
-    {0x2d, 0, "Read updated block"},
-    {0x2e, 0, "Write and verify(10)"},
-                        /* SBC-3 r31 recommends Write and verify(16) */
-    {0x2f, 0, "Verify(10)"},    /* SBC-3 r31 recommends Verify(16) */
-    {0x30, 0, "Search data high(10)"},
-    {0x31, 0, "Search data equal(10)"},
-    {0x32, 0, "Search data low(10)"},
-    {0x33, 0, "Set limits(10)"},
-    {0x34, 0, "Pre-fetch(10)"}, /* SBC-3 r31 recommends Pre-fetch(16) */
+    {0x2c, PDT_ALL, "Erase(10)"},
+    {0x2d, PDT_OPTICAL, "Read updated block"},
+    {0x2e, PDT_ALL, "Write and verify(10)"},
+                        /* sbc3r31 recommends Write and verify(16) */
+    {0x2f, PDT_ALL, "Verify(10)"},    /* sbc3r31 recommends Verify(16) */
+    {0x30, PDT_ALL, "Search data high(10)"},
+    {0x31, PDT_ALL, "Search data equal(10)"},
+    {0x32, PDT_ALL, "Search data low(10)"},
+    {0x33, PDT_ALL, "Set limits(10)"},
+    {0x34, PDT_ALL, "Pre-fetch(10)"}, /* sbc3r31 recommends Pre-fetch(16) */
     {0x34, PDT_TAPE, "Read position"},
-    {0x35, 0, "Synchronize cache(10)"},
+    {0x35, PDT_ALL, "Synchronize cache(10)"},
                         /* SBC-3 r31 recommends Synchronize cache(16) */
     {0x36, 0, "Lock unlock cache(10)"},
     {0x37, 0, "Read defect data(10)"},
                         /* SBC-3 r31 recommends Read defect data(12) */
     {0x37, PDT_MCHANGER, "Initialize element status with range"},
-    {0x38, 0, "Format with preset scan"},
+    {0x38, PDT_DISK_ZBC, "Format with preset scan"},
     {0x38, PDT_OCRW, "Medium scan"},
-    {0x39, 0, "Compare"},               /* obsolete in SPC-4 r11 */
-    {0x3a, 0, "Copy and verify"},       /* obsolete in SPC-4 r11 */
-    {0x3b, 0, "Write buffer"},
-    {0x3c, 0, "Read buffer(10)"},
-    {0x3d, 0, "Update block"},
-    {0x3e, 0, "Read long(10)"},         /* obsolete in SBC-4 r7 */
-    {0x3f, 0, "Write long(10)"}, /* SBC-3 r31 recommends Write long(16) */
-    {0x40, 0, "Change definition"},     /* obsolete in SPC-4 r11 */
-    {0x41, 0, "Write same(10)"}, /* SBC-3 r31 recommends Write same(16) */
-    {0x42, 0, "Unmap"},                 /* added SPC-4 rev 18 */
+    {0x39, PDT_ALL, "Compare"},               /* obsolete in SPC-4 r11 */
+    {0x3a, PDT_ALL, "Copy and verify"},       /* obsolete in SPC-4 r11 */
+    {0x3b, PDT_ALL, "Write buffer"},
+    {0x3c, PDT_ALL, "Read buffer(10)"},
+    {0x3d, PDT_OPTICAL, "Update block"},
+    {0x3e, PDT_ALL, "Read long(10)"},         /* obsolete in SBC-4 r7 */
+    {0x3f, PDT_ALL, "Write long(10)"}, /* sbc3r31 recommends Write long(16) */
+    {0x40, PDT_ALL, "Change definition"},     /* obsolete in SPC-4 r11 */
+    {0x41, PDT_ALL, "Write same(10)"}, /* sbc3r31 recommends Write same(16) */
+    {0x42, PDT_DISK_ZBC, "Unmap"},                 /* added SPC-4 rev 18 */
     {0x42, PDT_MMC, "Read sub-channel"},
     {0x43, PDT_MMC, "Read TOC/PMA/ATIP"},
-    {0x44, 0, "Report density support"},
+    {0x44, PDT_ALL, "Report density support"},
     {0x45, PDT_MMC, "Play audio(10)"},
     {0x46, PDT_MMC, "Get configuration"},
     {0x47, PDT_MMC, "Play audio msf"},
-    {0x48, 0, "Sanitize"},
+    {0x48, PDT_ALL, "Sanitize"},
     {0x4a, PDT_MMC, "Get event status notification"},
     {0x4b, PDT_MMC, "Pause/resume"},
-    {0x4c, 0, "Log select"},
-    {0x4d, 0, "Log sense"},
-    {0x4e, 0, "Stop play/scan"},
-    {0x50, 0, "Xdwrite(10)"},           /* obsolete in SBC-3 r31 */
-    {0x51, 0, "Xpwrite(10)"},           /* obsolete in SBC-4 r15 */
+    {0x4c, PDT_ALL, "Log select"},
+    {0x4d, PDT_ALL, "Log sense"},
+    {0x4e, PDT_MMC, "Stop play/scan"},
+    {0x50, PDT_DISK, "Xdwrite(10)"},           /* obsolete in SBC-3 r31 */
+    {0x51, PDT_DISK, "Xpwrite(10)"},           /* obsolete in SBC-4 r15 */
     {0x51, PDT_MMC, "Read disk information"},
-    {0x52, 0, "Xdread(10)"},            /* obsolete in SBC-3 r31 */
+    {0x52, PDT_DISK, "Xdread(10)"},            /* obsolete in SBC-3 r31 */
     {0x52, PDT_MMC, "Read track information"},
-    {0x53, 0, "Xdwriteread(10)"},       /* obsolete in SBC-4 r15 */
-    {0x54, 0, "Send OPC information"},
-    {0x55, 0, "Mode select(10)"},
-    {0x56, 0, "Reserve(10)"},           /* obsolete in SPC-4 r11 */
+    {0x53, PDT_DISK, "Xdwriteread(10)"},       /* obsolete in SBC-4 r15 */
+    {0x54, PDT_MMC, "Send OPC information"},
+    {0x55, PDT_ALL, "Mode select(10)"},
+    {0x56, PDT_ALL, "Reserve(10)"},           /* obsolete in SPC-4 r11 */
     {0x56, PDT_MCHANGER, "Reserve element(10)"},
-    {0x57, 0, "Release(10)"},           /* obsolete in SPC-4 r11 */
+    {0x57, PDT_ALL, "Release(10)"},           /* obsolete in SPC-4 r11 */
     {0x57, PDT_MCHANGER, "Release element(10)"},
-    {0x58, 0, "Repair track"},
-    {0x5a, 0, "Mode sense(10)"},
-    {0x5b, 0, "Close track/session"},
-    {0x5c, 0, "Read buffer capacity"},
-    {0x5d, 0, "Send cue sheet"},
-    {0x5e, 0, "Persistent reserve in"},
-    {0x5f, 0, "Persistent reserve out"},
-    {0x7e, 0, "Extended cdb (XCBD)"},           /* added in SPC-4 r12 */
-    {0x80, 0, "Xdwrite extended(16)"},          /* obsolete in SBC-4 r15 */
+    {0x58, PDT_MMC, "Repair track"},
+    {0x5a, PDT_ALL, "Mode sense(10)"},
+    {0x5b, PDT_MMC, "Close track/session"},
+    {0x5c, PDT_MMC, "Read buffer capacity"},
+    {0x5d, PDT_MMC, "Send cue sheet"},
+    {0x5e, PDT_ALL, "Persistent reserve in"},
+    {0x5f, PDT_ALL, "Persistent reserve out"},
+    {0x7e, PDT_ALL, "Extended cdb (XCBD)"},        /* added in SPC-4 r12 */
+    {0x80, PDT_DISK, "Xdwrite extended(16)"},     /* obsolete in SBC-4 r15 */
     {0x80, PDT_TAPE, "Write filemarks(16)"},
-    {0x81, 0, "Rebuild(16)"},
+    {0x81, PDT_DISK, "Rebuild(16)"},
     {0x81, PDT_TAPE, "Read reverse(16)"},
-    {0x82, 0, "Regenerate(16)"},
-    {0x83, 0, "Third party copy out"},  /* Extended copy, before spc4r34 */
+    {0x82, PDT_DISK, "Regenerate(16)"},
+    {0x83, PDT_ALL, "Third party copy out"},/* Extended copy before spc4r34 */
         /* Following was "Receive copy results", before spc4r34 */
-    {0x84, 0, "Third party copy in"},
-    {0x85, 0, "ATA pass-through(16)"},  /* was 0x98 in spc3 rev21c */
-    {0x86, 0, "Access control in"},
-    {0x87, 0, "Access control out"},
-    {0x88, 0, "Read(16)"},
-    {0x89, 0, "Compare and write"},
-    {0x8a, 0, "Write(16)"},
-    {0x8b, 0, "Orwrite(16)"},
-    {0x8c, 0, "Read attribute"},
-    {0x8d, 0, "Write attribute"},
-    {0x8e, 0, "Write and verify(16)"},
-    {0x8f, 0, "Verify(16)"},
-    {0x90, 0, "Pre-fetch(16)"},
-    {0x91, 0, "Synchronize cache(16)"},
+    {0x84, PDT_ALL, "Third party copy in"},
+    {0x85, PDT_ALL, "ATA pass-through(16)"},  /* was 0x98 in spc3 rev21c */
+    {0x86, PDT_ALL, "Access control in"},
+    {0x87, PDT_ALL, "Access control out"},
+    {0x88, PDT_ALL, "Read(16)"},
+    {0x89, PDT_ALL, "Compare and write"},
+    {0x8a, PDT_ALL, "Write(16)"},
+    {0x8b, PDT_DISK, "Orwrite(16)"},
+    {0x8c, PDT_ALL, "Read attribute"},
+    {0x8d, PDT_ALL, "Write attribute"},
+    {0x8e, PDT_ALL, "Write and verify(16)"},
+    {0x8f, PDT_ALL, "Verify(16)"},
+    {0x90, PDT_ALL, "Pre-fetch(16)"},
+    {0x91, PDT_ALL, "Synchronize cache(16)"},
     {0x91, PDT_TAPE, "Space(16)"},
-    {0x92, 0, "Lock unlock cache(16)"},
+    {0x92, PDT_DISK, "Lock unlock cache(16)"},
     {0x92, PDT_TAPE, "Locate(16)"},
-    {0x93, 0, "Write same(16)"},
+    {0x93, PDT_ALL, "Write same(16)"},
     {0x93, PDT_TAPE, "Erase(16)"},
-    {0x94, PDT_ZBC, "ZBC out"},  /* new sbc4r04, has service actions */
-    {0x95, PDT_ZBC, "ZBC in"},   /* new sbc4r04, has service actions */
-    {0x9a, 0, "Write stream(16)"},      /* added sbc4r07 */
-    {0x9b, 0, "Read buffer(16)"},       /* added spc5r02 */
-    {0x9c, 0, "Write atomic(16)"},
-    {0x9d, 0, "Service action bidirectional"},  /* added spc4r35 */
-    {0x9e, 0, "Service action in(16)"},
-    {0x9f, 0, "Service action out(16)"},
-    {0xa0, 0, "Report luns"},
-    {0xa1, 0, "ATA pass-through(12)"},
+    {0x94, PDT_DISK_ZBC, "ZBC out"},  /* new sbc4r04, has service actions */
+    {0x95, PDT_DISK_ZBC, "ZBC in"},   /* new sbc4r04, has service actions */
+    {0x9a, PDT_ALL, "Write stream(16)"},      /* added sbc4r07 */
+    {0x9b, PDT_ALL, "Read buffer(16)"},       /* added spc5r02 */
+    {0x9c, PDT_ALL, "Write atomic(16)"},
+    {0x9d, PDT_ALL, "Service action bidirectional"},  /* added spc4r35 */
+    {0x9e, PDT_ALL, "Service action in(16)"},
+    {0x9f, PDT_ALL, "Service action out(16)"},
+    {0xa0, PDT_ALL, "Report luns"},
+    {0xa1, PDT_ALL, "ATA pass-through(12)"},
     {0xa1, PDT_MMC, "Blank"},
-    {0xa2, 0, "Security protocol in"},
-    {0xa3, 0, "Maintenance in"},
+    {0xa2, PDT_ALL, "Security protocol in"},
+    {0xa3, PDT_ALL, "Maintenance in"},
     {0xa3, PDT_MMC, "Send key"},
-    {0xa4, 0, "Maintenance out"},
+    {0xa4, PDT_ALL, "Maintenance out"},
     {0xa4, PDT_MMC, "Report key"},
-    {0xa5, 0, "Move medium"},
+    {0xa5, PDT_ALL, "Move medium"},
     {0xa5, PDT_MMC, "Play audio(12)"},
-    {0xa6, 0, "Exchange medium"},
+    {0xa6, PDT_MCHANGER, "Exchange medium"},
     {0xa6, PDT_MMC, "Load/unload medium"},
-    {0xa7, 0, "Move medium attached"},
+    {0xa7, PDT_OPTICAL, "Move medium attached"},
     {0xa7, PDT_MMC, "Set read ahead"},
-    {0xa8, 0, "Read(12)"},      /* SBC-3 r31 recommends Read(16) */
-    {0xa9, 0, "Service action out(12)"},
-    {0xaa, 0, "Write(12)"},     /* SBC-3 r31 recommends Write(16) */
-    {0xab, 0, "Service action in(12)"},
-    {0xac, 0, "erase(12)"},
+    {0xa8, PDT_ALL, "Read(12)"},      /* SBC-3 r31 recommends Read(16) */
+    {0xa9, PDT_ALL, "Service action out(12)"},
+    {0xaa, PDT_ALL, "Write(12)"},     /* SBC-3 r31 recommends Write(16) */
+    {0xab, PDT_ALL, "Service action in(12)"},
+    {0xac, PDT_OPTICAL, "erase(12)"},
     {0xac, PDT_MMC, "Get performance"},
     {0xad, PDT_MMC, "Read DVD/BD structure"},
-    {0xae, 0, "Write and verify(12)"},
+    {0xae, PDT_ALL, "Write and verify(12)"},
                         /* SBC-3 r31 recommends Write and verify(16) */
-    {0xaf, 0, "Verify(12)"},    /* SBC-3 r31 recommends Verify(16) */
-    {0xb0, 0, "Search data high(12)"},
-    {0xb1, 0, "Search data equal(12)"},
+    {0xaf, PDT_ALL, "Verify(12)"},    /* SBC-3 r31 recommends Verify(16) */
+    {0xb0, PDT_DISK, "Search data high(12)"},
+    {0xb1, PDT_DISK, "Search data equal(12)"},
     {0xb1, PDT_MCHANGER, "Open/close import/export element"},
-    {0xb2, 0, "Search data low(12)"},
-    {0xb3, 0, "Set limits(12)"},
-    {0xb4, 0, "Read element status attached"},
-    {0xb5, 0, "Security protocol out"},
+    {0xb2, PDT_DISK, "Search data low(12)"},
+    {0xb3, PDT_DISK, "Set limits(12)"},
+    {0xb4, PDT_ALL, "Read element status attached"},
     {0xb5, PDT_MCHANGER, "Request volume element address"},
-    {0xb6, 0, "Send volume tag"},
+    {0xb5, PDT_ALL, "Security protocol out"},
+    {0xb6, PDT_MCHANGER, "Send volume tag"},
     {0xb6, PDT_MMC, "Set streaming"},
-    {0xb7, 0, "Read defect data(12)"},
-    {0xb8, 0, "Read element status"},
-    {0xb9, 0, "Read CD msf"},
-    {0xba, 0, "Redundancy group in"},
+    {0xb7, PDT_ALL, "Read defect data(12)"},
+    {0xb8, PDT_ALL, "Read element status"},
+    {0xb9, PDT_MMC, "Read CD msf"},
     {0xba, PDT_MMC, "Scan"},
-    {0xbb, 0, "Redundancy group out"},
+    {0xba, PDT_ALL, "Redundancy group in"},
+    {0xbb, PDT_ALL, "Redundancy group out"},
     {0xbb, PDT_MMC, "Set CD speed"},
-    {0xbc, 0, "Spare in"},
-    {0xbd, 0, "Spare out"},
+    {0xbc, PDT_ALL, "Spare in"},
+    {0xbd, PDT_ALL, "Spare out"},
     {0xbd, PDT_MMC, "Mechanism status"},
-    {0xbe, 0, "Volume set in"},
     {0xbe, PDT_MMC, "Read CD"},
-    {0xbf, 0, "Volume set out"},
+    {0xbe, PDT_ALL, "Volume set in"},
     {0xbf, PDT_MMC, "Send DVD/BD structure"},
+    {0xbf, PDT_ALL, "Volume set out"},
     {0xffff, 0, NULL},
 };
 
 /* Read buffer(10) [0x3c] and Read buffer(16) [0x9b] service actions (sa),
  * need prefix */
 struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
-    {0x0, 0, "combined header and data [or multiple modes]"},
-    {0x2, 0, "data"},
-    {0x3, 0, "descriptor"},
-    {0xa, 0, "read data from echo buffer"},
-    {0xb, 0, "echo buffer descriptor"},
-    {0x1a, 0, "enable expander comms protocol and echo buffer"},
-    {0x1c, 0, "error history"},
+    {0x0, PDT_ALL, "combined header and data [or multiple modes]"},
+    {0x2, PDT_ALL, "data"},
+    {0x3, PDT_ALL, "descriptor"},
+    {0xa, PDT_ALL, "read data from echo buffer"},
+    {0xb, PDT_ALL, "echo buffer descriptor"},
+    {0x1a, PDT_ALL, "enable expander comms protocol and echo buffer"},
+    {0x1c, PDT_ALL, "error history"},
     {0xffff, 0, NULL},
 };
 
 /* Write buffer [0x3b] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {
-    {0x0, 0, "combined header and data [or multiple modes]"},
-    {0x2, 0, "data"},
-    {0x4, 0, "download microcode and activate"},
-    {0x5, 0, "download microcode, save, and activate"},
-    {0x6, 0, "download microcode with offsets and activate"},
-    {0x7, 0, "download microcode with offsets, save, and activate"},
-    {0xa, 0, "write data to echo buffer"},
-    {0xd, 0, "download microcode with offsets, select activation events, "
-             "save and defer activate"},
-    {0xe, 0, "download microcode with offsets, save and defer activate"},
-    {0xf, 0, "activate deferred microcode"},
-    {0x1a, 0, "enable expander comms protocol and echo buffer"},
-    {0x1b, 0, "disable expander comms protocol"},
-    {0x1c, 0, "download application client error history"},
+    {0x0, PDT_ALL, "combined header and data [or multiple modes]"},
+    {0x2, PDT_ALL, "data"},
+    {0x4, PDT_ALL, "download microcode and activate"},
+    {0x5, PDT_ALL, "download microcode, save, and activate"},
+    {0x6, PDT_ALL, "download microcode with offsets and activate"},
+    {0x7, PDT_ALL, "download microcode with offsets, save, and activate"},
+    {0xa, PDT_ALL, "write data to echo buffer"},
+    {0xd, PDT_ALL, "download microcode with offsets, select activation "
+             "events, save and defer activate"},
+    {0xe, PDT_ALL, "download microcode with offsets, save and defer activate"},
+    {0xf, PDT_ALL, "activate deferred microcode"},
+    {0x1a, PDT_ALL, "enable expander comms protocol and echo buffer"},
+    {0x1b, PDT_ALL, "disable expander comms protocol"},
+    {0x1c, PDT_ALL, "download application client error history"},
     {0xffff, 0, NULL},
 };
 
@@ -298,25 +298,25 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
     {0x2, PDT_SAC, "Report component device attachments"},
     {0x3, PDT_SAC, "Report peripheral device"},
     {0x4, PDT_SAC, "Report peripheral device associations"},
-    {0x5, 0, "Report identifying information"},
+    {0x5, PDT_ALL, "Report identifying information"},
                 /* was "Report device identifier" prior to spc4r07 */
     {0x6, PDT_SAC, "Report states"},
     {0x7, PDT_SAC, "Report device identification"},
     {0x8, PDT_SAC, "Report unconfigured capacity"},
     {0x9, PDT_SAC, "Report supported configuration method"},
-    {0xa, 0, "Report target port groups"},
-    {0xb, 0, "Report aliases"},
-    {0xc, 0, "Report supported operation codes"},
-    {0xd, 0, "Report supported task management functions"},
-    {0xe, 0, "Report priority"},
-    {0xf, 0, "Report timestamp"},
-    {0x10, 0, "Management protocol in"},
+    {0xa, PDT_ALL, "Report target port groups"},
+    {0xb, PDT_ALL, "Report aliases"},
+    {0xc, PDT_ALL, "Report supported operation codes"},
+    {0xd, PDT_ALL, "Report supported task management functions"},
+    {0xe, PDT_ALL, "Report priority"},
+    {0xf, PDT_ALL, "Report timestamp"},
+    {0x10, PDT_ALL, "Management protocol in"},
     {0x1d, PDT_DISK, "Report provisioning initialization pattern"},
         /* added in sbc4r07, shares sa 0x1d with ssc5r01 (tape) */
     {0x1d, PDT_TAPE, "Receive recommended access order"},
     {0x1e, PDT_TAPE, "Read dynamic runtime attribute"},
     {0x1e, PDT_ADC, "Report automation device attributes"},
-    {0x1f, 0, "Maintenance in vendor specific"},
+    {0x1f, PDT_ALL, "Maintenance in vendor specific"},
     {0xffff, 0, NULL},
 };
 
@@ -329,71 +329,71 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
     {0x3, PDT_SAC, "Exchange peripheral device / component device"},
     {0x4, PDT_SAC, "Instruct component device"},
     {0x5, PDT_SAC, "Remove peripheral device / component device"},
-    {0x6, 0, "Set identifying information"},
+    {0x6, PDT_ALL, "Set identifying information"},
                 /* was "Set device identifier" prior to spc4r07 */
     {0x7, PDT_SAC, "Break peripheral device / component device"},
-    {0xa, 0, "Set target port groups"},
-    {0xb, 0, "Change aliases"},
-    {0xc, 0, "Remove I_T nexus"},
-    {0xe, 0, "Set priority"},
-    {0xf, 0, "Set timestamp"},
-    {0x10, 0, "Management protocol out"},
+    {0xa, PDT_ALL, "Set target port groups"},
+    {0xb, PDT_ALL, "Change aliases"},
+    {0xc, PDT_ALL, "Remove I_T nexus"},
+    {0xe, PDT_ALL, "Set priority"},
+    {0xf, PDT_ALL, "Set timestamp"},
+    {0x10, PDT_ALL, "Management protocol out"},
     {0x1d, PDT_TAPE, "Generate recommended access order"},
     {0x1e, PDT_TAPE, "write dynamic runtime attribute"},
     {0x1e, PDT_ADC, "Set automation device attributes"},
-    {0x1f, 0, "Maintenance out vendor specific"},
+    {0x1f, PDT_ALL, "Maintenance out vendor specific"},
     {0xffff, 0, NULL},
 };
 
 /* Sanitize [0x48] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {
-    {0x1, 0, "overwrite"},
-    {0x2, 0, "block erase"},
-    {0x3, 0, "cryptographic erase"},
-    {0x1f, 0, "exit failure mode"},
+    {0x1, PDT_ALL, "overwrite"},
+    {0x2, PDT_ALL, "block erase"},
+    {0x3, PDT_ALL, "cryptographic erase"},
+    {0x1f, PDT_ALL, "exit failure mode"},
     {0xffff, 0, NULL},
 };
 
 /* Service action in(12) [0xab] service actions */
 struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = {
-    {0x1, 0, "Read media serial number"},
+    {0x1, PDT_ALL, "Read media serial number"},
     {0xffff, 0, NULL},
 };
 
 /* Service action out(12) [0xa9] service actions */
 struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
     {0x1f, PDT_ADC, "Set medium attribute"},
-    {0xff, 0, "Impossible command name"},
+    {0xff, PDT_ALL, "Impossible command name"},
     {0xffff, 0, NULL},
 };
 
 /* Service action in(16) [0x9e] service actions */
 struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
-    {0xf, 0, "Receive binding report"}, /* added spc5r11 */
-    {0x10, 0, "Read capacity(16)"},
-    {0x11, 0, "Read long(16)"},         /* obsolete in SBC-4 r7 */
-    {0x12, 0, "Get LBA status(16)"},    /* 32 byte variant added in sbc4r14 */
-    {0x13, 0, "Report referrals"},
-    {0x14, 0, "Stream control"},
-    {0x15, 0, "Background control"},
-    {0x16, 0, "Get stream status"},
-    {0x17, 0, "Get physical element status"},   /* added sbc4r13 */
-    {0x18, 0, "Remove element and truncate"},   /* added sbc4r13 */
-    {0x19, 0, "Restore elements and rebuild"},  /* added sbc4r19 */
-    {0x1a, 0, "Remove element and modify zones"},   /* added zbc2r07 */
+    {0xf, PDT_ALL, "Receive binding report"}, /* added spc5r11 */
+    {0x10, PDT_ALL, "Read capacity(16)"},
+    {0x11, PDT_ALL, "Read long(16)"},         /* obsolete in SBC-4 r7 */
+    {0x12, PDT_ALL, "Get LBA status(16)"},/* also 32 byte variant sbc4r14 */
+    {0x13, PDT_ALL, "Report referrals"},
+    {0x14, PDT_ALL, "Stream control"},
+    {0x15, PDT_ALL, "Background control"},
+    {0x16, PDT_ALL, "Get stream status"},
+    {0x17, PDT_ALL, "Get physical element status"},   /* added sbc4r13 */
+    {0x18, PDT_ALL, "Remove element and truncate"},   /* added sbc4r13 */
+    {0x19, PDT_ALL, "Restore elements and rebuild"},  /* added sbc4r19 */
+    {0x1a, PDT_ALL, "Remove element and modify zones"},   /* added zbc2r07 */
     {0xffff, 0, NULL},
 };
 
 /* Service action out(16) [0x9f] service actions */
 struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
-    {0x0b, 0, "Test bind"},             /* added spc5r13 */
-    {0x0c, 0, "Prepare bind report"},   /* added spc5r11 */
-    {0x0d, 0, "Set affiliation"},
-    {0x0e, 0, "Bind"},
-    {0x0f, 0, "Unbind"},
-    {0x11, 0, "Write long(16)"},
-    {0x12, 0, "Write scattered(16)"},   /* added sbc4r11 */
-    {0x14, PDT_ZBC, "Reset write pointer"},
+    {0x0b, PDT_ALL, "Test bind"},             /* added spc5r13 */
+    {0x0c, PDT_ALL, "Prepare bind report"},   /* added spc5r11 */
+    {0x0d, PDT_ALL, "Set affiliation"},
+    {0x0e, PDT_ALL, "Bind"},
+    {0x0f, PDT_ALL, "Unbind"},
+    {0x11, PDT_ALL, "Write long(16)"},
+    {0x12, PDT_ALL, "Write scattered(16)"},   /* added sbc4r11 */
+    {0x14, PDT_DISK_ZBC, "Reset write pointer"},
     {0x1f, PDT_ADC, "Notify data transfer device(16)"},
     {0xffff, 0, NULL},
 };
@@ -405,24 +405,24 @@ struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = {
 
 /* Persistent reserve in [0x5e] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
-    {0x0, 0, "read keys"},
-    {0x1, 0, "read reservation"},
-    {0x2, 0, "report capabilities"},
-    {0x3, 0, "read full status"},
+    {0x0, PDT_ALL, "read keys"},
+    {0x1, PDT_ALL, "read reservation"},
+    {0x2, PDT_ALL, "report capabilities"},
+    {0x3, PDT_ALL, "read full status"},
     {0xffff, 0, NULL},
 };
 
 /* Persistent reserve out [0x5f] service actions, need prefix */
 struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
-    {0x0, 0, "register"},
-    {0x1, 0, "reserve"},
-    {0x2, 0, "release"},
-    {0x3, 0, "clear"},
-    {0x4, 0, "preempt"},
-    {0x5, 0, "preempt and abort"},
-    {0x6, 0, "register and ignore existing key"},
-    {0x7, 0, "register and move"},
-    {0x8, 0, "replace lost reservation"},
+    {0x0, PDT_ALL, "register"},
+    {0x1, PDT_ALL, "reserve"},
+    {0x2, PDT_ALL, "release"},
+    {0x3, PDT_ALL, "clear"},
+    {0x4, PDT_ALL, "preempt"},
+    {0x5, PDT_ALL, "preempt and abort"},
+    {0x6, PDT_ALL, "register and ignore existing key"},
+    {0x7, PDT_ALL, "register and move"},
+    {0x8, PDT_ALL, "replace lost reservation"},
     {0xffff, 0, NULL},
 };
 
@@ -432,12 +432,12 @@ struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
  * LID1 discontinued (references back to SPC-4) and "(LID4)" suffix removed
  * as there is no need to differentiate. */
 struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {    /* originating */
-    {0x0, 0, "Extended copy(LID1)"},
-    {0x1, 0, "Extended copy"},          /* was 'Extended copy(LID4)' */
-    {0x10, 0, "Populate token"},
-    {0x11, 0, "Write using token"},
-    {0x16, 1, "Set tape stream mirroring"},     /* ADC-4 and SSC-5 */
-    {0x1c, 0, "Copy operation abort"},
+    {0x0, PDT_ALL, "Extended copy(LID1)"},
+    {0x1, PDT_ALL, "Extended copy"},          /* was 'Extended copy(LID4)' */
+    {0x10, PDT_ALL, "Populate token"},
+    {0x11, PDT_ALL, "Write using token"},
+    {0x16, PDT_TAPE, "Set tape stream mirroring"},     /* ADC-4 and SSC-5 */
+    {0x1c, PDT_ALL, "Copy operation abort"},
     {0xffff, 0, NULL},
 };
 
@@ -445,124 +445,124 @@ struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {    /* originating */
  * Opcode 'Extended copy' was renamed 'Third party copy out' in spc4r34
  * LID4 is an abbreviation of List Identifier length of 4 bytes */
 struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* retrieve */
-    {0x0, 0, "Receive copy status(LID1)"},
-    {0x1, 0, "Receive copy data(LID1)"},
-    {0x3, 0, "Receive copy operating parameters"},
-    {0x4, 0, "Receive copy failure details(LID1)"},
-    {0x5, 0, "Receive copy status"},    /* was 'Receive copy status(LID4)' */
-    {0x6, 0, "Receive copy data"},      /* was 'Receive copy data(LID4)' */
-    {0x7, 0, "Receive ROD token information"},
-    {0x8, 0, "Report all ROD tokens"},
-    {0x16, 1, "Report tape stream mirroring"},  /* SSC-5 */
+    {0x0, PDT_ALL, "Receive copy status(LID1)"},
+    {0x1, PDT_ALL, "Receive copy data(LID1)"},
+    {0x3, PDT_ALL, "Receive copy operating parameters"},
+    {0x4, PDT_ALL, "Receive copy failure details(LID1)"},
+    {0x5, PDT_ALL, "Receive copy status"},/* was: Receive copy status(LID4) */
+    {0x6, PDT_ALL, "Receive copy data"},  /* was: Receive copy data(LID4) */
+    {0x7, PDT_ALL, "Receive ROD token information"},
+    {0x8, PDT_ALL, "Report all ROD tokens"},
+    {0x16, PDT_TAPE, "Report tape stream mirroring"},  /* SSC-5 */
     {0xffff, 0, NULL},
 };
 
 /* Variable length cdb [0x7f] service actions (more than 16 bytes long) */
 struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
-    {0x1, 0, "Rebuild(32)"},
-    {0x2, 0, "Regenerate(32)"},
-    {0x3, 0, "Xdread(32)"},             /* obsolete in SBC-3 r31 */
-    {0x4, 0, "Xdwrite(32)"},            /* obsolete in SBC-3 r31 */
-    {0x5, 0, "Xdwrite extended(32)"},   /* obsolete in SBC-4 r15 */
-    {0x6, 0, "Xpwrite(32)"},            /* obsolete in SBC-4 r15 */
-    {0x7, 0, "Xdwriteread(32)"},        /* obsolete in SBC-4 r15 */
-    {0x8, 0, "Xdwrite extended(64)"},   /* obsolete in SBC-4 r15 */
-    {0x9, 0, "Read(32)"},
-    {0xa, 0, "Verify(32)"},
-    {0xb, 0, "Write(32)"},
-    {0xc, 0, "Write and verify(32)"},
-    {0xd, 0, "Write same(32)"},
-    {0xe, 0, "Orwrite(32)"},            /* added sbc3r25 */
-    {0xf, 0, "Atomic write(32)"},       /* added sbc4r02 */
-    {0x10, 0, "Write stream(32)"},      /* added sbc4r07 */
-    {0x11, 0, "Write scattered(32)"},   /* added sbc4r11 */
-    {0x12, 0, "Get LBA status(32)"},    /* added sbc4r14 */
-    {0x1800, 0, "Receive credential"},
-    {0x1ff0, 0, "ATA pass-through(32)"},/* added sat4r05 */
-    {0x8801, 0, "Format OSD (osd)"},
-    {0x8802, 0, "Create (osd)"},
-    {0x8803, 0, "List (osd)"},
-    {0x8805, 0, "Read (osd)"},
-    {0x8806, 0, "Write (osd)"},
-    {0x8807, 0, "Append (osd)"},
-    {0x8808, 0, "Flush (osd)"},
-    {0x880a, 0, "Remove (osd)"},
-    {0x880b, 0, "Create partition (osd)"},
-    {0x880c, 0, "Remove partition (osd)"},
-    {0x880e, 0, "Get attributes (osd)"},
-    {0x880f, 0, "Set attributes (osd)"},
-    {0x8812, 0, "Create and write (osd)"},
-    {0x8815, 0, "Create collection (osd)"},
-    {0x8816, 0, "Remove collection (osd)"},
-    {0x8817, 0, "List collection (osd)"},
-    {0x8818, 0, "Set key (osd)"},
-    {0x8819, 0, "Set master key (osd)"},
-    {0x881a, 0, "Flush collection (osd)"},
-    {0x881b, 0, "Flush partition (osd)"},
-    {0x881c, 0, "Flush OSD (osd)"},
-    {0x8880, 0, "Object structure check (osd-2)"},
-    {0x8881, 0, "Format OSD (osd-2)"},
-    {0x8882, 0, "Create (osd-2)"},
-    {0x8883, 0, "List (osd-2)"},
-    {0x8884, 0, "Punch (osd-2)"},
-    {0x8885, 0, "Read (osd-2)"},
-    {0x8886, 0, "Write (osd-2)"},
-    {0x8887, 0, "Append (osd-2)"},
-    {0x8888, 0, "Flush (osd-2)"},
-    {0x8889, 0, "Clear (osd-2)"},
-    {0x888a, 0, "Remove (osd-2)"},
-    {0x888b, 0, "Create partition (osd-2)"},
-    {0x888c, 0, "Remove partition (osd-2)"},
-    {0x888e, 0, "Get attributes (osd-2)"},
-    {0x888f, 0, "Set attributes (osd-2)"},
-    {0x8892, 0, "Create and write (osd-2)"},
-    {0x8895, 0, "Create collection (osd-2)"},
-    {0x8896, 0, "Remove collection (osd-2)"},
-    {0x8897, 0, "List collection (osd-2)"},
-    {0x8898, 0, "Set key (osd-2)"},
-    {0x8899, 0, "Set master key (osd-2)"},
-    {0x889a, 0, "Flush collection (osd-2)"},
-    {0x889b, 0, "Flush partition (osd-2)"},
-    {0x889c, 0, "Flush OSD (osd-2)"},
-    {0x88a0, 0, "Query (osd-2)"},
-    {0x88a1, 0, "Remove member objects (osd-2)"},
-    {0x88a2, 0, "Get member attributes (osd-2)"},
-    {0x88a3, 0, "Set member attributes (osd-2)"},
-    {0x88b1, 0, "Read map (osd-2)"},
-    {0x8f7c, 0, "Perform SCSI command (osd-2)"},
-    {0x8f7d, 0, "Perform task management function (osd-2)"},
-    {0x8f7e, 0, "Perform SCSI command (osd)"},
-    {0x8f7f, 0, "Perform task management function (osd)"},
+    {0x1, PDT_ALL, "Rebuild(32)"},
+    {0x2, PDT_ALL, "Regenerate(32)"},
+    {0x3, PDT_ALL, "Xdread(32)"},             /* obsolete in SBC-3 r31 */
+    {0x4, PDT_ALL, "Xdwrite(32)"},            /* obsolete in SBC-3 r31 */
+    {0x5, PDT_ALL, "Xdwrite extended(32)"},   /* obsolete in SBC-4 r15 */
+    {0x6, PDT_ALL, "Xpwrite(32)"},            /* obsolete in SBC-4 r15 */
+    {0x7, PDT_ALL, "Xdwriteread(32)"},        /* obsolete in SBC-4 r15 */
+    {0x8, PDT_ALL, "Xdwrite extended(64)"},   /* obsolete in SBC-4 r15 */
+    {0x9, PDT_ALL, "Read(32)"},
+    {0xa, PDT_ALL, "Verify(32)"},
+    {0xb, PDT_ALL, "Write(32)"},
+    {0xc, PDT_ALL, "Write and verify(32)"},
+    {0xd, PDT_ALL, "Write same(32)"},
+    {0xe, PDT_ALL, "Orwrite(32)"},            /* added sbc3r25 */
+    {0xf, PDT_ALL, "Atomic write(32)"},       /* added sbc4r02 */
+    {0x10, PDT_ALL, "Write stream(32)"},      /* added sbc4r07 */
+    {0x11, PDT_ALL, "Write scattered(32)"},   /* added sbc4r11 */
+    {0x12, PDT_ALL, "Get LBA status(32)"},    /* added sbc4r14 */
+    {0x1800, PDT_ALL, "Receive credential"},
+    {0x1ff0, PDT_ALL, "ATA pass-through(32)"},/* added sat4r05 */
+    {0x8801, PDT_ALL, "Format OSD (osd)"},
+    {0x8802, PDT_ALL, "Create (osd)"},
+    {0x8803, PDT_ALL, "List (osd)"},
+    {0x8805, PDT_ALL, "Read (osd)"},
+    {0x8806, PDT_ALL, "Write (osd)"},
+    {0x8807, PDT_ALL, "Append (osd)"},
+    {0x8808, PDT_ALL, "Flush (osd)"},
+    {0x880a, PDT_ALL, "Remove (osd)"},
+    {0x880b, PDT_ALL, "Create partition (osd)"},
+    {0x880c, PDT_ALL, "Remove partition (osd)"},
+    {0x880e, PDT_ALL, "Get attributes (osd)"},
+    {0x880f, PDT_ALL, "Set attributes (osd)"},
+    {0x8812, PDT_ALL, "Create and write (osd)"},
+    {0x8815, PDT_ALL, "Create collection (osd)"},
+    {0x8816, PDT_ALL, "Remove collection (osd)"},
+    {0x8817, PDT_ALL, "List collection (osd)"},
+    {0x8818, PDT_ALL, "Set key (osd)"},
+    {0x8819, PDT_ALL, "Set master key (osd)"},
+    {0x881a, PDT_ALL, "Flush collection (osd)"},
+    {0x881b, PDT_ALL, "Flush partition (osd)"},
+    {0x881c, PDT_ALL, "Flush OSD (osd)"},
+    {0x8880, PDT_ALL, "Object structure check (osd-2)"},
+    {0x8881, PDT_ALL, "Format OSD (osd-2)"},
+    {0x8882, PDT_ALL, "Create (osd-2)"},
+    {0x8883, PDT_ALL, "List (osd-2)"},
+    {0x8884, PDT_ALL, "Punch (osd-2)"},
+    {0x8885, PDT_ALL, "Read (osd-2)"},
+    {0x8886, PDT_ALL, "Write (osd-2)"},
+    {0x8887, PDT_ALL, "Append (osd-2)"},
+    {0x8888, PDT_ALL, "Flush (osd-2)"},
+    {0x8889, PDT_ALL, "Clear (osd-2)"},
+    {0x888a, PDT_ALL, "Remove (osd-2)"},
+    {0x888b, PDT_ALL, "Create partition (osd-2)"},
+    {0x888c, PDT_ALL, "Remove partition (osd-2)"},
+    {0x888e, PDT_ALL, "Get attributes (osd-2)"},
+    {0x888f, PDT_ALL, "Set attributes (osd-2)"},
+    {0x8892, PDT_ALL, "Create and write (osd-2)"},
+    {0x8895, PDT_ALL, "Create collection (osd-2)"},
+    {0x8896, PDT_ALL, "Remove collection (osd-2)"},
+    {0x8897, PDT_ALL, "List collection (osd-2)"},
+    {0x8898, PDT_ALL, "Set key (osd-2)"},
+    {0x8899, PDT_ALL, "Set master key (osd-2)"},
+    {0x889a, PDT_ALL, "Flush collection (osd-2)"},
+    {0x889b, PDT_ALL, "Flush partition (osd-2)"},
+    {0x889c, PDT_ALL, "Flush OSD (osd-2)"},
+    {0x88a0, PDT_ALL, "Query (osd-2)"},
+    {0x88a1, PDT_ALL, "Remove member objects (osd-2)"},
+    {0x88a2, PDT_ALL, "Get member attributes (osd-2)"},
+    {0x88a3, PDT_ALL, "Set member attributes (osd-2)"},
+    {0x88b1, PDT_ALL, "Read map (osd-2)"},
+    {0x8f7c, PDT_ALL, "Perform SCSI command (osd-2)"},
+    {0x8f7d, PDT_ALL, "Perform task management function (osd-2)"},
+    {0x8f7e, PDT_ALL, "Perform SCSI command (osd)"},
+    {0x8f7f, PDT_ALL, "Perform task management function (osd)"},
     {0xffff, 0, NULL},
 };
 
 /* Zoning out [0x94] service actions */
 struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
-    {0x1, PDT_ZBC, "Close zone"},
-    {0x2, PDT_ZBC, "Finish zone"},
-    {0x3, PDT_ZBC, "Open zone"},
-    {0x4, PDT_ZBC, "Reset write pointer"},
-    {0x10, PDT_ZBC, "Sequentialize zone"},      /* zbc2r01b */
+    {0x1, PDT_DISK_ZBC, "Close zone"},
+    {0x2, PDT_DISK_ZBC, "Finish zone"},
+    {0x3, PDT_DISK_ZBC, "Open zone"},
+    {0x4, PDT_DISK_ZBC, "Reset write pointer"},
+    {0x10, PDT_DISK_ZBC, "Sequentialize zone"},      /* zbc2r01b */
     {0xffff, 0, NULL},
 };
 
 /* Zoning in [0x95] service actions */
 struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
-    {0x0, PDT_ZBC, "Report zones"},
-    {0x6, PDT_ZBC, "Report realms"},            /* zbc2r04 */
-    {0x7, PDT_ZBC, "Report zone domains"},      /* zbc2r04 */
-    {0x8, PDT_ZBC, "Zone activate"},            /* zbc2r04 */
-    {0x9, PDT_ZBC, "Zone query"},               /* zbc2r04 */
+    {0x0, PDT_DISK_ZBC, "Report zones"},
+    {0x6, PDT_DISK_ZBC, "Report realms"},            /* zbc2r04 */
+    {0x7, PDT_DISK_ZBC, "Report zone domains"},      /* zbc2r04 */
+    {0x8, PDT_DISK_ZBC, "Zone activate"},            /* zbc2r04 */
+    {0x9, PDT_DISK_ZBC, "Zone query"},               /* zbc2r04 */
     {0xffff, 0, NULL},
 };
 
 /* Read attribute [0x8c] service actions */
 struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
-    {0x0, 0, "attribute values"},
-    {0x1, 0, "attribute list"},
-    {0x2, 0, "logical volume list"},
-    {0x3, 0, "partition list"},
-    {0x5, 0, "supported attributes"},
+    {0x0, PDT_ALL, "attribute values"},
+    {0x1, PDT_ALL, "attribute list"},
+    {0x2, PDT_ALL, "logical volume list"},
+    {0x3, PDT_ALL, "partition list"},
+    {0x5, PDT_ALL, "supported attributes"},
     {0xffff, 0, NULL},
 };
 
@@ -1554,9 +1554,9 @@ struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
     {SCSI_FS_SBC_BASE_2016, PDT_DISK, "SBC Base 2016"},
     {SCSI_FS_SBC_BASIC_PROV_2016, PDT_DISK, "Basic provisioning 2016"},
     {SCSI_FS_SBC_DRIVE_MAINT_2016, PDT_DISK, "Drive maintenance 2016"},
-    {SCSI_FS_ZBC_HOST_AWARE_2020, PDT_ZBC, "Host Aware 2020"},
-    {SCSI_FS_ZBC_HOST_MANAGED_2020, PDT_ZBC, "Host Managed 2020"},
-    {SCSI_FS_ZBC_DOMAINS_REALMS_2020, PDT_ZBC, "Domains and Realms 2020"},
+    {SCSI_FS_ZBC_HOST_AWARE_2020, PDT_DISK_ZBC, "Host Aware 2020"},
+    {SCSI_FS_ZBC_HOST_MANAGED_2020, PDT_DISK_ZBC, "Host Managed 2020"},
+    {SCSI_FS_ZBC_DOMAINS_REALMS_2020, PDT_DISK_ZBC, "Domains and Realms 2020"},
     {0x0, 0, NULL},     /* 0x0 is reserved sfs; trailing sentinel */
 };
 
