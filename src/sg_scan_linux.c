@@ -452,7 +452,7 @@ int sg3_inq(int sg_fd, uint8_t * inqBuff, bool do_extra)
         printf("    %.8s  %.16s  %.4s ", p + 8, p + 16, p + 32);
         printf("[rmb=%d cmdq=%d pqual=%d pdev=0x%x] ",
                !!(p[1] & 0x80), !!(p[7] & 2), (p[0] & 0xe0) >> 5,
-               (p[0] & 0x1f));
+               (p[0] & PDT_MASK));
         if (do_extra && sg_io)
             printf("dur=%ums\n", io_hdr.duration);
         else

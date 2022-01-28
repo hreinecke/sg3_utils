@@ -504,7 +504,7 @@ std_inq_decode(uint8_t * b, int len, int verbose)
     else
         printf(" [reserved or vendor specific qualifier [%d]]\n", pqual);
     printf("  PQual=%d  PDT=%d  RMB=%d  LU_CONG=%d  hot_pluggable=%d  "
-           "version=0x%02x ", pqual, b[0] & 0x1f, !!(b[1] & 0x80),
+           "version=0x%02x ", pqual, b[0] & PDT_MASK, !!(b[1] & 0x80),
                !!(b[1] & 0x40), (b[1] >> 4) & 0x3, (unsigned int)b[2]);
     printf(" [%s]\n", sg_ansi_version_arr[b[2] & 0xf]);
     printf("  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
@@ -1308,8 +1308,8 @@ decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op)
         else if (bp[2] >= 0x20)
             printf("Reserved [0x%x]\n", bp[2]);
         else
-            printf("%s [0x%x]\n", sg_get_pdt_str(0x1f & bp[2], sizeof(b), b),
-                   bp[2]);
+            printf("%s [0x%x]\n",
+                   sg_get_pdt_str(PDT_MASK & bp[2], sizeof(b), b), bp[2]);
         printf("    Vendor_identification: %.8s\n", bp + 4);
         printf("    Product_identification: %.16s\n", bp + 12);
         printf("    Product_revision_level: %.4s\n", bp + 28);
@@ -2562,11 +2562,11 @@ decode_zbdch_vpd(uint8_t * b, int len, int do_hex)
         return;
     }
     printf("  Peripheral device type: %s\n",
-           sg_get_pdt_str(0x1f & b[0], sizeof(d), d));
+           sg_get_pdt_str(PDT_MASK & b[0], sizeof(d), d));
     printf("  Zoned block device extension: ");
     switch ((b[4] >> 4) & 0xf) {
     case 0:
-        if (PDT_ZBC == (0x1f & b[0]))
+        if (PDT_ZBC == (PDT_MASK & b[0]))
             printf("host managed zoned block device [0, pdt=0x14]\n");
         else
             printf("not reported [0]\n");
@@ -2920,7 +2920,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             else if (op->do_hex)
                 hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -2967,7 +2967,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             else if (op->do_hex)
                 hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -2995,7 +2995,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             else if (op->do_hex)
                 hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3016,7 +3016,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3064,7 +3064,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
                     } else
                         protect = !!(sir.byte_5 & 0x1); /* SPC-3 and later */
                 }
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3085,7 +3085,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3106,7 +3106,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3136,7 +3136,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             else if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3157,7 +3157,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3193,7 +3193,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3216,7 +3216,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             else if (1 == op->do_hex)
                 hex2stdout(rp, len, 0);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3237,7 +3237,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rsp_buff[0] & 0x1f;
+                pdt = rsp_buff[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3258,7 +3258,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3279,7 +3279,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3292,7 +3292,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb0:  /* depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Block limits VPD page (SBC):";
@@ -3314,7 +3314,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3329,7 +3329,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb1:  /* depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Block device characteristics VPD page (SBC):";
@@ -3368,7 +3368,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb2:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Logical block provisioning VPD page (SBC):";
@@ -3401,7 +3401,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb3:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Referrals VPD page (SBC):";
@@ -3434,7 +3434,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb4:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Supported block lengths and protection types VPD page "
@@ -3468,7 +3468,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb5:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Block device characteristics extension VPD page (SBC):";
@@ -3501,7 +3501,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case VPD_ZBC_DEV_CHARS:       /* 0xb6 for both pdt=0 and pdt=0x14 */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Zoned block device characteristics VPD page (SBC, "
@@ -3532,7 +3532,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb7:
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Block limits extension VPD page (SBC):";
@@ -3548,7 +3548,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3563,7 +3563,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb8:          /* VPD_FORMAT_PRESETS */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Format presets VPD page (SBC):";
@@ -3579,7 +3579,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
@@ -3594,7 +3594,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
     case 0xb9:          /* VPD_CON_POS_RANGE */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Concurrent positioning ranges VPD page (SBC):";
@@ -3610,7 +3610,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & 0x1f;
+                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2018 Douglas Gilbert.
+ * Copyright (c) 2006-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -43,7 +43,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.22 (win32) 20181110";
+static const char * version_str = "1.23 (win32) 20220127";
 
 #define MAX_SCSI_ELEMS 4096
 #define MAX_ADAPTER_NUM 256
@@ -366,7 +366,7 @@ enum_scsi_adapters(void)
                         printf("%-15s", b);
                         snprintf(b, sizeof(b) - 1, "claimed=%d pdt=%xh %s ",
                                  pid->DeviceClaimed,
-                                 pid->InquiryData[0] % 0x3f,
+                                 pid->InquiryData[0] % PDT_MASK,
                                  ((0 == pid->InquiryData[4]) ? "dubious" :
                                                                ""));
                         printf("%-26s", b);

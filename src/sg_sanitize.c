@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2021 Douglas Gilbert.
+ * Copyright (c) 2011-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.17 20211114";
+static const char * version_str = "1.18 20220127";
 
 /* Not all environments support the Unix sleep() */
 #if defined(MSC_VER) || defined(__MINGW32__)
@@ -368,7 +368,7 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen, int verbose)
         n = SAFE_STD_INQ_RESP_LEN;
     memcpy(sinq_resp, b, (n < max_rlen) ? n : max_rlen);
     if (n == SAFE_STD_INQ_RESP_LEN) {
-        pdt = b[0] & 0x1f;
+        pdt = b[0] & PDT_MASK;
         printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
                (const char *)(b + 8), (const char *)(b + 16),
                (const char *)(b + 32),

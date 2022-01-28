@@ -62,6 +62,10 @@ extern "C" {
 #define PDT_ZBC 0x14    /* Zoned Block Commands (ZBC) */
 #define PDT_WLUN 0x1e   /* Well known logical unit (WLUN) */
 #define PDT_UNKNOWN 0x1f        /* Unknown or no device type */
+#define PDT_MASK 0x1f   /* For byte 0 of INQUIRY response */
+#define PDT_MAX 0x1f
+
+#define GRPNUM_MASK 0x3f
 
 /* ZBC disks use either PDT_ZBC (if 'host managed') or PDT_DISK .
  * So squeeze two PDTs into one integer. Use sg_pdt_s_eq() to compare.

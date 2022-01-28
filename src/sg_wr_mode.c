@@ -502,7 +502,7 @@ main(int argc, char * argv[])
     if (0 == sg_simple_inquiry(sg_fd, &inq_data, false, verbose))
         pdt = inq_data.peripheral_type;
     else
-        pdt = 0x1f;
+        pdt = PDT_UNKNOWN;
 
     /* do MODE SENSE to fetch current values */
     memset(ref_md, 0, MX_ALLOC_LEN);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021 Douglas Gilbert.
+ * Copyright (c) 2017-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.29 20211114";
+static const char * version_str = "1.30 20220127";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -160,7 +160,7 @@ struct opts_t {
                          * DLD0, bit 1 --> DLD1, bit 2 --> DLD2
                          * only WRITE(16) and WRITE SCATTERED(16) */
     int dry_run;        /* temporary write when used more than once */
-    int grpnum;         /* "Group Number", 0 to 0x3f */
+    int grpnum;         /* "Group Number", 0 to 0x3f (GRPNUM_MASK) */
     int help;
     int pi_type;        /* -1: unknown: 0: type 0 (none): 1: type 1 */
     int strict;         /* > 0, report then exit on questionable meta data */
@@ -1062,10 +1062,10 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
     if (16 == cdb_len) {
         if (! op->do_scattered)
             sg_put_unaligned_be64(op->lba, x_cdb + 2);
-        x_cdb[14] = (op->grpnum & 0x1f);
+        x_cdb[14] = (op->grpnum & GRPNUM_MASK);
     } else {
         x_cdb[0] = VARIABLE_LEN_OP;
-        x_cdb[6] = (op->grpnum & 0x1f);
+        x_cdb[6] = (op->grpnum & GRPNUM_MASK);
         x_cdb[7] = WRITE_X_32_ADD;
         if (! op->do_scattered)
             sg_put_unaligned_be64(op->lba, x_cdb + 12);

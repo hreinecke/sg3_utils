@@ -1,5 +1,5 @@
 /*
-*  Copyright (c) 2012-2021, Kaminario Technologies LTD
+*  Copyright (c) 2012-2022, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -56,7 +56,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.31 20211114";
+static const char * version_str = "1.32 20220127";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -339,7 +339,7 @@ sg_build_scsi_cdb(uint8_t * cdbp, unsigned int blocks,
         sg_put_unaligned_be64((uint64_t)start_block, cdbp + 2);
         /* cdbp[10-12] are reserved */
         cdbp[13] = (uint8_t)(blocks & 0xff);
-        cdbp[14] = (uint8_t)(flags.group & 0x1f);
+        cdbp[14] = (uint8_t)(flags.group & GRPNUM_MASK);
         return 0;
 }
 

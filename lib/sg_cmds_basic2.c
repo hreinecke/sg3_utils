@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2021 Douglas Gilbert.
+ * Copyright (c) 1999-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -101,7 +101,7 @@ sg_ll_sync_cache_10(int sg_fd, bool sync_nv, bool immed, int group,
     if (immed)
         sc_cdb[1] |= 2;
     sg_put_unaligned_be32((uint32_t)lba, sc_cdb + 2);
-    sc_cdb[6] = group & 0x1f;
+    sc_cdb[6] = group & GRPNUM_MASK;
     if (count > 0xffff) {
         pr2ws("count too big\n");
         return -1;

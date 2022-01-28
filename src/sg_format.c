@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2021  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2022  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.64 20211114";
+static const char * version_str = "1.65 20220127";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -909,7 +909,7 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
                 n = SAFE_STD_INQ_RESP_LEN;
         memcpy(sinq_resp, b, (n < max_rlen) ? n : max_rlen);
         if (n == SAFE_STD_INQ_RESP_LEN) {
-                pdt = b[0] & 0x1f;
+                pdt = b[0] & PDT_MASK;
                 printf("    %.8s  %.16s  %.4s   peripheral_type: %s [0x%x]\n",
                        (const char *)(b + 8), (const char *)(b + 16),
                        (const char *)(b + 32),
@@ -1586,7 +1586,7 @@ main(int argc, char **argv)
                 } else
                         goto out;
         } else
-                pdt = 0x1f & inq_resp[0];
+                pdt = PDT_MASK & inq_resp[0];
         if (op->format) {
                 if ((PDT_DISK != pdt) && (PDT_OPTICAL != pdt) &&
                     (PDT_RBC != pdt)) {

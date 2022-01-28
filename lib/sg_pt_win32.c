@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2021 Douglas Gilbert.
+ * Copyright (c) 2006-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -133,7 +133,7 @@ struct sg_pt_handle {
     int bus;            /* a.k.a. PathId in MS docs */
     int target;
     int lun;
-    int scsi_pdt;       /* Peripheral Device Type, -1 if not known */
+    int scsi_pdt;       /* Peripheral Device Type, PDT_ALL if not known */
     // uint32_t nvme_nsid;      /* how do we find this given file handle ?? */
     int verbose;        /* tunnel verbose through to scsi_pt_close_device */
     char dname[20];
@@ -436,7 +436,7 @@ scsi_pt_open_flags(const char * device_name, int flags, int vb)
     shp->bus = bus;
     shp->target = target;
     shp->lun = lun;
-    shp->scsi_pdt = -1;
+    shp->scsi_pdt = PDT_ALL;
     shp->verbose = vb;
     memset(shp->adapter, 0, sizeof(shp->adapter));
     memcpy(shp->adapter, "\\\\.\\", 4);
@@ -548,7 +548,7 @@ get_scsi_pdt(struct sg_pt_handle *shp, int vb)
                 if ((shp->bus == pid->PathId) &&
                     (shp->target == pid->TargetId) &&
                     (shp->lun == pid->Lun)) {   /* got match */
-                    shp->scsi_pdt = pid->InquiryData[0] & 0x3f;
+                    shp->scsi_pdt = pid->InquiryData[0] & PDT_MASK;
                     shp->not_claimed = ! pid->DeviceClaimed;
                     shp->checked_handle = true;
                     shp->bus_type_failed = false;
@@ -2443,7 +2443,7 @@ sntl_inq(struct sg_pt_win32_scsi * psp, struct sg_pt_handle * shp,
         }
     } else {            /* Standard INQUIRY response */
         /* pdt=0 --> disk; pdt=0xd --> SES; pdt=3 --> processor (safte) */
-        inq_dout[0] = (0x1f & shp->dev_stat.pdt);  /* (PQ=0)<<5 */
+        inq_dout[0] = (PDT_MASK & shp->dev_stat.pdt);  /* (PQ=0)<<5 */
         /* inq_dout[1] = (RMD=0)<<7 | (LU_CONG=0)<<6; rest reserved */
         inq_dout[2] = 6;   /* version: SPC-4 */
         inq_dout[3] = 2;   /* NORMACA=0, HISUP=0, response data format: 2 */

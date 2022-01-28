@@ -586,7 +586,7 @@ sg_get_sense_progress_fld(const uint8_t * sbp, int sb_len,
 char *
 sg_get_pdt_str(int pdt, int buff_len, char * buff)
 {
-    if ((pdt < 0) || (pdt > 31))
+    if ((pdt < 0) || (pdt > PDT_MAX))
         sg_scnpr(buff, buff_len, "bad pdt");
     else
         sg_scnpr(buff, buff_len, "%s", sg_lib_pdt_strs[pdt]);
@@ -623,7 +623,7 @@ sg_pdt_s_eq(int l_pdt_s, int r_pdt_s)
 int
 sg_lib_pdt_decay(int pdt)
 {
-    if ((pdt < 0) || (pdt > 31))
+    if ((pdt < 0) || (pdt > PDT_MAX))
         return 0;
     return sg_lib_pdt_decay_arr[pdt];
 }
@@ -2329,33 +2329,34 @@ sg_get_command_name(const uint8_t * cdbp, int peri_type, int buff_len,
 
 struct op_code2sa_t {
     int op_code;
-    int pdt_match;      /* -1->all; 0->disk,ZBC,RCB, 1->tape+adc+smc */
+    int pdt_s;
     struct sg_lib_value_name_t * arr;
     const char * prefix;
 };
 
 static struct op_code2sa_t op_code2sa_arr[] = {
-    {SG_VARIABLE_LENGTH_CMD, -1, sg_lib_variable_length_arr, NULL},
-    {SG_MAINTENANCE_IN, -1, sg_lib_maint_in_arr, NULL},
-    {SG_MAINTENANCE_OUT, -1, sg_lib_maint_out_arr, NULL},
-    {SG_SERVICE_ACTION_IN_12, -1, sg_lib_serv_in12_arr, NULL},
-    {SG_SERVICE_ACTION_OUT_12, -1, sg_lib_serv_out12_arr, NULL},
-    {SG_SERVICE_ACTION_IN_16, -1, sg_lib_serv_in16_arr, NULL},
-    {SG_SERVICE_ACTION_OUT_16, -1, sg_lib_serv_out16_arr, NULL},
-    {SG_SERVICE_ACTION_BIDI, -1, sg_lib_serv_bidi_arr, NULL},
-    {SG_PERSISTENT_RESERVE_IN, -1, sg_lib_pr_in_arr, "Persistent reserve in"},
-    {SG_PERSISTENT_RESERVE_OUT, -1, sg_lib_pr_out_arr,
+    {SG_VARIABLE_LENGTH_CMD, PDT_ALL, sg_lib_variable_length_arr, NULL},
+    {SG_MAINTENANCE_IN, PDT_ALL, sg_lib_maint_in_arr, NULL},
+    {SG_MAINTENANCE_OUT, PDT_ALL, sg_lib_maint_out_arr, NULL},
+    {SG_SERVICE_ACTION_IN_12, PDT_ALL, sg_lib_serv_in12_arr, NULL},
+    {SG_SERVICE_ACTION_OUT_12, PDT_ALL, sg_lib_serv_out12_arr, NULL},
+    {SG_SERVICE_ACTION_IN_16, PDT_ALL, sg_lib_serv_in16_arr, NULL},
+    {SG_SERVICE_ACTION_OUT_16, PDT_ALL, sg_lib_serv_out16_arr, NULL},
+    {SG_SERVICE_ACTION_BIDI, PDT_ALL, sg_lib_serv_bidi_arr, NULL},
+    {SG_PERSISTENT_RESERVE_IN, PDT_ALL, sg_lib_pr_in_arr,
+     "Persistent reserve in"},
+    {SG_PERSISTENT_RESERVE_OUT, PDT_ALL, sg_lib_pr_out_arr,
      "Persistent reserve out"},
-    {SG_3PARTY_COPY_OUT, -1, sg_lib_xcopy_sa_arr, NULL},
-    {SG_3PARTY_COPY_IN, -1, sg_lib_rec_copy_sa_arr, NULL},
-    {SG_READ_BUFFER, -1, sg_lib_read_buff_arr, "Read buffer(10)"},
-    {SG_READ_BUFFER_16, -1, sg_lib_read_buff_arr, "Read buffer(16)"},
-    {SG_READ_ATTRIBUTE, -1, sg_lib_read_attr_arr, "Read attribute"},
-    {SG_READ_POSITION, 1, sg_lib_read_pos_arr, "Read position"},
-    {SG_SANITIZE, 0, sg_lib_sanitize_sa_arr, "Sanitize"},
-    {SG_WRITE_BUFFER, -1, sg_lib_write_buff_arr, "Write buffer"},
-    {SG_ZONING_IN, 0, sg_lib_zoning_in_arr, NULL},
-    {SG_ZONING_OUT, 0, sg_lib_zoning_out_arr, NULL},
+    {SG_3PARTY_COPY_OUT, PDT_ALL, sg_lib_xcopy_sa_arr, NULL},
+    {SG_3PARTY_COPY_IN, PDT_ALL, sg_lib_rec_copy_sa_arr, NULL},
+    {SG_READ_BUFFER, PDT_ALL, sg_lib_read_buff_arr, "Read buffer(10)"},
+    {SG_READ_BUFFER_16, PDT_ALL, sg_lib_read_buff_arr, "Read buffer(16)"},
+    {SG_READ_ATTRIBUTE, PDT_ALL, sg_lib_read_attr_arr, "Read attribute"},
+    {SG_READ_POSITION, PDT_TAPE, sg_lib_read_pos_arr, "Read position"},
+    {SG_SANITIZE, PDT_DISK_ZBC, sg_lib_sanitize_sa_arr, "Sanitize"},
+    {SG_WRITE_BUFFER, PDT_ALL, sg_lib_write_buff_arr, "Write buffer"},
+    {SG_ZONING_IN, PDT_DISK_ZBC, sg_lib_zoning_in_arr, NULL},
+    {SG_ZONING_OUT, PDT_DISK_ZBC, sg_lib_zoning_out_arr, NULL},
     {0xffff, -1, NULL, NULL},
 };
 
@@ -2380,7 +2381,7 @@ sg_get_opcode_sa_name(uint8_t cmd_byte0, int service_action,
     d_pdt = sg_lib_pdt_decay(peri_type);
     for (osp = op_code2sa_arr; osp->arr; ++osp) {
         if ((int)cmd_byte0 == osp->op_code) {
-            if ((osp->pdt_match < 0) || (d_pdt == osp->pdt_match)) {
+            if (sg_pdt_s_eq(osp->pdt_s, d_pdt)) {
                 vnp = get_value_name(osp->arr, service_action, peri_type);
                 if (vnp) {
                     if (osp->prefix)
@@ -2562,7 +2563,7 @@ sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len, char * buff,
             *foundp = false;
         return NULL;
     }
-    my_pdt = ((peri_type < -1) || (peri_type > 0x1f)) ? -2 : peri_type;
+    my_pdt = ((peri_type < -1) || (peri_type > PDT_MAX)) ? -2 : peri_type;
     vnp = get_value_name(sg_lib_scsi_feature_sets, sfs_code, my_pdt);
     if (vnp && (-2 != my_pdt)) {
         if (! sg_pdt_s_eq(my_pdt, vnp->peri_dev_type))
@@ -2866,7 +2867,6 @@ dStrHexFp(const char* str, int len, int no_ascii, FILE * fp)
     int bpos = bpstart;
     int i, k, blen;
 
-fprintf(stderr, "%s: no_ascii=%d\n", __func__, no_ascii);
     if (len <= 0)
         return;
     blen = (int)sizeof(buff);

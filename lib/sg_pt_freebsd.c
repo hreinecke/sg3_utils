@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2021 Douglas Gilbert.
+ * Copyright (c) 2005-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.46 20210912 */
+/* sg_pt_freebsd version 1.47 20220127 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1852,7 +1852,7 @@ sntl_inq(struct sg_pt_freebsd_scsi * ptp, const uint8_t * cdbp, int time_secs,
         }
     } else {            /* Standard INQUIRY response */
         /* pdt=0 --> disk; pdt=0xd --> SES; pdt=3 --> processor (safte) */
-        inq_dout[0] = (0x1f & fdc_p->dev_stat.pdt);  /* (PQ=0)<<5 */
+        inq_dout[0] = (PDT_MASK & fdc_p->dev_stat.pdt);  /* (PQ=0)<<5 */
         /* inq_dout[1] = (RMD=0)<<7 | (LU_CONG=0)<<6; rest reserved */
         inq_dout[2] = 6;   /* version: SPC-4 */
         inq_dout[3] = 2;   /* NORMACA=0, HISUP=0, response data format: 2 */

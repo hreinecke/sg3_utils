@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2021 D. Gilbert
+ *  Copyright (C) 2004-2022 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.72 20211221";    /* spc6r05 */
+static const char * version_str = "0.73 20220127";    /* spc6r06 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -393,7 +393,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 n = sg_get_num(optarg);
             else if ((2 == strlen(optarg)) && (0 == strcmp("-1", optarg)))
                 n = -1;
-            if ((n < -1) || (n > 0x1f)) {
+            if ((n < -1) || (n > PDT_MAX)) {
                 pr2serr("bad argument to '--pdt=DT', expect -1 to 31\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -539,7 +539,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 op->opcode = n;
             } else if (0 == strncmp("p=", cp, 2)) {
                 num = sscanf(cp + 2, "%d", &n);
-                if ((1 != num) || (n > 0x1f) || (n < -1)) {
+                if ((1 != num) || (n > PDT_MAX) || (n < -1)) {
                     pr2serr("Bad number after 'p=' option, expect -1 to "
                             "31\n");
                     return SG_LIB_SYNTAX_ERROR;

@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.92 20220114";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.93 20220127";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -5046,6 +5046,7 @@ static bool
 show_zoned_block_dev_stats(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
+    bool trunc, bad_pl;
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -5055,8 +5056,12 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
+        trunc = false;
+        bad_pl = false;
         pc = sg_get_unaligned_be16(bp + 0);
         pl = bp[3] + 4;
+        if (4 == pl)    /* DC HC560 has empty descriptors */
+            goto skip;
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
@@ -5070,166 +5075,135 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
         }
         switch (pc) {
         case 0x0:
-            printf("  Maximum open zones:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Maximum open zones: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x1:
-            printf("  Maximum explicitly open zones:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Maximum explicitly open zones: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x2:
-            printf("  Maximum implicitly open zones:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Maximum implicitly open zones: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x3:
-            printf("  Minimum empty zones:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Minimum empty zones: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x4:
-            printf("  Maximum non-sequential zones:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Maximum non-sequential zones: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x5:
-            printf("  Zones emptied:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Zones emptied: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x6:
-            printf("  Suboptimal write commands:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Suboptimal write commands: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x7:
-            printf("  Commands exceeding optimal limit:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Commands exceeding optimal limit: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x8:
-            printf("  Failed explicit opens:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Failed explicit opens: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0x9:
-            printf("  Read rule violations:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Read rule violations: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0xa:
-            printf("  Write rule violations:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Write rule violations: %" PRIu32 "\n",
+                       sg_get_unaligned_be32(bp + 8));
             break;
         case 0xb:       /* added zbc2r04 */
-            printf("  Maximum implicitly open or before required zones:");
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
-                    pr2serr("\n    truncated by response length, expected "
-                            "at least 8 bytes\n");
+                    trunc = true;
                 else
-                    pr2serr("\n    parameter length >= 8 expected, got %d\n",
-                            pl);
-                break;
-            }
-            printf(" %" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
+                    bad_pl = true;
+            } else
+                printf("  Maximum implicitly open or before required zones: "
+                       "%" PRIu32 "\n", sg_get_unaligned_be32(bp + 8));
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             hex2stdout(bp, ((pl < num) ? pl : num), 0);
             break;
         }
+        if (trunc)
+            pr2serr("    truncated by response length, expected at least "
+                    "8 bytes\n");
+        if (bad_pl)
+            pr2serr("    parameter length >= 8 expected, got %d\n", pl);
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)

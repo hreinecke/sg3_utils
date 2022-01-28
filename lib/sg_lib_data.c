@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.85 20220126";
+const char * sg_lib_version_str = "2.85 20220127";
 /* spc6r06, sbc5r01, zbc2r12 */
 
 
@@ -116,10 +116,10 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0x34, PDT_TAPE, "Read position"},
     {0x35, PDT_ALL, "Synchronize cache(10)"},
                         /* SBC-3 r31 recommends Synchronize cache(16) */
-    {0x36, 0, "Lock unlock cache(10)"},
-    {0x37, 0, "Read defect data(10)"},
-                        /* SBC-3 r31 recommends Read defect data(12) */
+    {0x36, PDT_ALL, "Lock unlock cache(10)"},
     {0x37, PDT_MCHANGER, "Initialize element status with range"},
+    {0x37, PDT_ALL, "Read defect data(10)"},
+                        /* SBC-3 r31 recommends Read defect data(12) */
     {0x38, PDT_DISK_ZBC, "Format with preset scan"},
     {0x38, PDT_OCRW, "Medium scan"},
     {0x39, PDT_ALL, "Compare"},               /* obsolete in SPC-4 r11 */

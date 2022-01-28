@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2021 Douglas Gilbert.
+ * Copyright (c) 2009-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.33 20211114";
+static const char * version_str = "1.34 20220127";
 
 
 #define ME "sg_write_same: "
@@ -209,7 +209,7 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
         if (op->lbdata)
             ws_cdb[1] |= 0x2;
         sg_put_unaligned_be32((uint32_t)op->lba, ws_cdb + 2);
-        ws_cdb[6] = (op->grpnum & 0x1f);
+        ws_cdb[6] = (op->grpnum & GRPNUM_MASK);
         sg_put_unaligned_be16((uint16_t)op->numblocks, ws_cdb + 7);
         break;
     case WRITE_SAME16_LEN:
@@ -227,11 +227,11 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
             ws_cdb[1] |= 0x1;
         sg_put_unaligned_be64(op->lba, ws_cdb + 2);
         sg_put_unaligned_be32((uint32_t)op->numblocks, ws_cdb + 10);
-        ws_cdb[14] = (op->grpnum & 0x1f);
+        ws_cdb[14] = (op->grpnum & GRPNUM_MASK);
         break;
     case WRITE_SAME32_LEN:
         ws_cdb[0] = VARIABLE_LEN_OP;
-        ws_cdb[6] = (op->grpnum & 0x1f);
+        ws_cdb[6] = (op->grpnum & GRPNUM_MASK);
         ws_cdb[7] = WRITE_SAME32_ADD;
         sg_put_unaligned_be16((uint16_t)WRITE_SAME32_SA, ws_cdb + 8);
         ws_cdb[10] = ((op->wrprotect & 0x7) << 5);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2021 Douglas Gilbert.
+ * Copyright (c) 2004-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.54 20211028";    /* ses4r04 */
+static const char * version_str = "2.55 20220127";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -5750,7 +5750,7 @@ main(int argc, char * argv[])
                     pr2serr("Short INQUIRY response, not looking good\n");
                 printf("  %.8s  %.16s  %.4s\n", inq_rsp + 8, inq_rsp + 16,
                        inq_rsp + 32);
-                pd_type = 0x1f & inq_rsp[0];
+                pd_type = PDT_MASK & inq_rsp[0];
                 cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
                 if (0xd == pd_type) {
                     if (vb)

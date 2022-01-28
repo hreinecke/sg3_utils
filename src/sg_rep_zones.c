@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 Douglas Gilbert.
+ * Copyright (c) 2014-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,8 +39,9 @@
  * Based on zbc2r10.pdf
  */
 
-static const char * version_str = "1.29 20211117";
+static const char * version_str = "1.30 20220128";
 
+#define WILD_RZONES_BUFF_LEN (1 << 28)
 #define MAX_RZONES_BUFF_LEN (1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 8)
 
@@ -54,6 +55,7 @@ static const char * version_str = "1.29 20211117";
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
 struct opts_t {
+    bool do_brief;
     bool do_force;
     bool do_partial;
     bool do_raw;
@@ -76,6 +78,7 @@ struct opts_t {
 
 
 static struct option long_options[] = {
+        {"brief", no_argument, 0, 'b'}, /* only header and last descriptor */
         {"domain", no_argument, 0, 'd'},
         {"domains", no_argument, 0, 'd'},
         {"force", no_argument, 0, 'f'},
@@ -108,10 +111,11 @@ usage(int h)
             "sg_rep_zones  [--domain] [--force] [--help] [--hex] "
             "[--inhex=FN]\n"
             "                     [--locator=LBA] [--maxlen=LEN] "
-            "[--partial] [--raw]\n"
-            "                     [--readonly] [--realm] [--report=OPT] "
-            "[--start=LBA]\n"
-            "                     [--verbose] [--version] DEVICE\n");
+            "[--partial] [--only]\n"
+            "                     [--raw] [--readonly] [--realm] "
+            "[--report=OPT]\n"
+            "                     [--start=LBA] [--verbose] [--version] "
+            "DEVICE\n");
     pr2serr("  where:\n"
             "    --domain|-d        sends a REPORT ZONE DOMAINS command\n"
             "    --force|-f         bypass some sanity checks when decoding "
@@ -128,6 +132,8 @@ usage(int h)
             "                           (def: 0 -> 8192 bytes)\n"
             "    --num=NUM|-n NUM    number of zones to output (def: 0 -> "
             "all)\n"
+            "    --only|-o          output header and starting LBA of "
+            "next\n"
             "    --partial|-p       sets PARTIAL bit in cdb (def: 0 -> "
             "zone list\n"
             "                       length not altered by allocation length "
@@ -317,7 +323,7 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
 {
     uint8_t zt;
     int k, same, zc, num_zd;
-    uint64_t wp;
+    uint64_t wp, ul, ul2, mx_lba;
     const uint8_t * bp;
     char b[80];
 
@@ -334,10 +340,10 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
     } else
         num_zd = (decod_len - 64) / 64;
     same = rzBuff[4] & 0xf;
+    mx_lba = sg_get_unaligned_be64(rzBuff + 8);
     if (! op->wp_only) {
         printf("  Same=%d: %s\n", same, same_desc_arr[same]);
-        printf("  Maximum LBA: 0x%" PRIx64 "\n\n",
-               sg_get_unaligned_be64(rzBuff + 8));
+        printf("  Maximum LBA: 0x%" PRIx64 "\n\n", mx_lba);
         printf("  Reported zone starting LBA granularity: 0x%" PRIx64 "\n\n",
                sg_get_unaligned_be64(rzBuff + 16));     /* zbc2r12 */
     }
@@ -348,6 +354,20 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
                 "value less than %d\n", num_zd);
         return SG_LIB_CAT_MALFORMED;
     }
+    if (op->do_brief && (num_zd > 0)) {
+        bp = rzBuff + 64 + ((num_zd - 1) * 64);
+        printf("From last descriptor in this response:\n");
+        ul = sg_get_unaligned_be64(bp + 16);
+        printf("   Zone start LBA: 0x%" PRIx64 "\n", ul);
+        ul2 = sg_get_unaligned_be64(bp + 8);
+        printf("   Zone Length: 0x%" PRIx64 "\n", ul2);
+        ul = ul + ul2;
+        if (ul > mx_lba)
+            printf("   This zone seems to be the last one\n");
+        else
+            printf("   Probable next Zone start LBA: 0x%" PRIx64 "\n", ul);
+        return 0;
+    }
     for (k = 0, bp = rzBuff + 64; k < num_zd; ++k, bp += 64) {
         if (! op->wp_only)
             printf(" Zone descriptor: %d\n", k);
@@ -356,7 +376,11 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
             continue;
         }
         if (op->wp_only) {
-            printf("0x%" PRIx64 "\n", sg_get_unaligned_be64(bp + 24));
+            wp = sg_get_unaligned_be64(bp + 24);
+            if (sg_all_ffs((const uint8_t *)&wp, sizeof(wp)))
+                printf("-1\n");
+            else
+                printf("0x%" PRIx64 "\n", wp);
             continue;
         }
         zt = bp[0] & 0xf;
@@ -531,12 +555,15 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "defhHi:l:m:n:o:prRs:vVw", long_options,
+        c = getopt_long(argc, argv, "bdefhHi:l:m:n:o:prRs:vVw", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'b':
+            op->do_brief = true;
+            break;
         case 'd':
             op->do_zdomains = true;
             serv_act = REPORT_ZONE_DOMAINS_SA;
@@ -744,7 +771,7 @@ start_response:
             goto the_end;
         }
         decod_len = sg_get_unaligned_be32(rzBuff + 0) + 64;
-        if (decod_len > MAX_RZONES_BUFF_LEN) {
+        if (decod_len > WILD_RZONES_BUFF_LEN) {
             if (! op->do_force) {
                 pr2serr("decode length [%u bytes] seems wild, use --force "
                         "override\n", decod_len);
@@ -753,8 +780,9 @@ start_response:
         }
         if (decod_len > (uint32_t)rlen) {
             if ((REPORT_ZONES_SA == serv_act) && (! op->do_partial)) {
-                printf("%u zones available but only %d zones returned\n",
-                       (decod_len - 64) / 64, (rlen - 64) / 64);
+                printf("%u zones starting from LBA 0x%" PRIx64 " available "
+                       "but only %d zones returned\n",
+                       (decod_len - 64) / 64, op->st_lba, (rlen - 64) / 64);
                 decod_len = rlen;
                 act_len = rlen;
             } else {

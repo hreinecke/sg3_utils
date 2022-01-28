@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2021 Douglas Gilbert.
+ * Copyright (c) 2009-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * scsi_pt_version_str = "3.18 20210617";
+static const char * scsi_pt_version_str = "3.19 20220127";
 
 /* List of external functions that need to be defined for each OS are
  * listed at the top of sg_pt_dummy.c   */
@@ -413,7 +413,7 @@ sntl_resp_mode_sense10(const struct sg_sntl_dev_state_t * dsp,
     pcode = cdbp[2] & 0x3f;
     subpcode = cdbp[3];
     llbaa = !!(cdbp[1] & 0x10);
-    is_disk = ((dsp->pdt == PDT_DISK) || (dsp->pdt == PDT_ZBC));
+    is_disk = sg_pdt_s_eq(sg_lib_pdt_decay(dsp->pdt), PDT_DISK_ZBC);
     if (is_disk && !dbd)
         bd_len = llbaa ? 16 : 8;
     else

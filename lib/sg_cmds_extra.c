@@ -1718,7 +1718,7 @@ sg_ll_verify16(int sg_fd, int vrprotect, bool dpo, int bytchk, uint64_t llba,
         v_cdb[1] |= 0x10;
     sg_put_unaligned_be64(llba, v_cdb + 2);
     sg_put_unaligned_be32((uint32_t)veri_len, v_cdb + 10);
-    v_cdb[14] = group_num & 0x1f;
+    v_cdb[14] = group_num & GRPNUM_MASK;
     if (vb > 1) {
         char b[128];
 
@@ -2191,7 +2191,7 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
     if (anchor)
         u_cdb[1] |= 0x1;
     tmout = (timeout_secs > 0) ? timeout_secs : DEF_PT_TIMEOUT;
-    u_cdb[6] = group_num & 0x1f;
+    u_cdb[6] = group_num & GRPNUM_MASK;
     sg_put_unaligned_be16((uint16_t)param_len, u_cdb + 7);
     if (vb) {
         char b[128];
@@ -2443,7 +2443,7 @@ sg_ll_3party_copy_out(int sg_fd, int sa, unsigned int list_id, int group_num,
     case 0x11:  /* WRITE USING TOKEN (SBC-3) */
         sg_put_unaligned_be32((uint32_t)list_id, xcopy_cdb + 6);
         sg_put_unaligned_be32((uint32_t)param_len, xcopy_cdb + 10);
-        xcopy_cdb[14] = (uint8_t)(group_num & 0x1f);
+        xcopy_cdb[14] = (uint8_t)(group_num & GRPNUM_MASK);
         break;
     case 0x1c:  /* COPY OPERATION ABORT */
         sg_put_unaligned_be32((uint32_t)list_id, xcopy_cdb + 2);
@@ -2545,7 +2545,7 @@ sg_ll_pre_fetch_x(int sg_fd, bool do_seek10, bool cdb16, bool immed,
                 preFetchCdb[1] = 0x2;
             sg_put_unaligned_be64(lba, preFetchCdb + 2);
             sg_put_unaligned_be32(num_blocks, preFetchCdb + 10);
-            preFetchCdb[14] = 0x3f & group_num;
+            preFetchCdb[14] = GRPNUM_MASK & group_num;
         } else {
             preFetchCdb[0] = PRE_FETCH10_CMD;
             cdb_len = PRE_FETCH10_CMDLEN;
@@ -2553,7 +2553,7 @@ sg_ll_pre_fetch_x(int sg_fd, bool do_seek10, bool cdb16, bool immed,
             if (immed)
                 preFetchCdb[1] = 0x2;
             sg_put_unaligned_be32((uint32_t)lba, preFetchCdb + 2);
-            preFetchCdb[6] = 0x3f & group_num;
+            preFetchCdb[6] = GRPNUM_MASK & group_num;
             sg_put_unaligned_be16((uint16_t)num_blocks, preFetchCdb + 7);
         }
     }

@@ -1,13 +1,14 @@
-.TH SG_REP_ZONES "8" "November 2021" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_REP_ZONES "8" "January 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_rep_zones \- send SCSI REPORT ZONES, REALMS or ZONE DOMAINS command
 .SH SYNOPSIS
 .B sg_rep_zones
-[\fI\-\-domain\fR] [\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-inhex=FN\fR] [\fI\-\-locator=LBA\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-num=NUM\fR] [\fI\-\-partial\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
-[\fI\-\-realm\fR] [\fI\-\-report=OPT\fR] [\fI\-\-start=LBA\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wp\fR] \fIDEVICE\fR
+[\fI\-\-brief\fR] [\fI\-\-domain\fR] [\fI\-\-force\fR] [\fI\-\-help\fR]
+[\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-locator=LBA\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR] [\fI\-\-partial\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-realm\fR] [\fI\-\-report=OPT\fR]
+[\fI\-\-start=LBA\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wp\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -29,6 +30,13 @@ command response is assumed; if the \fI\-\-domain\fR or \fI\-\-realm\fR
 option is given then the corresponding command response is assumed.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-b\fR, \fB\-\-brief\fR
+even though a ZBC disk will typically limit the size of the response
+to the REPORT ZONES command (e.g. to 127 zones say), this is still
+potentially a lot of output. This option will only decode and output
+fields found in the header plus some of the fields from the last
+descriptor in the current response.
 .TP
 \fB\-d\fR, \fB\-\-domain\fR
 send or decode the SCSI REPORT ZONE DOMAINS command.
@@ -141,7 +149,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014\-2021 Douglas Gilbert
+Copyright \(co 2014\-2022 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

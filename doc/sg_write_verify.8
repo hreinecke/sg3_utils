@@ -1,4 +1,4 @@
-.TH "WRITE AND VERIFY" "8" "June 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH "WRITE AND VERIFY" "8" "January 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_write_and_verify \- send the SCSI WRITE AND VERIFY command
 .SH SYNOPSIS
@@ -57,7 +57,7 @@ it clear.
 .TP
 \fB\-g\fR, \fB\-\-group\fR=\fIGN\fR
 where \fIGN\fR is the value to place in the command's GROUP NUMBER field.
-Values between 0 and 31 (inclusive) are accepted. The default is value is 0.
+Values between 0 and 63 (inclusive) are accepted. The default is value is 0.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.

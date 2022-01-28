@@ -1067,7 +1067,7 @@ decode_supported_vpd(uint8_t * buff, int len, int do_hex)
         pr2serr("Supported VPD pages VPD page length too short=%d\n", len);
         return;
     }
-    pdt = 0x1f & buff[0];
+    pdt = PDT_MASK & buff[0];
     rlen = buff[3] + 4;
     if (rlen > len)
         pr2serr("Supported VPD pages VPD page truncated, indicates %d, got "
@@ -2187,7 +2187,7 @@ decode_b0_vpd(uint8_t * buff, int len, int do_hex)
         hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
-    pdt = 0x1f & buff[0];
+    pdt = PDT_MASK & buff[0];
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 16) {
@@ -2333,7 +2333,7 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex)
         hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
-    pdt = 0x1f & buff[0];
+    pdt = PDT_MASK & buff[0];
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 64) {
@@ -2408,7 +2408,7 @@ decode_b3_vpd(uint8_t * buff, int len, int do_hex)
         hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
         return;
     }
-    pdt = 0x1f & buff[0];
+    pdt = PDT_MASK & buff[0];
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
             if (len < 0x10) {
@@ -2811,7 +2811,7 @@ std_inq_decode(const struct opts_t * op, int act_len)
      * [spc-r11a (1997)] bits 6,7: ISO/IEC version; bits 3-5: ECMA
      * version; bits 0-2: SCSI version */
     ansi_version = rp[2] & 0x7;       /* Only take SCSI version */
-    peri_type = rp[0] & 0x1f;
+    peri_type = rp[0] & PDT_MASK;
     if (op->do_export) {
         printf("SCSI_TPGS=%d\n", (rp[5] & 0x30) >> 4);
         cp = sg_get_pdt_str(peri_type, sizeof(buff), buff);
@@ -3194,7 +3194,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
             res = sg_ll_inquiry(sg_fd, true /* cmddt */, false, k, rsp_buff,
                                 DEF_ALLOC_LEN, true, op->verbose);
             if (0 == res) {
-                peri_type = rsp_buff[0] & 0x1f;
+                peri_type = rsp_buff[0] & PDT_MASK;
                 support_num = rsp_buff[1] & 7;
                 reserved_cmddt = rsp_buff[4];
                 if ((3 == support_num) || (5 == support_num)) {
@@ -3227,7 +3227,7 @@ cmddt_process(int sg_fd, const struct opts_t * op)
         res = sg_ll_inquiry(sg_fd, true /* cmddt */, false, op->page_num,
                             rsp_buff, DEF_ALLOC_LEN, true, op->verbose);
         if (0 == res) {
-            peri_type = rsp_buff[0] & 0x1f;
+            peri_type = rsp_buff[0] & PDT_MASK;
             if (! op->do_raw) {
                 printf("CmdDt INQUIRY, opcode=0x%.2x:  [", op->page_num);
                 sg_get_opcode_name((uint8_t)op->page_num, peri_type,
@@ -3335,7 +3335,7 @@ vpd_mainly_hex(int sg_fd, const struct opts_t * op, int inhex_len)
                 decode_supported_vpd(rp, len, op->do_hex);
             else {
                 if (op->verbose) {
-                    cp = sg_get_pdt_str(rp[0] & 0x1f, sizeof(b), b);
+                    cp = sg_get_pdt_str(rp[0] & PDT_MASK, sizeof(b), b);
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5, cp);
                 }
@@ -3395,7 +3395,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
         else if (op->do_hex)
             hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
         else
-            decode_supported_vpd(rp, len, 0x1f & rp[0]);
+            decode_supported_vpd(rp, len, PDT_MASK & rp[0]);
         break;
     case VPD_UNIT_SERIAL_NUM:
         if (! op->do_raw && ! op->do_export && (op->do_hex < 2))
@@ -3538,7 +3538,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
     case 0xb0:  /* VPD pages in B0h to BFh range depend on pdt */
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
@@ -3566,7 +3566,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
     case 0xb1:  /* VPD pages in B0h to BFh range depend on pdt */
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
@@ -3604,7 +3604,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
     case 0xb3:  /* VPD pages in B0h to BFh range depend on pdt */
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, mxlen, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & 0x1f;
+            pdt = rp[0] & PDT_MASK;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
                 case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
@@ -4230,7 +4230,7 @@ main(int argc, char * argv[])
         op->do_raw = 0;         /* don't want raw on output with --inhex= */
         if (-1 == op->page_num) {       /* may be able to deduce VPD page */
             if (op->page_pdt < 0)
-                op->page_pdt = 0x1f & rsp_buff[0];
+                op->page_pdt = PDT_MASK & rsp_buff[0];
             if ((0x2 == (0xf & rsp_buff[3])) && (rsp_buff[2] > 2)) {
                 if (op->verbose)
                     pr2serr("Guessing from --inhex= this is a standard "

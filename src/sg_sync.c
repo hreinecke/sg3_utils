@@ -109,7 +109,7 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
     if (immed)
         sc_cdb[1] |= 2;
     sg_put_unaligned_be64(lba, sc_cdb + 2);
-    sc_cdb[14] = group & 0x1f;
+    sc_cdb[14] = group & GRPNUM_MASK;
     sg_put_unaligned_be32((uint32_t)num_lb, sc_cdb + 10);
 
     if (verbose) {

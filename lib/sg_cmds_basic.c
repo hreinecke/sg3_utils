@@ -542,7 +542,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
     if (inq_data) {
         memset(inq_data, 0, sizeof(* inq_data));
         inq_data->peripheral_qualifier = 0x3;
-        inq_data->peripheral_type = 0x1f;
+        inq_data->peripheral_type = PDT_UNKNOWN;
     }
     inq_resp = sg_memalign(SAFE_STD_INQ_RESP_LEN, 0, &free_irp, false);
     if (NULL == inq_resp) {
@@ -554,7 +554,7 @@ sg_simple_inquiry(int sg_fd, struct sg_simple_inquiry_resp * inq_data,
 
     if (inq_data && (0 == ret)) {
         inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
-        inq_data->peripheral_type = inq_resp[0] & 0x1f;
+        inq_data->peripheral_type = inq_resp[0] & PDT_MASK;
         inq_data->byte_1 = inq_resp[1];
         inq_data->version = inq_resp[2];
         inq_data->byte_3 = inq_resp[3];
@@ -584,7 +584,7 @@ sg_simple_inquiry_pt(struct sg_pt_base * ptvp,
     if (inq_data) {
         memset(inq_data, 0, sizeof(* inq_data));
         inq_data->peripheral_qualifier = 0x3;
-        inq_data->peripheral_type = 0x1f;
+        inq_data->peripheral_type = PDT_MASK;
     }
     inq_resp = sg_memalign(SAFE_STD_INQ_RESP_LEN, 0, &free_irp, false);
     if (NULL == inq_resp) {
@@ -596,7 +596,7 @@ sg_simple_inquiry_pt(struct sg_pt_base * ptvp,
 
     if (inq_data && (0 == ret)) {
         inq_data->peripheral_qualifier = (inq_resp[0] >> 5) & 0x7;
-        inq_data->peripheral_type = inq_resp[0] & 0x1f;
+        inq_data->peripheral_type = inq_resp[0] & PDT_MASK;
         inq_data->byte_1 = inq_resp[1];
         inq_data->version = inq_resp[2];
         inq_data->byte_3 = inq_resp[3];

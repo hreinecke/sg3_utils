@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 Douglas Gilbert
+ * Copyright (c) 2014-2022 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.20 20211114";
+static const char * version_str = "1.21 20220127";
 
 
 #define ME "sg_write_verify: "
@@ -215,7 +215,7 @@ sg_ll_write_verify10(int sg_fd, int wrprotect, bool dpo, int bytchk,
        wv_cdb[1] |= ((bytchk & 0x3) << 1);
 
     sg_put_unaligned_be32((uint32_t)lba, wv_cdb + 2);
-    wv_cdb[6] = group & 0x1f;
+    wv_cdb[6] = group & GRPNUM_MASK;
     sg_put_unaligned_be16((uint16_t)num_lb, wv_cdb + 7);
     ret = run_scsi_transaction(sg_fd, wv_cdb, sizeof(wv_cdb), dop, do_len,
                                timeout, noisy, verbose);
@@ -243,7 +243,7 @@ sg_ll_write_verify16(int sg_fd, int wrprotect, bool dpo, int bytchk,
 
     sg_put_unaligned_be64(llba, wv_cdb + 2);
     sg_put_unaligned_be32((uint32_t)num_lb, wv_cdb + 10);
-    wv_cdb[14] = group & 0x1f;
+    wv_cdb[14] = group & GRPNUM_MASK;
     ret = run_scsi_transaction(sg_fd, wv_cdb, sizeof(wv_cdb), dop, do_len,
                                timeout, noisy, verbose);
     return ret;
