@@ -39,11 +39,11 @@
  * Based on zbc2r10.pdf
  */
 
-static const char * version_str = "1.30 20220128";
+static const char * version_str = "1.31 20220201";
 
 #define WILD_RZONES_BUFF_LEN (1 << 28)
-#define MAX_RZONES_BUFF_LEN (1024 * 1024)
-#define DEF_RZONES_BUFF_LEN (1024 * 8)
+#define MAX_RZONES_BUFF_LEN (2 * 1024 * 1024)
+#define DEF_RZONES_BUFF_LEN (1024 * 16)
 
 #define SG_ZONING_IN_CMDLEN 16
 
@@ -51,6 +51,7 @@ static const char * version_str = "1.30 20220128";
 #define REPORT_ZONE_DOMAINS_SA 0x7
 #define REPORT_REALMS_SA 0x6
 
+#define REPORT_ZONES_DESC_LEN 64
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
@@ -69,6 +70,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int do_num;
+    int find_zt;        /* negative values: find first not equal to */
     int maxlen;
     int reporting_opt;
     int vb;
@@ -76,12 +78,17 @@ struct opts_t {
     const char * in_fn;
 };
 
+struct zt_num2abbrev_t {
+    int ztn;
+    const char * abbrev;
+};
 
 static struct option long_options[] = {
         {"brief", no_argument, 0, 'b'}, /* only header and last descriptor */
         {"domain", no_argument, 0, 'd'},
         {"domains", no_argument, 0, 'd'},
         {"force", no_argument, 0, 'f'},
+        {"find", required_argument, 0, 'F'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
@@ -102,22 +109,58 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+static struct zt_num2abbrev_t zt_num2abbrev[] = {
+    {0, "none"},
+    {1, "c"},           /* conventionial */
+    {2, "swr"},         /* sequential write required */
+    {3, "swp"},         /* sequential write preferred */
+    {4, "sobr"},        /* sequential or before required */
+    {5, "g"},           /* gap */
+    {-1, NULL},         /* sentinel */
+};
+
+static const char * zn_dnum_s = "zone descriptor number: ";
+
+
+static void
+prn_zone_type_abbrevs(void)
+{
+    const struct zt_num2abbrev_t * n2ap = zt_num2abbrev;
+    char b[32];
+
+    pr2serr("Zone type number\tAbbreviation\tName\n");
+    pr2serr("----------------\t------------\t----\n");
+    for ( ; n2ap->abbrev; ++n2ap) {
+        if (n2ap == zt_num2abbrev)
+            pr2serr("\t%d\t\t%s\t\t[reserved]\n",
+                    n2ap->ztn, n2ap->abbrev);
+        else
+            pr2serr("\t%d\t\t%s\t\t%s\n", n2ap->ztn, n2ap->abbrev,
+                    sg_get_zone_type_str(n2ap->ztn, sizeof(b), b));
+    }
+}
 
 static void
 usage(int h)
 {
     if (h > 1) goto h_twoormore;
     pr2serr("Usage: "
-            "sg_rep_zones  [--domain] [--force] [--help] [--hex] "
-            "[--inhex=FN]\n"
-            "                     [--locator=LBA] [--maxlen=LEN] "
-            "[--partial] [--only]\n"
-            "                     [--raw] [--readonly] [--realm] "
-            "[--report=OPT]\n"
-            "                     [--start=LBA] [--verbose] [--version] "
-            "DEVICE\n");
+            "sg_rep_zones  [--domain] [--find=ZT] [--force] [--help] "
+            "[--hex]\n"
+            "                     [--inhex=FN] [--locator=LBA] "
+            "[--maxlen=LEN]\n"
+            "                     [--partial] [--only] [--raw] "
+            "[--readonly]\n"
+            "                     [--realm] [--report=OPT] [--start=LBA] "
+            "[--verbose]\n"
+            "                     [--version] DEVICE\n");
     pr2serr("  where:\n"
             "    --domain|-d        sends a REPORT ZONE DOMAINS command\n"
+            "    --find=ZT|-F ZT    find first zone with ZT zone type, "
+            "starting at LBA\n"
+            "                       if first character of ZT is - or !, "
+            "find first\n"
+            "                       zone that is not ZT\n"
             "    --force|-f         bypass some sanity checks when decoding "
             "response\n"
             "    --help|-h          print out usage message, use twice for "
@@ -186,6 +229,8 @@ h_twoormore:
             "Required zones\n"
             "    0x3    list all realms that contain active Sequential Write "
             "Preferred zones\n");
+    pr2serr("\n");
+    prn_zone_type_abbrevs();
 }
 
 /* Invokes a SCSI REPORT ZONES, REPORT ZONE DOMAINS or REPORT REALMS command
@@ -317,18 +362,44 @@ static const char * same_desc_arr[16] = {
     "Reserved [0xc]", "Reserved [0xd]", "Reserved [0xe]", "Reserved [0xf]",
 };
 
+static uint64_t
+prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op)
+{
+    uint8_t zt, zc;
+    uint64_t lba, len, wp;
+    char b[80];
+
+    zt = bp[0] & 0xf;
+    zc = (bp[1] >> 4) & 0xf;
+    printf("   Zone type: %s\n", sg_get_zone_type_str(zt, sizeof(b), b));
+    printf("   Zone condition: %s\n", zone_condition_str(zc, b,
+           sizeof(b), op->vb));
+    printf("   PUEP: %d\n", !!(bp[1] & 0x4));   /* added in zbc2r07 */
+    printf("   Non_seq: %d\n", !!(bp[1] & 0x2));
+    printf("   Reset: %d\n", bp[1] & 0x1);
+    len = sg_get_unaligned_be64(bp + 8);
+    printf("   Zone Length: 0x%" PRIx64 "\n", len);
+    lba = sg_get_unaligned_be64(bp + 16);
+    printf("   Zone start LBA: 0x%" PRIx64 "\n", lba);
+    wp = sg_get_unaligned_be64(bp + 24);
+    if (sg_all_ffs((const uint8_t *)&wp, sizeof(wp)))
+        printf("   Write pointer LBA: -1\n");
+    else
+        printf("   Write pointer LBA: 0x%" PRIx64 "\n", wp);
+    return lba + len;
+}
+
 static int
 decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
                  const struct opts_t * op)
 {
-    uint8_t zt;
-    int k, same, zc, num_zd;
-    uint64_t wp, ul, ul2, mx_lba;
+    int k, same, num_zd;
+    uint64_t wp, ul, mx_lba;
     const uint8_t * bp;
-    char b[80];
 
     if ((uint32_t)act_len < decod_len) {
-        num_zd = (act_len >= 64) ? ((act_len - 64) / 64): 0;
+        num_zd = (act_len >= 64) ? ((act_len - 64) / REPORT_ZONES_DESC_LEN)
+                                 : 0;
         if (act_len == op->maxlen) {
             if (op->maxlen_given)
                 pr2serr("decode length [%u bytes] may be constrained by "
@@ -338,10 +409,15 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
         } else if (op->in_fn)
             pr2serr("perhaps %s has been truncated\n", op->in_fn);
     } else
-        num_zd = (decod_len - 64) / 64;
+        num_zd = (decod_len - 64) / REPORT_ZONES_DESC_LEN;
     same = rzBuff[4] & 0xf;
     mx_lba = sg_get_unaligned_be64(rzBuff + 8);
-    if (! op->wp_only) {
+    if (op->wp_only) {
+        ;
+    } else if (op->do_hex) {
+        hex2stdout(rzBuff, 64, -1);
+        printf("\n");
+    } else {
         printf("  Same=%d: %s\n", same, same_desc_arr[same]);
         printf("  Maximum LBA: 0x%" PRIx64 "\n\n", mx_lba);
         printf("  Reported zone starting LBA granularity: 0x%" PRIx64 "\n\n",
@@ -349,61 +425,54 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
     }
     if (op->do_num > 0)
             num_zd = (num_zd > op->do_num) ? op->do_num : num_zd;
-    if (((uint32_t)act_len < decod_len) && ((num_zd * 64) + 64 > act_len)) {
+    if (((uint32_t)act_len < decod_len) &&
+        ((num_zd * REPORT_ZONES_DESC_LEN) + 64 > act_len)) {
         pr2serr("Skip due to truncated response, try using --num= to a "
                 "value less than %d\n", num_zd);
         return SG_LIB_CAT_MALFORMED;
     }
     if (op->do_brief && (num_zd > 0)) {
-        bp = rzBuff + 64 + ((num_zd - 1) * 64);
+        bp = rzBuff + 64 + ((num_zd - 1) * REPORT_ZONES_DESC_LEN);
+        if (op->do_hex) {
+            if (op->wp_only)
+                hex2stdout(bp + 24, 8, -1);
+            else
+                hex2stdout(bp, 64, -1);
+            return 0;
+        }
         printf("From last descriptor in this response:\n");
-        ul = sg_get_unaligned_be64(bp + 16);
-        printf("   Zone start LBA: 0x%" PRIx64 "\n", ul);
-        ul2 = sg_get_unaligned_be64(bp + 8);
-        printf("   Zone Length: 0x%" PRIx64 "\n", ul2);
-        ul = ul + ul2;
+        printf(" %s%d\n", zn_dnum_s, num_zd - 1);
+        ul = prt_a_zn_desc(bp, op);
         if (ul > mx_lba)
-            printf("   This zone seems to be the last one\n");
+            printf("   >> This zone seems to be the last one\n");
         else
-            printf("   Probable next Zone start LBA: 0x%" PRIx64 "\n", ul);
+            printf("   >> Probable next Zone start LBA: 0x%" PRIx64 "\n", ul);
         return 0;
     }
-    for (k = 0, bp = rzBuff + 64; k < num_zd; ++k, bp += 64) {
+    for (k = 0, bp = rzBuff + 64; k < num_zd;
+         ++k, bp += REPORT_ZONES_DESC_LEN) {
         if (! op->wp_only)
-            printf(" Zone descriptor: %d\n", k);
+            printf(" %s%d\n", zn_dnum_s, k);
         if (op->do_hex) {
             hex2stdout(bp, 64, -1);
             continue;
         }
         if (op->wp_only) {
-            wp = sg_get_unaligned_be64(bp + 24);
-            if (sg_all_ffs((const uint8_t *)&wp, sizeof(wp)))
-                printf("-1\n");
-            else
-                printf("0x%" PRIx64 "\n", wp);
+            if (op->do_hex)
+                hex2stdout(bp + 24, 8, -1);
+            else {
+                wp = sg_get_unaligned_be64(bp + 24);
+                if (sg_all_ffs((const uint8_t *)&wp, sizeof(wp)))
+                    printf("-1\n");
+                else
+                    printf("0x%" PRIx64 "\n", wp);
+            }
             continue;
         }
-        zt = bp[0] & 0xf;
-        zc = (bp[1] >> 4) & 0xf;
-        printf("   Zone type: %s\n", sg_get_zone_type_str(zt, sizeof(b),
-               b));
-        printf("   Zone condition: %s\n", zone_condition_str(zc, b,
-               sizeof(b), op->vb));
-        printf("   PUEP: %d\n", !!(bp[1] & 0x4));   /* added in zbc2r07 */
-        printf("   Non_seq: %d\n", !!(bp[1] & 0x2));
-        printf("   Reset: %d\n", bp[1] & 0x1);
-        printf("   Zone Length: 0x%" PRIx64 "\n",
-               sg_get_unaligned_be64(bp + 8));
-        printf("   Zone start LBA: 0x%" PRIx64 "\n",
-               sg_get_unaligned_be64(bp + 16));
-        wp = sg_get_unaligned_be64(bp + 24);
-        if (sg_all_ffs((const uint8_t *)&wp, sizeof(wp)))
-            printf("   Write pointer LBA: -1\n");
-        else
-            printf("   Write pointer LBA: 0x%" PRIx64 "\n", wp);
+        prt_a_zn_desc(bp, op);
     }
-    if ((op->do_num == 0) && (! op->wp_only)) {
-        if ((64 + (64 * (uint32_t)num_zd)) < decod_len)
+    if ((op->do_num == 0) && (! op->wp_only) && (! op->do_hex)) {
+        if ((64 + (REPORT_ZONES_DESC_LEN * (uint32_t)num_zd)) < decod_len)
             printf("\n>>> Beware: Zone list truncated, may need another "
                    "call\n");
     }
@@ -532,11 +601,89 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
     return 0;
 }
 
+static int
+find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
+                  struct opts_t * op)
+{
+    bool found = false;
+    uint8_t zt;
+    int k, res, resid, rlen, num_zd;
+    uint32_t zn_dnum = 0;
+    uint64_t slba = op->st_lba;
+    uint64_t mx_lba = 0;
+    const uint8_t * bp = rzBuff;
+    char b[96];
+
+    k = 0;
+    while (true) {
+        resid = 0;
+        res = sg_ll_report_zzz(sg_fd, REPORT_ZONES_SA, slba,
+                               true /* set partial */, op->reporting_opt,
+                               rzBuff, op->maxlen, &resid, true, op->vb);
+        if (res) {
+            if (SG_LIB_CAT_INVALID_OP == res)
+                pr2serr("%s: %s%u, %s command not supported\n", __func__,
+                        zn_dnum_s, zn_dnum, cmd_name);
+            else {
+                sg_get_category_sense_str(res, sizeof(b), b, op->vb);
+                pr2serr("%s: %s%u, %s command: %s\n", __func__,
+                        zn_dnum_s, zn_dnum, cmd_name, b);
+            }
+            break;
+        }
+        rlen = op->maxlen - resid;
+        if (rlen <= 64) {
+            break;
+        }
+        mx_lba = sg_get_unaligned_be64(rzBuff + 8);
+        num_zd = (rlen - 64) / REPORT_ZONES_DESC_LEN;
+        for (k = 0, bp = rzBuff + 64; k < num_zd;
+             ++k, bp += REPORT_ZONES_DESC_LEN, ++zn_dnum) {
+            zt = 0xf & bp[0];
+            if (op->find_zt > 0) {
+                if ((uint8_t)op->find_zt == zt )
+                    break;
+            } else if (op->find_zt < 0) {
+                if ((uint8_t)(-op->find_zt) != zt )
+                    break;
+            }
+            slba = sg_get_unaligned_be64(bp + 16) +
+                   sg_get_unaligned_be64(bp + 8);
+        }
+        if (k < num_zd) {
+            found = true;
+            break;
+        } else if (slba > mx_lba)
+            break;
+    }
+    if (res == 0) {
+        if (found) {
+            if (op->do_hex) {
+                hex2stdout(rzBuff, 64, -1);
+                printf("\n");
+                hex2stdout(bp, 64, -1);
+            } else {
+                printf("Condition met at:\n");
+                printf(" %s: %d\n", zn_dnum_s, zn_dnum);
+                prt_a_zn_desc(bp, op);
+            }
+        } else {
+            if (op->do_hex) {
+                memset(b, 0xff, 64);
+                hex2stdout((const uint8_t *)b, 64, -1);
+            } else
+                printf("Condition NOT met; next %s%u\n", zn_dnum_s, zn_dnum);
+        }
+    }
+    return res;
+}
+
+
 int
 main(int argc, char * argv[])
 {
     bool no_final_msg = false;
-    int res, c, act_len, rlen, in_len;
+    int res, c, act_len, rlen, in_len, off;
     int sg_fd = -1;
     int resid = 0;
     int ret = 0;
@@ -555,8 +702,8 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bdefhHi:l:m:n:o:prRs:vVw", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "bdefF:hHi:l:m:n:o:prRs:vVw",
+                        long_options, &option_index);
         if (c == -1)
             break;
 
@@ -574,6 +721,31 @@ main(int argc, char * argv[])
             break;
         case 'f':
             op->do_force = true;
+            break;
+        case 'F':
+            off = (('-' == *optarg) || ('!' == *optarg)) ? 1 : 0;
+            if (isdigit(*(optarg + off))) {
+                op->find_zt = sg_get_num_nomult(optarg + off);
+                if (op->find_zt < 0) {
+                    pr2serr("bad numeric argument to '--find='\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                if (off)
+                    op->find_zt = -op->find_zt; /* find first not equal */
+            } else {    /* check for abbreviation */
+                struct zt_num2abbrev_t * zn2ap = zt_num2abbrev;
+
+                for ( ; zn2ap->abbrev; ++zn2ap) {
+                    if (0 == strcmp(optarg + off, zn2ap->abbrev))
+                        break;
+                }
+                if (NULL == zn2ap->abbrev) {
+                    pr2serr("bad abbreviation argument to '--find='\n\n");
+                    prn_zone_type_abbrevs();
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->find_zt = off ? -zn2ap->ztn : zn2ap->ztn;
+            }
             break;
         case 'h':
         case '?':
@@ -758,6 +930,10 @@ main(int argc, char * argv[])
         goto the_end;
     }
 
+    if (op->find_zt) {  /* so '-F none' will drop through */
+        ret = find_report_zones(sg_fd, rzBuff, cmd_name, op);
+        goto the_end;
+    }
     res = sg_ll_report_zzz(sg_fd, serv_act, op->st_lba, op->do_partial,
                            op->reporting_opt, rzBuff, op->maxlen, &resid,
                            true, op->vb);
@@ -782,7 +958,8 @@ start_response:
             if ((REPORT_ZONES_SA == serv_act) && (! op->do_partial)) {
                 printf("%u zones starting from LBA 0x%" PRIx64 " available "
                        "but only %d zones returned\n",
-                       (decod_len - 64) / 64, op->st_lba, (rlen - 64) / 64);
+                       (decod_len - 64) / REPORT_ZONES_DESC_LEN, op->st_lba,
+                       (rlen - 64) / REPORT_ZONES_DESC_LEN);
                 decod_len = rlen;
                 act_len = rlen;
             } else {
@@ -806,7 +983,7 @@ start_response:
             hex2stdout(rzBuff, act_len, ((1 == op->do_hex) ? 1 : -1));
             goto the_end;
         }
-        if (! op->wp_only)
+        if (! op->wp_only && (! op->do_hex))
             printf("%s response:\n", cmd_name);
         if (act_len < 64) {
             pr2serr("Zone length [%d] too short (perhaps after truncation\n)",

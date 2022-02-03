@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2000-2021 D. Gilbert
+ *  Copyright (C) 2000-2022 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.74 20210803";
+static const char * version_str = "1.75 20220202";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 #define DEF_6_ALLOC_LEN 252
@@ -880,8 +880,7 @@ static const char *
 find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
                     bool encserv, bool mchngr, int t_proto)
 {
-    int k;
-    int num;
+    int k, num, decayed_pdt;
     const struct page_code_desc * pcdp;
 
     if (t_proto >= 0) {
@@ -896,6 +895,7 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
             }
         }
     }
+try_again:
     pcdp = get_mpage_tbl_size(scsi_ptype, &num);
     if (pcdp) {
         for (k = 0; k < num; ++k, ++pcdp) {
@@ -905,6 +905,11 @@ find_page_code_desc(int page_num, int subpage_num, int scsi_ptype,
             else if (page_num < pcdp->page_code)
                 break;
         }
+    }
+    decayed_pdt = sg_lib_pdt_decay(scsi_ptype);
+    if (decayed_pdt != scsi_ptype) {
+        scsi_ptype = decayed_pdt;
+        goto try_again;
     }
     if ((0xd != scsi_ptype) && encserv) {
         /* check for attached enclosure services processor */

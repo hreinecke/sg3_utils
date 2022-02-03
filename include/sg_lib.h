@@ -71,7 +71,7 @@ extern "C" {
  * So squeeze two PDTs into one integer. Use sg_pdt_s_eq() to compare.
  * N.B. Must not use PDT_DISK as upper */
 #define PDT_DISK_ZBC (PDT_DISK | (PDT_ZBC << 8))
-#define PDT_ALL (-1)	/* for common to all PDTs */
+#define PDT_ALL (-1)    /* for common to all PDTs */
 #define PDT_LOWER_MASK 0xff
 #define PDT_UPPER_MASK (~PDT_LOWER_MASK)
 
@@ -515,7 +515,7 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 /* for 33 see SG_LIB_CAT_TIMEOUT below */
 #define SG_LIB_WINDOWS_ERR 34   /* Windows error number don't fit in 7 bits so
                                  * map to a single value for exit statuses */
-#define SG_LIB_TRANSPORT_ERROR 35	/* driver or interconnect */
+#define SG_LIB_TRANSPORT_ERROR 35       /* driver or interconnect */
 #define SG_LIB_OK_FALSE 36      /* no error, reporting false (cf. no error,
                                  * reporting true is SG_LIB_OK_TRUE(0) ) */
 #define SG_LIB_CAT_PROTECTION 40 /* subset of aborted command (for PI, DIF)
@@ -612,19 +612,22 @@ void dStrHexFp(const char* str, int len, int no_ascii, FILE * fp);
  * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
  * per line with an extra space between the 8th and 9th bytes. 'format'
  * is 0 for repeat in printable ASCII ('.' for non printable chars) to
- * right of each line; 1 don't (so just output ASCII hex). Returns
- * number of bytes written to 'b' excluding the trailing '\0'. */
+ * right of each line; 1 don't (so just output ASCII hex). Note that
+ * an address is not printed on each line preceding the hex data. Returns
+ * number of bytes written to 'b' excluding the trailing '\0'.
+ * The only difference between dStrHexStr() and hex2str() is the type of
+ * the first argument. */
 int dStrHexStr(const char * str, int len, const char * leadin, int format,
                int cb_len, char * cbp);
-
-/* The following 3 functions are equivalent to dStrHex(), dStrHexErr() and
- * dStrHexStr() respectively. The difference is the type of the first of
- * argument: uint8_t instead of char. The name of the argument is changed
- * to b_str to stress it is a pointer to the start of a binary string. */
-void hex2stdout(const uint8_t * b_str, int len, int no_ascii);
-void hex2stderr(const uint8_t * b_str, int len, int no_ascii);
 int hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
             int cb_len, char * cbp);
+
+/* The following 2 functions are equivalent to dStrHex() and dStrHexErr()
+ * respectively. The difference is only the type of the first of argument:
+ * uint8_t instead of char. The name of the argument is changed to b_str to
+ * stress it is a pointer to the start of a binary string. */
+void hex2stdout(const uint8_t * b_str, int len, int no_ascii);
+void hex2stderr(const uint8_t * b_str, int len, int no_ascii);
 
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as
  * stdin). If reading ASCII hex then there should be either one entry per

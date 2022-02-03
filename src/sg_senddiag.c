@@ -1,6 +1,6 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem
- *    Copyright (C) 2003-2021 D. Gilbert
+ *    Copyright (C) 2003-2022 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -34,7 +34,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "0.64 20210610";
+static const char * version_str = "0.65 20220128";
 
 #define ME "sg_senddiag: "
 
@@ -836,16 +836,23 @@ main(int argc, char * argv[])
             num = sg_msense_calc_length(rsp_buff, 32, false, &bd_len);
             num -= (8 /* MS(10) header length */ + bd_len);
             if (num >= 0xc) {
-                int secs;
+                int secs = sg_get_unaligned_be16(rsp_buff + 8 + bd_len + 10);
 
-                secs = sg_get_unaligned_be16(rsp_buff + 8 + bd_len + 10);
+		if (0xffff == secs) {
+		    if (op->verbose > 1)
+			printf("Expected extended self-test duration's value "
+			       "[65535] indicates the\nsimilarly named field "
+			       "in the Extended Inquiry VPD page should be "
+			       "used\n");
+		} else {
 #ifdef SG_LIB_MINGW
-                printf("Expected extended self-test duration=%d seconds "
-                       "(%g minutes)\n", secs, secs / 60.0);
+                    printf("Expected extended self-test duration=%d seconds "
+                           "(%g minutes)\n", secs, secs / 60.0);
 #else
-                printf("Expected extended self-test duration=%d seconds "
-                       "(%.2f minutes)\n", secs, secs / 60.0);
+                    printf("Expected extended self-test duration=%d seconds "
+                           "(%.2f minutes)\n", secs, secs / 60.0);
 #endif
+		}
             } else
                 printf("Extended self-test duration not available\n");
         } else {

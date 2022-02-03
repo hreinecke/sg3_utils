@@ -1,10 +1,10 @@
-.TH SG_REP_ZONES "8" "January 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_REP_ZONES "8" "February 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_rep_zones \- send SCSI REPORT ZONES, REALMS or ZONE DOMAINS command
 .SH SYNOPSIS
 .B sg_rep_zones
-[\fI\-\-brief\fR] [\fI\-\-domain\fR] [\fI\-\-force\fR] [\fI\-\-help\fR]
-[\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-locator=LBA\fR]
+[\fI\-\-brief\fR] [\fI\-\-domain\fR] [\fI\-\-find=ZT\fR] [\fI\-\-force\fR]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-locator=LBA\fR]
 [\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR] [\fI\-\-partial\fR] [\fI\-\-raw\fR]
 [\fI\-\-readonly\fR] [\fI\-\-realm\fR] [\fI\-\-report=OPT\fR]
 [\fI\-\-start=LBA\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wp\fR]
@@ -14,13 +14,13 @@ sg_rep_zones \- send SCSI REPORT ZONES, REALMS or ZONE DOMAINS command
 .PP
 Sends a SCSI REPORT ZONES, REPORT REALMS or REPORT ZONE DOMAINS command to
 \fIDEVICE\fR and decodes (or simply outputs) the data returned. These
-commands is found in the ZBC\-2 draft standard, revision 10 (zbc2r05.pdf).
+commands are found in the ZBC\-2 draft standard, revision 12 (zbc2r12.pdf).
 Only the REPORT ZONES command is defined in the original ZBC
-standard (INCITS 536\-2017) and it is the default.
+standard (INCITS 536\-2017) and it is the default for this utility.
 .PP
-The REPORT ZONE DOMAINS command will be sent (or decoded) when the
+The REPORT ZONE DOMAINS command will be sent (and decoded) when the
 \fI\-\-domain\fR option is given. The REPORT REALMS command will be
-sent (or decoded) when the \fI\-\-realm\fR option is given.
+sent (and decoded) when the \fI\-\-realm\fR option is given.
 .PP
 Rather than send a SCSI command to \fIDEVICE\fR, if the \fI\-\-inhex=FN\fR
 option is given, then the contents of the file named \fIFN\fR are decoded
@@ -32,14 +32,37 @@ option is given then the corresponding command response is assumed.
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-b\fR, \fB\-\-brief\fR
-even though a ZBC disk will typically limit the size of the response
-to the REPORT ZONES command (e.g. to 127 zones say), this is still
-potentially a lot of output. This option will only decode and output
-fields found in the header plus some of the fields from the last
+even though a ZBC disk will typically limit the size of the response to the
+REPORT ZONES command (e.g. due to the "allocation length" field), this may
+still be potentially a lot of output. This option will only decode and
+output fields found in the response header plus fields from the last
 descriptor in the current response.
 .TP
 \fB\-d\fR, \fB\-\-domain\fR
 send or decode the SCSI REPORT ZONE DOMAINS command.
+.TP
+\fB\-F\fR, \fB\-\-find\fR=\fIZT\fR
+where \fIZT\fR is a zone type number or an abbreviation for a zone
+type. If \fIZT\fR is prefixed by either '\-' or '!' then the check for
+equality is inverted to be a check for inequality. IOWs it does a: find
+the first occurrence that is
+.B not
+the given zone type.
+.br
+The algorithm used by this option takes into account the \fI\-\-hex\fR,
+\fI\-\-maxlen=LEN\fR, \fI\-\-report=OPT\fR and \fI\-\-start=LBA\fR options,
+if given, and ignores other options. It is only implemented for the Report
+zones command. The algorithm may call the Report zones command repeatedly,
+with the PARTIAL bit set and the Zone start LBA field being increased as it
+goes. This continues until either there is a match on the \fIZT\fR condition
+or the number of zones is exhausted.
+.br
+The \fIZT\fR numbers and abbreviations are listed when the \fI\-\-help\fR
+option is given twice. Warning: using '!' for inverting the condition may
+not be so practical as the shell (e.g. bash) may interprete '!' as having
+special meaning. Placing single quotes around \fIZT\fR fixes the problem
+for the bash shell (e.g. \-\-find='!c' meaning find the first zone whose
+type is not conventional).
 .TP
 \fB\-f\fR, \fB\-\-force\fR
 when decoding the response to this command, certain sanity checks are
@@ -48,7 +71,8 @@ exit status is set. If this option is given those sanity checks are
 bypassed.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
-output the usage message then exit.
+output the usage message then exit. When given twice, additional usage
+information is output.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 output the response in hexadecimal to stdout. When used once the whole
@@ -57,8 +81,13 @@ response is output in ASCII hexadecimal with a leading address (starting at
 output separately in hexadecimal. When used thrice the whole response is
 output in hexadecimal with no leading address (on each line).
 .br
-The output format when this option is given thrice is suitable contents
-for a later invocation with the \fI\-\-inhex=FN\fR option.
+When this option is used twice, it can be useful with either the
+\fI\-\-brief\fR or \fI\-\-find=ZT\fR option to only output the header
+and zone descriptor in hex that those two options would otherwise print
+in ASCII in the absence of the \fI\-\-hex\fR option.
+.br
+The output format when this option is given thrice is suitable for a later
+invocation with the \fI\-\-inhex=FN\fR option.
 .TP
 \fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
 where \fIFN\fR is a file name whose contents are assumed to be ASCII
@@ -80,7 +109,7 @@ commands.
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
 the cdb's "allocation length" field. If not given (or \fILEN\fR is zero)
-then 8192 is used. The maximum allowed value of \fILEN\fR is 1048576.
+then 16384 is used. The maximum allowed value of \fILEN\fR is 2097152.
 .TP
 \fB\-n\fR, \fB\-\-num\fR=\fINUM\fR
 where \fINUM\fR is the (maximum) number of zone descriptors to print out.
@@ -88,7 +117,22 @@ The default value is zero which is taken to mean print out all zone
 descriptors returned by the REPORT ZONES command.
 .TP
 \fB\-p\fR, \fB\-\-partial\fR
-set the PARTIAL bit in the cdb.
+set the PARTIAL bit in the cdb. Without the PARTIAL bit set a ZBC disk
+will attempt to form a response with all zones from \fILBA\fR to the end
+of the disk. If there are a large number of zones (e.g. > 10,000) this
+large response will be truncated so that it doesn't exceed the "allocation
+length" field in the cdb (see \fI\-\-maxlen=LEN\fR). The advantage of doing
+this is that the number of (remaining) zones on the disk can be calculated.
+The disadvantage is the amount of time that may take.
+.br
+With the PARTIAL bit set in the cdb, only the number of zones implied by
+the "allocation length" field are fetched. This may be considerably faster
+than the same command without the PARTIAL bit set.
+.br
+When iterating through the zones on a ZBC disk, the process will be faster
+when the PARTIAL bit is set. Typically \fI\-\-start=LBA\fR is set to zero
+or the [LBA + zone_length] of the last zone reported in the previous
+iteration.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary (to stdout) unless the \fI\-\-inhex=FN\fR option
