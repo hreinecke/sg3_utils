@@ -716,7 +716,7 @@ expandlist ()
       result="$result $beg";
     else
       end=${first#*-}
-      result="$result $(seq $beg $end)"
+      result="$result $(seq -s ' ' $beg $end)"
     fi
     [ "$rest" = "$first" ] && rest=""
     first=${rest%%,*}
@@ -1200,7 +1200,7 @@ fi
 unsetcolor
 debug=0
 lunsearch=
-opt_idsearch=$(seq 0 7)
+opt_idsearch=$(seq -s ' ' 0 7)
 filter_ids=0
 opt_channelsearch=
 remove=
@@ -1227,13 +1227,13 @@ while [ ! -z "$opt" ] && [ -z "${opt##-*}" ] ; do
     f) flush=1 ;;
     i) lipreset=0 ;;
     I) shift; lipreset=$opt ;;
-    l) lunsearch=$(seq 0 7) ;;
-    L) lunsearch=$(seq 0 "$2"); shift ;;
+    l) lunsearch=$(seq -s ' ' 0 7) ;;
+    L) lunsearch=$(seq -s ' ' 0 "$2"); shift ;;
     m) mp_enable=1 ;;
     r) remove=1 ;;
     s) resize=1; mp_enable=1 ;;
     u) update=1 ;;
-    w) opt_idsearch=$(seq 0 15) ;;
+    w) opt_idsearch=$(seq -s ' ' 0 15) ;;
     -alltargets)  existing_targets=;;
     -attachpq3) scan_flags=$((scan_flags|0x1000000)) ;;
     -channels=*)  arg=${opt#-channels=};opt_channelsearch=$(expandlist "$arg") ;;
@@ -1257,7 +1257,7 @@ while [ ! -z "$opt" ] && [ -z "${opt##-*}" ] ; do
     -sparselun) scan_flags=$((scan_flags|0x40)) ;;
     -sync) sync=2 ;;
     -update) update=1;;
-    -wide) opt_idsearch=$(seq 0 15) ;;
+    -wide) opt_idsearch=$(seq -s ' ' 0 15) ;;
     *) echo "Unknown option -$opt !" ;;
   esac
   shift
