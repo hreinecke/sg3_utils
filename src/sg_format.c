@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.65 20220127";
+static const char * version_str = "1.66 20220211";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -1589,9 +1589,9 @@ main(int argc, char **argv)
                 pdt = PDT_MASK & inq_resp[0];
         if (op->format) {
                 if ((PDT_DISK != pdt) && (PDT_OPTICAL != pdt) &&
-                    (PDT_RBC != pdt)) {
+                    (PDT_RBC != pdt) && (PDT_ZBC != pdt)) {
                         pr2serr("This format is only defined for disks "
-                                "(using SBC-2 or RBC) and MO media\n");
+                                "(using SBC-2+, ZBC or RBC) and MO media\n");
                         ret = SG_LIB_CAT_MALFORMED;
                         goto out;
                 }

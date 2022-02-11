@@ -1,4 +1,4 @@
-.TH SG_FORMAT "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_FORMAT "8" "February 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_format \- format, format with preset, resize SCSI disk; format tape
 .SH SYNOPSIS
@@ -28,7 +28,11 @@ This utility issues one of three SCSI format commands: FORMAT UNIT, FORMAT
 MEDIUM or FORMAT WITH PRESET. In the following description, unqualified
 sections will usually be referring to the SCSI FORMAT UNIT command. Both
 FORMAT UNIT and FORMAT WITH PRESET apply to disks (or disk\-like devices).
-The FORMAT MEDIUM command is for tapes.
+The FORMAT MEDIUM command is for tapes. A SCSI INQUIRY response categorizes
+the 'Peripheral Device Type' (PDT) of each SCSI device. This utility uses
+the PDT to check if there is a conflict between the \fIDEVICE\fR and the
+given option (e.g. giving the \fI\-\-tape=FM\fR option when \fIDEVICE\fR is
+a normal disk). If there is a conflict, this utility will not continue.
 .PP
 This utility can format modern SCSI disks and potentially change their block
 size (if permitted) and the block count (i.e. number of accessible blocks on
@@ -200,6 +204,10 @@ When used three times (or more) the preliminary MODE SENSE and SELECT
 commands are bypassed, leaving only the initial INQUIRY and FORMAT UNIT
 commands. This is for emergency use (e.g. when the MODE SENSE/SELECT
 commands are not working) and cannot change the logical block size.
+.br
+Host managed zoned devices (e.g. many zoned disks) have a different PDT
+compared to other disks but can still be formatted as if they were 'normal'
+disks.
 .br
 See NOTES section for implementation details and EXAMPLES section for typical
 use.
@@ -550,6 +558,17 @@ provisioned formats typically complete faster than fully provisioned ones
 on the same disk (see the \fI\-\-ip_def\fR option). In either case format
 operations on SSDs tend to be a lot faster than they are on hard disks with
 spinning media.
+.PP
+Host managed zoned devices (aka zoned disks) have a different Peripheral
+Device Type [PDT=20 or 0x14] from normal disks. They can be considered
+as a superset of normal disks (e.g. SSDs and hard disks) at least from
+the perspective of the number of SCSI commands they support. Typically
+they can be formatted just like other SCSI disks. They have their own
+T10 standards: ZBC standard (INCITS 536\-2016) and draft ZBC\-2.
+.br
+Two other zoned disk variants ("host aware" and "Domains and Realms") use
+the same PDT as other disks (i.e. PDT=0) and can be formatted by this
+utility as if they were normal disks.
 .SH TAPE
 Tape system use a variant of the FORMAT UNIT command used on disks. Tape
 systems use the FORMAT MEDIUM command which is simpler with only three
@@ -695,7 +714,7 @@ Written by Grant Grundler, James Bottomley and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2020 Grant Grundler, James Bottomley and Douglas Gilbert
+Copyright \(co 2005\-2022 Grant Grundler, James Bottomley and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
