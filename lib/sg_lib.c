@@ -954,8 +954,8 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
 {
     int m, p_id, piv, c_set, assoc, desig_type, ci_off, c_id, d_id, naa;
     int vsi, k, n, dlen;
+    uint64_t ccc_id, vsei;
     const uint8_t * ip;
-    uint64_t vsei;
     char e[64];
     const char * cp;
 
@@ -1061,17 +1061,9 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
             n += hex2str(ip, dlen, lip, 1, blen - n, b + n);
             break;
         }
-        c_id = sg_get_unaligned_be24(ip + ci_off);
-        n += sg_scnpr(b + n, blen - n, "%s      IEEE Company_id: 0x%x\n", lip,
-                      c_id);
-        vsei = 0;
-        for (m = 0; m < 5; ++m) {
-            if (m > 0)
-                vsei <<= 8;
-            vsei |= ip[ci_off + 3 + m];
-        }
-        n += sg_scnpr(b + n, blen - n, "%s      Vendor Specific Extension "
-                      "Identifier: 0x%" PRIx64 "\n", lip, vsei);
+        ccc_id = sg_get_unaligned_be64(ip + ci_off);
+        n += sg_scnpr(b + n, blen - n, "%s      IEEE identifier: 0x%"
+		      PRIx64 "x\n", lip, ccc_id);
         if (12 == dlen) {
             d_id = sg_get_unaligned_be32(ip + 8);
             n += sg_scnpr(b + n, blen - n, "%s      Directory ID: 0x%x\n",
@@ -1100,8 +1092,8 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
             if (do_long) {
                 n += sg_scnpr(b + n, blen - n, "%s      NAA 2, vendor "
                               "specific identifier A: 0x%x\n", lip, d_id);
-                n += sg_scnpr(b + n, blen - n, "%s      IEEE Company_id: "
-                              "0x%x\n", lip, c_id);
+                n += sg_scnpr(b + n, blen - n, "%s      AOI: 0x%x\n", lip,
+			      c_id);
                 n += sg_scnpr(b + n, blen - n, "%s      vendor specific "
                               "identifier B: 0x%x\n", lip, vsi);
                 n += sg_scnpr(b + n, blen - n, "%s      [0x", lip);
@@ -1144,8 +1136,8 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
                 vsei |= ip[3 + m];
             }
             if (do_long) {
-                n += sg_scnpr(b + n, blen - n, "%s      NAA 5, IEEE "
-                              "Company_id: 0x%x\n", lip, c_id);
+                n += sg_scnpr(b + n, blen - n, "%s      NAA 5, AOI: 0x%x\n",
+			      lip, c_id);
                 n += sg_scnpr(b + n, blen - n, "%s      Vendor Specific "
                               "Identifier: 0x%" PRIx64 "\n", lip, vsei);
                 n += sg_scnpr(b + n, blen - n, "%s      [0x", lip);
@@ -1174,8 +1166,8 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
                 vsei |= ip[3 + m];
             }
             if (do_long) {
-                n += sg_scnpr(b + n, blen - n, "%s      NAA 6, IEEE "
-                              "Company_id: 0x%x\n", lip, c_id);
+                n += sg_scnpr(b + n, blen - n, "%s      NAA 6, AOI: 0x%x\n",
+			      lip, c_id);
                 n += sg_scnpr(b + n, blen - n, "%s      Vendor Specific "
                               "Identifier: 0x%" PRIx64 "\n", lip, vsei);
                 vsei = sg_get_unaligned_be64(ip + 8);

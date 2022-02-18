@@ -1,29 +1,47 @@
-.TH SG_READ_BUFFER "8" "May 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_READ_BUFFER "8" "February 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_read_buffer \- send SCSI READ BUFFER command
 .SH SYNOPSIS
 .B sg_read_buffer
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id=ID\fR] [\fI\-\-inhex=FN\fR]
-[\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR] [\fI\-\-offset=OFF\fR]
-[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-specific=MS\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-eh_code=EHC\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id=ID\fR]
+[\fI\-\-inhex=FN\fR] [\fI\-\-length=LEN\fR] [\fI\-\-mode=MO\fR]
+[\fI\-\-no_output\fR] [\fI\-\-offset=OFF\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-specific=MS\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
-Sends a SCSI READ BUFFER command to the \fIDEVICE\fR, and if there
-is a response either decodes it, prints it in hexadecimal or sends
-it in binary to stdout. If a response is received for a "descriptor"
-mode then, in the absence of \fI\-\-hex\fR and \fI\-\-raw\fR, it is
-decoded. Response for non\-descriptor modes are output in hexadecimal
-unless the \fI\-\-raw\fR option is given.
+Sends a SCSI READ BUFFER command to the \fIDEVICE\fR, and if there is a
+response either decodes it, prints it in hexadecimal or sends it in binary to
+stdout. If a response is received for a "descriptor" mode then, in the absence
+of \fI\-\-hex\fR and \fI\-\-raw\fR, it is decoded. Response for
+non\-descriptor modes are output in hexadecimal unless the \fI\-\-raw\fR
+option is given.
+.PP
+The responses to the Read microcode status ('rd_microc_st' [0xf]) and Error
+history ('err_hist' [0x1c]) modes are decoded as described in spc6r06.pdf and
+earlier T10 documents.
 .PP
 This utility may be called without a \fIDEVICE\fR but with a
-\fI\-\-inhex=FN\fR option instead. \fIFN\fR is expected to be a file
-name (or '\-' for stdin). The contents of the file (or stdin stream)
-is assumed to be hexadecimal (or binary) data that represents a SCSI
-READ BUFFER command response and is decoded as such.
+\fI\-\-inhex=FN\fR option instead. \fIFN\fR is expected to be a file name (or
+ '\-' for stdin). The contents of the file (or stdin stream) is assumed to be
+hexadecimal (or binary) data that represents a SCSI READ BUFFER command
+response and is decoded as such.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-e\fR, \fB\-\-eh_code\fR=\fIEHC\fR
+\fIEHC\fR is the error history code placed in the Buffer ID field of the cdb.
+The Mode field is set to err_hist [0x1c]. The option is equivalent to using
+the '\fI\-\-mode=eh\fR \fI\-\-id=EHC\fR' options. If this option and one of
+the other options is given, then an error will be generated if they
+contradict. The default (maximum) response length is increased to 64 bytes
+when may need to be increased (if so that is noted if the output is
+truncated).
+.br
+An example is setting \fIEHC\fR to 0 in which case the error history
+directory will be decoded (unless \fI\-\-hex\fR or \fI\-\-raw\fR options
+is given).
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit. If used multiple times also prints
@@ -32,26 +50,34 @@ the mode names and their acronyms.
 \fB\-H\fR, \fB\-\-hex\fR
 output the response in hexadecimal. When given twice the response is
 output in hex with the corresponding representation in ASCII to the
-right of each line.
+right of each line. When given three time the hex is printed without
+addresses (indexes) at the start of each line; this type of format is
+suitable for the \fI\-\-inhex=FN\fR option on a subsequent invocation.
 .TP
 \fB\-i\fR, \fB\-\-id\fR=\fIID\fR
-this option sets the buffer id field in the cdb. \fIID\fR is a value between
-0 (default) and 255 inclusive.
+this option sets the Buffer ID field in the cdb. \fIID\fR is a value between
+0 (default) and 255 inclusive. The meaning of the Buffer ID field varies
+with the value in the Mode field of the cdb.
 .TP
 \fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
 \fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
 ASCII hexadecimal or binary representing a READ BUFFER response. If known
-this utility will then decode that response. It is preferable to also
-supply the \fI\-\-mode=MO\fR and \fI\-\-specific=MS\fR options, since these
-are not present in the response. The hexadecimal should be arranged as 1 or
-2 digits representing a byte each of which is whitespace or comma separated.
-Anything from and including a hash mark to the end of line is ignored. If the
-\fI\-\-raw\fR option is also given then \fIFN\fR is treated as binary.
+this utility will then decode that response. It is preferable to also supply
+the \fI\-\-mode=MO\fR, \fI\-\-id=ID\fR and possible \fI\-\-specific=MS\fR
+options, since these are not present in the response. See the "FORMAT OF
+FILES CONTAINING ASCII HEX" section in the sg3_utils manpage for more
+information. If the \fI\-\-raw\fR option is also given then the contents
+of \fIFN\fR is treated as binary.
 .TP
 \fB\-l\fR, \fB\-\-length\fR=\fILEN\fR
 where \fILEN\fR is the length, in bytes, that is placed in the "allocation
-length" field in the cdb. The default value is 4 (bytes). The device may
+length" field in the cdb. The default value is 4 (bytes) which is increased
+to 64 if the 'err_hist' mode [0x1c] is given or implied. The device may
 respond with less bytes.
+.br
+If the \fI\-\-inhex=FN\fR option is given, then the default value of the
+length is increased to 8192 bytes. This length may then be reduced to match
+the number of bytes decoded from the contents of \fIFN\fR.
 .TP
 \fB\-m\fR, \fB\-\-mode\fR=\fIMO\fR
 this option sets the mode field in the cdb. \fIMO\fR is a value between
@@ -60,12 +86,23 @@ See the MODES section below. To list the available mode abbreviations use
 an invalid one (e.g. '\-\-mode=xxx'). As an example, to fetch the read
 buffer descriptor give '\-\-mode=desc' .
 .TP
+\fB\-N\fR, \fB\-\-no_output\fR
+when this option is given after sending the SCSI command to the \fIDEVICE\fR
+the response is processed, looking for any errors, and then this utility
+exits. Any data read by the READ BUFFER command is ignored.
+.br
+May be useful for timing larger reads from the \fIDEVICE\fR buffer in 'data'
+mode [0x2].
+.TP
 \fB\-o\fR, \fB\-\-offset\fR=\fIOFF\fR
 this option sets the buffer offset field in the cdb. \fIOFF\fR is a value
 between 0 (default) and 2**24\-1 . It is a byte offset.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
-if a response is received then it is sent in binary to stdout.
+if a response is received then it is sent in binary to stdout. When this
+option is given together with \fI\-\-inhex=FN\fR then the contents of
+\fIFN\fR is assumed to be binary and the output of this utility is
+normal ASCII (i.e. _not_ in binary).
 .TP
 \fB\-R\fR, \fB\-\-readonly\fR
 open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
@@ -115,8 +152,9 @@ en_ex  [26, 0x1a]
 Enable expander communications protocol and Echo buffer. Made obsolete in
 SPC\-4.
 .TP
-err_hist  [28, 0x1c]
-Error history. Introduced in SPC\-4.
+err_hist|eh  [28, 0x1c]
+Error history. Either 'err_hist' or the short 'eh' abbreviation can be used
+for this mode. Introduced in SPC\-4.
 .SH NOTES
 All numbers given with options are assumed to be decimal.
 Alternatively numerical values can be given in hexadecimal preceded by

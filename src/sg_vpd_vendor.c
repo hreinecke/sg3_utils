@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2019 Douglas Gilbert.
+ * Copyright (c) 2006-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -232,11 +233,11 @@ dup_sanity_chk(int sz_opts_t, int sz_values_name_t)
                 sz_values_name_t);
 }
 
-static int
+static bool
 is_like_pdt(int actual_pdt, const struct svpd_values_name_t * vnp)
 {
     if (actual_pdt == vnp->pdt)
-        return 1;
+        return true;
     if (PDT_DISK == vnp->pdt) {
         switch (actual_pdt) {
         case PDT_DISK:
@@ -244,21 +245,21 @@ is_like_pdt(int actual_pdt, const struct svpd_values_name_t * vnp)
         case PDT_PROCESSOR:
         case PDT_SAC:
         case PDT_ZBC:
-            return 1;
+            return true;
         default:
-            return 0;
+            return false;
         }
     } else if (PDT_TAPE == vnp->pdt) {
         switch (actual_pdt) {
         case PDT_TAPE:
         case PDT_MCHANGER:
         case PDT_ADC:
-            return 1;
+            return true;
         default:
-            return 0;
+            return false;
         }
     } else
-        return 0;
+        return false;
 }
 
 static const struct svpd_values_name_t *

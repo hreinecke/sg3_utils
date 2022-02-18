@@ -38,7 +38,7 @@
  * command to the given SCSI device. Based on zbc2r12.pdf .
  */
 
-static const char * version_str = "1.02 20211203";
+static const char * version_str = "1.03 20211217";
 
 #define SG_ZBC_IN_CMDLEN 16
 #define Z_ACTIVATE_SA 0x8
@@ -365,10 +365,9 @@ main(int argc, char * argv[])
     uint8_t * free_zibp = NULL;
     const char * sa_name;
     char b[80];
-    struct opts_t opts;
+    struct opts_t opts = {0};
     struct opts_t * op = &opts;
 
-    memset(&opts, 0, sizeof(opts));
     while (1) {
         int option_index = 0;
 

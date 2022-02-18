@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.30 20220127";
+static const char * version_str = "1.31 20220217";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -2197,10 +2197,9 @@ main(int argc, char * argv[])
     uint64_t addr_arr[MAX_NUM_ADDR];
     uint32_t num_arr[MAX_NUM_ADDR];
     struct stat if_stat, sf_stat;
-    struct opts_t opts;
+    struct opts_t opts = {0};
 
     op = &opts;
-    memset(op, 0, sizeof(opts));
     memset(&if_stat, 0, sizeof(if_stat));
     memset(&sf_stat, 0, sizeof(sf_stat));
     op->numblocks = DEF_WR_NUMBLOCKS;

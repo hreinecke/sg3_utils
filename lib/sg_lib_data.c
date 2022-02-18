@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.85 20220127";
+const char * sg_lib_version_str = "2.87 20220217";
 /* spc6r06, sbc5r01, zbc2r12 */
 
 
@@ -257,6 +257,7 @@ struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
     {0x3, PDT_ALL, "descriptor"},
     {0xa, PDT_ALL, "read data from echo buffer"},
     {0xb, PDT_ALL, "echo buffer descriptor"},
+    {0xf, PDT_ALL, "read microcode status"},	/* added in spc5r20 */
     {0x1a, PDT_ALL, "enable expander comms protocol and echo buffer"},
     {0x1c, PDT_ALL, "error history"},
     {0xffff, 0, NULL},
@@ -1625,7 +1626,7 @@ struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[] =
 /* .value is completion queue's DW3 as follows: ((DW3 >> 17) & 0x3ff)
  * .peri_dev_type is an index for the sg_lib_scsi_status_sense_arr[]
  * .name is taken from NVMe 1.3a document, section 4.6.1.2.1 with less
- *   capitalization.
+ *       capitalization.
  * NVMe term bits 31:17 of DW3 in the completion field as the "Status
  * Field" (SF). Bit 31 is "Do not retry" (DNR) and bit 30 is "More" (M).
  * Bits 29:28 are reserved, bit 27:25 are the "Status Code Type" (SCT)
@@ -1674,14 +1675,31 @@ struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
     {0x20,  18, "Namespace is write protected"},        /* NVMe 1.4 */
     {0x21,  6, "Command interrupted"},                  /* NVMe 1.4 */
     {0x22,  5, "Transient transport error"},            /* NVMe 1.4 */
+    {0x23,  5, "Prohibited by lockdown"},               /* NVMe 2.0 */
+    {0x24,  5, "Admin command: media not ready"},       /* NVMe 2.0 */
 
     /* 0x80 - 0xbf: I/O command set specific */
-    /* Generic command status values, NVM (I/O) Command Set */
+    /* Command specific status values, NVM (I/O) Command Set */
     {0x80, 12, "LBA out of range"},
     {0x81,  3, "Capacity exceeded"},
     {0x82, 13, "Namespace not ready"},
     {0x83, 14, "Reservation conflict"},
     {0x84, 15, "Format in progress"},
+    {0x85, 2, "Invalid value size"},
+    {0x86, 2, "Invalid key size"},
+    {0x87, 2, "KV key does not exist"},
+    {0x88, 15, "Unrecovered error"},
+    {0x89, 2, "Key exists"},
+
+    /* Command specific status values, ZNS (NVM) Command Set */
+    {0xb8, 0x1f, "Zone boundary error"},
+    {0xb9, 0x2, "Zone is full"},
+    {0xba, 0x1b, "Zone is read only"},
+    {0xbb, 0x1c, "Zone is offline"},
+    {0xbc, 2, "Zone invalid write"},
+    {0xbd, 0x20, "Too many active zones"},
+    {0xbe, 0x20, "Too many open zones"},
+    {0xbf, 2, "Invalid zone state transition"},
     /* 0xc0 - 0xff: vendor specific */
 
     /* Command specific status values, Status Code Type (SCT): 1h */
@@ -1753,14 +1771,18 @@ struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
  * as 0x2. */
 struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
 {
-    {SAM_STAT_GOOD, SPC_SK_NO_SENSE, 0, 0},     /* it's all good */ /* 0 */
+    /* SCSI Status, SCSI sense key, ASC, ASCQ */
+/* index: 0 */
+    {SAM_STAT_GOOD, SPC_SK_NO_SENSE, 0, 0},     /* it's all good */
     {SAM_STAT_CHECK_CONDITION, SPC_SK_ILLEGAL_REQUEST, 0x20, 0x0},/* opcode */
     {0x2, SPC_SK_ILLEGAL_REQUEST, 0x24, 0x0},   /* field in cdb */
     {0x2, SPC_SK_MEDIUM_ERROR, 0x0, 0x0},
     {SAM_STAT_TASK_ABORTED, SPC_SK_ABORTED_COMMAND, 0xb, 0x8},
-    {0x2, SPC_SK_HARDWARE_ERROR, 0x44, 0x0},   /* internal error */ /* 5 */
+    {0x2, SPC_SK_HARDWARE_ERROR, 0x44, 0x0},   /* internal error */
     {SAM_STAT_TASK_ABORTED, SPC_SK_ABORTED_COMMAND, 0x0, 0x0},
     {0x2, SPC_SK_ILLEGAL_REQUEST, 0x20, 0x9},   /* invalid LU */
+
+/* index: 8 */
     {0x2, SPC_SK_ILLEGAL_REQUEST, 0x20, 0x2},   /* access denied */
     {0x2, SPC_SK_ILLEGAL_REQUEST, 0x2c, 0x0},   /* cmd sequence error */
     {0x2, SPC_SK_MEDIUM_ERROR, 0x31, 0x3},   /* sanitize failed */ /* 10 */
@@ -1768,18 +1790,30 @@ struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
     {0x2, SPC_SK_ILLEGAL_REQUEST, 0x21, 0x0},   /* LBA out of range */
     {0x2, SPC_SK_NOT_READY, 0x4, 0x0},  /* not reportable; 0x1: becoming */
     {SAM_STAT_RESERVATION_CONFLICT, 0x0, 0x0, 0x0},
-    {0x2, SPC_SK_NOT_READY, 0x4, 0x4},  /* format in progress */  /* 15 */
+    {0x2, SPC_SK_NOT_READY, 0x4, 0x4},  /* format in progress */
+
+/* index: 0x10 */
     {0x2, SPC_SK_ILLEGAL_REQUEST, 0x31, 0x1},  /* format failed */
     {0x2, SPC_SK_NOT_READY, 0x4, 0x9},  /* self-test in progress */
     {0x2, SPC_SK_DATA_PROTECT, 0x27, 0x0},      /* write prohibited */
     {0x2, SPC_SK_ILLEGAL_REQUEST, 0x10, 0x5},  /* protection info */
-    {0x2, SPC_SK_MEDIUM_ERROR, 0x3, 0x0}, /* periph dev w fault */ /* 20 */
+    {0x2, SPC_SK_MEDIUM_ERROR, 0x3, 0x0}, /* periph dev w fault */
     {0x2, SPC_SK_MEDIUM_ERROR, 0x11, 0x0},      /* unrecoc rd */
     {0x2, SPC_SK_MEDIUM_ERROR, 0x10, 0x1},      /* PI guard */
     {0x2, SPC_SK_MEDIUM_ERROR, 0x10, 0x2},      /* PI app tag */
-    {0x2, SPC_SK_MEDIUM_ERROR, 0x10, 0x2},      /* PI app tag */
-    {0x2, SPC_SK_MISCOMPARE, 0x1d, 0x0},        /* during verify */ /* 25 */
+
+/* index: 0x18 */
+    {0x2, SPC_SK_MEDIUM_ERROR, 0x10, 0x3},      /* PI reference tag */
+    {0x2, SPC_SK_MISCOMPARE, 0x1d, 0x0},        /* during verify */
     {0x2, SPC_SK_MEDIUM_ERROR, 0x21, 0x6},      /* read invalid data */
+    {0x2, SPC_SK_DATA_PROTECT, 0x27, 0x8},      /* zone is read only */
+    {0x2, SPC_SK_DATA_PROTECT, 0x2c, 0xe},      /* zone is offline */
+    {0x2, SPC_SK_DATA_PROTECT, 0x2c, 0x12},     /* zone is inactive */
+    {0x2, SPC_SK_DATA_PROTECT, 0x3f, 0x17},     /* zone is full */
+    {0x2, SPC_SK_ILLEGAL_REQUEST, 0x21, 0x5},   /* Write boundary violation */
+
+/* index: 0x20 */
+    {0x2, SPC_SK_DATA_PROTECT, 0x55, 0xe},   /* Insufficient zone resources */
 
     /* Leave this Sentinel value at end of this array */
     {0xff, 0xff, 0xff, 0xff},

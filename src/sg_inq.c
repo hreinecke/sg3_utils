@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.14 20220109";  /* spc6r06 */
+static const char * version_str = "2.16 20220217";  /* spc6r06 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -1337,12 +1337,11 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len, int do_hex,
 {
     int u, j, m, id_len, p_id, c_set, piv, assoc, desig_type, i_len;
     int off, ci_off, c_id, d_id, naa, vsi, k;
-    uint64_t vsei;
-    uint64_t id_ext;
+    uint64_t vsei, id_ext, ccc_id;
     const uint8_t * bp;
     const uint8_t * ip;
-    char b[64];
     const char * cp;
+    char b[64];
 
     if (buff[2] != 0) {
         /*
@@ -1452,11 +1451,8 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len, int do_hex,
                 hex2stderr(ip, i_len, -1);
                 break;
             }
-            c_id = sg_get_unaligned_be24(ip + ci_off);
-            printf("      IEEE Company_id: 0x%x\n", c_id);
-            vsei = sg_get_unaligned_be48(ip + ci_off + 3);
-            printf("      Vendor Specific Extension Identifier: 0x%" PRIx64
-                   "\n", vsei);
+            ccc_id = sg_get_unaligned_be64(ip + ci_off);
+            printf("      IEEE identifier: 0x%" PRIx64 "\n", ccc_id);
             if (12 == i_len) {
                 d_id = sg_get_unaligned_be32(ip + 8);
                 printf("      Directory ID: 0x%x\n", d_id);
@@ -1487,7 +1483,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len, int do_hex,
                 vsi = sg_get_unaligned_be24(ip + 5);
                 printf("      NAA 2, vendor specific identifier A: 0x%x\n",
                        d_id);
-                printf("      IEEE Company_id: 0x%x\n", c_id);
+                printf("      AOI: 0x%x\n", c_id);
                 printf("      vendor specific identifier B: 0x%x\n", vsi);
                 printf("      [0x");
                 for (m = 0; m < 8; ++m)
@@ -1521,7 +1517,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len, int do_hex,
                     vsei <<= 8;
                     vsei |= ip[3 + m];
                 }
-                printf("      NAA 5, IEEE Company_id: 0x%x\n", c_id);
+                printf("      NAA 5, AOI: 0x%x\n", c_id);
                 printf("      Vendor Specific Identifier: 0x%" PRIx64
                        "\n", vsei);
                 printf("      [0x");
@@ -1543,7 +1539,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len, int do_hex,
                     vsei <<= 8;
                     vsei |= ip[3 + m];
                 }
-                printf("      NAA 6, IEEE Company_id: 0x%x\n", c_id);
+                printf("      NAA 6, AOI: 0x%x\n", c_id);
                 printf("      Vendor Specific Identifier: 0x%" PRIx64 "\n",
                        vsei);
                 vsei = sg_get_unaligned_be64(ip + 8);
@@ -2032,9 +2028,8 @@ decode_softw_inf_id(uint8_t * buff, int len, int do_hex)
     len -= 4;
     buff += 4;
     for ( ; len > 5; len -= 6, buff += 6)
-        printf("    IEEE Company_id: 0x%06x, vendor specific extension "
-               "id: 0x%06x\n", sg_get_unaligned_be24(buff + 0),
-               sg_get_unaligned_be24(buff + 3));
+        printf("    IEEE identifier: 0x%" PRIx64 "\n",
+	       sg_get_unaligned_be48(buff + 0));
 }
 
 /* VPD_ATA_INFO [0x89] */
@@ -2189,7 +2184,7 @@ decode_b0_vpd(uint8_t * buff, int len, int do_hex)
     }
     pdt = PDT_MASK & buff[0];
     switch (pdt) {
-        case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+        case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
             if (len < 16) {
                 pr2serr("Block limits VPD page length too short=%d\n", len);
                 return;
@@ -2335,7 +2330,7 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex)
     }
     pdt = PDT_MASK & buff[0];
     switch (pdt) {
-        case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+        case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
             if (len < 64) {
                 pr2serr("Block device characteristics VPD page length too "
                         "short=%d\n", len);
@@ -2410,7 +2405,7 @@ decode_b3_vpd(uint8_t * buff, int len, int do_hex)
     }
     pdt = PDT_MASK & buff[0];
     switch (pdt) {
-        case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+        case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
             if (len < 0x10) {
                 pr2serr("Referrals VPD page length too short=%d\n", len);
                 return;
@@ -3541,7 +3536,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             pdt = rp[0] & PDT_MASK;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
-                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                     printf("VPD INQUIRY: Block limits page (SBC)\n");
                     break;
                 case PDT_TAPE: case PDT_MCHANGER:
@@ -3569,7 +3564,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             pdt = rp[0] & PDT_MASK;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
-                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                     printf("VPD INQUIRY: Block device characteristics page "
                            "(SBC)\n");
                     break;
@@ -3607,7 +3602,7 @@ vpd_decode(int sg_fd, const struct opts_t * op, int inhex_len)
             pdt = rp[0] & PDT_MASK;
             if (! op->do_raw && (op->do_hex < 2)) {
                 switch (pdt) {
-                case PDT_DISK: case PDT_WO: case PDT_OPTICAL:
+                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                     printf("VPD INQUIRY: Referrals VPD page (SBC)\n");
                     break;
                 default:
@@ -3902,7 +3897,7 @@ show_nvme_id_ctrl(const uint8_t *dinp, const char *dev_name, int do_long)
     printf("  PCI vendor ID VID/SSVID: 0x%x/0x%x\n",
            sg_get_unaligned_le16(dinp + 0),
            sg_get_unaligned_le16(dinp + 2));
-    printf("  IEEE OUI Identifier: 0x%x\n",
+    printf("  IEEE OUI Identifier: 0x%x\n",  /* this has been renamed AOI */
            sg_get_unaligned_le24(dinp + 73));
     got_fguid = ! sg_all_zeros(dinp + 112, 16);
     if (got_fguid) {

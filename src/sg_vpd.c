@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.68 20220118";  /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.69 20220217";  /* spc6r06 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -1150,11 +1150,9 @@ decode_softw_inf_id(uint8_t * buff, int len, int do_hex)
     }
     len -= 4;
     buff += 4;
-    for ( ; len > 5; len -= 6, buff += 6) {
-        printf("    IEEE Company_id: 0x%06x, vendor specific extension "
-               "id: 0x%06x\n", sg_get_unaligned_be24(buff),
-               sg_get_unaligned_be24(buff + 3));
-    }
+    for ( ; len > 5; len -= 6, buff += 6)
+	printf("    IEEE identifier: 0x%" PRIx64 "\n",
+               sg_get_unaligned_be48(buff + 0));
 }
 
 /* VPD_ATA_INFO */
