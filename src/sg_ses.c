@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.55 20220127";    /* ses4r04 */
+static const char * version_str = "2.56 20220218";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -5515,7 +5515,7 @@ enumerate_work(const struct opts_t * op)
                "['es' or 'ec'] page");
         if (op->ind_given && op->ind_etp &&
             (cp = etype_str(op->ind_etp->elem_type_code, bb, sizeof(bb)))) {
-            printf("\n(element type: %s)", bb);
+            printf("\n(element type: %s)", cp);
             given_et = true;
         }
         printf(":\n");

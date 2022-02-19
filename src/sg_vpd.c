@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.69 20220217";  /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.70 20220218";  /* spc6r06 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -755,7 +755,6 @@ decode_dev_ids_quiet(uint8_t * buff, int len, int m_assoc,
     uint8_t sas_tport_addr[8];
 
     rtp = 0;
-    u = 0;
     memset(sas_tport_addr, 0, sizeof(sas_tport_addr));
     for (k = 0, off = -1; true; ++k) {
         if ((0 == k) && (0 != buff[2])) {

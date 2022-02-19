@@ -39,7 +39,7 @@
  * Based on zbc2r10.pdf
  */
 
-static const char * version_str = "1.31 20220201";
+static const char * version_str = "1.32 20220218";
 
 #define WILD_RZONES_BUFF_LEN (1 << 28)
 #define MAX_RZONES_BUFF_LEN (2 * 1024 * 1024)
@@ -614,7 +614,6 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
     const uint8_t * bp = rzBuff;
     char b[96];
 
-    k = 0;
     while (true) {
         resid = 0;
         res = sg_ll_report_zzz(sg_fd, REPORT_ZONES_SA, slba,

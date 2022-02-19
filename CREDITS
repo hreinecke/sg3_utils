@@ -112,7 +112,8 @@ Mark Knibbs <markk at clara dot co dot uk>
 
 Martin Schwenke <martin at meltin dot net> added the raw switch "-r" to sg_inq
 
-Martin Wilck <mwilck at suse dot com> contributed script files [20190425]
+Martin Wilck <mwilck at suse dot com> contributed script files [20190425 and
+        20220218]]
 
 Nate Dailey < Nate dot Dailey at stratus dot com > extended sg_map for sparse
         disk node names (e.g. /dev/sdaaa) [20050511]
@@ -159,4 +160,4 @@ Xose Vazquez Perez <xose dot vazquez at gmail dot com>
 
 
 Douglas Gilbert
-3rd January 2022
+18th February 2022

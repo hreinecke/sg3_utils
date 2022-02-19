@@ -36,7 +36,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.94 20220201";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.95 20220218";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define SHORT_RESP_LEN 128
@@ -7218,7 +7218,6 @@ main(int argc, char * argv[])
         }
         op->pg_code = PROTO_SPECIFIC_LPAGE;
     }
-    pg_len = 0;
 
     memset(&inq_out, 0, sizeof(inq_out));
     if (op->no_inq < 2) {

@@ -73,8 +73,8 @@ findhosts_26 ()
     echo "No SCSI host adapters found in sysfs"
     exit 1;
   fi
-  # Not necessary just use double quotes around variable to preserve new lines
-  #hosts=$(echo $hosts | tr ' ' '\n')
+  # ensure numeric ordering. No quotes arount $hosts to skip leading space.
+  hosts=$(echo $hosts | tr ' ' '\n' | sort -n)
 }
 
 # Return hosts. /proc/scsi/HOSTADAPTER/? must exist

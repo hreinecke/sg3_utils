@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2021 Douglas Gilbert.
+ * Copyright (c) 2009-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.23 20211104";      /* sbc4r15 */
+static const char * version_str = "1.24 20220218";      /* sbc4r15 */
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -354,7 +354,6 @@ main(int argc, char * argv[])
                 ret = SG_LIB_SYNTAX_ERROR;
                 goto fini;
             }
-            res = 0;
             goto start_response;
         } else {
             pr2serr("missing device name!\n\n");
