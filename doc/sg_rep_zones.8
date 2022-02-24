@@ -7,8 +7,8 @@ sg_rep_zones \- send SCSI REPORT ZONES, REALMS or ZONE DOMAINS command
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-locator=LBA\fR]
 [\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR] [\fI\-\-partial\fR] [\fI\-\-raw\fR]
 [\fI\-\-readonly\fR] [\fI\-\-realm\fR] [\fI\-\-report=OPT\fR]
-[\fI\-\-start=LBA\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wp\fR]
-\fIDEVICE\fR
+[\fI\-\-start=LBA\fR] [\fI\-\-statistics\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-wp\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -50,11 +50,12 @@ the first occurrence that is
 the given zone type.
 .br
 The algorithm used by this option takes into account the \fI\-\-hex\fR,
-\fI\-\-maxlen=LEN\fR, \fI\-\-report=OPT\fR and \fI\-\-start=LBA\fR options,
-if given, and ignores other options. It is only implemented for the Report
-zones command. The algorithm may call the Report zones command repeatedly,
-with the PARTIAL bit set and the Zone start LBA field being increased as it
-goes. This continues until either there is a match on the \fIZT\fR condition
+\fI\-\-maxlen=LEN\fR, \fI\-\-num=NUM\fR, \fI\-\-report=OPT\fR and
+\fI\-\-start=LBA\fR options, if given, and ignores other options. It is only
+implemented for the Report zones command currently. The algorithm may call
+the Report zones command repeatedly, with the PARTIAL bit set and the Zone
+start LBA field being increased as it goes. This continues until either
+there is a match on the \fIZT\fR condition, \fI\-\-num=NUM\fR is exhausted
 or the number of zones is exhausted.
 .br
 The \fIZT\fR numbers and abbreviations are listed when the \fI\-\-help\fR
@@ -174,6 +175,13 @@ The zone start LBA field used in the REPORT ZONES command was changed to
 the zone domain/realm locator field for the two newer ZBC\-2 commands. For
 this utility \fI\-\-locator=LBA\fR and \fI\-\-start=LBA\fR are
 interchangeable.
+.TP
+\fB\-S\fR, \fB\-\-statistics\fR
+reviews all or a limited number of report zones, collects statistics and
+prints them (on stdout). The number of zones reviewed may be limited by
+any combination of \fI\-\-num=NUM\fR, \fI\-\-report=OPT\fR and
+\fI\-\-start=LBA\fR options. The long option name may be abbreviated to
+\fI\-\-stats\fR.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).

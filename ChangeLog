@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220218] [svn: r939]
+Changelog for pre-release sg3_utils-1.48 [20220224] [svn: r940]
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
   - sg_rep_density: new utility for decoding the response of
@@ -20,6 +20,7 @@ Changelog for pre-release sg3_utils-1.48 [20220218] [svn: r939]
       descriptor fetched
     - add --find ZT option to find the first occurrence of
       ZT; if ZT prefixed by - or ! find first not equal to ZT
+    - add --statistics option
   - sg_decode_sense: add --nodecode option
   - sg_logs: tweak the meaning of --list option to more closely
     reflect the contents of log pages 0x0 and 0x0,0xff

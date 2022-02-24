@@ -14,6 +14,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <limits.h>
 #include <errno.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -39,21 +40,24 @@
  * Based on zbc2r10.pdf
  */
 
-static const char * version_str = "1.32 20220218";
+static const char * version_str = "1.33 20220224";
 
 #define WILD_RZONES_BUFF_LEN (1 << 28)
 #define MAX_RZONES_BUFF_LEN (2 * 1024 * 1024)
 #define DEF_RZONES_BUFF_LEN (1024 * 16)
+#define RCAP16_REPLY_LEN 32
 
 #define SG_ZONING_IN_CMDLEN 16
-
-#define REPORT_ZONES_SA 0x0
-#define REPORT_ZONE_DOMAINS_SA 0x7
-#define REPORT_REALMS_SA 0x6
-
 #define REPORT_ZONES_DESC_LEN 64
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
+
+/* Three zone service actions supported by this utility */
+enum zone_report_sa_e {
+    REPORT_ZONES_SA = 0x0,
+    REPORT_REALMS_SA = 0x6,
+    REPORT_ZONE_DOMAINS_SA = 0x7
+};
 
 struct opts_t {
     bool do_brief;
@@ -64,9 +68,11 @@ struct opts_t {
     bool do_zdomains;
     bool maxlen_given;
     bool o_readonly;
+    bool statistics;
     bool verbose_given;
     bool version_given;
     bool wp_only;
+    enum zone_report_sa_e serv_act;
     int do_help;
     int do_hex;
     int do_num;
@@ -103,6 +109,8 @@ static struct option long_options[] = {
         {"realms", no_argument, 0, 'e'},
         {"report", required_argument, 0, 'o'},
         {"start", required_argument, 0, 's'},
+        {"statistics", no_argument, 0, 'S'},
+        {"stats", no_argument, 0, 'S'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {"wp", no_argument, 0, 'w'},
@@ -188,6 +196,7 @@ usage(int h)
             "zones)\n"
             "    --start=LBA|-s LBA    report zones from the LBA (def: 0)\n"
             "                          need not be a zone starting LBA\n"
+            "    --statistics       gather statistics by reviewing zones\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
             "    --wp|-w            output write pointer only\n\n"
@@ -237,8 +246,8 @@ h_twoormore:
  * (see ZBC and ZBC-2).  Return of 0 -> success, various SG_LIB_CAT_* positive
  * values or -1 -> other errors */
 static int
-sg_ll_report_zzz(int sg_fd, int serv_act, uint64_t zs_lba, bool partial,
-                 int report_opts, void * resp, int mx_resp_len,
+sg_ll_report_zzz(int sg_fd, enum zone_report_sa_e serv_act, uint64_t zs_lba,
+                 bool partial, int report_opts, void * resp, int mx_resp_len,
                  int * residp, bool noisy, int vb)
 {
     int ret, res, sense_cat;
@@ -248,7 +257,7 @@ sg_ll_report_zzz(int sg_fd, int serv_act, uint64_t zs_lba, bool partial,
     uint8_t sense_b[SENSE_BUFF_LEN] = {0};
     struct sg_pt_base * ptvp;
 
-    rz_cdb[1] = serv_act;
+    rz_cdb[1] = (uint8_t)serv_act;
     sg_put_unaligned_be64(zs_lba, rz_cdb + 2);
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rz_cdb + 10);
     rz_cdb[14] = report_opts & 0x3f;
@@ -607,35 +616,40 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
 {
     bool found = false;
     uint8_t zt;
-    int k, res, resid, rlen, num_zd;
+    int k, res, resid, rlen, num_zd, num_rem;
     uint32_t zn_dnum = 0;
     uint64_t slba = op->st_lba;
     uint64_t mx_lba = 0;
     const uint8_t * bp = rzBuff;
     char b[96];
 
-    while (true) {
+    num_rem = op->do_num ? op->do_num : INT_MAX;
+    for ( ; num_rem > 0; num_rem -= num_zd) {
         resid = 0;
-        res = sg_ll_report_zzz(sg_fd, REPORT_ZONES_SA, slba,
-                               true /* set partial */, op->reporting_opt,
-                               rzBuff, op->maxlen, &resid, true, op->vb);
-        if (res) {
-            if (SG_LIB_CAT_INVALID_OP == res)
-                pr2serr("%s: %s%u, %s command not supported\n", __func__,
-                        zn_dnum_s, zn_dnum, cmd_name);
-            else {
-                sg_get_category_sense_str(res, sizeof(b), b, op->vb);
-                pr2serr("%s: %s%u, %s command: %s\n", __func__,
-                        zn_dnum_s, zn_dnum, cmd_name, b);
+        if (sg_fd >= 0) {
+            res = sg_ll_report_zzz(sg_fd, REPORT_ZONES_SA, slba,
+                                   true /* set partial */, op->reporting_opt,
+                                   rzBuff, op->maxlen, &resid, true, op->vb);
+            if (res) {
+                if (SG_LIB_CAT_INVALID_OP == res)
+                    pr2serr("%s: %s%u, %s command not supported\n", __func__,
+                            zn_dnum_s, zn_dnum, cmd_name);
+                else {
+                    sg_get_category_sense_str(res, sizeof(b), b, op->vb);
+                    pr2serr("%s: %s%u, %s command: %s\n", __func__,
+                            zn_dnum_s, zn_dnum, cmd_name, b);
+                }
+                break;
             }
-            break;
-        }
+        } else
+            res = 0;
         rlen = op->maxlen - resid;
-        if (rlen <= 64) {
+        if (rlen <= 64)
             break;
-        }
         mx_lba = sg_get_unaligned_be64(rzBuff + 8);
         num_zd = (rlen - 64) / REPORT_ZONES_DESC_LEN;
+        if (num_zd > num_rem)
+            num_zd = num_rem;
         for (k = 0, bp = rzBuff + 64; k < num_zd;
              ++k, bp += REPORT_ZONES_DESC_LEN, ++zn_dnum) {
             zt = 0xf & bp[0];
@@ -652,9 +666,9 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
         if (k < num_zd) {
             found = true;
             break;
-        } else if (slba > mx_lba)
+        } else if ((slba > mx_lba) || (sg_fd < 0))
             break;
-    }
+    }           /* end of outer for loop */
     if (res == 0) {
         if (found) {
             if (op->do_hex) {
@@ -670,8 +684,323 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
             if (op->do_hex) {
                 memset(b, 0xff, 64);
                 hex2stdout((const uint8_t *)b, 64, -1);
-            } else
+            } else if (num_rem < 1)
+                printf("Condition NOT met, checked %d zones; next %s%u\n",
+                       op->do_num, zn_dnum_s, zn_dnum);
+            else
                 printf("Condition NOT met; next %s%u\n", zn_dnum_s, zn_dnum);
+        }
+    }
+    return res;
+}
+
+struct statistics_t {
+    uint32_t zt_conv_num;
+    uint32_t zt_swr_num;
+    uint32_t zt_swp_num;
+    uint32_t zt_sob_num;
+    uint32_t zt_gap_num;
+    uint32_t zt_unk_num;
+
+    uint32_t zc_nwp_num;
+    uint32_t zc_mt_num;
+    uint32_t zc_iop_num;
+    uint32_t zc_eop_num;
+    uint32_t zc_cl_num;
+    uint32_t zc_ina_num;
+    uint32_t zc_ro_num;
+    uint32_t zc_full_num;
+    uint32_t zc_off_num;
+    uint32_t zc_unk_num;
+
+    /* The following LBAs have 1 added to them, initialized to 0 */
+    uint64_t zt_swr_1st_lba1;
+    uint64_t zt_swp_1st_lba1;
+    uint64_t zt_sob_1st_lba1;
+    uint64_t zt_gap_1st_lba1;
+
+    uint64_t zc_nwp_1st_lba1;
+    uint64_t zc_mt_1st_lba1;
+    uint64_t zc_iop_1st_lba1;
+    uint64_t zc_eop_1st_lba1;
+    uint64_t zc_cl_1st_lba1;
+    uint64_t zc_ina_1st_lba1;
+    uint64_t zc_ro_1st_lba1;
+    uint64_t zc_full_1st_lba1;
+    uint64_t zc_off_1st_lba1;
+
+    uint64_t wp_max_lba1;       /* ... that isn't Zone start LBA */
+    uint64_t wp_blk_num;        /* sum of (zwp - zs_lba) */
+};
+
+static int
+gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
+                  struct opts_t * op)
+{
+    uint8_t zt, zc;
+    int k, res, resid, rlen, num_zd, num_rem;
+    uint32_t zn_dnum = 0;
+    uint64_t slba = op->st_lba;
+    uint64_t mx_lba = 0;
+    uint64_t zs_lba, zwp, z_blks;
+    const uint8_t * bp = rzBuff;
+    struct statistics_t st = {0};
+    char b[96];
+
+    if (op->serv_act != REPORT_ZONES_SA) {
+        pr2serr("%s: do not support statistics for %s yet\n", __func__,
+                cmd_name);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+
+    num_rem = op->do_num ? op->do_num : INT_MAX;
+    for ( ; num_rem > 0; num_rem -= num_zd) {
+        resid = 0;
+        zs_lba = slba;
+        if (sg_fd >= 0) {
+            res = sg_ll_report_zzz(sg_fd, REPORT_ZONES_SA, slba,
+                                   true /* set partial */, op->reporting_opt,
+                                   rzBuff, op->maxlen, &resid, true, op->vb);
+            if (res) {
+                if (SG_LIB_CAT_INVALID_OP == res)
+                    pr2serr("%s: %s%u, %s command not supported\n", __func__,
+                            zn_dnum_s, zn_dnum, cmd_name);
+                else {
+                    sg_get_category_sense_str(res, sizeof(b), b, op->vb);
+                    pr2serr("%s: %s%u, %s command: %s\n", __func__,
+                            zn_dnum_s, zn_dnum, cmd_name, b);
+                }
+                break;
+            }
+        } else
+            res = 0;
+        rlen = op->maxlen - resid;
+        if (rlen <= 64) {
+            break;
+        }
+        mx_lba = sg_get_unaligned_be64(rzBuff + 8);
+        num_zd = (rlen - 64) / REPORT_ZONES_DESC_LEN;
+        if (num_zd > num_rem)
+            num_zd = num_rem;
+        for (k = 0, bp = rzBuff + 64; k < num_zd;
+             ++k, bp += REPORT_ZONES_DESC_LEN, ++zn_dnum) {
+            z_blks = sg_get_unaligned_be64(bp + 8);
+            zs_lba = sg_get_unaligned_be64(bp + 16);
+            zwp = sg_get_unaligned_be64(bp + 24);
+            zt = 0xf & bp[0];
+            switch (zt) {
+            case 1:
+                ++st.zt_conv_num;
+                break;
+            case 2:
+                ++st.zt_swr_num;
+                if (0 == st.zt_swr_1st_lba1)
+                    st.zt_swr_1st_lba1 = zs_lba + 1;
+                break;
+            case 3:
+                ++st.zt_swp_num;
+                if (0 == st.zt_swp_1st_lba1)
+                    st.zt_swp_1st_lba1 = zs_lba + 1;
+                break;
+            case 4:
+                ++st.zt_sob_num;
+                if (0 == st.zt_sob_1st_lba1)
+                    st.zt_sob_1st_lba1 = zs_lba + 1;
+                break;
+            case 5:
+                ++st.zt_gap_num;
+                if (0 == st.zt_gap_1st_lba1)
+                    st.zt_gap_1st_lba1 = zs_lba + 1;
+                break;
+            default:
+                ++st.zt_unk_num;
+                break;
+            }
+            zc = (bp[1] >> 4) & 0xf;
+            switch (zc) {
+            case 0:     /* not write pointer (zone) */
+                ++st.zc_nwp_num;
+                if (0 == st.zc_nwp_1st_lba1)
+                    st.zc_nwp_1st_lba1 = zs_lba + 1;
+                break;
+            case 1:     /* empty */
+                ++st.zc_mt_num;
+                if (0 == st.zc_mt_1st_lba1)
+                    st.zc_mt_1st_lba1 = zs_lba + 1;
+                break;
+            case 2:     /* implicitly opened */
+                ++st.zc_iop_num;
+                if (0 == st.zc_iop_1st_lba1)
+                    st.zc_iop_1st_lba1 = zs_lba + 1;
+                if (zwp > zs_lba) {
+                    st.wp_max_lba1 = zwp + 1;
+                    st.wp_blk_num += zwp - zs_lba;
+                }
+                break;
+            case 3:     /* explicitly opened */
+                ++st.zc_eop_num;
+                if (0 == st.zc_eop_1st_lba1)
+                    st.zc_eop_1st_lba1 = zs_lba + 1;
+                if (zwp > zs_lba) {
+                    st.wp_max_lba1 = zwp + 1;
+                    st.wp_blk_num += zwp - zs_lba;
+                }
+                break;
+            case 4:     /* closed */
+                ++st.zc_cl_num;
+                if (0 == st.zc_cl_1st_lba1)
+                    st.zc_cl_1st_lba1 = zs_lba + 1;
+                if (zwp > zs_lba) {
+                    st.wp_max_lba1 = zwp + 1;
+                    st.wp_blk_num += zwp - zs_lba;
+                }
+                break;
+            case 5:
+                ++st.zc_ina_num;
+                if (0 == st.zc_ina_1st_lba1)
+                    st.zc_ina_1st_lba1 = zs_lba + 1;
+                break;
+            case 0xd:
+                ++st.zc_ro_num;
+                if (0 == st.zc_ro_1st_lba1)
+                    st.zc_ro_1st_lba1 = zs_lba + 1;
+                break;
+            case 0xe:
+                ++st.zc_full_num;
+                if (0 == st.zc_full_1st_lba1)
+                    st.zc_full_1st_lba1 = zs_lba + 1;
+                st.wp_blk_num += z_blks;
+                break;
+            case 0xf:
+                ++st.zc_off_num;
+                if (0 == st.zc_off_1st_lba1)
+                    st.zc_off_1st_lba1 = zs_lba + 1;
+                break;
+            default:
+                ++st.zc_unk_num;
+                break;
+            }
+            slba = zs_lba + z_blks;
+        }       /* end of inner for loop */
+        if ((slba > mx_lba) || (sg_fd < 0))
+            break;
+    }           /* end of outer for loop */
+    printf("Number of conventional type zones: %u\n", st.zt_conv_num);
+    if (st.zt_swr_num > 0)
+        printf("Number of sequential write required type zones: %u\n",
+               st.zt_swr_num);
+    if (st.zt_swr_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zt_swr_1st_lba1 - 1);
+    if (st.zt_swp_num > 0)
+        printf("Number of sequential write preferred type zones: %u\n",
+               st.zt_swp_num);
+    if (st.zt_swp_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zt_swp_1st_lba1 - 1);
+    if (st.zt_sob_num > 0)
+        printf("Number of sequential or before type zones: %u\n",
+               st.zt_sob_num);
+    if (st.zt_sob_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zt_sob_1st_lba1 - 1);
+    if (st.zt_gap_num > 0)
+        printf("Number of gap type zones: %u\n", st.zt_gap_num);
+    if (st.zt_gap_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zt_gap_1st_lba1 - 1);
+    if (st.zt_unk_num > 0)
+        printf("Number of unknown type zones: %u\n", st.zt_unk_num);
+
+    printf("Number of 'not write pointer' condition zones: %u\n",
+           st.zc_nwp_num);
+    if (st.zc_nwp_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_nwp_1st_lba1 - 1);
+    printf("Number of empty condition zones: %u\n", st.zc_mt_num);
+    if (st.zc_mt_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_mt_1st_lba1 - 1);
+    if (st.zc_iop_num > 0)
+        printf("Number of implicitly open condition zones: %u\n",
+               st.zc_iop_num);
+    if (st.zc_iop_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_iop_1st_lba1 - 1);
+    if (st.zc_eop_num)
+        printf("Number of explicitly open condition zones: %u\n",
+               st.zc_eop_num);
+    if (st.zc_eop_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_eop_1st_lba1 - 1);
+    if (st.zc_cl_num)
+        printf("Number of closed condition zones: %u\n", st.zc_cl_num);
+    if (st.zc_cl_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_cl_1st_lba1 - 1);
+    if (st.zc_ina_num)
+        printf("Number of inactive condition zones: %u\n", st.zc_ina_num);
+    if (st.zc_ina_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_ina_1st_lba1 - 1);
+    if (st.zc_ro_num)
+        printf("Number of inactive condition zones: %u\n", st.zc_ro_num);
+    if (st.zc_ro_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_ro_1st_lba1 - 1);
+    if (st.zc_full_num)
+        printf("Number of full condition zones: %u\n", st.zc_full_num);
+    if (st.zc_full_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_full_1st_lba1 - 1);
+    if (st.zc_off_num)
+        printf("Number of offline condition zones: %u\n", st.zc_off_num);
+    if (st.zc_off_1st_lba1 > 0)
+        printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
+              st.zc_off_1st_lba1 - 1);
+    if (st.zc_unk_num > 0)
+        printf("Number of unknown condition zones: %u\n", st.zc_unk_num);
+
+    if (st.wp_max_lba1 > 0)
+        printf("Highest active write pointer LBA: 0x%" PRIx64 "\n",
+              st.wp_max_lba1 - 1);
+    printf("Number of used blocks in write pointer zones: 0x%" PRIx64 "\n",
+           st.wp_blk_num);
+
+    if ((sg_fd >= 0) && (op->maxlen >= RCAP16_REPLY_LEN) &&
+        (st.wp_blk_num > 0)) {
+        res = sg_ll_readcap_16(sg_fd, false, 0, rzBuff,
+                               RCAP16_REPLY_LEN, true, op->vb);
+        if (SG_LIB_CAT_INVALID_OP == res) {
+            pr2serr("READ CAPACITY (16) cdb not supported\n");
+        } else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            pr2serr("bad field in READ CAPACITY (16) cdb including "
+                    "unsupported service action\n");
+        else if (res) {
+            sg_get_category_sense_str(res, sizeof(b), b, op->vb);
+            pr2serr("READ CAPACITY (16) failed: %s\n", b);
+        } else {
+            uint32_t block_size = sg_get_unaligned_be32(rzBuff + 8);
+            uint64_t total_sz = st.wp_blk_num * block_size;
+            double sz_mb, sz_gb;
+
+            sz_mb = (double)(total_sz) / (double)(1048576);
+            sz_gb = (double)(total_sz) / (double)(1000000000L);
+#ifdef SG_LIB_MINGW
+            printf("   associated size: %" PRIu64 " bytes, %g MiB, %g GB",
+                   total_sz, sz_mb, sz_gb);
+#else
+            printf("   associated size: %" PRIu64 " bytes, %.1f MiB, %.2f "
+                   "GB", total_sz, sz_mb, sz_gb);
+#endif
+            if (sz_gb > 2000) {
+#ifdef SG_LIB_MINGW
+                printf(", %g TB", sz_gb / 1000);
+#else
+                printf(", %.2f TB", sz_gb / 1000);
+#endif
+            }
+            printf("\n");
         }
     }
     return res;
@@ -686,7 +1015,6 @@ main(int argc, char * argv[])
     int sg_fd = -1;
     int resid = 0;
     int ret = 0;
-    int serv_act = REPORT_ZONES_SA;
     uint32_t decod_len;
     int64_t ll;
     const char * device_name = NULL;
@@ -694,14 +1022,14 @@ main(int argc, char * argv[])
     uint8_t * free_rzbp = NULL;
     const char * cmd_name = "Report zones";
     char b[80];
-    struct opts_t opts;
+    struct opts_t opts = {0};
     struct opts_t * op = &opts;
 
-    memset(&opts, 0, sizeof(opts));
+    op->serv_act = REPORT_ZONES_SA;
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bdefF:hHi:l:m:n:o:prRs:vVw",
+        c = getopt_long(argc, argv, "bdefF:hHi:l:m:n:o:prRs:SvVw",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -712,11 +1040,11 @@ main(int argc, char * argv[])
             break;
         case 'd':
             op->do_zdomains = true;
-            serv_act = REPORT_ZONE_DOMAINS_SA;
+            op->serv_act = REPORT_ZONE_DOMAINS_SA;
             break;
         case 'e':
             op->do_realms = true;
-            serv_act = REPORT_REALMS_SA;
+            op->serv_act = REPORT_REALMS_SA;
             break;
         case 'f':
             op->do_force = true;
@@ -803,6 +1131,9 @@ main(int argc, char * argv[])
             }
             op->st_lba = (uint64_t)ll;
             break;
+        case 'S':
+            op->statistics = true;
+            break;
         case 'v':
             op->verbose_given = true;
             ++op->vb;
@@ -863,7 +1194,7 @@ main(int argc, char * argv[])
         cmd_name = "Report zone domains";
     else if (op->do_realms)
         cmd_name = "Report realms";
-    if ((serv_act != REPORT_ZONES_SA) && op->do_partial) {
+    if ((op->serv_act != REPORT_ZONES_SA) && op->do_partial) {
         pr2serr("Can only use --partial with REPORT ZONES\n");
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -932,8 +1263,11 @@ main(int argc, char * argv[])
     if (op->find_zt) {  /* so '-F none' will drop through */
         ret = find_report_zones(sg_fd, rzBuff, cmd_name, op);
         goto the_end;
+    } else if (op->statistics) {
+        ret = gather_statistics(sg_fd, rzBuff, cmd_name, op);
+        goto the_end;
     }
-    res = sg_ll_report_zzz(sg_fd, serv_act, op->st_lba, op->do_partial,
+    res = sg_ll_report_zzz(sg_fd, op->serv_act, op->st_lba, op->do_partial,
                            op->reporting_opt, rzBuff, op->maxlen, &resid,
                            true, op->vb);
     ret = res;
@@ -954,7 +1288,7 @@ start_response:
             }
         }
         if (decod_len > (uint32_t)rlen) {
-            if ((REPORT_ZONES_SA == serv_act) && (! op->do_partial)) {
+            if ((REPORT_ZONES_SA == op->serv_act) && (! op->do_partial)) {
                 printf("%u zones starting from LBA 0x%" PRIx64 " available "
                        "but only %d zones returned\n",
                        (decod_len - 64) / REPORT_ZONES_DESC_LEN, op->st_lba,
@@ -990,7 +1324,7 @@ start_response:
             ret = SG_LIB_CAT_MALFORMED;
             goto the_end;
         }
-        if (REPORT_ZONES_SA == serv_act)
+        if (REPORT_ZONES_SA == op->serv_act)
             ret = decode_rep_zones(rzBuff, act_len, decod_len, op);
         else if (op->do_realms)
             ret = decode_rep_realms(rzBuff, act_len, op);
