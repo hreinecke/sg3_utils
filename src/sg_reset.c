@@ -107,7 +107,7 @@ usage(int compat_mode)
     }
     pr2serr("    --no-esc|-N     overrides default action and only does "
             "reset requested\n"
-            "    --no-escalate   The same as --no-esc|-N"
+            "    --no-escalate   The same as --no-esc|-N\n"
             "    --target|-t     target reset. The target holds the DEVICE "
             "and perhaps\n"
             "                    other LUs\n"
