@@ -1,4 +1,4 @@
-.TH SG_RESET_WP "8" "May 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_RESET_WP "8" "February 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_reset_wp \- send SCSI RESET WRITE POINTER command
 .SH SYNOPSIS
@@ -9,8 +9,8 @@ sg_reset_wp \- send SCSI RESET WRITE POINTER command
 .\" Add any additional description here
 .PP
 Sends a SCSI RESET WRITE POINTER command to the \fIDEVICE\fR. This command
-is found in the soon to be released ZBC standard (draft prior to standard:
-zbc\-r05.pdf).
+is described in ZBC standard (INCITS 536\-2016) and the draft ZBC\-2
+documents at T10 (e.g. zbc2r12.pdf).
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -24,6 +24,10 @@ all open zones and full zones. When this option is given then the
 ZC is placed in the Zone Count field in the cdb of the RESET WRITE POINTER
 command supported by this utility. ZC should be a value from 0 to
 65535 (0xffff) inclusive.
+.br
+The action that the \fIDEVICE\fR takes with this option depends on whether
+the \fI\-\-all\fR option is set. See the RESET WRITE POINTER command
+description (e.g. section 5.9, table 46 in zbc2r12.pdf).
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -41,6 +45,10 @@ operation on the zone identified by the ZONE ID field. The default value is
 0. Either this option or the \fI\-\-all\fR option is required.
 \fIID\fR is assumed to be in decimal unless prefixed with '0x' or has a
 trailing 'h' which indicate hexadecimal.
+.SH NOTES
+The Zones Emptied log parameter in the Zoned Block Device Statistics log
+page counts the number of times the RESET WRITE POINTER command has
+been (successfully) invoked.
 .SH EXIT STATUS
 The exit status of sg_reset_wp is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -49,7 +57,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014\-2018 Douglas Gilbert
+Copyright \(co 2014\-2022 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

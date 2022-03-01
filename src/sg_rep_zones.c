@@ -731,6 +731,7 @@ struct statistics_t {
 
     uint64_t wp_max_lba1;       /* ... that isn't Zone start LBA */
     uint64_t wp_blk_num;        /* sum of (zwp - zs_lba) */
+    uint64_t conv_blk_num;      /* sum of (z_blks) of zt=conv */
 };
 
 static int
@@ -789,25 +790,26 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
             zwp = sg_get_unaligned_be64(bp + 24);
             zt = 0xf & bp[0];
             switch (zt) {
-            case 1:
+            case 1:     /* conventional */
                 ++st.zt_conv_num;
+                st.conv_blk_num += z_blks;
                 break;
-            case 2:
+            case 2:     /* sequential write required */
                 ++st.zt_swr_num;
                 if (0 == st.zt_swr_1st_lba1)
                     st.zt_swr_1st_lba1 = zs_lba + 1;
                 break;
-            case 3:
+            case 3:     /* sequential write preferred */
                 ++st.zt_swp_num;
                 if (0 == st.zt_swp_1st_lba1)
                     st.zt_swp_1st_lba1 = zs_lba + 1;
                 break;
-            case 4:
+            case 4:     /* sequential or before (write) */
                 ++st.zt_sob_num;
                 if (0 == st.zt_sob_1st_lba1)
                     st.zt_sob_1st_lba1 = zs_lba + 1;
                 break;
-            case 5:
+            case 5:     /* gap */
                 ++st.zt_gap_num;
                 if (0 == st.zt_gap_1st_lba1)
                     st.zt_gap_1st_lba1 = zs_lba + 1;
@@ -855,23 +857,23 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
                     st.wp_blk_num += zwp - zs_lba;
                 }
                 break;
-            case 5:
+            case 5:     /* inactive */
                 ++st.zc_ina_num;
                 if (0 == st.zc_ina_1st_lba1)
                     st.zc_ina_1st_lba1 = zs_lba + 1;
                 break;
-            case 0xd:
+            case 0xd:   /* read-only */
                 ++st.zc_ro_num;
                 if (0 == st.zc_ro_1st_lba1)
                     st.zc_ro_1st_lba1 = zs_lba + 1;
                 break;
-            case 0xe:
+            case 0xe:   /* full */
                 ++st.zc_full_num;
                 if (0 == st.zc_full_1st_lba1)
                     st.zc_full_1st_lba1 = zs_lba + 1;
                 st.wp_blk_num += z_blks;
                 break;
-            case 0xf:
+            case 0xf:   /* offline */
                 ++st.zc_off_num;
                 if (0 == st.zc_off_1st_lba1)
                     st.zc_off_1st_lba1 = zs_lba + 1;
@@ -968,7 +970,11 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
            st.wp_blk_num);
 
     if ((sg_fd >= 0) && (op->maxlen >= RCAP16_REPLY_LEN) &&
-        (st.wp_blk_num > 0)) {
+        ((st.wp_blk_num > 0) || (st.conv_blk_num > 0))) {
+        uint32_t block_size = 0;
+        uint64_t total_sz;
+        double sz_mb, sz_gb;
+
         res = sg_ll_readcap_16(sg_fd, false, 0, rzBuff,
                                RCAP16_REPLY_LEN, true, op->vb);
         if (SG_LIB_CAT_INVALID_OP == res) {
@@ -979,11 +985,11 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
         else if (res) {
             sg_get_category_sense_str(res, sizeof(b), b, op->vb);
             pr2serr("READ CAPACITY (16) failed: %s\n", b);
-        } else {
-            uint32_t block_size = sg_get_unaligned_be32(rzBuff + 8);
-            uint64_t total_sz = st.wp_blk_num * block_size;
-            double sz_mb, sz_gb;
+        } else
+            block_size = sg_get_unaligned_be32(rzBuff + 8);
 
+        if (st.wp_blk_num) {
+            total_sz = st.wp_blk_num * block_size;
             sz_mb = (double)(total_sz) / (double)(1048576);
             sz_gb = (double)(total_sz) / (double)(1000000000L);
 #ifdef SG_LIB_MINGW
@@ -992,6 +998,27 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
 #else
             printf("   associated size: %" PRIu64 " bytes, %.1f MiB, %.2f "
                    "GB", total_sz, sz_mb, sz_gb);
+#endif
+            if (sz_gb > 2000) {
+#ifdef SG_LIB_MINGW
+                printf(", %g TB", sz_gb / 1000);
+#else
+                printf(", %.2f TB", sz_gb / 1000);
+#endif
+            }
+            printf("\n");
+        }
+        if (st.conv_blk_num) {
+            total_sz = st.conv_blk_num * block_size;
+            sz_mb = (double)(total_sz) / (double)(1048576);
+            sz_gb = (double)(total_sz) / (double)(1000000000L);
+            printf("Size of all conventional zones: ");
+#ifdef SG_LIB_MINGW
+            printf("%" PRIu64 " bytes, %g MiB, %g GB", total_sz, sz_mb,
+                   sz_gb);
+#else
+            printf("%" PRIu64 " bytes, %.1f MiB, %.2f GB", total_sz,
+                   sz_mb, sz_gb);
 #endif
             if (sz_gb > 2000) {
 #ifdef SG_LIB_MINGW
