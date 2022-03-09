@@ -4,9 +4,9 @@
 # SCSI INQUIRY command.
 
 # The response in this file can be decoded with:
-#     sg_inq --inhex=sg_inq_standard.hex
+#     sg_inq --inhex=inq_standard.hex
 # or
-#     sg_vpd --inhex=sg_inq_standard.hex --page=sinq
+#     sg_vpd --inhex=inq_standard.hex --page=sinq
 #
 # The sg_inq utility defaults to the 'standard' INQUIRY while the
 # sg_vpd utility defaults to the "Supported VPD pages" VPD page.

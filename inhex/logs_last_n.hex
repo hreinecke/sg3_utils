@@ -1,0 +1,41 @@
+# This file contains the ASCII hex of a SCSI LOG SENSE command responses
+# for the various "Last n" log (sub)pages concaternated together.
+
+# The response in this file can be decoded with:
+#     sg_logs --inhex=logs_last_n.hex
+# or
+#     sg_logs --inhex=logs_last_n.hex --brief
+# or
+#     sg_logs --inhex=logs_last_n.hex --exclude
+
+# Last n mode page data changed log subpage
+4b 02 00 28
+00 00 03 0c 00 00 00 04  00 00 00 02 00 00 00 01
+00 01 03 04 0a 00 00 00
+00 02 03 04 5a 01 00 00
+00 03 03 04 5c 02 00 00
+
+# Last n INQUIRY data changed log subpage
+4b 01 00 28
+00 00 03 0c 00 00 00 01  00 00 00 03 00 00 00 02
+00 01 03 04 00 00 00 00
+00 02 03 04 01 80 00 00
+00 03 03 04 01 83 00 00
+
+# Last n deferred errors or asynchronous events log subpage
+0b 00 00 5a
+00 00 03 40
+73,0,0,0,0,0,0     38
+b,36,1,0
+0,0,0,2,11,11,11,11,22,22,22,22,55,55,55,55,66,66,66,66   1,0,0,7,  2,0,0,8
+0,0,0,1,77,77,77,77,77,77,77,77,88,88,88,88,88,88,88,88,  3,0,0,5
+00 01 03 12
+f1 00 03 00 00 12 34 0a 00 00 00 00 11 00 00 00 00 00
+
+# Last n error events log page
+07 00 00 31
+00 00 01 0c
+6d 65 64 69 75 6d 20 65  72 72 6f 72
+00 01 01 1d
+55 41 3a 20 63 61 70 61  63 69 74 79 20 64 61 74
+61 20 68 61 73 20 63 68  61 6e 67 65 64 

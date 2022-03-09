@@ -1,6 +1,7 @@
 libsgutils2_la_SOURCES = \
 	sg_lib.c \
 	sg_lib_data.c \
+	sg_lib_names.c \
 	sg_cmds_basic.c \
 	sg_cmds_basic2.c \
 	sg_cmds_extra.c \

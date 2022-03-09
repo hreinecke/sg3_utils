@@ -1063,7 +1063,7 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
         }
         ccc_id = sg_get_unaligned_be64(ip + ci_off);
         n += sg_scnpr(b + n, blen - n, "%s      IEEE identifier: 0x%"
-		      PRIx64 "x\n", lip, ccc_id);
+                      PRIx64 "x\n", lip, ccc_id);
         if (12 == dlen) {
             d_id = sg_get_unaligned_be32(ip + 8);
             n += sg_scnpr(b + n, blen - n, "%s      Directory ID: 0x%x\n",
@@ -1093,7 +1093,7 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
                 n += sg_scnpr(b + n, blen - n, "%s      NAA 2, vendor "
                               "specific identifier A: 0x%x\n", lip, d_id);
                 n += sg_scnpr(b + n, blen - n, "%s      AOI: 0x%x\n", lip,
-			      c_id);
+                              c_id);
                 n += sg_scnpr(b + n, blen - n, "%s      vendor specific "
                               "identifier B: 0x%x\n", lip, vsi);
                 n += sg_scnpr(b + n, blen - n, "%s      [0x", lip);
@@ -1137,7 +1137,7 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
             }
             if (do_long) {
                 n += sg_scnpr(b + n, blen - n, "%s      NAA 5, AOI: 0x%x\n",
-			      lip, c_id);
+                              lip, c_id);
                 n += sg_scnpr(b + n, blen - n, "%s      Vendor Specific "
                               "Identifier: 0x%" PRIx64 "\n", lip, vsei);
                 n += sg_scnpr(b + n, blen - n, "%s      [0x", lip);
@@ -1167,7 +1167,7 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
             }
             if (do_long) {
                 n += sg_scnpr(b + n, blen - n, "%s      NAA 6, AOI: 0x%x\n",
-			      lip, c_id);
+                              lip, c_id);
                 n += sg_scnpr(b + n, blen - n, "%s      Vendor Specific "
                               "Identifier: 0x%" PRIx64 "\n", lip, vsei);
                 vsei = sg_get_unaligned_be64(ip + 8);
@@ -2943,24 +2943,27 @@ dStrHexErr(const char* str, int len, int no_ascii)
               (sg_warnings_strm ? sg_warnings_strm : stderr));
 }
 
-#define DSHS_LINE_BLEN 160
-#define DSHS_BPL 16
+#define DSHS_LINE_BLEN 160      /* maximum characters per line */
+#define DSHS_BPL 16             /* bytes per line */
 
 /* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
  * separated) to 'b' not to exceed 'b_len' characters. Each line
  * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
  * per line with an extra space between the 8th and 9th bytes. 'format'
- * is 0 for repeat in printable ASCII ('.' for non printable) to
- * right of each line; 1 don't (so just output ASCII hex). Returns
- * number of bytes written to 'b' excluding the trailing '\0'. */
+ * is 0 for repeat in printable ASCII ('.' for non printable chars) to
+ * right of each line; 1 don't (so just output ASCII hex). Note that
+ * an address is not printed on each line preceding the hex data. Returns
+ * number of bytes written to 'b' excluding the trailing '\0'.
+ * The only difference between dStrHexStr() and hex2str() is the type of
+ * the first argument. */
 int
 dStrHexStr(const char * str, int len, const char * leadin, int format,
            int b_len, char * b)
 {
     int bpstart, bpos, k, n, prior_ascii_len;
     bool want_ascii;
-    char buff[DSHS_LINE_BLEN + 2];
-    char a[DSHS_BPL + 1];
+    char buff[DSHS_LINE_BLEN + 2];      /* allow for trailing null */
+    char a[DSHS_BPL + 1];               /* printable ASCII bytes or '.' */
     const char * p = str;
 
     if (len <= 0) {
@@ -3531,6 +3534,8 @@ sg_get_llnum_nomult(const char * buf)
     return (1 == res) ? num : -1;
 }
 
+#define MAX_NUM_ASCII_LINES 1048576
+
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as
  * stdin). If reading ASCII hex then there should be either one entry per
  * line or a comma, space or tab separated list of bytes. If no_space is
@@ -3622,7 +3627,7 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
     }
 
     carry_over[0] = 0;
-    for (j = 0; j < 512; ++j) {
+    for (j = 0; j < MAX_NUM_ASCII_LINES; ++j) {
         if (NULL == fgets(line, sizeof(line), fp))
             break;
         in_len = strlen(line);
@@ -3740,6 +3745,11 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
             }
             off += (k + 1);
         }
+    }           /* end of per line loop */
+    if (j >= MAX_NUM_ASCII_LINES) {
+        pr2ws("%s: wow, more than %d lines of ASCII, give up\n", __func__,
+              SG_LIB_LBA_OUT_OF_RANGE);
+        return SG_LIB_LBA_OUT_OF_RANGE;
     }
     *mp_arr_len = off;
     if (stdin != fp)

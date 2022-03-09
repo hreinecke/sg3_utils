@@ -2,7 +2,9 @@
         ========================================
 
 The files in this folder contain hexadecimal data (in ASCII) and associated
-comments (prefixed with the hash mark symbol: '#' ).
+comments (prefixed with the hash mark symbol: '#' ). Files containing
+hexadecimal data have the extension ".hex". There is at least one file
+containing binary data and it has the extension ".raw".
 
 The utility that each hex file is associated with can be determined in most
 case by prepending "sg_" to these filenames. Then go to the 'src' folder (a
@@ -15,7 +17,7 @@ after prepending 'sg_' becomes:
     sg_vpd_dev_id.hex
 which is a partial match on the sg_vpd utility.
 The remaining 'dev_id.hex' is meant to suggest the 'device identifier'
-VPD page which is a mandatory VPD page.
+VPD page which is a mandatory VPD page for SCSI devices..
 
 Assuming sg3_utils is installed, it can be tested like this:
     sg_vpd --inhex=<folder_holding_sg3_utils>/inhex/vpd_dev_id.hex

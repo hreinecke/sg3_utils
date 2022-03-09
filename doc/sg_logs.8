@@ -1,35 +1,36 @@
-.TH SG_LOGS "8" "December 2021" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_LOGS "8" "March 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
-[\fI\-\-All\fR] [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-filter=FL\fR]
-[\fI\-\-hex\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR]
-[\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR] [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR]
-[\fI\-\-ppc\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
-[\fI\-\-sp\fR] [\fI\-\-temperature\fR] [\fI\-\-transport\fR]
-[\fI\-\-vendor=VP\fR] [\fI\-\-verbose\fR] \fIDEVICE\fR
+[\fI\-\-ALL\fR] [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-exclude\fR]
+[\fI\-\-filter=FL\fR] [\fI\-\-hex\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR] [\fI\-\-paramp=PP\fR]
+[\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-sp\fR] [\fI\-\-temperature\fR]
+[\fI\-\-transport\fR] [\fI\-\-undefined\fR] [\fI\-\-vendor=VP\fR]
+[\fI\-\-verbose\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
-[\fI\-\-brief\fR] [\fI\-\-filter=FL\fR] [\fI\-\-hex\fR] \fI\-\-in=FN\fR
-[\fI\-\-name\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-vendor=VP\fR]
+\fI\-\-in=FN\fR  [\fI\-\-brief\fR] [\fI\-\-exclude\fR] [\fI\-\-filter=FL\fR]
+[\fI\-\-hex\fR] [\fI\-\-name\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR]
+[\fI\-\-undefined\fR] [\fI\-\-vendor=VP\fR]
 .PP
 .B sg_logs
-[\fI\-\-control=PC\fR] [\fI\-\-in=FN\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
-[\fI\-\-reset\fR] \fI\-\-select\fR [\fI\-\-sp\fR] [\fI\-\-verbose\fR]
-\fIDEVICE\fR
+\fI\-\-select\fR  [\fI\-\-control=PC\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
+[\fI\-\-reset\fR] [\fI\-\-sp\fR] [\fI\-\-verbose\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
-[\fI\-\-enumerate\fR] [\fI\-\-filter=FL\fR] [\fI\-\-help\fR]
+\fI\-\-enumerate\fR  [\fI\-\-filter=FL\fR] [\fI\-\-help\fR]
 [\fI\-\-vendor=VP\fR] [\fI\-\-version\fR]
 .PP
 .B sg_logs
-[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-D=DT\fR] [\fI\-c=PC\fR] [\fI\-e\fR]
-[\fI\-f=FL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR] [\fI\-L\fR]
-[\fI\-m=LEN\fR] [\fI\-M=VP\fR] [\fI\-n\fR] [\fI\-p=PG\fR] [\fI\-paramp=PP\fR]
-[\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR] [\fI\-select\fR]
-[\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
-[\fI\-x\fR] \fIDEVICE\fR
+[\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-D=DT\fR] [\fI\-e\fR]
+[\fI\-E\fR] [\fI\-f=FL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR]
+[\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-M=VP\fR] [\fI\-n\fR] [\fI\-p=PG\fR]
+[\fI\-paramp=PP\fR] [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR]
+[\fI\-select\fR] [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-u\fR] [\fI\-v\fR]
+[\fI\-V\fR] [\fI\-?\fR] [\fI\-x\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -41,7 +42,7 @@ to the \fIDEVICE\fR. Alternatively one or more log page responses can be in
 a file read using the \fI\-\-in=FN\fR option; in this case those responses
 are decoded and the \fIDEVICE\fR argument, if given, is ignored.
 .PP
-In SPC\-4 revision 5 a subpage code was introduced to both the LOG SENSE and
+In SPC\-4 revision 5 the subpage code was introduced to both the LOG SENSE and
 LOG SELECT command. At the same time a page code field was introduced to the
 to the LOG SELECT command. The log subpage code can range from 0 to 255 (0xff)
 inclusive. The subpage code value 255 can be thought of as a wildcard.
@@ -59,23 +60,25 @@ When no options are given, just a \fIDEVICE\fR, that is equivalent to calling
 this utility with the \fI\-\-list\fR option. In that case the names of the
 supported log pages (but not subpages) are listed out.
 .SH OPTIONS
-Arguments to long options are mandatory for short options as well.
-The options are arranged in alphabetical order based on the long
-option name.
+Arguments to long options are mandatory for short options as well. The options
+are arranged in alphabetical order based on the long option name.
 .TP
-\fB\-A\fR, \fB\-\-All\fR
+\fB\-A\fR, \fB\-\-ALL\fR
 fetch and decode all the log pages and subpages supported by the \fIDEVICE\fR.
 This requires a two stage process: first the "supported log pages and
 subpages" log page is fetched, then for each entry in its response, the
 corresponding log page (or subpage) is fetched and displayed. Note that there
 are many SCSI devices that do not support LOG SENSE subpages and respond
-to this option with an illegal request sense key (or ignored the subpage
-field).
+to this option with an illegal request sense key.
 .br
 Since some vendors don't list all log pages in the "supported log pages and
 subpages" log page, the '\-lll' option can be given in addition. This will
 merge both "supported ..." log pages then, from that resultant merged list,
 fetch page contents.
+.br
+The long option may also appear as \fB\-\-All\fR.
+.br
+This option overrides the \fI\-\-page=PG\fR if the latter is also given.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
 outputs all the log pages supported by the \fIDEVICE\fR. This requires a two
@@ -83,6 +86,8 @@ stage process: first the "supported log pages" log page is fetched, then for
 each entry in its response, the corresponding log page is fetched and
 displayed. When used twice (e.g. '\-aa') all log pages and subpages are
 fetched.
+.br
+This option overrides the \fI\-\-page=PG\fR if the latter is also given.
 .TP
 \fB\-b\fR, \fB\-\-brief\fR
 shorten the amount of output for some log pages. For example the Tape
@@ -114,6 +119,15 @@ four times, vendor pages are excluded from the numeric order.
 .br
 The \fI\-\-filter=FL\fR and \fI\-\-verbose\fR options reduce the output
 of the enumeration.
+.TP
+\fB\-E\fR, \fB\-\-exclude\fR
+this option excludes vendor specific pages and parameters from the output.
+Trying to decode vendor specific pages and parameters does not necessarily
+work well for many reasons. This option limits the output to pages and
+parameters defined by T10.
+.br
+Only parameter fields identified in the drafts as 'vendor specific' are
+excluded. So parameters codes identified as 'reserved' are shown.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR=\fIFL\fR
 \fIFL\fR is either a parameter code when \fIDEVICE\fR is given, or a
@@ -148,6 +162,10 @@ to the right. When used three times, the hex has no leading address nor
 trailing ASCII making it suitable to be placed in a file (or piped). That
 file might later be used by another invocation using the \fI\-\-in=FN\fR
 option.
+.br
+A weaker form of this option, called \fI\-\-undefined\fR, handles the
+formatting of hexadecimal output for fields that this utility is unable to
+decode.
 .TP
 \fB\-i\fR, \fB\-\-in\fR=\fIFN\fR
 This option may be used in two different contexts. One is with the
@@ -180,7 +198,7 @@ using this option three times will yield a list from the "supported log
 pages" log page. In the absence of other options, the page/subpage names,
 but not their contents, are shown when this option is given.
 .br
-The '\-lll' form may be useful with the \fI\-\-All\fR option to show the
+The '\-lll' form may be useful with the \fI\-\-ALL\fR option to show the
 contents of all pages referred to in either the "supported log page" or
 the "supported log page and subpage" log pages.
 .TP
@@ -189,13 +207,12 @@ sets the "allocation length" field in the LOG SENSE cdb. The is the maximum
 length in bytes that the response will be. Without this option (or \fILEN\fR
 equal to 0) this utility first fetches the 4 byte response then does a second
 access with the length indicated in the first (4 byte) response. Negative
-values and 1 for \fILEN\fR are not accepted. \fILEN\fR cannot exceed
-65535 (0xffff).  Responses can be quite large (e.g. the background scan
-results log page) and this option can be used to limit the amount of
-information returned.
+values and 1 for \fILEN\fR are not accepted. Responses can be quite
+large (e.g. the background scan results log page) and this option can be used
+to limit the amount of information returned.
 .br
-If \fILEN\fR is less than 2 of greater than 65,535 an error is generated.
-Otherwise if \fILEN\fR is less than 4 then 4 is used instead.
+The default \fILEN\fR is 65532 unless the \fI\-\-in=FN\fR option is given;
+in that case the default is 262144 .
 .TP
 \fB\-n\fR, \fB\-\-name\fR
 decode some log pages into 'name=value' entries, one per line. The name
@@ -232,24 +249,30 @@ used to fetch the Supported subpages log page (e.g. \-\-page=temp,0xff).
 .TP
 \fB\-P\fR, \fB\-\-paramp\fR=\fIPP\fR
 \fIPP\fR is the parameter pointer value to place in a field of that name in
-the LOG SENSE cdb. A decimal number in the range 0 to 65535 (0xffff) is
+the LOG SENSE cdb. A number in the range 0 to 65535 (0x0 to 0xffff) is
 expected. When a value greater than 0 is given the \fI\-\-ppc\fR option
 should be selected. The default value is 0.
+.br
+For log pages that have parameter codes, the \fIDEVICE\fR should return
+only parameters code equal to \fIPP\fR or higher in its response.
 .TP
 \fB\-q\fR, \fB\-\-pcb\fR
 show Parameter Control Byte settings (only relevant when log parameters
 being output in ASCII). This byte includes the DU and TSD bits plus
 the 'Format and linking' field (2 bits wide).
 .TP
+\fB\-D\fR, \fB\-\-pdt\fR=\fIDT\fR
+\fIDT\fR is the peripheral device type (PDT) that is used when it is not
+available from the \fIDEVICE\fR. There are two main cases of this: with
+the \fI\-\-pdt=DT\fR without a \fIDEVICE\fR (e.g. when \fI\-\-in=FN\fR
+is used) and when \fI\-\-no_inq\fR is used with a \fIDEVICE\fR.
+.br
+\fIDT\fR may be -1 which is the default value. This value may select any
+device type but favours the lower numbers (e.g. the PDT of disks is 0).
+.TP
 \fB\-Q\fR, \fB\-\-ppc\fR
 sets the Parameter Pointer Control (PPC) bit in the LOG SENSE cdb. Default
 is 0 (i.e. cleared). This bit was made obsolete in SPC\-4 revision 18.
-.TP
-\fB\-D\fR, \fB\-\-pdt\fR=\fIDT\fR
-\fIDT\fR is the peripheral device type that is used when it is not available
-from the \fIDEVICE\fR. There are two main cases of this: with the
-\fI\-\-pdt=DT\fR without a \fIDEVICE\fR and when \fI\-\-no_inq\fR is used
-with a \fIDEVICE\fR.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output the response in binary to stdout. Error messages and warnings are
@@ -302,6 +325,14 @@ may also have the current temperature (especially on older disks).
 \fB\-T\fR, \fB\-\-transport\fR
 outputs the transport ('Protocol specific port') log page. Equivalent to
 setting '\-\-page=18h'.
+.TP
+\fB\-u\fR, \fB\-\-undefined\fR
+to see fields decoded, the \fI\-\-hex\fR option cannot be used. However some
+fields are not defined in the T10 documents and in that case they are output
+in hex. This option controls the format of 'undefined' fields when they
+output in hex. Multiple uses of this option has the same sense as the
+\fI\-\-hex\fR option. For example '\-uu' will output undefined fields in
+hexadecimal with an ASCII rendering to the right of each line.
 .TP
 \fB\-M\fR, \fB\-\-vendor\fR=\fIVP\fR
 where \fIVP\fR is a vendor/manufacturer (e.g. "sea" for Seagate) or
@@ -401,14 +432,20 @@ Equivalent to \fI\-\-all\fR in the main description.
 .TP
 \fB\-A\fR
 outputs all the log pages and subpages supported by the \fIDEVICE\fR.
-Equivalent to '\-\-all \-\-all' in the main description.
+Equivalent to \fI\-\-ALL\fR in the main description.
 .TP
 \fB\-c\fR=\fIPC\fR
 Equivalent to \fI\-\-control=PC\fR in the main description.
 .TP
+\fB\-D\fR=\fIDT\fR
+Equivalent to \fI\-\-pdt=DT\fR in the main description.
+.TP
 \fB\-e\fR
 enumerate internal tables to show information about known log pages.
 Equivalent to \fI\-\-enumerate\fR in the main description.
+.TP
+\fB\-E\fR
+Equivalent to \fI\-\-exclude\fR in the main description.
 .TP
 \fB\-h\fR
 suppresses decoding of known log sense pages and prints out the
@@ -508,7 +545,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2021 Douglas Gilbert
+Copyright \(co 2002\-2022 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

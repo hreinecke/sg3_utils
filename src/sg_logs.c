@@ -29,6 +29,7 @@
 #include "config.h"
 #endif
 #include "sg_lib.h"
+#include "sg_lib_names.h"
 #include "sg_cmds_basic.h"
 #ifdef SG_LIB_WIN32
 #include "sg_pt.h"      /* needed for scsi_pt_win32_direct() */
@@ -36,9 +37,11 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.95 20220218";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.97 20220309";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
+#define MX_INLEN_ALLOC_LEN (0x800000)
+#define DEF_INLEN_ALLOC_LEN (0x40000)
 #define SHORT_RESP_LEN 128
 
 #define SUPP_PAGES_LPAGE 0x0
@@ -114,16 +117,17 @@ static const char * version_str = "1.95 20220218";    /* spc6r06 + sbc5r01 */
 
 static uint8_t * rsp_buff;
 static uint8_t * free_rsp_buff;
-static const int rsp_buff_sz = MX_ALLOC_LEN + 4;
+static int rsp_buff_sz = MX_ALLOC_LEN + 4;
 static const int parr_sz = 4096;
 
 static struct option long_options[] = {
         {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
-        {"ALL", no_argument, 0, 'A'},
+        {"ALL", no_argument, 0, 'A'},   /* equivalent to '-aa' */
         {"all", no_argument, 0, 'a'},
         {"brief", no_argument, 0, 'b'},
         {"control", required_argument, 0, 'c'},
         {"enumerate", no_argument, 0, 'e'},
+        {"exclude", no_argument, 0, 'E'},
         {"filter", required_argument, 0, 'f'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
@@ -148,6 +152,7 @@ static struct option long_options[] = {
         {"select", no_argument, 0, 'S'},
         {"temperature", no_argument, 0, 't'},
         {"transport", no_argument, 0, 'T'},
+        {"undefined", no_argument, 0, 'u'},
         {"vendor", required_argument, 0, 'M'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
@@ -164,7 +169,9 @@ struct opts_t {
     bool do_sp;
     bool do_temperature;
     bool do_transport;
+    bool exclude_vendor;
     bool filter_given;
+    bool maxlen_given;
     bool o_readonly;
     bool opt_new;
     bool verbose_given;
@@ -175,6 +182,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int do_list;
+    int dstrhex_no_ascii;       /* value for dStrHex() no_ascii argument */
     int vend_prod_num;  /* one of the VP_* constants or -1 (def) */
     int deduced_vpn;    /* deduced vendor_prod_num; from INQUIRY, etc */
     int verbose;
@@ -187,6 +195,7 @@ struct opts_t {
     int no_inq;
     int dev_pdt;        /* from device or --pdt=DT */
     int decod_subpg_code;
+    int undefined_hex;  /* hex format of undefined/unrecognized fields */
     const char * device_name;
     const char * in_fn;
     const char * pg_arg;
@@ -215,6 +224,8 @@ struct vp_name_t {
     const char * t10_vendorp;
     const char * t10_productp;
 };
+
+static const char * ls_s = "log_sense: ";
 
 static bool show_supported_pgs_page(const uint8_t * resp, int len,
                                     const struct opts_t * op);
@@ -498,20 +509,21 @@ usage(int hval)
 {
     if (1 == hval) {
         pr2serr(
-           "Usage: sg_logs [-All] [--all] [--brief] [--control=PC] "
+           "Usage: sg_logs [-ALL] [--all] [--brief] [--control=PC] "
            "[--enumerate]\n"
-           "               [--filter=FL] [--help] [--hex] [--in=FN] "
-           "[--list]\n"
-           "               [--no_inq] [--maxlen=LEN] [--name] [--page=PG]\n"
+           "               [--exclude] [--filter=FL] [--help] [--hex] "
+           "[--in=FN]\n"
+           "               [--list] [--no_inq] [--maxlen=LEN] [--name] "
+           "[--page=PG]\n"
            "               [--paramp=PP] [--pcb] [--ppc] [--pdt=DT] "
            "[--raw]\n"
            "               [--readonly] [--reset] [--select] [--sp] "
-           "[--temperature]\n"
-           "               [--transport] [--vendor=VP] [--verbose] "
-           "[--version]\n"
-           "               DEVICE\n"
+           "[--undefined]\n"
+           "               [--temperature] [--transport] [--vendor=VP] "
+           "[--verbose]\n"
+           "               [--version] DEVICE\n"
            "  where the main options are:\n"
-           "    --All|-A        fetch and decode all log pages and "
+           "    --ALL|-A        fetch and decode all log pages and "
            "subpages\n"
            "    --all|-a        fetch and decode all log pages, but not "
            "subpages; use\n"
@@ -535,7 +547,8 @@ usage(int hval)
            "known)\n"
            "    --in=FN|-i FN    FN is a filename containing a log page "
            "in ASCII hex\n"
-           "                     or binary if --raw also given.\n"
+           "                     or binary if --raw also given. --inhex=FN "
+           "also accepted\n"
            "    --list|-l       list supported log pages; twice: list "
            "supported log\n"
            "                    pages and subpages page; thrice: merge of "
@@ -567,6 +580,8 @@ usage(int hval)
            "cumulative\n"
            "                          2: default threshold, 3: default "
            "cumulative\n"
+           "    --exclude|-E    exclude vendor specific pages and "
+           "parameters\n"
            "    --list|-l       list supported log page names (equivalent to "
            "'-p sp')\n"
            "                    use twice to list supported log page and "
@@ -579,7 +594,8 @@ usage(int hval)
            "    --no_inq|-x     no initial INQUIRY output (twice: and no "
            "INQUIRY call)\n"
            "    --old|-O        use old interface (use as first option)\n"
-           "    --paramp=PP|-P PP    parameter pointer (decimal) (def: 0)\n"
+           "    --paramp=PP|-P PP    place PP in parameter pointer field in "
+           "cdb (def: 0)\n"
            "    --pcb|-q        show parameter control bytes in decoded "
            "output\n"
            "    --ppc|-Q        set the Parameter Pointer Control (PPC) bit "
@@ -596,6 +612,10 @@ usage(int hval)
            "    --select|-S     perform LOG SELECT (def: LOG SENSE)\n"
            "    --sp|-s         set the Saving Parameters (SP) bit (def: "
            "0)\n"
+           "    --undefined|-u    hex format for undefined/unrecognized "
+           "fields,\n"
+           "                      use one or more times; format as per "
+           "--hex\n"
            "    --version|-V    output version string then exit\n\n"
            "If DEVICE and --select are given, a LOG SELECT command will be "
            "issued.\nIf DEVICE is not given and '--in=FN' is given then FN "
@@ -609,13 +629,13 @@ usage(int hval)
 static void
 usage_old()
 {
-    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-D=DT] [-e] [-f=FL] "
+    printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-D=DT] [-e] [-E] [-f=FL] "
            "[-h]\n"
            "               [-H] [-i=FN] [-l] [-L] [-m=LEN] [-M=VP] [-n] "
            "[-p=PG]\n"
            "               [-paramp=PP] [-pcb] [-ppc] [-r] [-select] [-sp] "
            "[-t] [-T]\n"
-           "               [-v] [-V] [-x] [-X] [-?] DEVICE\n"
+           "               [-u] [-v] [-V] [-x] [-X] [-?] DEVICE\n"
            "  where:\n"
            "    -a     fetch and decode all log pages\n"
            "    -A     fetch and decode all log pages and subpages\n"
@@ -624,6 +644,9 @@ usage_old()
            "                  0: current threshold, 1: current cumulative\n"
            "                  2: default threshold, 3: default cumulative\n"
            "    -e     enumerate known log pages\n"
+           "    -D=DT    DT is peripheral device type to use with "
+           "'--in=FN'\n"
+           "    -E     exclude vendor specific pages and parameters\n"
            "    -f=FL    filter match parameter code or pdt\n"
            "    -h     output in hex (default: decode if known)\n"
            "    -H     output in hex (same as '-h')\n"
@@ -656,6 +679,7 @@ usage_old()
            "    -t       outputs temperature log page (0xd)\n"
            "    -T       outputs transport (protocol specific port) log "
            "page (0x18)\n"
+           "    -u       hex format for undefined/unrecognized fields\n"
            "    -v       increase verbosity\n"
            "    -V       output version string\n"
            "    -x       no initial INQUIRY output (twice: no INQUIRY call)\n"
@@ -818,6 +842,8 @@ find_vpn_by_acron(const char * vp_ap)
     return VP_NONE;
 }
 
+/* Find vendor product number using T10 VENDOR and PRODUCT ID fields in a
+   INQUIRY response. */
 static int
 find_vpn_by_inquiry(void)
 {
@@ -918,7 +944,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         int c, n;
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:D:ef:hHi:lLm:M:nNOp:P:qQrRsStTvV"
+        c = getopt_long(argc, argv, "aAbc:D:eEf:hHi:lLm:M:nNOp:P:qQrRsStTuvV"
                         "xX", long_options, &option_index);
         if (c == -1)
             break;
@@ -943,15 +969,22 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->page_control = n;
             break;
         case 'D':
-            n = sg_get_num(optarg);
-            if ((n < 0) || (n > 31)) {
-                pr2serr("bad argument to '--pdt='\n");
-                return SG_LIB_SYNTAX_ERROR;
+            if (0 == memcmp("-1", optarg, 3))
+                op->dev_pdt = -1;
+            else {
+                n = sg_get_num(optarg);
+                if ((n < 0) || (n > 31)) {
+                    pr2serr("bad argument to '--pdt='\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->dev_pdt = n;
             }
-            op->dev_pdt = n;
             break;
         case 'e':
             ++op->do_enumerate;
+            break;
+        case 'E':
+            op->exclude_vendor = true;
             break;
         case 'f':
             if ('-' == optarg[0]) {
@@ -990,9 +1023,9 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'm':
             n = sg_get_num(optarg);
-            if ((n < 0) || (1 == n) || (n > 0xffff)) {
-                pr2serr("bad argument to '--maxlen=', from 2 to 65535 "
-                        "(inclusive) expected\n");
+            if ((n < 0) || (1 == n)) {
+                pr2serr("bad argument to '--maxlen=', from 2 and up "
+                        "expected\n");
                 usage(2);
                 return SG_LIB_SYNTAX_ERROR;
             } else if (n < 4) {
@@ -1000,6 +1033,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 n = 4;
             }
             op->maxlen = n;
+            op->maxlen_given = true;
             break;
         case 'M':
             if (op->vend_prod) {
@@ -1053,6 +1087,9 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'T':
             op->do_transport = true;
+            break;
+        case 'u':
+            ++op->undefined_hex;
             break;
         case 'v':
             op->verbose_given = true;
@@ -1122,6 +1159,9 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'e':
                     ++op->do_enumerate;
                     break;
+                case 'E':
+                    op->exclude_vendor = true;
+                    break;
                 case 'h':
                 case 'H':
                     ++op->do_hex;
@@ -1149,6 +1189,9 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     break;
                 case 'T':
                     op->do_transport = true;
+                    break;
+                case 'u':
+                    ++op->undefined_hex;
                     break;
                 case 'v':
                     op->verbose_given = true;
@@ -1208,12 +1251,13 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 op->in_fn = cp + 2;
             else if (0 == strncmp("m=", cp, 2)) {
                 num = sscanf(cp + 2, "%8d", &n);
-                if ((1 != num) || (n < 0) || (n > MX_ALLOC_LEN)) {
+                if ((1 != num) || (n < 0)) {
                     pr2serr("Bad maximum response length after '-m=' "
                             "option\n");
                     usage_old();
                     return SG_LIB_SYNTAX_ERROR;
                 }
+                op->maxlen_given = true;
                 op->maxlen = n;
             } else if (0 == strncmp("M=", cp, 2)) {
                 if (op->vend_prod) {
@@ -1520,6 +1564,13 @@ show_supported_pgs_page(const uint8_t * resp, int len,
         printf("Supported log pages  [0x0]:\n");  /* introduced: SPC-2 */
     num = len - 4;
     bp = &resp[0] + 4;
+    if ((op->do_hex > 0) || op->do_raw) {
+        if (op->do_raw)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     for (k = 0; k < num; ++k) {
         int pg_code = bp[k];
         const struct log_elem * lep;
@@ -1558,6 +1609,13 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
     }
     num = len - 4;
     bp = &resp[0] + 4;
+    if ((op->do_hex > 0) || op->do_raw) {
+        if (op->do_raw)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     for (k = 0; k < num; k += 2) {
         int pg_code = bp[k];
         int subpg_code = bp[k + 1];
@@ -1609,13 +1667,13 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         switch (pc) {
         case 0x0:
@@ -1716,6 +1774,8 @@ static bool
 show_error_counter_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
+    bool skip_out = false;
+    bool evsm_output = false;
     int num, pl, pc, pg_code;
     uint64_t val;
     const uint8_t * bp;
@@ -1751,13 +1811,13 @@ show_error_counter_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         switch (pc) {
         case 0: printf("  Errors corrected without substantial delay"); break;
@@ -1767,17 +1827,34 @@ show_error_counter_page(const uint8_t * resp, int len,
         case 4: printf("  Total times correction algorithm processed"); break;
         case 5: printf("  Total bytes processed"); break;
         case 6: printf("  Total uncorrected errors"); break;
-        case 0x8009: printf("  Track following errors [Hitachi]"); break;
-        case 0x8015: printf("  Positioning errors [Hitachi]"); break;
-        default: printf("  Reserved or vendor specific [0x%x]", pc); break;
+        default:
+            if (op->exclude_vendor) {
+                skip_out = true;
+                if ((op->verbose > 0) && (0 == op->do_brief) &&
+                    (! evsm_output)) {
+                    evsm_output = true;
+                    printf("  Vendor specific parameter(s) being ignored\n");
+                }
+            } else {
+                if (0x8009 == pc)
+                    printf("  Track following errors [Hitachi]");
+                else if (0x8015 == pc)
+                    printf("  Positioning errors [Hitachi]");
+                else
+                    printf("  Reserved or vendor specific [0x%x]", pc);
+            }
         }
-        val = sg_get_unaligned_be(pl - 4, bp + 4);
-        printf(" = %" PRIu64 "", val);
-        if (val > ((uint64_t)1 << 40))
-            printf(" [%" PRIu64 " TB]\n",
-                   (val / (1000UL * 1000 * 1000 * 1000)));
-        else
-            printf("\n");
+        if (skip_out)
+            skip_out = false;
+        else {
+            val = sg_get_unaligned_be(pl - 4, bp + 4);
+            printf(" = %" PRIu64 "", val);
+            if (val > ((uint64_t)1 << 40))
+                printf(" [%" PRIu64 " TB]\n",
+                       (val / (1000UL * 1000 * 1000 * 1000)));
+            else
+                printf("\n");
+        }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -1794,6 +1871,8 @@ static bool
 show_non_medium_error_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
+    bool skip_out = false;
+    bool evsm_output = false;
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -1808,13 +1887,13 @@ show_non_medium_error_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         switch (pc) {
         case 0:
@@ -1823,12 +1902,26 @@ show_non_medium_error_page(const uint8_t * resp, int len,
         default:
             if (pc <= 0x7fff)
                 printf("  Reserved [0x%x]", pc);
-            else
-                printf("  Vendor specific [0x%x]", pc);
+            else {
+                if (op->exclude_vendor) {
+                    skip_out = true;
+                    if ((op->verbose > 0) && (0 == op->do_brief) &&
+                        (! evsm_output)) {
+                        evsm_output = true;
+                        printf("  Vendor specific parameter(s) being "
+                               "ignored\n");
+                    }
+                } else
+                    printf("  Vendor specific [0x%x]", pc);
+            }
             break;
         }
-        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-        printf("\n");
+        if (skip_out)
+            skip_out = false;
+        else {
+            printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
+            printf("\n");
+        }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -1859,13 +1952,13 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         switch (pc) {
         case 1:
@@ -1947,13 +2040,13 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         other_valid = !!(bp[4] & 1);
         if (pc < 0x100) {
@@ -2038,13 +2131,13 @@ show_environmental_limits_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         if (pc < 0x100) {
             if (pl < 12)  {
@@ -2117,13 +2210,13 @@ show_cmd_dur_limits_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         switch (pc) {
         case 0x1:
@@ -2231,13 +2324,13 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, extra);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, extra);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
+            break;
         }
         ull = n = 0;
         switch (bp[3]) {
@@ -2336,13 +2429,13 @@ show_hgst_perf_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         switch (pc) {
         case 0:
@@ -2413,13 +2506,13 @@ show_tape_capacity_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, extra);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, extra);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
+            break;
         }
         if (extra != 8)
             continue;
@@ -2484,18 +2577,18 @@ show_data_compression_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, extra);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, extra);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
+            break;
         }
         if ((0 == pl) || (pl > 8)) {
             printf("badly formed data compression log parameter\n");
             printf("  parameter code = 0x%x, contents in hex:\n", pc);
-            hex2stdout(bp, extra, 1);
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
             goto skip_para;
         }
         /* variable length integer, max length 8 bytes */
@@ -2541,7 +2634,7 @@ show_data_compression_page(const uint8_t * resp, int len,
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                     "hex:\n", pc);
-            hex2stdout(bp, extra, 1);
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
             break;
         }
 skip_para:
@@ -2583,24 +2676,24 @@ show_last_n_error_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         printf("  Error event %d:\n", pc);
         if (pl > 4) {
             if ((bp[2] & 0x1) && (bp[2] & 0x2)) {
                 printf("    [binary]:\n");
-                hex2stdout(bp + 4, pl - 4, 1);
-            } else if (bp[2] & 0x1)
+                hex2stdout(bp + 4, pl - 4, op->dstrhex_no_ascii);
+            } else if (0x01 == (bp[2] & 0x3)    /* ASCII */)
                 printf("    %.*s\n", pl - 4, (const char *)(bp + 4));
             else {
                 printf("    [data counter?? (LP bit should be set)]:\n");
-                hex2stdout(bp + 4, pl - 4, 1);
+                hex2stdout(bp + 4, pl - 4, op->dstrhex_no_ascii);
             }
         }
         if (op->do_pcb)
@@ -2616,7 +2709,7 @@ static bool
 show_last_n_deferred_error_page(const uint8_t * resp, int len,
                                 const struct opts_t * op)
 {
-    int k, num, pl;
+    int k, n, num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2640,16 +2733,24 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
         }
-        printf("  Deferred error %d:\n", pc);
-        hex2stdout(bp + 4, pl - 4, 1);
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
+        }
+        printf("  Deferred error [0x%x]:\n", pc);
+        if (op->do_brief > 0)
+            hex2stdout(bp + 4, pl - 4, op->dstrhex_no_ascii);
+        else {
+            char b[512];
+
+            n = sg_get_sense_str("    ", bp + 4, pl - 4,  false, sizeof(b),
+                                 b);
+            printf("%.*s\n", n, b);
+        }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
         if (op->filter_given)
@@ -2664,6 +2765,7 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
     int j, num, pl;
+    unsigned int k;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2678,13 +2780,13 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         if (0 == pc) {
             if (pl < 8)  {
@@ -2692,19 +2794,29 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
                        "long, got %d, skip>>\n", pc, pl);
                 goto skip;
             }
-            printf("  Generation number of Inquiry data changed indication: "
-                   "%u\n", sg_get_unaligned_be32(bp + 4));
-            if (pl > 11)
-                printf("  Generation number of Mode page data changed "
-                       "indication: %u\n", sg_get_unaligned_be32(bp + 8));
-            for (j = 12; j < pl; j +=4)
-                printf("  Generation number of indication [0x%x]: %u\n",
-                       (j / 4), sg_get_unaligned_be32(bp + j));
+            printf("  Change list generation code [pc=0x0]:\n");
+            for (j = 4, k = 1; j < pl; j +=4, ++k)
+                printf("    Changed generation number [0x%x]: %u\n", k,
+                       sg_get_unaligned_be32(bp + j));
         } else {
             printf("  Parameter code 0x%x, ", pc);
-            if (1 & *(bp + 4))
-                printf("VPD page 0x%x changed\n", *(bp + 5));
-            else
+            if (1 & *(bp + 4)) { /* VPD bit set */
+                int vpd = *(bp + 5);
+                printf("VPD page 0x%x changed\n", vpd);
+                if (0 == op->do_brief) {
+                    int k;
+                    const int num = sg_lib_names_mode_len;
+                    struct sg_lib_simple_value_name_t * nvp =
+                                                    sg_lib_names_vpd_arr;
+
+                    for (k = 0; k < num; ++k, ++nvp) {
+                        if (nvp->value == vpd)
+                            break;
+                    }
+                    if (k < num)
+                        printf("    name: %s\n", nvp->name);
+                }
+            } else
                 printf("Standard Inquiry data changed\n");
         }
         if (op->do_pcb)
@@ -2723,7 +2835,7 @@ static bool
 show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
                                  const struct opts_t * op)
 {
-    int j, num, pl;
+    int j, num, pl, pg_code, spg_code;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -2737,13 +2849,13 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         if (0 == pc) {  /* Same as LAST_N_INQUIRY_DATA_CH_SUBPG [0xb,0x1] */
             if (pl < 8)  {
@@ -2751,21 +2863,32 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
                        "long, got %d, skip>>\n", pc, pl);
                 goto skip;
             }
-            printf("  Generation number of Inquiry data changed indication: "
-                   "%u\n", sg_get_unaligned_be32(bp + 4));
-            if (pl > 11)
-                printf("  Generation number of Mode page data changed "
-                       "indication: %u\n", sg_get_unaligned_be32(bp + 8));
-            for (j = 12; j < pl; j +=4)
-                printf("  Generation number of indication [0x%x]: %u\n",
+            printf("  Change list generation code [pc=0x0]:\n");
+            for (j = 4; j < pl; j +=4)
+                printf("    Changed generation number [0x%x]: %u\n",
                        (j / 4), sg_get_unaligned_be32(bp + j));
         } else {
             printf("  Parameter code 0x%x, ", pc);
-            if (0x40 & *(bp + 5))       /* SPF bit set */
-                printf("Mode page 0x%x,0%x changed\n", (0x3f & *(bp + 5)),
-                       *(bp + 6));
+            pg_code = 0x3f & *(bp + 4);
+            spg_code = (0x40 & *(bp + 4)) ? *(bp + 5) : 0;
+            if (spg_code > 0)       /* SPF bit set */
+                printf("mode page 0x%x,0%x changed\n", pg_code, spg_code);
             else
-                printf("Mode page 0x%x changed\n", (0x3f & *(bp + 5)));
+                printf("mode page 0x%x changed\n", pg_code);
+            if (0 == op->do_brief) {
+                int k;
+                const int num = sg_lib_names_mode_len;
+                int val = (pg_code << 8) | spg_code;
+                struct sg_lib_simple_value_name_t * nmp =
+                                                sg_lib_names_mode_arr;
+
+                for (k = 0; k < num; ++k, ++nmp) {
+                    if (nmp->value == val)
+                        break;
+                }
+                if (k < num)
+                    printf("    name: %s\n", nmp->name);
+            }
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -2822,13 +2945,13 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            break;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            break;
         }
         n = sg_get_unaligned_be16(bp + 6);
         if ((0 == n) && (0 == bp[4]))
@@ -2848,14 +2971,17 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         v = bp[16] & 0xf;
         if (v) {
-            printf("    sense key = 0x%x [%s] , asc = 0x%x, ascq = 0x%x",
-                   v, sg_get_sense_key_str(v, sizeof(b), b), bp[17],
-                   bp[18]);
-            if (bp[17] || bp[18])
-                printf("      [%s]\n", sg_get_asc_ascq_str(bp[17], bp[18],
+            if (op->do_brief)
+                printf("    sense key = 0x%x , asc = 0x%x, ascq = 0x%x\n",
+                       v, bp[17], bp[18]);
+            else {
+                printf("    sense key = 0x%x [%s]\n", v,
+                       sg_get_sense_key_str(v, sizeof(b), b));
+
+                printf("      asc = 0x%x, ascq = 0x%x [%s]\n",
+                       bp[17], bp[18], sg_get_asc_ascq_str(bp[17], bp[18],
                        sizeof(b), b));
-            else
-                printf("\n");
+            }
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -2865,7 +2991,9 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
     return true;
 }
 
-/* TEMPERATURE_LPAGE [0xd] <temp>  introduced: SPC-3 */
+/* TEMPERATURE_LPAGE [0xd] <temp>  introduced: SPC-3
+ * N.B. The ENV_REPORTING_SUBPG [0xd,0x1] and the ENV_LIMITS_SUBPG [0xd,0x2]
+ * (both added SPC-5) are a superset of this page. */
 static bool
 show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
@@ -2895,13 +3023,13 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, extra);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, extra);
+            goto skip;
+        } else if (op->do_hex) {
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
+            goto skip;
         }
         switch (pc) {
         case 0:
@@ -2926,13 +3054,14 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
             if (! op->do_temperature) {
                 printf("  unknown parameter code = 0x%x, contents in "
                        "hex:\n", pc);
-                hex2stdout(bp, extra, 1);
+                hex2stdout(bp, extra, op->dstrhex_no_ascii);
             } else
                 continue;
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+skip:
         if (op->filter_given)
             break;
     }
@@ -2967,13 +3096,13 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, extra);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, extra);
+            goto skip;
+        } else if (op->do_hex) {
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
+            goto skip;
         }
         switch (pc) {
         case 1:
@@ -3037,12 +3166,13 @@ show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
         default:
             printf("  unknown parameter code = 0x%x, contents in "
                    "hex:\n", pc);
-            hex2stdout(bp, extra, 1);
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
             break;
         }
         printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+skip:
         if (op->filter_given)
             break;
     }
@@ -3067,12 +3197,12 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         printf("Application client page  [0xf]\n");
     if (0 == op->filter_given) {
         if ((len > 128) && (0 == op->do_hex)) {
-            hex2stdout(resp, 64, 1);
+            hex2stdout(resp, 64, op->dstrhex_no_ascii);
             printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
                    "see the rest)]\n", len);
         }
         else
-            hex2stdout(resp, len, 1);
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
         return true;
     }
     /* only here if filter_given set */
@@ -3087,14 +3217,13 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         pc = sg_get_unaligned_be16(bp + 0);
         if (op->filter != pc)
             continue;
-        if (op->do_raw)
+        if (op->do_raw) {
             dStrRaw(bp, extra);
-        else if (0 == op->do_hex)
-            hex2stdout(bp, extra, 0);
-        else if (1 == op->do_hex)
-            hex2stdout(bp, extra, 1);
+            break;
+        } else if (0 == op->do_hex)
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
         else
-            hex2stdout(bp, extra, -1);
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
         printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -3108,6 +3237,7 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 static bool
 show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
 {
+    bool skip = false;
     int k, num, param_len;
     const uint8_t * bp;
     const char * cp;
@@ -3146,13 +3276,13 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, param_len);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, param_len, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, param_len);
+            goto skip;
+        } else if (op->do_hex) {
+            hex2stdout(bp, param_len, op->dstrhex_no_ascii);
+            goto skip;
         }
         decoded = true;
         cp = NULL;
@@ -3192,6 +3322,11 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
             }
             break;
         default:
+            if (op->do_brief > 0) {
+                cp = NULL;
+                skip = true;
+                break;
+            }
             if (is_smstr && (param_len >= 24)) {
                 switch (pc) {
                 case 0x1:
@@ -3304,13 +3439,17 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
                 decoded = false;
             break;
         }               /* end of switch statement */
-        if ((! decoded) && full) {
-            hex2str(bp, param_len, "    ", 1 /* no ASCII */, sizeof(b), b);
+        if (skip)
+            skip = false;
+        else if ((! decoded) && full) {
+            hex2str(bp, param_len, "    ", 0 != op->dstrhex_no_ascii,
+                    sizeof(b), b);
             printf("  parameter code = 0x%x, contents in hex:\n%s", pc, b);
         } else
             printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+skip:
         if (op->filter_given)
             break;
     }           /* end of for loop */
@@ -3614,15 +3753,19 @@ show_sas_port_param(const uint8_t * bp, int param_len,
             ull = sg_get_unaligned_be64(vcp + 16);
             printf("    attached SAS address = 0x%" PRIx64 "\n", ull);
             printf("    attached phy identifier = %d\n", vcp[24]);
-            ui = sg_get_unaligned_be32(vcp + 32);
-            printf("    Invalid DWORD count = %u\n", ui);
-            ui = sg_get_unaligned_be32(vcp + 36);
-            printf("    Running disparity error count = %u\n", ui);
-            ui = sg_get_unaligned_be32(vcp + 40);
-            printf("    Loss of DWORD synchronization count = %u\n", ui);
-            ui = sg_get_unaligned_be32(vcp + 44);
-            printf("    Phy reset problem count = %u\n", ui);
+            if (0 == op->do_brief) {
+                ui = sg_get_unaligned_be32(vcp + 32);
+                printf("    Invalid DWORD count = %u\n", ui);
+                ui = sg_get_unaligned_be32(vcp + 36);
+                printf("    Running disparity error count = %u\n", ui);
+                ui = sg_get_unaligned_be32(vcp + 40);
+                printf("    Loss of DWORD synchronization count = %u\n", ui);
+                ui = sg_get_unaligned_be32(vcp + 44);
+                printf("    Phy reset problem count = %u\n", ui);
+            }
         }
+        if (op->do_brief > 0)
+            continue;
         if (spld_len > 51) {
             int num_ped;
             const uint8_t * xcp;
@@ -3673,13 +3816,13 @@ show_protocol_specific_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto skip;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto skip;
         }
         pid = 0xf & bp[4];
         if (6 != pid) {
@@ -3747,13 +3890,13 @@ show_stats_perform_pages(const uint8_t * resp, int len,
             if (op->filter_given) {
                 if (param_code != op->filter)
                     continue;
-                if (op->do_raw) {
-                    dStrRaw(bp, extra);
-                    break;
-                } else if (op->do_hex) {
-                    hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
-                    break;
-                }
+            }
+            if (op->do_raw) {
+                dStrRaw(bp, extra);
+                goto skip;
+            } else if (op->do_hex) {
+                hex2stdout(bp, extra, op->dstrhex_no_ascii);
+                goto skip;
             }
             switch (param_code) {
             case 1:     /* Statistics and performance log parameter */
@@ -3875,6 +4018,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
             }
             if ((op->do_pcb) && (! op->do_name))
                 printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+skip:
             if (op->filter_given)
                 break;
         }
@@ -3890,13 +4034,13 @@ show_stats_perform_pages(const uint8_t * resp, int len,
             if (op->filter_given) {
                 if (param_code != op->filter)
                     continue;
-                if (op->do_raw) {
-                    dStrRaw(bp, extra);
-                    break;
-                } else if (op->do_hex) {
-                    hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
-                    break;
-                }
+            }
+            if (op->do_raw) {
+                dStrRaw(bp, extra);
+                goto skip2;
+            } else if (op->do_hex) {
+                hex2stdout(bp, extra, op->dstrhex_no_ascii);
+                goto skip2;
             }
             switch (param_code) {
             case 1:     /* Group n Statistics and performance log parameter */
@@ -3980,6 +4124,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
             }
             if ((op->do_pcb) && (! op->do_name))
                 printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+skip2:
             if (op->filter_given)
                 break;
         }
@@ -4035,13 +4180,13 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 continue;
-            if (op->do_raw) {
-                dStrRaw(bp, extra);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, extra, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, extra);
+            goto skip;
+        } else if (op->do_hex) {
+            hex2stdout(bp, extra, op->dstrhex_no_ascii);
+            goto skip;
         }
         switch (pc) {
         case 1:     /* Read cache memory hits log parameter */
@@ -4115,6 +4260,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         if ((op->do_pcb) && (! op->do_name))
             printf("    <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+skip:
         if (op->filter_given)
             break;
     }
@@ -4144,13 +4290,13 @@ show_format_status_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         is_count = true;
         switch (pc) {
@@ -4161,7 +4307,7 @@ show_format_status_page(const uint8_t * resp, int len,
                 if (sg_all_ffs(bp + 4, pl - 4))
                     printf("  Format data out: <not available>\n");
                 else {
-                    hex2str(bp + 4, pl - 4, "    ", 1 /* no ASCII */,
+                    hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
                             sizeof(b), b);
                     printf("  Format data out:\n%s", b);
                 }
@@ -4183,7 +4329,7 @@ show_format_status_page(const uint8_t * resp, int len,
         default:
             printf("  Unknown Format parameter code = 0x%x\n", pc);
             is_count = false;
-            hex2str(bp, pl, "    ", 1 /* no ASCII */, sizeof(b), b);
+            hex2str(bp, pl, "    ", 0 != op->dstrhex_no_ascii, sizeof(b), b);
             printf("%s", b);
             break;
         }
@@ -4203,6 +4349,7 @@ show_format_status_page(const uint8_t * resp, int len,
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4231,13 +4378,13 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0:
@@ -4284,11 +4431,12 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
             break;
         default:
             printf("  Unknown parameter code = 0x%x\n", pc);
-            hex2stdout(bp, pl, 0);
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4303,6 +4451,7 @@ static bool
 show_lb_provisioning_page(const uint8_t * resp, int len,
                           const struct opts_t * op)
 {
+    bool evsm_output = false;
     int num, pl, pc;
     const uint8_t * bp;
     const char * cp;
@@ -4318,13 +4467,13 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x1:
@@ -4374,14 +4523,23 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
                 printf("    Scope: %s\n", cp);
             }
         } else if ((pc >= 0xfff0) && (pc <= 0xffff)) {
-            printf("  Vendor specific [0x%x]:", pc);
-            hex2stdout(bp, ((pl < num) ? pl : num), 0);
+            if (op->exclude_vendor) {
+                if ((op->verbose > 0) && (0 == op->do_brief) &&
+                    (! evsm_output)) {
+                    evsm_output = true;
+                    printf("  Vendor specific parameter(s) being ignored\n");
+                }
+            } else {
+                printf("  Vendor specific [0x%x]:", pc);
+                hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
+            }
         } else {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            hex2stdout(bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4409,13 +4567,13 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x0:
@@ -4447,11 +4605,12 @@ show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            hex2stdout(bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4480,13 +4639,13 @@ show_solid_state_media_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x1:
@@ -4504,11 +4663,12 @@ show_solid_state_media_page(const uint8_t * resp, int len,
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            hex2stdout(bp, ((pl < num) ? pl : num), 0);
+            hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4543,6 +4703,7 @@ static bool
 show_dt_device_status_page(const uint8_t * resp, int len,
                            const struct opts_t * op)
 {
+    bool evsm_output = false;
     int num, pl, pc, j;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -4558,13 +4719,13 @@ show_dt_device_status_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x0:
@@ -4624,7 +4785,8 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            hex2str(bp + 4, 8, "      ", 1 /* no ASCII */, sizeof(b), b);
+            hex2str(bp + 4, 8, "      ", 0 != op->dstrhex_no_ascii,
+                    sizeof(b), b);
             printf("%s", b);
             break;
         case 0x3:
@@ -4638,7 +4800,8 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            hex2str(bp + 4, 12, "      ", 1 /* no ASCII */, sizeof(b), b);
+            hex2str(bp + 4, 12, "      ", 0 != op->dstrhex_no_ascii,
+                    sizeof(b), b);
             printf("%s", b);
             break;
         default:
@@ -4657,24 +4820,34 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                 } else {
                     printf("    non-SAS transport, in hex:\n");
                     hex2str(bp + 4, ((pl < num) ? pl : num) - 4, "      ",
-                            1 /* no ASCII */, sizeof(b), b);
+                            0 != op->dstrhex_no_ascii, sizeof(b), b);
                     printf("%s", b);
                 }
             } else if (pc >= 0x8000) {
-                printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ", 1 /* no ASCII */,
-                        sizeof(b), b);
-                printf("%s", b);
+                if (op->exclude_vendor) {
+                    if ((op->verbose > 0) && (0 == op->do_brief) &&
+                        (! evsm_output)) {
+                        evsm_output = true;
+                        printf("  Vendor specific parameter(s) being "
+                               "ignored\n");
+                    }
+                } else {
+                    printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
+                    hex2str(bp, ((pl < num) ? pl : num), "    ",
+                            0 != op->dstrhex_no_ascii, sizeof(b), b);
+                    printf("%s", b);
+                }
             } else {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ", 1 /* no ASCII */,
-                        sizeof(b), b);
+                hex2str(bp, ((pl < num) ? pl : num), "    ",
+                        0 != op->dstrhex_no_ascii, sizeof(b), b);
                 printf("%s", b);
             }
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4689,6 +4862,7 @@ static bool
 show_tapealert_response_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
+    bool evsm_output = false;
     int num, pl, pc, k, mod, div;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -4704,13 +4878,13 @@ show_tapealert_response_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x0:
@@ -4734,18 +4908,28 @@ show_tapealert_response_page(const uint8_t * resp, int len,
             if (pc <= 0x8000) {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
                 hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        1 /* no ASCII */, sizeof(b), b);
+                        0 != op->dstrhex_no_ascii, sizeof(b), b);
                 printf("%s", b);
             } else {
-                printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        1 /* no ASCII */, sizeof(b), b);
-                printf("%s", b);
+                if (op->exclude_vendor) {
+                    if ((op->verbose > 0) && (0 == op->do_brief) &&
+                        (! evsm_output)) {
+                        evsm_output = true;
+                        printf("  Vendor specific parameter(s) being "
+                               "ignored\n");
+                    }
+                } else {
+                    printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
+                    hex2str(bp, ((pl < num) ? pl : num), "    ",
+                            0 != op->dstrhex_no_ascii, sizeof(b), b);
+                    printf("%s", b);
+                }
             }
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4783,6 +4967,7 @@ static bool
 show_requested_recovery_page(const uint8_t * resp, int len,
                              const struct opts_t * op)
 {
+    bool evsm_output = false;
     int num, pl, pc, j, k;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -4798,13 +4983,13 @@ show_requested_recovery_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x0:
@@ -4823,18 +5008,28 @@ show_requested_recovery_page(const uint8_t * resp, int len,
             if (pc <= 0x8000) {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
                 hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        1 /* no ASCII */, sizeof(b), b);
+                        0 != op->dstrhex_no_ascii, sizeof(b), b);
                 printf("%s", b);
             } else {
-                printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        1 /* no ASCII */, sizeof(b), b);
-                printf("%s", b);
+                if (op->exclude_vendor) {
+                    if ((op->verbose > 0) && (0 == op->do_brief) &&
+                        (! evsm_output)) {
+                        evsm_output = true;
+                        printf("  Vendor specific parameter(s) being "
+                               "ignored\n");
+                    }
+                } else {
+                    printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
+                    hex2str(bp, ((pl < num) ? pl : num), "    ",
+                            0 != op->dstrhex_no_ascii, sizeof(b), b);
+                    printf("%s", b);
+                }
             }
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4865,13 +5060,13 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         if ((pc < 0xf) && (pl > 17)) {
             int extend, count;
@@ -4892,17 +5087,18 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
         } else if (pl > 17) {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             hex2str(bp, ((pl < num) ? pl : num), "    ",
-                    1 /* no ASCII */, sizeof(b), b);
+                    0 != op->dstrhex_no_ascii, sizeof(b), b);
             printf("%s", b);
         } else {
             printf("  short parameter length: %d [parameter_code=0x%x]:\n",
                    pl, pc);
             hex2str(bp, ((pl < num) ? pl : num), "    ",
-                    1 /* no ASCII */, sizeof(b), b);
+                    0 != op->dstrhex_no_ascii, sizeof(b), b);
             printf("%s", b);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -4944,6 +5140,8 @@ static bool
 show_background_scan_results_page(const uint8_t * resp, int len,
                                   const struct opts_t * op)
 {
+    bool skip_out = false;
+    bool evsm_output = false;
     int j, m, num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -4959,13 +5157,13 @@ show_background_scan_results_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0:
@@ -5008,15 +5206,28 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             break;
         default:
             if (pc > 0x800) {
-                if ((pc >= 0x8000) && (pc <= 0xafff))
-                    printf("  Medium scan parameter # %d [0x%x], vendor "
-                           "specific\n", pc, pc);
-                else
+                if ((pc >= 0x8000) && (pc <= 0xafff)) {
+                    if (op->exclude_vendor) {
+                        skip_out = true;
+                        if ((op->verbose > 0) && (0 == op->do_brief) &&
+                            (! evsm_output)) {
+                            evsm_output = true;
+                            printf("  Vendor specific parameter(s) being "
+                                   "ignored\n");
+                        }
+                    } else
+                        printf("  Medium scan parameter # %d [0x%x], vendor "
+                               "specific\n", pc, pc);
+                } else
                     printf("  Medium scan parameter # %d [0x%x], "
                            "reserved\n", pc, pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        1 /* no ASCII */, sizeof(b), b);
-                printf("%s", b);
+                if (skip_out)
+                    skip_out = false;
+                else {
+                    hex2str(bp, ((pl < num) ? pl : num), "    ",
+                            0 != op->dstrhex_no_ascii, sizeof(b), b);
+                    printf("%s", b);
+                }
                 break;
             } else
                 printf("  Medium scan parameter # %d [0x%x]\n", pc, pc);
@@ -5061,6 +5272,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5095,13 +5307,13 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x0:
@@ -5227,7 +5439,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             hex2str(bp, ((pl < num) ? pl : num), "    ",
-                    1 /* no ASCII */, sizeof(b), b);
+                    0 != op->dstrhex_no_ascii, sizeof(b), b);
             printf("%s", b);
             break;
         }
@@ -5238,6 +5450,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
             pr2serr("    parameter length >= 8 expected, got %d\n", pl);
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5267,13 +5480,13 @@ show_pending_defects_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x0:
@@ -5314,6 +5527,7 @@ show_pending_defects_page(const uint8_t * resp, int len,
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5343,13 +5557,13 @@ show_background_op_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x0:
@@ -5368,12 +5582,13 @@ show_background_op_page(const uint8_t * resp, int len,
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
             hex2str(bp, ((pl < num) ? pl : num), "    ",
-                    1 /* no ASCII */, sizeof(b), b);
+                    0 != op->dstrhex_no_ascii, sizeof(b), b);
             printf("%s", b);
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5404,13 +5619,13 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0x0:
@@ -5433,13 +5648,14 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
             } else {
                 printf("<unexpected pc=0x%x>\n", pc);
                 hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        1 /* no ASCII */, sizeof(b), b);
+                        0 != op->dstrhex_no_ascii, sizeof(b), b);
                 printf("%s", b);
             }
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5454,6 +5670,7 @@ static bool
 show_service_buffer_info_page(const uint8_t * resp, int len,
                               const struct opts_t * op)
 {
+    bool evsm_output = false;
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -5469,13 +5686,13 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         if (pc < 0x100) {
             printf("  Service buffer identifier: 0x%x\n", pc);
@@ -5488,16 +5705,28 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
         } else if (pc < 0x8000) {
             printf("  parameter_code=0x%x, Reserved, parameter in hex:\n",
                    pc);
-            hex2str(bp + 4, pl - 4, "    ", 1 /* no ASCII */, sizeof(b), b);
+            hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
+                    sizeof(b), b);
             printf("%s", b);
         } else {
-            printf("  parameter_code=0x%x, Vendor-specific, parameter in "
-                   "hex:\n", pc);
-            hex2str(bp + 4, pl - 4, "    ", 1 /* no ASCII */, sizeof(b), b);
-            printf("%s", b);
+            if (op->exclude_vendor) {
+                if ((op->verbose > 0) && (0 == op->do_brief) &&
+                    (! evsm_output)) {
+                    evsm_output = true;
+                    printf("  Vendor specific parameter(s) being "
+                           "ignored\n");
+                }
+            } else {
+                printf("  parameter_code=0x%x, Vendor-specific, parameter in "
+                       "hex:\n", pc);
+                hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
+                        sizeof(b), b);
+                printf("%s", b);
+            }
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5512,6 +5741,7 @@ static bool
 show_sequential_access_page(const uint8_t * resp, int len,
                             const struct opts_t * op)
 {
+    bool evsm_output = false;
     int num, pl, pc;
     const uint8_t * bp;
     uint64_t ull, gbytes;
@@ -5528,13 +5758,13 @@ show_sequential_access_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         ull = sg_get_unaligned_be(pl - 4, bp + 4);
         all_set = sg_all_ffs(bp + 4, pl - 4);
@@ -5602,16 +5832,25 @@ show_sequential_access_page(const uint8_t * resp, int len,
                 printf("    cleaning value: %" PRIu64 "\n", ull);
             break;
         default:
-            if (pc >= 0x8000)
-                printf("  Vendor specific parameter [0x%x] value: %" PRIu64
-                       "\n", pc, ull);
-            else
+            if (pc >= 0x8000) {
+                if (op->exclude_vendor) {
+                    if ((op->verbose > 0) && (0 == op->do_brief) &&
+                        (! evsm_output)) {
+                        evsm_output = true;
+                        printf("  Vendor specific parameter(s) being "
+                               "ignored\n");
+                    }
+                } else
+                    printf("  Vendor specific parameter [0x%x] value: %"
+                           PRIu64 "\n", pc, ull);
+            } else
                 printf("  Reserved parameter [0x%x] value: %" PRIu64 "\n",
                        pc, ull);
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5626,6 +5865,7 @@ static bool
 show_device_stats_page(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
+    bool evsm_output = false;
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
@@ -5641,13 +5881,13 @@ show_device_stats_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+             goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+             goto filter_chk;
         }
         if (pc < 0x1000) {
             bool vl_num = true;
@@ -5761,7 +6001,7 @@ show_device_stats_page(const uint8_t * resp, int len,
             default:
                 vl_num = false;
                 printf("  Reserved parameter code [0x%x] data in hex:\n", pc);
-                hex2str(bp + 4, pl - 4, "    ", 1 /* no ASCII */,
+                hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
                         sizeof(b), b);
                 printf("%s", b);
                 break;
@@ -5781,19 +6021,29 @@ show_device_stats_page(const uint8_t * resp, int len,
                            sg_get_unaligned_be32(p + 4));
                 break;
             default:
-                if (pc >= 0x8000)
-                    printf("  Vendor specific parameter [0x%x], dump in "
-                           "hex:\n", pc);
-                else
+                if (pc >= 0x8000) {
+                    if (op->exclude_vendor) {
+                        if ((op->verbose > 0) && (0 == op->do_brief) &&
+                            (! evsm_output)) {
+                            evsm_output = true;
+                            printf("  Vendor specific parameter(s) being "
+                                   "ignored\n");
+                        }
+                    } else
+                        printf("  Vendor specific parameter [0x%x], dump in "
+                               "hex:\n", pc);
+                } else {
                     printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
-                hex2str(bp + 4, pl - 4, "    ", 1 /* no ASCII */,
-                        sizeof(b), b);
-                printf("%s", b);
+                    hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
+                            sizeof(b), b);
+                    printf("%s", b);
+                }
                 break;
             }
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5822,13 +6072,13 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         ull = sg_get_unaligned_be(pl - 4, bp + 4);
         switch (pc) {
@@ -5929,6 +6179,7 @@ show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -5958,13 +6209,13 @@ show_element_stats_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         printf("  Element address: %d\n", pc);
         v = sg_get_unaligned_be32(bp + 4);
@@ -5981,6 +6232,7 @@ show_element_stats_page(const uint8_t * resp, int len,
         printf("    Number of unreadable volume identifiers: %u\n", v);
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -6011,13 +6263,13 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         printf("  Parameter code: %d\n", pc);
         printf("    Density code: 0x%x\n", bp[6]);
@@ -6054,12 +6306,13 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
         if (sg_all_zeros(bp + 66, 6))
             printf("    Timestamp is all zeros:\n");
         else {
-            hex2str(bp + 66, 6, NULL, 1 /* no ASCII */, sizeof(b), b);
+            hex2str(bp + 66, 6, NULL, 0 != op->dstrhex_no_ascii,
+                    sizeof(b), b);
             printf("    Timestamp: %s", b);
         }
         if (pl > 72) {
             n = pl - 72;
-            k = hex2str(bp + 72, n, "      ", 0 /* with ASCII */,
+            k = hex2str(bp + 72, n, "      ", 0 != op->dstrhex_no_ascii,
                         sizeof(b), b);
             printf("    Vendor specific:\n");
             printf("%s", b);
@@ -6068,6 +6321,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -6098,13 +6352,13 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         printf("  Parameter code: %d\n", pc);
         printf("    Repeat: %d\n", !!(bp[5] & 0x80));
@@ -6151,19 +6405,20 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
         printf("    Destination address: 0x%x\n", v);
         if (pl > 91) {
             printf("    Volume tag information:\n");
-            hex2str(bp + 56, 36, "    ", 1 /* no ASCII */,
+            hex2str(bp + 56, 36, "    ", 0 != op->dstrhex_no_ascii,
                     sizeof(b), b);
             printf("%s", b);
         }
         if (pl > 99) {
             printf("    Timestamp origin: 0x%x\n", bp[92] & 0xf);
             printf("    Timestamp:\n");
-            hex2str(bp + 94, 6, "    ", 1 /* no ASCII */,
+            hex2str(bp + 94, 6, "    ", 0 != op->dstrhex_no_ascii,
                     sizeof(b), b);
             printf("%s", b);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -6249,6 +6504,8 @@ static bool
 show_volume_stats_pages(const uint8_t * resp, int len,
                        const struct opts_t * op)
 {
+    bool skip_out = false;
+    bool evsm_output = false;
     int num, pl, pc, subpg_code;
     bool spf;
     const uint8_t * bp;
@@ -6275,13 +6532,13 @@ show_volume_stats_pages(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
 
         switch (pc) {
@@ -6459,18 +6716,33 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             break;
 
         default:
-            if (pc >= 0xf000)
-                printf("  Vendor specific parameter code (0x%x), payload "
-                       "in hex\n", pc);
-            else
+            if (pc >= 0xf000) {
+                    if (op->exclude_vendor) {
+                    skip_out = true;
+                    if ((op->verbose > 0) && (0 == op->do_brief) &&
+                        (! evsm_output)) {
+                        evsm_output = true;
+                        printf("  Vendor specific parameter(s) being "
+                               "ignored\n");
+                    }
+                } else
+                    printf("  Vendor specific parameter code (0x%x), payload "
+                           "in hex\n", pc);
+            } else
                 printf("  Reserved parameter code (0x%x), payload in hex\n",
                        pc);
-            hex2str(bp + 4, pl - 4, "    ", 1 /* no ASCII */, sizeof(b), b);
-            printf("%s", b);
+            if (skip_out)
+                skip_out = false;
+            else {
+                hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
+                        sizeof(b), b);
+                printf("%s", b);
+            }
             break;
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -6564,13 +6836,13 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         flag = bp[4] & 1;
         if (op->verbose && (0 == op->do_brief) && flag)
@@ -6584,6 +6856,7 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -6598,7 +6871,9 @@ static bool
 show_seagate_cache_page(const uint8_t * resp, int len,
                         const struct opts_t * op)
 {
+    bool skip = false;
     int num, pl, pc;
+    int bsti = 0;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
@@ -6607,6 +6882,8 @@ show_seagate_cache_page(const uint8_t * resp, int len,
             printf("Suspicious page 0x37, SPF=0 but subpage=0x%x\n", resp[1]);
             if (op->verbose)
                 printf("... try vendor=wdc\n");
+            if (op->do_brief > 0)
+                return true;
         } else
             printf("Seagate cache page [0x37]\n");
     }
@@ -6618,16 +6895,22 @@ show_seagate_cache_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
-        case 0: printf("  Blocks sent to initiator"); break;
+        case 0:
+            ++bsti;
+            if (bsti < 2)
+                printf("  Blocks sent to initiator");
+            else
+                skip = true;
+            break;
         case 1: printf("  Blocks received from initiator"); break;
         case 2:
             printf("  Blocks read from cache and sent to initiator");
@@ -6641,10 +6924,16 @@ show_seagate_cache_page(const uint8_t * resp, int len,
                    "> segment size"); break;
         default: printf("  Unknown Seagate parameter code = 0x%x", pc); break;
         }
-        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-        printf("\n");
-        if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+        if (skip)
+            skip = false;
+        else {
+            printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
+            printf("\n");
+            if (op->do_pcb)
+                printf("        <%s>\n", get_pcb_str(bp[2], str,
+                       sizeof(str)));
+        }
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -6678,13 +6967,13 @@ show_hgst_misc_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         switch (pc) {
         case 0:
@@ -6713,6 +7002,7 @@ show_hgst_misc_page(const uint8_t * resp, int len, const struct opts_t * op)
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -6743,13 +7033,13 @@ show_seagate_factory_page(const uint8_t * resp, int len,
         if (op->filter_given) {
             if (pc != op->filter)
                 goto skip;
-            if (op->do_raw) {
-                dStrRaw(bp, pl);
-                break;
-            } else if (op->do_hex) {
-                hex2stdout(bp, pl, ((1 == op->do_hex) ? 1 : -1));
-                break;
-            }
+        }
+        if (op->do_raw) {
+            dStrRaw(bp, pl);
+            goto filter_chk;
+        } else if (op->do_hex) {
+            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            goto filter_chk;
         }
         valid = true;
         switch (pc) {
@@ -6771,6 +7061,7 @@ show_seagate_factory_page(const uint8_t * resp, int len,
         printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+filter_chk:
         if (op->filter_given)
             break;
 skip:
@@ -6807,28 +7098,40 @@ decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
     }
     vpn = (op->vend_prod_num >= 0) ? op->vend_prod_num : op->deduced_vpn;
     lep = pg_subpg_pdt_search(pg_code, subpg_code, op->dev_pdt, vpn);
+
+    /* Below is the indirect function call to all the show_* functions */
     if (lep && lep->show_pagep)
         done = (*lep->show_pagep)(resp, len, op);
 
     if (! done) {
-        if (subpg_code > 0)
-            printf("Unable to decode page = 0x%x, subpage = 0x%x, here is "
-                   "hex:\n", pg_code, subpg_code);
-        else
-            printf("Unable to decode page = 0x%x, here is hex:\n", pg_code);
-        if (len > 128) {
-            hex2str(resp, 64, "    ", 1 /* no ASCII */, sizeof(b), b);
+        if (0 == op->do_hex) {
+            static const char * unable_s = "Unable to decode page = 0x";
+
+            if (subpg_code > 0)
+                printf("%s%x, subpage = 0x%x, here is hex:\n", unable_s,
+                       pg_code, subpg_code);
+            else
+                printf("%s%x, here is hex:\n", unable_s, pg_code);
+        }
+        if ((len > 128) && (0 == op->do_hex)) {
+            hex2str(resp, 64, "    ", 0 != op->dstrhex_no_ascii,
+                    sizeof(b), b);
             printf("%s", b);
             printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
                    "see the rest)]\n", len);
-        }
-        else {
-            hex2str(resp, len, "    ", 1 /* no ASCII */, sizeof(b), b);
-            printf("%s", b);
+        } else {
+            if (0 == op->do_hex) {
+                hex2str(resp, len, "    ", 0 != op->dstrhex_no_ascii,
+                        sizeof(b), b);
+                printf("%s", b);
+            } else
+                hex2stdout(resp, len, op->dstrhex_no_ascii);
         }
     }
 }
 
+/* Tries to fetch the TEMPERATURE_LPAGE [0xd] page first. If that fails
+ * tries to get the Informational Exceptions (IE_LPAGE) page. */
 static int
 fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
 {
@@ -6843,7 +7146,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
         if (op->do_raw)
             dStrRaw(resp, len);
         else if (op->do_hex)
-            hex2stdout(resp, len, (1 == op->do_hex));
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
         else
             show_temperature_page(resp, len, op);
     } else if (SG_LIB_CAT_NOT_READY == res)
@@ -6856,7 +7159,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
             if (op->do_raw)
                 dStrRaw(resp, len);
             else if (op->do_hex)
-                hex2stdout(resp, len, (1 == op->do_hex));
+                hex2stdout(resp, len, op->dstrhex_no_ascii);
             else
                 show_ie_page(resp, len, op);
         } else
@@ -6996,11 +7299,10 @@ main(int argc, char * argv[])
     uint8_t * free_parr = NULL;
     struct opts_t * op;
     struct sg_simple_inquiry_resp inq_out;
-    struct opts_t opts;
+    struct opts_t opts = {0};
     uint8_t supp_pgs_rsp[256];
 
     op = &opts;
-    memset(op, 0, sizeof(opts));
     /* N.B. some disks only give data for current cumulative */
     op->page_control = 1;
     op->dev_pdt = -1;
@@ -7033,9 +7335,25 @@ main(int argc, char * argv[])
         pr2serr("Version string: %s\n", version_str);
         return 0;
     }
+    if (op->do_hex > 0) {
+        if (op->do_hex > 2)
+            op->dstrhex_no_ascii = -1;
+        else
+            op->dstrhex_no_ascii = (1 == op->do_hex);
+    } else {
+        if (op->undefined_hex > 0) {
+            if (op->undefined_hex > 2)
+                op->dstrhex_no_ascii = -1;
+            else
+                op->dstrhex_no_ascii = (1 == op->undefined_hex);
+        } else         /* default when no --hex nor --undefined */
+            op->dstrhex_no_ascii = -1;
+    }
     vb = op->verbose;
     if (op->vend_prod) {
-        if (isdigit((uint8_t)op->vend_prod[0]))
+        if (0 == memcmp("-1", op->vend_prod,3))
+            k = VP_NONE;
+        else if (isdigit((uint8_t)op->vend_prod[0]))
             k = sg_get_num_nomult(op->vend_prod);
         else
             k = find_vpn_by_acron(op->vend_prod);
@@ -7055,6 +7373,26 @@ main(int argc, char * argv[])
                     op->device_name);
         enumerate_pages(op);
         return 0;
+    }
+    if (op->in_fn) {
+        if (op->maxlen_given) {
+            if (op->maxlen > MX_INLEN_ALLOC_LEN) {
+                pr2serr("bad argument to '--maxlen=' when --in= given, from "
+                        "2 to %d (inclusive) expected\n", MX_INLEN_ALLOC_LEN);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            rsp_buff_sz = op->maxlen;
+        } else
+            rsp_buff_sz = DEF_INLEN_ALLOC_LEN;
+    } else {
+        if (op->maxlen_given) {
+            if (op->maxlen > MX_ALLOC_LEN) {
+                pr2serr("bad argument to '--maxlen=', from 2 to 65535 "
+                        "(inclusive) expected\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            rsp_buff_sz = op->maxlen;
+        }
     }
     rsp_buff = sg_memalign(rsp_buff_sz, 0 /* page aligned */, &free_rsp_buff,
                            false);
@@ -7098,10 +7436,14 @@ main(int argc, char * argv[])
                             n);
                     n = in_len - k;
                 }
+                if (op->exclude_vendor && (pg_code >= 0x30))
+                    continue;
                 pdt = op->dev_pdt;
                 lep = pg_subpg_pdt_search(pg_code, subpg_code, pdt,
                                           op->vend_prod_num);
                 if (lep) {
+                    /* Below is the indirect function call to all the
+                     * show_* functions */
                     if (lep->show_pagep)
                         (*lep->show_pagep)(bp, n, op);
                     else
@@ -7151,11 +7493,6 @@ main(int argc, char * argv[])
     if (op->do_all) {
         if (op->do_select) {
             pr2serr("--all conflicts with --select\n");
-            ret = SG_LIB_CONTRADICT;
-            goto err_out;
-        }
-        if (op->filter) {
-            pr2serr("--all conflicts with --filter\n");
             ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
@@ -7294,9 +7631,9 @@ main(int argc, char * argv[])
     }
 bad:
     if (SG_LIB_CAT_INVALID_OP == res)
-        pr2serr("log_sense: not supported\n");
+        pr2serr("%snot supported\n", ls_s);
     else if (SG_LIB_CAT_NOT_READY == res)
-        pr2serr("log_sense: device not ready\n");
+        pr2serr("%sdevice not ready\n", ls_s);
     else if (SG_LIB_CAT_ILLEGAL_REQ == res) {
         if ((op->do_list > 2) && (SUPP_SPGS_SUBPG == op->subpg_code)) {
             rsp_buff[0] = 0x40;
@@ -7304,19 +7641,19 @@ bad:
             pg_len = 0;
             res = 0;
             if (op->verbose)
-                pr2serr("log_sense: field in cdb illegal in [0,0xff], "
-                        "continue with merge\n");
+                pr2serr("%sfield in cdb illegal in [0,0xff], "
+                        "continue with merge\n", ls_s);
             goto good;
         } else
-            pr2serr("log_sense: field in cdb illegal\n");
+            pr2serr("%sfield in cdb illegal\n", ls_s);
     } else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-        pr2serr("log_sense: unit attention\n");
+        pr2serr("%sunit attention\n", ls_s);
     else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-        pr2serr("log_sense: aborted command\n");
+        pr2serr("%saborted command\n", ls_s);
     else if (SG_LIB_TRANSPORT_ERROR == res)
-        pr2serr("log_sense: transport error\n");
+        pr2serr("%stransport error\n", ls_s);
     else
-        pr2serr("log_sense: other error [%d]\n", res);
+        pr2serr("%sother error [%d]\n", ls_s, res);
     ret = res;
     goto err_out;
 
@@ -7327,13 +7664,13 @@ good:
     if (0 == op->do_all) {
         if (op->filter_given) {
             if (op->do_hex > 2)
-                hex2stdout(rsp_buff, pg_len + 4, (op->do_hex < 4));
+                hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
             else
                 decode_page_contents(rsp_buff, pg_len + 4, op);
         } else if (op->do_raw)
             dStrRaw(rsp_buff, pg_len + 4);
         else if (op->do_hex > 1)
-            hex2stdout(rsp_buff, pg_len + 4, (2 == op->do_hex) ? 0 : -1);
+            hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
         else if (pg_len > 1) {
             if (op->do_hex) {
                 if (rsp_buff[0] & 0x40)
@@ -7343,7 +7680,7 @@ good:
                 else
                     printf("Log page code=0x%x, DS=%d, SPF=0, page_len=0x%x\n",
                            rsp_buff[0] & 0x3f, !!(rsp_buff[0] & 0x80), pg_len);
-                hex2stdout(rsp_buff, pg_len + 4, 1);
+                hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
             }
             else
                 decode_page_contents(rsp_buff, pg_len + 4, op);
@@ -7378,6 +7715,8 @@ good:
             /* Some devices include [pg_code, 0xff] for all pg_code > 0 */
             if ((op->pg_code > 0) && (SUPP_SPGS_SUBPG == op->subpg_code))
                 continue;       /* skip since no new information */
+            if ((op->pg_code >= 0x30) && op->exclude_vendor)
+                continue;
             if (! op->do_raw)
                 printf("\n");
             res = do_logs(sg_fd, rsp_buff, resp_len, op);
@@ -7388,38 +7727,42 @@ good:
                             "output\n", resp_len);
                     pg_len = resp_len - 4;
                 }
-                if (op->do_raw)
+                if (op->do_raw && (! op->filter_given))
                     dStrRaw(rsp_buff, pg_len + 4);
+                else if (op->do_hex > 4)
+                    decode_page_contents(rsp_buff, pg_len + 4, op);
                 else if (op->do_hex > 1)
-                    hex2stdout(rsp_buff, pg_len + 4,
-                               (2 == op->do_hex) ? 0 : -1);
-                else if (op->do_hex) {
-                    if (rsp_buff[0] & 0x40)
-                        printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, page_"
-                               "len=0x%x\n", rsp_buff[0] & 0x3f, rsp_buff[1],
-                               !!(rsp_buff[0] & 0x80), pg_len);
-                    else
-                        printf("Log page code=0x%x, DS=%d, SPF=0, page_len="
-                               "0x%x\n", rsp_buff[0] & 0x3f,
-                               !!(rsp_buff[0] & 0x80), pg_len);
-                    hex2stdout(rsp_buff, pg_len + 4, 1);
+                    hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
+                else if (1 == op->do_hex) {
+                    if (0 == op->do_brief) {
+                        if (rsp_buff[0] & 0x40)
+                            printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, "
+                                   "page_len=0x%x\n", rsp_buff[0] & 0x3f,
+                                   rsp_buff[1], !!(rsp_buff[0] & 0x80),
+                                   pg_len);
+                        else
+                            printf("Log page code=0x%x, DS=%d, SPF=0, "
+                                   "page_len=0x%x\n", rsp_buff[0] & 0x3f,
+                                   !!(rsp_buff[0] & 0x80), pg_len);
+                    }
+                    hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
                 }
                 else
                     decode_page_contents(rsp_buff, pg_len + 4, op);
             } else if (SG_LIB_CAT_INVALID_OP == res)
-                pr2serr("log_sense: page=0x%x,0x%x not supported\n",
+                pr2serr("%spage=0x%x,0x%x not supported\n", ls_s,
                         op->pg_code, op->subpg_code);
             else if (SG_LIB_CAT_NOT_READY == res)
-                pr2serr("log_sense: device not ready\n");
+                pr2serr("%sdevice not ready\n", ls_s);
             else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                pr2serr("log_sense: field in cdb illegal "
-                        "[page=0x%x,0x%x]\n", op->pg_code, op->subpg_code);
+                pr2serr("%sfield in cdb illegal [page=0x%x,0x%x]\n", ls_s,
+                        op->pg_code, op->subpg_code);
             else if (SG_LIB_CAT_UNIT_ATTENTION == res)
-                pr2serr("log_sense: unit attention\n");
+                pr2serr("%sunit attention\n", ls_s);
             else if (SG_LIB_CAT_ABORTED_COMMAND == res)
-                pr2serr("log_sense: aborted command\n");
+                pr2serr("%saborted command\n", ls_s);
             else
-                pr2serr("log_sense: failed, try '-v' for more information\n");
+                pr2serr("%sfailed, try '-v' for more information\n", ls_s);
         }
     }
 err_out:

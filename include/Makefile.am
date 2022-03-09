@@ -4,6 +4,7 @@ scsiincludedir      = $(includedir)/scsi
 scsiinclude_HEADERS = \
 	sg_lib.h \
 	sg_lib_data.h \
+	sg_lib_names.h \
 	sg_cmds.h \
 	sg_cmds_basic.h \
 	sg_cmds_extra.h \

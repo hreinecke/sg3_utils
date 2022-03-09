@@ -236,13 +236,14 @@ static struct page_code_desc pc_desc_t_spi4[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
+/* SAS protocol layers now in SPL standards */
 static struct page_code_desc pc_desc_t_sas[] = {
-    {0x18, 0x0, "pslu", "Protocol specific logical unit (SAS)"},
-    {0x19, 0x0, "pspo", "Protocol specific port (SAS)"},
-    {0x19, 0x1, "pcd", "Phy control and discover (SAS)"},
-    {0x19, 0x2, "spc", "Shared port control (SAS)"},
-    {0x19, 0x3, "sep", "Enhanced phy control (SAS)"},
-    {0x19, 0x4, "oobm", "Out of band management control (SAS)"}, /* spl5r01 */
+    {0x18, 0x0, "pslu", "Protocol specific logical unit (SPL)"},
+    {0x19, 0x0, "pspo", "Protocol specific port (SPL)"},
+    {0x19, 0x1, "pcd", "Phy control and discover (SPL)"},
+    {0x19, 0x2, "spc", "Shared port control (SPL)"},
+    {0x19, 0x3, "sep", "Enhanced phy control (SPL)"},
+    {0x19, 0x4, "oobm", "Out of band management control (SPL)"}, /* spl5r01 */
     {0x0, 0x0, NULL, NULL},
 };
 

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220228] [svn: r941]
+Changelog for pre-release sg3_utils-1.48 [20220309] [svn: r942]
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
   - sg_rep_density: new utility for decoding the response of
@@ -25,14 +25,22 @@ Changelog for pre-release sg3_utils-1.48 [20220228] [svn: r941]
   - sg_logs: tweak the meaning of --list option to more closely
     reflect the contents of log pages 0x0 and 0x0,0xff
     - make '-lll' set union of log pages 0x0 and 0x0,0xff
+    - add --exclude option to exclude vendor specific pages
+      and parameters
+    - add --undefined option for hex format of undefined/
+      unrecognized fields
     - for short binary fields, remove address (index) from
       the left hand side of each line of hex
+    - improve 'last_n' log pages; supply VPD and mode pages
+      with their name (if T10 defined)
   - sg_modes: improve handling of zbc disks with pdt=0x14
   - sg_inq, sg_vpd: Device Identication VPD page, change
     "IEEE Company_id" to "AOI" as per spc6r06.pdf
   - sg_opcodes: cleanup error reporting
   - sg_format: allow disk formats on ZBC (zoned) disks
   - sg_read_buffer: add --eh_code= and --no_output options
+  - inhex/logs_last_n.hex: new, tests for the 4 "Last n ..."
+    log (sub)pages
   - sg_lib: add sg_pdt_s_eq() to cope with ZBC disks which may
     be either PDT_ZBC (if host managed) or PDT_DISK 
     - cleanup masks for PDT [0x1f] and group_number [0x3f]

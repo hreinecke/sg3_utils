@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.87 20220217";
+const char * sg_lib_version_str = "2.88 20220305";
 /* spc6r06, sbc5r01, zbc2r12 */
 
 
@@ -257,7 +257,7 @@ struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
     {0x3, PDT_ALL, "descriptor"},
     {0xa, PDT_ALL, "read data from echo buffer"},
     {0xb, PDT_ALL, "echo buffer descriptor"},
-    {0xf, PDT_ALL, "read microcode status"},	/* added in spc5r20 */
+    {0xf, PDT_ALL, "read microcode status"},    /* added in spc5r20 */
     {0x1a, PDT_ALL, "enable expander comms protocol and echo buffer"},
     {0x1c, PDT_ALL, "error history"},
     {0xffff, 0, NULL},
