@@ -1337,7 +1337,7 @@ else
   [ -n "$channelsearch" ] && echo -n "channels $channelsearch "
   echo -n "for "
   if [ -n "$idsearch" ] ; then
-    echo -n " SCSI target IDs $idsearch"
+    echo -n " SCSI target IDs" $idsearch
   else
     echo -n " all SCSI target IDs"
   fi
