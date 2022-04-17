@@ -1,4 +1,4 @@
-.TH SCSI_LOGGING_LEVEL "8" "September 2018" "sg3_utils\-1.45" SG3_UTILS
+.TH SCSI_LOGGING_LEVEL "8" "April 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 scsi_logging_level \- access Linux SCSI logging level information
 .SH SYNOPSIS
@@ -104,6 +104,15 @@ the sg driver use:
 The output from the sg driver caused by this will go to the system
 logs (e.g. /var/log/syslog). To reduce the amount of output use a number
 lower than 7. Using 0 will turn off the tracing and debug.
+.PP
+To turn on maximum SCSI subsystem logging use:
+.PP
+  scsi_logging_level \-s \-a 7
+.PP
+That is probably best done on a system that does not use a SCSI command
+device to hold the root file system, or the file system that holds the
+system log. Note that SATA disks and USB attached storage nearly always
+use the SCSI subsystem.
 .SH AUTHORS
 Written by IBM. Small alterations by Douglas Gilbert.
 .SH "REPORTING BUGS"

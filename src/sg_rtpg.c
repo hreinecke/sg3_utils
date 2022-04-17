@@ -153,11 +153,11 @@ main(int argc, char * argv[])
     bool extended = false;
     bool verbose_given = false;
     bool version_given = false;
-    int k, j, off, res, c, report_len, tgt_port_count;
+    int k, j, off, res, c, report_len, buff_len, tgt_port_count;
     int sg_fd = -1;
     int ret = 0;
     int verbose = 0;
-    uint8_t reportTgtGrpBuff[REPORT_TGT_GRP_BUFF_LEN];
+    uint8_t * reportTgtGrpBuff = NULL;
     uint8_t * bp;
     const char * device_name = NULL;
 
@@ -255,20 +255,26 @@ main(int argc, char * argv[])
         goto err_out;
     }
 
-    memset(reportTgtGrpBuff, 0x0, sizeof(reportTgtGrpBuff));
-    /* trunc = 0; */
+    buff_len = REPORT_TGT_GRP_BUFF_LEN;
+
+retry:
+    reportTgtGrpBuff = (uint8_t *)malloc(buff_len);
+    if (NULL == reportTgtGrpBuff) {
+        pr2serr("    Out of memory (ram)\n");
+        goto err_out;
+    }
+    memset(reportTgtGrpBuff, 0x0, buff_len);
 
     res = sg_ll_report_tgt_prt_grp2(sg_fd, reportTgtGrpBuff,
-                                    sizeof(reportTgtGrpBuff),
+                                    buff_len,
                                     extended, true, verbose);
     ret = res;
     if (0 == res) {
         report_len = sg_get_unaligned_be32(reportTgtGrpBuff + 0) + 4;
-        if (report_len > (int)sizeof(reportTgtGrpBuff)) {
-            /* trunc = 1; */
-            pr2serr("  <<report too long for internal buffer, output "
-                    "truncated\n");
-            report_len = (int)sizeof(reportTgtGrpBuff);
+        if (report_len > buff_len) {
+            free(reportTgtGrpBuff);
+            buff_len = report_len;
+            goto retry;
         }
         if (raw) {
             dStrRaw(reportTgtGrpBuff, report_len);
@@ -354,6 +360,8 @@ err_out:
                 ret = sg_convert_errno(-res);
         }
     }
+    if (reportTgtGrpBuff)
+        free(reportTgtGrpBuff);
     if (0 == verbose) {
         if (! sg_if_can2stderr("sg_rtpg failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' "

@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.40 20220118";
+static const char * version_str = "1.41 20220413";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -390,6 +390,7 @@ static atomic<int> num_ebusy(0);
 static atomic<int> num_start_eagain(0);
 static atomic<int> num_fin_eagain(0);
 static atomic<int> num_miscompare(0);
+static atomic<int> num_fallthru_sigusr2(0);
 static atomic<bool> vb_first_time(true);
 
 static sigset_t signal_set;
@@ -1072,17 +1073,16 @@ siginfo_handler(int sig)
     print_stats("  ");
 }
 
-#if 0
+/* Usually this signal (SIGUSR2) will be caught by the timed wait in the
+ * sig_listen_thread thread but some might slip through while the timed
+ * wait is being re-armed or after that thread is finished. This handler
+ * acts as a backstop. */
 static void
 siginfo2_handler(int sig)
 {
     if (sig) { ; }      /* unused, dummy to suppress warning */
-    pr2serr("Progress report, continuing ...\n");
-    if (do_time > 0)
-        calc_duration_throughput(1);
-    print_stats("  ");
+    ++num_fallthru_sigusr2;
 }
-#endif
 
 static void
 install_handler(int sig_num, void (*sig_handler) (int sig))
@@ -4247,7 +4247,7 @@ main(int argc, char * argv[])
     install_handler(SIGQUIT, interrupt_handler);
     install_handler(SIGPIPE, interrupt_handler);
     install_handler(SIGUSR1, siginfo_handler);
-    // install_handler(SIGUSR2, siginfo2_handler);
+    install_handler(SIGUSR2, siginfo2_handler);
 
     num_ifiles = clp->inf_v.size();
     num_ofiles = clp->outf_v.size();
@@ -4590,9 +4590,11 @@ jump:
         }
         std::this_thread::yield();      // not enough it seems
         {   /* allow time for SIGUSR2 signal to get through */
-            struct timespec tspec = {0, 400000}; /* 400 usecs */
+            struct timespec tspec = {0, 1000000}; /* 1 msec */
+            struct timespec rem;
 
-            nanosleep(&tspec, NULL);
+            while ((nanosleep(&tspec, &rem) < 0) && (EINTR == errno))
+                tspec = rem;
         }
     }
 
@@ -4645,5 +4647,11 @@ fini:
     if (0 == res)
         res = clp->reason_res.load();
     sigprocmask(SIG_SETMASK, &orig_signal_set, NULL);
+    if (clp->verbose) {
+        int num_sigusr2 = num_fallthru_sigusr2.load();
+        if (num_sigusr2 > 0)
+            pr2serr("Number of fall-through SIGUSR2 signals caught: %d\n",
+                    num_sigusr2);
+    }
     return (res >= 0) ? res : SG_LIB_CAT_OTHER;
 }

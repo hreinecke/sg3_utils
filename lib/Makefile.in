@@ -146,9 +146,10 @@ am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__libsgutils2_la_SOURCES_DIST = sg_lib.c sg_lib_data.c \
 	sg_lib_names.c sg_cmds_basic.c sg_cmds_basic2.c \
-	sg_cmds_extra.c sg_cmds_mmc.c sg_pt_common.c sg_pt_dummy.c \
-	sg_pt_linux.c sg_io_linux.c sg_pt_linux_nvme.c sg_pt_win32.c \
-	sg_pt_freebsd.c sg_pt_solaris.c sg_pt_osf1.c sg_pt_haiku.c
+	sg_cmds_extra.c sg_cmds_mmc.c sg_pt_common.c sg_json_builder.c \
+	sg_pt_dummy.c sg_pt_linux.c sg_io_linux.c sg_pt_linux_nvme.c \
+	sg_pt_win32.c sg_pt_freebsd.c sg_pt_solaris.c sg_pt_osf1.c \
+	sg_pt_haiku.c
 @OS_LINUX_TRUE@@PT_DUMMY_TRUE@am__objects_1 = sg_pt_dummy.lo
 @OS_LINUX_TRUE@@PT_DUMMY_FALSE@am__objects_2 = sg_pt_linux.lo \
 @OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_io_linux.lo \
@@ -166,11 +167,12 @@ am__libsgutils2_la_SOURCES_DIST = sg_lib.c sg_lib_data.c \
 @OS_OTHER_TRUE@am__objects_13 = sg_pt_dummy.lo
 am_libsgutils2_la_OBJECTS = sg_lib.lo sg_lib_data.lo sg_lib_names.lo \
 	sg_cmds_basic.lo sg_cmds_basic2.lo sg_cmds_extra.lo \
-	sg_cmds_mmc.lo sg_pt_common.lo $(am__objects_1) \
-	$(am__objects_2) $(am__objects_3) $(am__objects_4) \
-	$(am__objects_5) $(am__objects_6) $(am__objects_7) \
-	$(am__objects_8) $(am__objects_9) $(am__objects_10) \
-	$(am__objects_11) $(am__objects_12) $(am__objects_13)
+	sg_cmds_mmc.lo sg_pt_common.lo sg_json_builder.lo \
+	$(am__objects_1) $(am__objects_2) $(am__objects_3) \
+	$(am__objects_4) $(am__objects_5) $(am__objects_6) \
+	$(am__objects_7) $(am__objects_8) $(am__objects_9) \
+	$(am__objects_10) $(am__objects_11) $(am__objects_12) \
+	$(am__objects_13)
 libsgutils2_la_OBJECTS = $(am_libsgutils2_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -198,12 +200,13 @@ am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/sg_cmds_basic.Plo \
 	./$(DEPDIR)/sg_cmds_basic2.Plo ./$(DEPDIR)/sg_cmds_extra.Plo \
 	./$(DEPDIR)/sg_cmds_mmc.Plo ./$(DEPDIR)/sg_io_linux.Plo \
-	./$(DEPDIR)/sg_lib.Plo ./$(DEPDIR)/sg_lib_data.Plo \
-	./$(DEPDIR)/sg_lib_names.Plo ./$(DEPDIR)/sg_pt_common.Plo \
-	./$(DEPDIR)/sg_pt_dummy.Plo ./$(DEPDIR)/sg_pt_freebsd.Plo \
-	./$(DEPDIR)/sg_pt_haiku.Plo ./$(DEPDIR)/sg_pt_linux.Plo \
-	./$(DEPDIR)/sg_pt_linux_nvme.Plo ./$(DEPDIR)/sg_pt_osf1.Plo \
-	./$(DEPDIR)/sg_pt_solaris.Plo ./$(DEPDIR)/sg_pt_win32.Plo
+	./$(DEPDIR)/sg_json_builder.Plo ./$(DEPDIR)/sg_lib.Plo \
+	./$(DEPDIR)/sg_lib_data.Plo ./$(DEPDIR)/sg_lib_names.Plo \
+	./$(DEPDIR)/sg_pt_common.Plo ./$(DEPDIR)/sg_pt_dummy.Plo \
+	./$(DEPDIR)/sg_pt_freebsd.Plo ./$(DEPDIR)/sg_pt_haiku.Plo \
+	./$(DEPDIR)/sg_pt_linux.Plo ./$(DEPDIR)/sg_pt_linux_nvme.Plo \
+	./$(DEPDIR)/sg_pt_osf1.Plo ./$(DEPDIR)/sg_pt_solaris.Plo \
+	./$(DEPDIR)/sg_pt_win32.Plo
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -376,11 +379,11 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 libsgutils2_la_SOURCES = sg_lib.c sg_lib_data.c sg_lib_names.c \
 	sg_cmds_basic.c sg_cmds_basic2.c sg_cmds_extra.c sg_cmds_mmc.c \
-	sg_pt_common.c $(am__append_1) $(am__append_2) $(am__append_3) \
-	$(am__append_4) $(am__append_5) $(am__append_6) \
-	$(am__append_7) $(am__append_8) $(am__append_9) \
-	$(am__append_10) $(am__append_11) $(am__append_12) \
-	$(am__append_13)
+	sg_pt_common.c sg_json_builder.c $(am__append_1) \
+	$(am__append_2) $(am__append_3) $(am__append_4) \
+	$(am__append_5) $(am__append_6) $(am__append_7) \
+	$(am__append_8) $(am__append_9) $(am__append_10) \
+	$(am__append_11) $(am__append_12) $(am__append_13)
 @DEBUG_FALSE@DBG_CFLAGS = 
 
 # This is active if --enable-debug given to ./configure
@@ -489,6 +492,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_cmds_extra.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_cmds_mmc.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_io_linux.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_json_builder.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_lib.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_lib_data.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_lib_names.Plo@am__quote@ # am--include-marker
@@ -667,6 +671,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sg_cmds_extra.Plo
 	-rm -f ./$(DEPDIR)/sg_cmds_mmc.Plo
 	-rm -f ./$(DEPDIR)/sg_io_linux.Plo
+	-rm -f ./$(DEPDIR)/sg_json_builder.Plo
 	-rm -f ./$(DEPDIR)/sg_lib.Plo
 	-rm -f ./$(DEPDIR)/sg_lib_data.Plo
 	-rm -f ./$(DEPDIR)/sg_lib_names.Plo
@@ -729,6 +734,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sg_cmds_extra.Plo
 	-rm -f ./$(DEPDIR)/sg_cmds_mmc.Plo
 	-rm -f ./$(DEPDIR)/sg_io_linux.Plo
+	-rm -f ./$(DEPDIR)/sg_json_builder.Plo
 	-rm -f ./$(DEPDIR)/sg_lib.Plo
 	-rm -f ./$(DEPDIR)/sg_lib_data.Plo
 	-rm -f ./$(DEPDIR)/sg_lib_names.Plo

@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.97 20220309";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.98 20220310";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define MX_INLEN_ALLOC_LEN (0x800000)
@@ -1575,7 +1575,7 @@ show_supported_pgs_page(const uint8_t * resp, int len,
         int pg_code = bp[k];
         const struct log_elem * lep;
 
-        snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
+        snprintf(b, sizeof(b) - 1, "  0x%02x        ", pg_code);
         lep = pg_subpg_pdt_search(pg_code, 0, op->dev_pdt, -1);
         if (lep) {
             if (op->do_brief > 1)
@@ -1622,9 +1622,9 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
 
         /* formerly ignored [pg, 0xff] when pg > 0, don't know why */
         if (NOT_SPG_SUBPG == subpg_code)
-            snprintf(b, sizeof(b) - 1, "    0x%02x        ", pg_code);
+            snprintf(b, sizeof(b) - 1, "  0x%02x        ", pg_code);
         else
-            snprintf(b, sizeof(b) - 1, "    0x%02x,0x%02x   ", pg_code,
+            snprintf(b, sizeof(b) - 1, "  0x%02x,0x%02x   ", pg_code,
                      subpg_code);
         if ((pg_code > 0) && (subpg_code == 0xff))
             printf("%s\n", b);
@@ -3196,13 +3196,13 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
     if (op->verbose || ((! op->do_raw) && (op->do_hex == 0)))
         printf("Application client page  [0xf]\n");
     if (0 == op->filter_given) {
-        if ((len > 128) && (0 == op->do_hex)) {
-            hex2stdout(resp, 64, op->dstrhex_no_ascii);
-            printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
+        if ((len > 128) && (0 == op->do_hex) && (0 == op->undefined_hex)) {
+            hex2fp(resp, 64, "  ", 0 != op->dstrhex_no_ascii, stdout);
+            printf("  .....  [truncated after 64 of %d bytes (use '-H' to "
                    "see the rest)]\n", len);
         }
         else
-            hex2stdout(resp, len, op->dstrhex_no_ascii);
+            hex2fp(resp, len, "  ", 0 != op->dstrhex_no_ascii, stdout);
         return true;
     }
     /* only here if filter_given set */
@@ -4329,8 +4329,7 @@ show_format_status_page(const uint8_t * resp, int len,
         default:
             printf("  Unknown Format parameter code = 0x%x\n", pc);
             is_count = false;
-            hex2str(bp, pl, "    ", 0 != op->dstrhex_no_ascii, sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp, pl, "    ", 0 != op->dstrhex_no_ascii, stdout);
             break;
         }
         if (is_count) {
@@ -4785,9 +4784,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            hex2str(bp + 4, 8, "      ", 0 != op->dstrhex_no_ascii,
-                    sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp + 4, 8, "      ", 0 != op->dstrhex_no_ascii, stdout);
             break;
         case 0x3:
             printf("   Key management error data (hex only now):\n");
@@ -4800,9 +4797,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             pl);
                 break;
             }
-            hex2str(bp + 4, 12, "      ", 0 != op->dstrhex_no_ascii,
-                    sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp + 4, 12, "      ", 0 != op->dstrhex_no_ascii, stdout);
             break;
         default:
             if ((pc >= 0x101) && (pc <= 0x1ff)) {
@@ -4819,9 +4814,8 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                             sg_get_unaligned_be64(bp + 8));
                 } else {
                     printf("    non-SAS transport, in hex:\n");
-                    hex2str(bp + 4, ((pl < num) ? pl : num) - 4, "      ",
-                            0 != op->dstrhex_no_ascii, sizeof(b), b);
-                    printf("%s", b);
+                    hex2fp(bp + 4, ((pl < num) ? pl : num) - 4, "      ",
+                           0 != op->dstrhex_no_ascii, stdout);
                 }
             } else if (pc >= 0x8000) {
                 if (op->exclude_vendor) {
@@ -4833,15 +4827,13 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                     }
                 } else {
                     printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                    hex2str(bp, ((pl < num) ? pl : num), "    ",
-                            0 != op->dstrhex_no_ascii, sizeof(b), b);
-                    printf("%s", b);
+                    hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                           0 != op->dstrhex_no_ascii, stdout);
                 }
             } else {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        0 != op->dstrhex_no_ascii, sizeof(b), b);
-                printf("%s", b);
+                hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                       0 != op->dstrhex_no_ascii, stdout);
             }
             break;
         }
@@ -4866,7 +4858,6 @@ show_tapealert_response_page(const uint8_t * resp, int len,
     int num, pl, pc, k, mod, div;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("TapeAlert response page (ssc-3, adc-3) [0x12]\n");
@@ -4907,9 +4898,8 @@ show_tapealert_response_page(const uint8_t * resp, int len,
         default:
             if (pc <= 0x8000) {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        0 != op->dstrhex_no_ascii, sizeof(b), b);
-                printf("%s", b);
+                hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                       0 != op->dstrhex_no_ascii, stdout);
             } else {
                 if (op->exclude_vendor) {
                     if ((op->verbose > 0) && (0 == op->do_brief) &&
@@ -4920,9 +4910,8 @@ show_tapealert_response_page(const uint8_t * resp, int len,
                     }
                 } else {
                     printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                    hex2str(bp, ((pl < num) ? pl : num), "    ",
-                            0 != op->dstrhex_no_ascii, sizeof(b), b);
-                    printf("%s", b);
+                    hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                           0 != op->dstrhex_no_ascii, stdout);
                 }
             }
             break;
@@ -4971,7 +4960,6 @@ show_requested_recovery_page(const uint8_t * resp, int len,
     int num, pl, pc, j, k;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Requested recovery page (ssc-3) [0x13]\n");
@@ -5007,9 +4995,8 @@ show_requested_recovery_page(const uint8_t * resp, int len,
         default:
             if (pc <= 0x8000) {
                 printf("  Reserved [parameter_code=0x%x]:\n", pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        0 != op->dstrhex_no_ascii, sizeof(b), b);
-                printf("%s", b);
+                hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                       0 != op->dstrhex_no_ascii, stdout);
             } else {
                 if (op->exclude_vendor) {
                     if ((op->verbose > 0) && (0 == op->do_brief) &&
@@ -5020,9 +5007,8 @@ show_requested_recovery_page(const uint8_t * resp, int len,
                     }
                 } else {
                     printf("  Vendor specific [parameter_code=0x%x]:\n", pc);
-                    hex2str(bp, ((pl < num) ? pl : num), "    ",
-                            0 != op->dstrhex_no_ascii, sizeof(b), b);
-                    printf("%s", b);
+                    hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                           0 != op->dstrhex_no_ascii, stdout);
                 }
             }
             break;
@@ -5048,7 +5034,6 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     const uint8_t * dp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("ATA pass-through results page (sat-2) [0x16]\n");
@@ -5086,15 +5071,13 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
             printf("    device=0x%x  status=0x%x\n", dp[12], dp[13]);
         } else if (pl > 17) {
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            hex2str(bp, ((pl < num) ? pl : num), "    ",
-                    0 != op->dstrhex_no_ascii, sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                   0 != op->dstrhex_no_ascii, stdout);
         } else {
             printf("  short parameter length: %d [parameter_code=0x%x]:\n",
                    pl, pc);
-            hex2str(bp, ((pl < num) ? pl : num), "    ",
-                    0 != op->dstrhex_no_ascii, sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                   0 != op->dstrhex_no_ascii, stdout);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -5145,7 +5128,6 @@ show_background_scan_results_page(const uint8_t * resp, int len,
     int j, m, num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Background scan results page  [0x15]\n");
@@ -5223,11 +5205,9 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                            "reserved\n", pc, pc);
                 if (skip_out)
                     skip_out = false;
-                else {
-                    hex2str(bp, ((pl < num) ? pl : num), "    ",
-                            0 != op->dstrhex_no_ascii, sizeof(b), b);
-                    printf("%s", b);
-                }
+                else
+                    hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                           0 != op->dstrhex_no_ascii, stdout);
                 break;
             } else
                 printf("  Medium scan parameter # %d [0x%x]\n", pc, pc);
@@ -5291,7 +5271,6 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Zoned block device statistics page  [0x14,0x1]\n");
@@ -5438,9 +5417,8 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            hex2str(bp, ((pl < num) ? pl : num), "    ",
-                    0 != op->dstrhex_no_ascii, sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                   0 != op->dstrhex_no_ascii, stdout);
             break;
         }
         if (trunc)
@@ -5545,7 +5523,6 @@ show_background_op_page(const uint8_t * resp, int len,
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Background operation page  [0x15,0x2]\n");
@@ -5581,9 +5558,8 @@ show_background_op_page(const uint8_t * resp, int len,
             break;
         default:
             printf("  Reserved [parameter_code=0x%x]:\n", pc);
-            hex2str(bp, ((pl < num) ? pl : num), "    ",
-                    0 != op->dstrhex_no_ascii, sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                   0 != op->dstrhex_no_ascii, stdout);
             break;
         }
         if (op->do_pcb)
@@ -5607,7 +5583,6 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("LPS misalignment page  [0x15,0x3]\n");
@@ -5647,9 +5622,8 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
                            pc, bp[4]);
             } else {
                 printf("<unexpected pc=0x%x>\n", pc);
-                hex2str(bp, ((pl < num) ? pl : num), "    ",
-                        0 != op->dstrhex_no_ascii, sizeof(b), b);
-                printf("%s", b);
+                hex2fp(bp, ((pl < num) ? pl : num), "    ",
+                       0 != op->dstrhex_no_ascii, stdout);
             }
             break;
         }
@@ -5674,7 +5648,6 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Service buffer information page (adc-3) [0x15]\n");
@@ -5705,9 +5678,7 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
         } else if (pc < 0x8000) {
             printf("  parameter_code=0x%x, Reserved, parameter in hex:\n",
                    pc);
-            hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
-                    sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii, stdout);
         } else {
             if (op->exclude_vendor) {
                 if ((op->verbose > 0) && (0 == op->do_brief) &&
@@ -5719,9 +5690,8 @@ show_service_buffer_info_page(const uint8_t * resp, int len,
             } else {
                 printf("  parameter_code=0x%x, Vendor-specific, parameter in "
                        "hex:\n", pc);
-                hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
-                        sizeof(b), b);
-                printf("%s", b);
+                hex2fp(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
+                       stdout);
             }
         }
         if (op->do_pcb)
@@ -5869,7 +5839,6 @@ show_device_stats_page(const uint8_t * resp, int len,
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
-    char b[512];
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Device statistics page (ssc-3 and adc)\n");
@@ -6001,9 +5970,8 @@ show_device_stats_page(const uint8_t * resp, int len,
             default:
                 vl_num = false;
                 printf("  Reserved parameter code [0x%x] data in hex:\n", pc);
-                hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
-                        sizeof(b), b);
-                printf("%s", b);
+                hex2fp(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
+                       stdout);
                 break;
             }
             if (vl_num)
@@ -6034,9 +6002,8 @@ show_device_stats_page(const uint8_t * resp, int len,
                                "hex:\n", pc);
                 } else {
                     printf("  Reserved parameter [0x%x], dump in hex:\n", pc);
-                    hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
-                            sizeof(b), b);
-                    printf("%s", b);
+                    hex2fp(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
+                           stdout);
                 }
                 break;
             }
@@ -6405,16 +6372,12 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
         printf("    Destination address: 0x%x\n", v);
         if (pl > 91) {
             printf("    Volume tag information:\n");
-            hex2str(bp + 56, 36, "    ", 0 != op->dstrhex_no_ascii,
-                    sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp + 56, 36, "    ", 0 != op->dstrhex_no_ascii, stdout);
         }
         if (pl > 99) {
             printf("    Timestamp origin: 0x%x\n", bp[92] & 0xf);
             printf("    Timestamp:\n");
-            hex2str(bp + 94, 6, "    ", 0 != op->dstrhex_no_ascii,
-                    sizeof(b), b);
-            printf("%s", b);
+            hex2fp(bp + 94, 6, "    ", 0 != op->dstrhex_no_ascii, stdout);
         }
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
@@ -6733,11 +6696,9 @@ show_volume_stats_pages(const uint8_t * resp, int len,
                        pc);
             if (skip_out)
                 skip_out = false;
-            else {
-                hex2str(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
-                        sizeof(b), b);
-                printf("%s", b);
-            }
+            else
+                hex2fp(bp + 4, pl - 4, "    ", 0 != op->dstrhex_no_ascii,
+                       stdout);
             break;
         }
         if (op->do_pcb)
@@ -7078,7 +7039,6 @@ decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
     bool spf;
     bool done = false;
     const struct log_elem * lep;
-    char b[512];
 
     if (len < 3) {
         pr2serr("%s: response has bad length: %d\n", __func__, len);
@@ -7114,17 +7074,13 @@ decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
                 printf("%s%x, here is hex:\n", unable_s, pg_code);
         }
         if ((len > 128) && (0 == op->do_hex)) {
-            hex2str(resp, 64, "    ", 0 != op->dstrhex_no_ascii,
-                    sizeof(b), b);
-            printf("%s", b);
-            printf(" .....  [truncated after 64 of %d bytes (use '-H' to "
+            hex2fp(resp, 64, "  ", 0 != op->dstrhex_no_ascii, stdout);
+            printf("  .....  [truncated after 64 of %d bytes (use '-H' to "
                    "see the rest)]\n", len);
         } else {
-            if (0 == op->do_hex) {
-                hex2str(resp, len, "    ", 0 != op->dstrhex_no_ascii,
-                        sizeof(b), b);
-                printf("%s", b);
-            } else
+            if (0 == op->do_hex)
+                hex2fp(resp, len, "  ", 0 != op->dstrhex_no_ascii, stdout);
+            else
                 hex2stdout(resp, len, op->dstrhex_no_ascii);
         }
     }

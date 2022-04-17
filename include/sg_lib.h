@@ -622,6 +622,10 @@ int dStrHexStr(const char * str, int len, const char * leadin, int format,
 int hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
             int cb_len, char * cbp);
 
+/* Similar to hex2str() but outputs to file pointed to be fp */
+void hex2fp(const uint8_t * b_str, int len, const char * leadin, int format,
+	    FILE * fp);
+
 /* The following 2 functions are equivalent to dStrHex() and dStrHexErr()
  * respectively. The difference is only the type of the first of argument:
  * uint8_t instead of char. The name of the argument is changed to b_str to

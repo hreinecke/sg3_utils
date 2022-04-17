@@ -32,6 +32,20 @@
 extern "C" {
 #endif
 
+#if 0
+enum sg_json_separator_t {
+    SG_JSON_SEP_NONE = 0,
+    SG_JSON_SEP_SPACE_1,
+    SG_JSON_SEP_SPACE_2,
+    SG_JSON_SEP_SPACE_3,
+    SG_JSON_SEP_SPACE_4,
+    SG_JSON_SEP_EQUAL_NO_SPACE,
+    SG_JSON_SEP_EQUAL_1_SPACE,
+    SG_JSON_SEP_COLON_NO_SPACE,
+    SG_JSON_SEP_COLON_1_SPACE,
+};
+#endif
+
 
 #if defined(__GNUC__) || defined(__clang__)
 #ifdef SG_LIB_MINGW
@@ -62,6 +76,15 @@ int pr2ws(const char * fmt, ...);
 
 int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...);
 
+#endif
+
+#if 0
+/* Print function for normal and/or json output. "hr" stands for human
+ * readable (only); "j" for JSON (only). */
+void pr_j_simple(int leadin_sp, const char * name,
+                 enum sg_json_separator_t sep, const char * value);
+void pr_j_hr_line(const char * hr_line, const char * jname,
+                  const char * jvalue);
 #endif
 
 

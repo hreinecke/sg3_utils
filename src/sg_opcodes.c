@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.73 20220127";    /* spc6r06 */
+static const char * version_str = "0.74 20220312";    /* spc6r06 */
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */

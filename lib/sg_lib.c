@@ -3049,6 +3049,24 @@ hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
     return dStrHexStr((const char *)b_str, len, leadin, format, b_len, b);
 }
 
+void
+hex2fp(const uint8_t * b_str, int len, const char * leadin, int format,
+       FILE * fp)
+{
+    int k, num;
+    char b[800];        /* allow for 4 lines of 16 bytes (in hex) each */
+
+    if (leadin && (strlen(leadin) > 118)) {
+        fprintf(fp, ">>> leadin parameter is too large\n");
+        return;
+    }
+    for (k = 0; k < len; k += num) {
+        num = ((k + 64) < len) ? 64 : (len - k);
+        hex2str(b_str + k, num, leadin, format, sizeof(b), b);
+        fprintf(fp, "%s", b);
+    }
+}
+
 /* Returns true when executed on big endian machine; else returns false.
  * Useful for displaying ATA identify words (which need swapping on a
  * big endian machine). */

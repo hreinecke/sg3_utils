@@ -7,7 +7,7 @@ MANDIR=$(DESTDIR)/$(PREFIX)/man
 EXECS = sg_sense_test sg_queue_tst bsg_queue_tst sg_chk_asc sg_tst_nvme \
 	sg_tst_ioctl sg_tst_bidi tst_sg_lib sgs_dd sg_tst_excl \
 	sg_tst_excl2 sg_tst_excl3 sg_tst_context sg_tst_async sgh_dd \
-	sg_mrq_dd sg_iovec_tst sg_take_snap
+	sg_mrq_dd sg_iovec_tst sg_take_snap sg_tst_json_builder
 	
 EXTRAS =
 
@@ -49,7 +49,8 @@ LIBFILESOLD = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_io_linux.o
 LIBFILESNEW = ../lib/sg_pt_linux_nvme.o ../lib/sg_lib.o ../lib/sg_lib_data.o \
 		../lib/sg_pt_linux.o ../lib/sg_io_linux.o \
 		../lib/sg_pt_common.o  ../lib/sg_cmds_basic.o \
-		../lib/sg_cmds_basic2.o ../lib/sg_lib_names.o
+		../lib/sg_cmds_basic2.o ../lib/sg_lib_names.o \
+		../lib/sg_json_builder.o
 
 all: $(EXECS)
 
@@ -63,7 +64,7 @@ depend dep:
 	done > .depend
 
 clean:
-	/bin/rm -f *.o $(EXECS) $(EXTRAS) $(BSG_EXTRAS) core .depend
+	/bin/rm -f *.o $(EXECS) $(EXTRAS) $(BSG_EXTRAS) json_writer core .depend
 
 sg_sense_test: sg_sense_test.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
@@ -118,6 +119,9 @@ sg_iovec_tst: sg_iovec_tst.o sg_scat_gath.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
 
 sg_take_snap: sg_take_snap.o $(LIBFILESNEW)
+	$(LD) -o $@ $(LDFLAGS) $^
+
+sg_tst_json_builder: sg_tst_json_builder.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 

@@ -37,10 +37,10 @@
  *
  * This program issues the SCSI REPORT ZONES, REPORT ZONE DOMAINS or REPORT
  * REALMS command to the given SCSI device and decodes the response.
- * Based on zbc2r10.pdf
+ * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.33 20220224";
+static const char * version_str = "1.34 20220416";
 
 #define WILD_RZONES_BUFF_LEN (1 << 28)
 #define MAX_RZONES_BUFF_LEN (2 * 1024 * 1024)
@@ -117,6 +117,7 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+/* Zone types */
 static struct zt_num2abbrev_t zt_num2abbrev[] = {
     {0, "none"},
     {1, "c"},           /* conventionial */
@@ -157,11 +158,11 @@ usage(int h)
             "[--hex]\n"
             "                     [--inhex=FN] [--locator=LBA] "
             "[--maxlen=LEN]\n"
-            "                     [--partial] [--only] [--raw] "
+            "                     [--num=NUM] [--partial] [--raw] "
             "[--readonly]\n"
             "                     [--realm] [--report=OPT] [--start=LBA] "
-            "[--verbose]\n"
-            "                     [--version] DEVICE\n");
+            "[--statistics]\n"
+            "                     [--verbose] [--version] [--wp] DEVICE\n");
     pr2serr("  where:\n"
             "    --domain|-d        sends a REPORT ZONE DOMAINS command\n"
             "    --find=ZT|-F ZT    find first zone with ZT zone type, "
@@ -183,8 +184,6 @@ usage(int h)
             "                           (def: 0 -> 8192 bytes)\n"
             "    --num=NUM|-n NUM    number of zones to output (def: 0 -> "
             "all)\n"
-            "    --only|-o          output header and starting LBA of "
-            "next\n"
             "    --partial|-p       sets PARTIAL bit in cdb (def: 0 -> "
             "zone list\n"
             "                       length not altered by allocation length "
