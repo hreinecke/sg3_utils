@@ -19,7 +19,9 @@
 #include <stdint.h>
 
 #include "../lib/sg_json_builder.h"
+#include "sg_pr2serr.h"
 
+#define MY_NAME "sg_tst_json_builder"
 
 
 static  json_serialize_opts out_settings = {
@@ -29,18 +31,19 @@ static  json_serialize_opts out_settings = {
 };
 
 int
-main(int arnum, char * argv[])
+main(int argc, char * argv[])
 {
     size_t len;
+    sg_json_state jstate;
+    sg_json_state * jstp = &jstate;
     json_value * jv1p;
     json_value * jv2p;
     json_value * jv3p = json_object_new(0);
-    json_value * jvp = json_object_new(0);
+    json_value * jvp = NULL;
     json_value * jv4p;
     json_value * jv5p;
     json_value * ja1p = json_array_new(0);
     json_value * ja2p;
-    json_value * ja3p;
     json_value * jsp = json_string_new("hello world 1");
     json_value * js2p = json_string_new("hello world 2");
     json_value * js3p = json_string_new("hello world 3");
@@ -49,6 +52,8 @@ main(int arnum, char * argv[])
     json_value * js12 = json_string_new("duplicate name 1");
     char b[8192];
 
+    sg_json_init_state(jstp);
+    jvp = sg_json_start(MY_NAME, "0.01 20220421", argc, argv, jstp);
     jv1p = json_object_push(jvp, "contents", jsp);
 
     if (jvp == jv1p)

@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.75 20220420";    /* spc6r06 */
+static const char * version_str = "0.76 20220421";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
