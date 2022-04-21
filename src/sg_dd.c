@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.32 20220118";
+static const char * version_str = "6.33 20220418";
 
 
 #define ME "sg_dd: "
@@ -1803,7 +1803,6 @@ main(int argc, char * argv[])
     int ret = 0;
     int64_t skip = 0;
     int64_t seek = 0;
-    int64_t out2_off = 0;
     int64_t in_num_sect = -1;
     int64_t out_num_sect = -1;
     char * key;
@@ -2486,7 +2485,6 @@ main(int argc, char * argv[])
                 break;
             }
             bytes_of2 = res;
-            out2_off += res;
         }
 
         if (oflag.sparse && (dd_count > blocks) &&

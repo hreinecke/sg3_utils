@@ -28,11 +28,20 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _JSON_BUILDER_H
-#define _JSON_BUILDER_H
+#ifndef SG_JSON_BUILDER_H
+#define SG_JSON_BUILDER_H
+
+/* This code was fetched from https://github.com/json-parser/json-builder
+ * and comes with the 2 clause BSD license (shown above) which is the same
+ * license that most of the rest of this package uses.
+ *
+ * This header file is in this 'lib' directory so its interface is _not_
+ * published with sg3_utils other header files found in the 'include'
+ * directory. Currently only this header's implementation (i.e.
+ * sg_json_builder.c) and sg_pr2serr.c are the only users of this header. */
 
 /*
- * Used to require json.h from json-parser but what was need as been
+ * Used to require json.h from json-parser but what was needed as been
  * included in this header.
  * https://github.com/udp/json-parser
  */
@@ -318,7 +327,7 @@ void json_builder_free (json_value *);
 }
 #endif
 
-#endif
+#endif		/* SG_JSON_BUILDER_H */
 
 
 

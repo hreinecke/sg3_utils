@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220417] [svn: r944]
+Changelog for pre-release sg3_utils-1.48 [20220420] [svn: r945]
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
   - sg_rep_density: new utility for decoding the response of
@@ -39,22 +39,27 @@ Changelog for pre-release sg3_utils-1.48 [20220417] [svn: r944]
   - sg_inq, sg_vpd: Device Identication VPD page, change
     "IEEE Company_id" to "AOI" as per spc6r06.pdf
   - sg_opcodes: cleanup error reporting
+    - add --inhex=FN to process earlier -HHH
+    - add experimental --json[=JO] option and generation
   - sg_format: allow disk formats on ZBC (zoned) disks
   - sg_read_buffer: add --eh_code= and --no_output options
   - sg_ses: add exp_sas_addr acronym for getting expander's
     SAS address
+  - sg_turs: change nanosleep() to Sleep() in MinGW
   - inhex/logs_last_n.hex: new, tests for the 4 "Last n ..."
     log (sub)pages
   - sg_lib: add sg_pdt_s_eq() to cope with ZBC disks which may
     be either PDT_ZBC (if host managed) or PDT_DISK 
     - add hex2fp(), similar to hex2str() but outputs to FILE
     - cleanup masks for PDT [0x1f] and group_number [0x3f]
+    - new sg_json_builder.[hc] files local to lib folder
   - initialize all sense buffers to 0
   - rework main README file
   - rev 921+922 are bugfix revs on release 1.47 [r919,920]
   - configure.ac: map msys to mingw
     - repeat tweak to accept uclinux as linux
   - sg_dd: change uint type to uint32_t
+    - remove unused out2_off in main()
   - sg_pt_dummy.c: remove problematic include
   - round of coverity identified issue fixes (and non-issues)
 

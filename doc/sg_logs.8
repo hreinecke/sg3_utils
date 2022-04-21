@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "March 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_LOGS "8" "April 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -184,6 +184,9 @@ arranged as 1 or 2 digits representing a byte each of which is whitespace or
 comma separated. Anything from and including a hash mark to the end of line
 is ignored. If the \fI\-\-raw\fR option is also given then \fIFN\fR is
 treated as binary.
+.br
+For compatibility with other utilities in this package "inhex" may also be
+used as this (long) option name.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 lists the names of the logs sense pages supported by this device. This is

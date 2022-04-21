@@ -35,6 +35,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* This code was fetched from https://github.com/json-parser/json-builder
+ * and comes with the 2 clause BSD license (shown above) which is the same
+ * license that most of the rest of this package uses. */
+
 #ifdef _MSC_VER
     #define snprintf _snprintf
 #endif

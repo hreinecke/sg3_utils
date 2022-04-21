@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000-2021 D. Gilbert
+ * Copyright (C) 2000-2022 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.49 20210830";
+static const char * version_str = "3.50 20220418";
 
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
@@ -330,6 +330,19 @@ parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     return res;
 }
 
+#ifdef SG_LIB_MINGW
+
+#include <windows.h>
+
+static void
+wait_millisecs(int millisecs)
+{
+    /* MinGW requires pthreads library for nanosleep, use Sleep() instead */
+    Sleep(millisecs);
+}
+
+#else
+
 static void
 wait_millisecs(int millisecs)
 {
@@ -340,6 +353,8 @@ wait_millisecs(int millisecs)
     while ((nanosleep(&wait_period, &rem) < 0) && (EINTR == errno))
                 wait_period = rem;
 }
+
+#endif
 
 /* Returns true if prints estimate of duration to ready */
 bool

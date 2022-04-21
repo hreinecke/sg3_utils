@@ -8,8 +8,8 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  *  This program outputs information provided by a SCSI REPORT SUPPORTED
- *  OPERATION CODES [0xa3/0xc] and REPORT SUPPORTED TASK MANAGEMENT
- *  FUNCTIONS [0xa3/0xd] commands.
+ *  OPERATION CODES [0xa3/0xc] (RSOC) and REPORT SUPPORTED TASK MANAGEMENT
+ *  FUNCTIONS [0xa3/0xd] (RSTMF) commands.
  */
 
 #include <unistd.h>
@@ -33,8 +33,9 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.74 20220312";    /* spc6r06 */
+static const char * version_str = "0.75 20220420";    /* spc6r06 */
 
+#define MY_NAME "sg_opcodes"
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_TIMEOUT_SECS 60
@@ -59,6 +60,9 @@ static struct option long_options[] = {
         {"enumerate", no_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
+        {"inhex", required_argument, 0, 'i'},
+        {"in", required_argument, 0, 'i'},
+        {"json", optional_argument, 0, 'j'},
         {"mask", no_argument, 0, 'm'},
         {"mlu", no_argument, 0, 'M'},           /* added in spc5r20 */
         {"no-inquiry", no_argument, 0, 'n'},
@@ -86,7 +90,7 @@ struct opts_t {
     bool do_mask;
     bool do_mlu;
     bool do_raw;
-    bool do_rctd;
+    bool do_rctd;       /* Return command timeout descriptor */
     bool do_repd;
     bool do_unsorted;
     bool do_taskman;
@@ -99,6 +103,8 @@ struct opts_t {
     int servact;
     int verbose;
     const char * device_name;
+    const char * inhex_fn;
+    sg_json_state json_st;
 };
 
 
@@ -107,12 +113,13 @@ usage()
 {
     pr2serr("Usage:  sg_opcodes [--alpha] [--compact] [--enumerate] "
             "[--help] [--hex]\n"
-            "                   [--mask] [--mlu] [--no-inquiry] "
-            "[--opcode=OP[,SA]]\n"
-            "                   [--pdt=DT] [--raw] [--rctd] [--repd] "
-            "[--sa=SA] [--tmf]\n"
-            "                   [--unsorted] [--verbose] [--version] "
-            "DEVICE\n"
+            "                   [--inhex=FN] [--json[=JO]] [--mask] [--mlu] "
+            "[--no-inquiry]\n"
+            "                   [--opcode=OP[,SA]] [--pdt=DT] [--raw] "
+            "[--rctd]\n"
+            "                   [--repd] [--sa=SA] [--tmf] [--unsorted] "
+            "[--verbose]\n"
+            "                   [--version] DEVICE\n"
             "  where:\n"
             "    --alpha|-a      output list of operation codes sorted "
             "alphabetically\n"
@@ -121,7 +128,17 @@ usage()
             "name,\n"
             "                      ignore DEVICE\n"
             "    --help|-h       print usage message then exit\n"
-            "    --hex|-H        output response in hex\n"
+            "    --hex|-H        output response in hex, use -HHH for "
+            "hex\n"
+            "                    suitable for later use of --inhex= "
+            "option\n"
+            "    --inhex=FN|-i FN    contents of file FN treated as hex "
+            "and used\n"
+            "                        instead of DEVICE which is ignored\n"
+            "    --json[=JO]|-jJO    output in JSON instead of human "
+            "readable\n"
+            "                        text. Optional argument JO see manpage "
+            "sg3_utils\n"
             "    --mask|-m       show cdb usage data (a mask) when "
             "all listed\n"
             "    --mlu|-M        show MLU bit when all listed\n"
@@ -131,7 +148,10 @@ usage()
             "    --pdt=DT|-p DT    give peripheral device type for "
             "'--no-inquiry'\n"
             "                      '--enumerate'\n"
-            "    --raw|-r        output response in binary to stdout\n"
+            "    --raw|-r        output response in binary to stdout unless "
+            "--inhex=FN\n"
+            "                    is given then FN is parsed as binary "
+            "instead\n"
             "    --rctd|-R       set RCTD (return command timeout "
             "descriptor) bit\n"
             "    --repd|-q       set Report Extended Parameter Data bit, "
@@ -154,10 +174,11 @@ usage()
 static void
 usage_old()
 {
-    pr2serr("Usage:  sg_opcodes [-a] [-c] [-e] [-H] [-m] [-M] [-n] [-o=OP] "
-            "[-p=DT]\n"
-            "                   [-q] [-r] [-R] [-s=SA] [-t] [-u] [-v] [-V] "
-            "DEVICE\n"
+    pr2serr("Usage:  sg_opcodes [-a] [-c] [-e] [-H] [-j] [-m] [-M] [-n] "
+            "[-o=OP]\n"
+            "                   [-p=DT] [-q] [-r] [-R] [-s=SA] [-t] [-u] "
+            "[-v] [-V]\n"
+            "                   DEVICE\n"
             "  where:\n"
             "    -a    output list of operation codes sorted "
             "alphabetically\n"
@@ -165,6 +186,7 @@ usage_old()
             "    -e    use '--opcode=' and '--pdt=' to look up name, "
             "ignore DEVICE\n"
             "    -H    print response in hex\n"
+            "    -j    print response in JSON\n"
             "    -m    show cdb usage data (a mask) when all listed\n"
             "    -M    show MLU bit when all listed\n"
             "    -n    don't output INQUIRY information\n"
@@ -312,15 +334,18 @@ do_rstmf(struct sg_pt_base * ptvp, bool repd, void * resp, int mx_resp_len,
 static int
 new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
-    int c, n;
+    bool bad_arg = false;
+    bool pr_verbose = false;
+    char bad_ch;
+    int c, n, k;
     char * cp;
     char b[32];
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "acehHmMnNo:Op:qrRs:tuvV", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "acehHi:j::mMnNo:Op:qrRs:tuvV",
+                        long_options, &option_index);
         if (c == -1)
             break;
 
@@ -340,6 +365,58 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'H':
             ++op->do_hex;
+            break;
+        case 'i':
+            op->inhex_fn = optarg;
+            break;
+        case 'j':
+            sg_json_init_state(&op->json_st);
+            if (optarg) {
+                for (k = 0; optarg[k]; ++k) {
+                    switch (optarg[k]) {
+                    case '0':
+                        op->json_st.pr_indent_size = 16;
+                        break;
+                    case '2':
+                        op->json_st.pr_indent_size = 2;
+                        break;
+                    case '4':
+                        op->json_st.pr_indent_size = 4;
+                        break;
+                    case '8':
+                        op->json_st.pr_indent_size = 8;
+                        break;
+                    case 'c':
+                        op->json_st.pr_pretty = false;
+                        break;
+                    case 'g':
+                        op->json_st.pr_format = 'g';
+                        break;
+                    case 'i':
+                        op->json_st.pr_implemented = true;
+                        break;
+                    case 'o':
+                        op->json_st.pr_output = true;
+                        break;
+                    case 's':
+                        op->json_st.pr_sorted = true;
+                        break;
+                    case 'u':
+                        op->json_st.pr_unimplemented = true;
+                        break;
+                    case 'v':
+                        pr_verbose = true;
+                        break;
+                    case 'y':
+                        op->json_st.pr_format = 'g';
+                        break;
+                    default:
+                        bad_arg = true;
+                        bad_ch = optarg[k];
+                        break;
+                    }
+                }
+            }
             break;
         case 'm':
             op->do_mask = true;
@@ -450,6 +527,17 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+    if (pr_verbose) {
+        if (op->verbose_given)
+            op->json_st.verbose = op->verbose;
+        else
+            op->json_st.verbose = 4;
+    }
+    if (bad_arg) {
+        pr2serr("Unrecognized argument character: %c given to --json=\n",
+                bad_ch);
+        return SG_LIB_SYNTAX_ERROR;
+    }
     return 0;
 }
 
@@ -479,6 +567,9 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     break;
                 case 'H':
                     ++op->do_hex;
+                    break;
+                case 'j':    /* don't accept argument with this old syntax */
+                    sg_json_init_state(&op->json_st);
                     break;
                 case 'm':
                     op->do_mask = true;
@@ -529,7 +620,9 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             }
             if (plen <= 0)
                 continue;
-            if (0 == strncmp("o=", cp, 2)) {
+            if (0 == strncmp("i=", cp, 2))
+                op->inhex_fn = cp + 2;
+            else if (0 == strncmp("o=", cp, 2)) {
                 num = sscanf(cp + 2, "%x", (unsigned int *)&n);
                 if ((1 != num) || (n > 255)) {
                     pr2serr("Bad number after 'o=' option\n");
@@ -664,62 +757,72 @@ opcode_alpha_compare(const void * left, const void * right)
     return strncmp(l_name_buff, r_name_buff, NAME_BUFF_SZ);
 }
 
+/* For decoding a RSOC command's "All_commands" parameter data */
 static int
 list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                struct sg_pt_base * ptvp)
 {
     bool sa_v;
-    int k, j, m, cd_len, serv_act, len, act_len, opcode, res;
+    int k, j, m, n, cd_len, serv_act, len, act_len, opcode, res;
     uint8_t byt5;
     unsigned int timeout;
     uint8_t * bp;
     uint8_t ** sort_arr = NULL;
+    sg_json_state * jsp = &op->json_st;
+    sg_json_opaque_p jap = NULL;
+    sg_json_opaque_p jop = NULL;
     char name_buff[NAME_BUFF_SZ];
     char sa_buff[8];
+    char b[192];
+    const int blen = sizeof(b);
 
     cd_len = sg_get_unaligned_be32(rsoc_buff + 0);
     if (cd_len > (rsoc_len - 4)) {
-        printf("sg_opcodes: command data length=%d, allocation=%d; "
-               "truncate\n", cd_len, rsoc_len - 4);
+        sgj_pr_hr(jsp, "sg_opcodes: command data length=%d, allocation=%d; "
+                   "truncate\n", cd_len, rsoc_len - 4);
         cd_len = ((rsoc_len - 4) / 8) * 8;
     }
     if (0 == cd_len) {
-        printf("sg_opcodes: no commands to display\n");
+        sgj_pr_hr(jsp, "sg_opcodes: no commands to display\n");
         return 0;
     }
     if (op->do_rctd) {  /* Return command timeout descriptor */
         if (op->do_compact) {
-            printf("\nOpcode,sa  Nominal  Recommended  Name\n");
-            printf(  "  (hex)    timeout  timeout(sec)     \n");
-            printf("-----------------------------------------------"
-                   "---------\n");
+            sgj_pr_hr(jsp, "\nOpcode,sa  Nominal  Recommended  Name\n");
+            sgj_pr_hr(jsp,   "  (hex)    timeout  timeout(sec)     \n");
+            sgj_pr_hr(jsp, "-----------------------------------------------"
+                       "---------\n");
         } else {
-            printf("\nOpcode  Service    CDB   Nominal  Recommended  Name\n");
-            printf(  "(hex)   action(h)  size  timeout  timeout(sec)     \n");
-            printf("-------------------------------------------------------"
-                   "---------\n");
+            sgj_pr_hr(jsp, "\nOpcode  Service    CDB   Nominal  Recommended  "
+                      "Name\n");
+            sgj_pr_hr(jsp,   "(hex)   action(h)  size  timeout  timeout(sec) "
+                      "    \n");
+            sgj_pr_hr(jsp, "-------------------------------------------------"
+                      "---------------\n");
         }
     } else {            /* RCTD clear in cdb */
         if (op->do_compact) {
-            printf("\nOpcode,sa  Name\n");
-            printf(  "  (hex)        \n");
-            printf("---------------------------------------\n");
+            sgj_pr_hr(jsp, "\nOpcode,sa  Name\n");
+            sgj_pr_hr(jsp,   "  (hex)        \n");
+            sgj_pr_hr(jsp, "---------------------------------------\n");
         } else if (op->do_mlu) {
-            printf("\nOpcode  Service    CDB    MLU    Name\n");
-            printf(  "(hex)   action(h)  size              \n");
-            printf("-----------------------------------------------\n");
+            sgj_pr_hr(jsp, "\nOpcode  Service    CDB    MLU    Name\n");
+            sgj_pr_hr(jsp,   "(hex)   action(h)  size              \n");
+            sgj_pr_hr(jsp, "-------------------------------------------"
+                      "----\n");
         } else {
-            printf("\nOpcode  Service    CDB  RWCDLP,  Name\n");
-            printf(  "(hex)   action(h)  size   CDLP       \n");
-            printf("-----------------------------------------------\n");
+            sgj_pr_hr(jsp, "\nOpcode  Service    CDB  RWCDLP,  Name\n");
+            sgj_pr_hr(jsp,   "(hex)   action(h)  size   CDLP       \n");
+            sgj_pr_hr(jsp, "-------------------------------------------"
+                      "----\n");
         }
     }
     /* SPC-4 does _not_ require any ordering of opcodes in the response */
     if (! op->do_unsorted) {
         sort_arr = (uint8_t **)calloc(cd_len, sizeof(uint8_t *));
         if (NULL == sort_arr) {
-            printf("sg_opcodes: no memory to sort operation codes, "
-                   "try '-u'\n");
+            pr2serr("sg_opcodes: no memory to sort operation codes, "
+                    "try '-u'\n");
             return sg_convert_errno(ENOMEM);
         }
         memset(sort_arr, 0, cd_len * sizeof(uint8_t *));
@@ -731,13 +834,18 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
         qsort(sort_arr, j, sizeof(uint8_t *),
               (op->do_alpha ? opcode_alpha_compare : opcode_num_compare));
     }
+
+    jap = sgj_new_named_array(jsp, jsp->basep, "all_command_descriptor");
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
+        jop = sgj_new_object(jsp);
+
         bp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
         byt5 = bp[5];
         len = (byt5 & 0x2) ? 20 : 8;
         opcode = bp[0];
-        sa_v = !!(byt5 & 1);
+        sa_v = !!(byt5 & 1);    /* service action valid */
         serv_act = 0;
+        name_buff[0] = '\0';
         if (sa_v) {
             serv_act = sg_get_unaligned_be16(bp + 2);
             sg_get_opcode_sa_name(opcode, serv_act, peri_dtype, NAME_BUFF_SZ,
@@ -751,33 +859,35 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
         if (op->do_rctd) {
+            n = 0;
             if (byt5 & 0x2) {          /* CTDP set */
                 /* don't show CDLP because it makes line too long */
                 if (op->do_compact)
-                    printf(" %.2x%c%.4s", opcode, (sa_v ? ',' : ' '),
-                           sa_buff);
+                    n += sg_scnpr(b + n, blen - n, " %.2x%c%.4s", opcode,
+                                  (sa_v ? ',' : ' '), sa_buff);
                 else
-                    printf(" %.2x     %.4s       %3d", opcode, sa_buff,
-                           sg_get_unaligned_be16(bp + 6));
+                    n += sg_scnpr(b + n, blen - n, " %.2x     %.4s       %3d",
+                                  opcode,
+                                  sa_buff, sg_get_unaligned_be16(bp + 6));
                 timeout = sg_get_unaligned_be32(bp + 12);
                 if (0 == timeout)
-                    printf("         -");
+                    n += sg_scnpr(b + n, blen - n, "         -");
                 else
-                    printf("  %8u", timeout);
+                    n += sg_scnpr(b + n, blen - n, "  %8u", timeout);
                 timeout = sg_get_unaligned_be32(bp + 16);
                 if (0 == timeout)
-                    printf("          -");
+                    n += sg_scnpr(b + n, blen - n, "          -");
                 else
-                    printf("   %8u", timeout);
-                printf("    %s\n", name_buff);
+                    n += sg_scnpr(b + n, blen - n, "   %8u", timeout);
+                sgj_pr_hr(jsp, "%s    %s\n", b, name_buff);
             } else                      /* CTDP clear */
                 if (op->do_compact)
-                    printf(" %.2x%c%.4s                        %s\n", opcode,
-                           (sa_v ? ',' : ' '), sa_buff, name_buff);
+                    sgj_pr_hr(jsp, " %.2x%c%.4s                        %s\n",
+                              opcode, (sa_v ? ',' : ' '), sa_buff, name_buff);
                 else
-                    printf(" %.2x     %.4s       %3d                         "
-                           "%s\n", opcode, sa_buff,
-                           sg_get_unaligned_be16(bp + 6), name_buff);
+                    sgj_pr_hr(jsp, " %.2x     %.4s       %3d                 "
+                              "        %s\n", opcode, sa_buff,
+                              sg_get_unaligned_be16(bp + 6), name_buff);
         } else {            /* RCTD clear in cdb */
             /* before version 0.69 treated RWCDLP (1 bit) and CDLP (2 bits),
              * as a 3 bit field, now break them out separately */
@@ -785,36 +895,73 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             int cdlp = !!(0x40 & byt5);
 
             if (op->do_compact)
-                printf(" %.2x%c%.4s   %s\n", bp[0], (sa_v ? ',' : ' '),
-                       sa_buff, name_buff);
+                sgj_pr_hr(jsp, " %.2x%c%.4s   %s\n", bp[0],
+                          (sa_v ? ',' : ' '), sa_buff, name_buff);
             else if (op->do_mlu)
-                printf(" %.2x     %.4s       %3d   %3d     %s\n", bp[0],
-                       sa_buff, sg_get_unaligned_be16(bp + 6),
-                       ((byt5 >> 4) & 0x3), name_buff);
+                sgj_pr_hr(jsp, " %.2x     %.4s       %3d   %3d     %s\n",
+                          bp[0], sa_buff, sg_get_unaligned_be16(bp + 6),
+                          ((byt5 >> 4) & 0x3), name_buff);
             else
-                printf(" %.2x     %.4s       %3d    %d,%d    %s\n", bp[0],
-                       sa_buff, sg_get_unaligned_be16(bp + 6), rwcdlp, cdlp,
-                       name_buff);
+                sgj_pr_hr(jsp, " %.2x     %.4s       %3d    %d,%d    %s\n",
+                          bp[0], sa_buff, sg_get_unaligned_be16(bp + 6),
+                          rwcdlp, cdlp, name_buff);
         }
-        if (op->do_mask) {
-            int cdb_sz;
-            uint8_t b[64];
+        if (jsp->pr_as_json) {
+            snprintf(b, blen, "0x%x", opcode);
+            sgj_add_name_vs(jsp, jop, "operation_code", b);
+            if (sa_v) {
+                snprintf(b, blen, "0x%x", serv_act);
+                sgj_add_name_vs(jsp, jop, "service_action", b);
+            }
+            if (name_buff[0])
+                sgj_add_name_vs(jsp, jop, "name", name_buff);
+            sgj_add_name_vi(jsp, jop, "rwcdlp", (byt5 >> 6) & 0x1);
+            sgj_add_name_vi(jsp, jop, "mlu", (byt5 >> 4) & 0x3);
+            sgj_add_name_vi(jsp, jop, "cdlp", (byt5 >> 2) & 0x3);
+            sgj_add_name_vi(jsp, jop, "ctdp", (byt5 >> 1) & 0x1);
+            sgj_add_name_vi(jsp, jop, "servactv", byt5 & 0x1);
+            sgj_add_name_vi(jsp, jop, "cdb_length",
+                            sg_get_unaligned_be16(bp + 6));
 
-            memset(b, 0, sizeof(b));
+            sgj_add_array_element(jsp, jap, jop);
+        }
+
+        if (op->do_mask && ptvp) {
+            int cdb_sz;
+            uint8_t d[64];
+
+            n = 0;
+            memset(d, 0, sizeof(d));
             res = do_rsoc(ptvp, false, (sa_v ? 2 : 1), opcode, serv_act,
-                          b, sizeof(b), &act_len, true, op->verbose);
+                          d, sizeof(d), &act_len, true, op->verbose);
             if (0 == res) {
-                cdb_sz = sg_get_unaligned_be16(b + 2);
+                int nn;
+
+                cdb_sz = sg_get_unaligned_be16(d + 2);
                 cdb_sz = (cdb_sz < act_len) ? cdb_sz : act_len;
                 if ((cdb_sz > 0) && (cdb_sz <= 80)) {
                     if (op->do_compact)
-                        printf("             usage: ");
+                        n += sg_scnpr(b + n, blen - n,
+                                      "             usage: ");
                     else
-                        printf("        cdb usage: ");
-                    for (m = 0; (m < cdb_sz) && ((4 + m) < (int)sizeof(b));
+                        n += sg_scnpr(b + n, blen - n, "        cdb usage: ");
+                    nn = n;
+                    for (m = 0; (m < cdb_sz) && ((4 + m) < (int)sizeof(d));
                          ++m)
-                        printf("%.2x ", b[4 + m]);
-                    printf("\n");
+                        n += sg_scnpr(b + n, blen - n, "%.2x ", d[4 + m]);
+                    sgj_pr_hr(jsp, "%s\n", b);
+                    if (jsp->pr_as_json) {
+                        int l;
+                        char *b2p = b + nn;
+                        sg_json_opaque_p jo2p = sgj_new_named_object(jsp, jop,
+                                         "one_command_descriptor");
+
+                        l = strlen(b2p);
+                        if ((l > 0) && (' ' == b2p[l - 1]))
+                            b2p[l - 1] = '\0';
+                        sgj_add_name_vi(jsp, jo2p, "cdb_size", cdb_sz);
+                        sgj_add_name_vs(jsp, jo2p, "cdb_usage_data", b2p);
+                    }
                 }
             } else
                 goto err_out;
@@ -828,10 +975,12 @@ err_out:
 }
 
 static void
-decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b)
+decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b,
+                        struct opts_t * op)
 {
     int len;
     unsigned int timeout;
+    sg_json_state * jsp = &op->json_st;
 
     if ((max_b_len < 2) || (NULL == dp))
         return;
@@ -848,6 +997,11 @@ decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b)
         snprintf(b, max_b_len, "no nominal timeout, ");
     else
         snprintf(b, max_b_len, "nominal timeout: %u secs, ", timeout);
+    if (jsp->pr_as_json) {
+        sgj_add_name_vi(jsp, jsp->userp, "command_specific", dp[3]);
+        sgj_add_name_vi(jsp, jsp->userp,
+                        "nominal_command_processing_timeout", timeout);
+    }
     len = strlen(b);
     max_b_len -= len;
     b += len;
@@ -856,33 +1010,45 @@ decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b)
         snprintf(b, max_b_len, "no recommended timeout");
     else
         snprintf(b, max_b_len, "recommended timeout: %u secs", timeout);
+    if (jsp->pr_as_json)
+        sgj_add_name_vi(jsp, jsp->userp,
+                        "recommended_command_timeout", timeout);
     return;
 }
 
-/* One command descriptor (includes cdb usage data) */
+/* For decoding a RSOC command's "One_command" parameter data which includes
+ * cdb usage data. */
 static void
 list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
          struct opts_t * op)
 {
     bool valid = false;
-    int k, mlu, rwcdlp;
+    int k, mlu, cdlp, rwcdlp, support, ctdp;
+    int n = 0;
     uint8_t * bp;
     const char * cp;
     const char * dlp;
     const char * mlu_p;
+    sg_json_state * jsp = &op->json_st;
+    sg_json_opaque_p jop = NULL;
     char name_buff[NAME_BUFF_SZ];
-    char b[64];
+    char d[64];
+    char b[192];
+    const int blen = sizeof(b);
 
 
-    printf("\n  Opcode=0x%.2x", op->opcode);
+    jop = sgj_new_named_object(jsp, jsp->basep, "one_command_descriptor");
+    n += sg_scnpr(b + n, blen - n, "\n  Opcode=0x%.2x", op->opcode);
     if (rep_opts > 1)
-        printf("  Service_action=0x%.4x", op->servact);
-    printf("\n");
+        n += sg_scnpr(b + n, blen - n, "  Service_action=0x%.4x", op->servact);
+    sgj_pr_hr(jsp, "%s\n", b);
     sg_get_opcode_sa_name(((op->opcode > 0) ? op->opcode : 0),
                           ((op->servact > 0) ? op->servact : 0),
                           peri_dtype, NAME_BUFF_SZ, name_buff);
-    printf("  Command_name: %s\n", name_buff);
-    switch((int)(rsoc_buff[1] & 7)) {   /* SUPPORT field */
+    sgj_pr_hr(jsp, "  Command_name: %s\n", name_buff);
+    ctdp = !!(0x80 & rsoc_buff[1]);
+    support = rsoc_buff[1] & 7;
+    switch(support) {
     case 0:
         cp = "not currently available";
         break;
@@ -903,9 +1069,9 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         cp = name_buff;
         break;
     }
-    k = 0x3 & (rsoc_buff[1] >> 3);
+    cdlp = 0x3 & (rsoc_buff[1] >> 3);
     rwcdlp = rsoc_buff[0] & 1;
-    switch (k) {        /* CDLP field */
+    switch (cdlp) {
     case 0:
         if (rwcdlp)
             dlp = "Reserved [RWCDLP=1, CDLP=0]";
@@ -928,8 +1094,8 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         dlp = "reserved [CDLP=3]";
         break;
     }
-    printf("  Command is %s\n", cp);
-    printf("  %s\n", dlp);
+    sgj_pr_hr(jsp, "  Command is %s\n", cp);
+    sgj_pr_hr(jsp, "  %s\n", dlp);
     mlu = 0x3 & (rsoc_buff[1] >> 5);
     switch (mlu) {
     case 0:
@@ -945,22 +1111,49 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         mlu_p = "affects all LUs in this target";
         break;
     default:
-        snprintf(b, sizeof(b), "reserved [MLU=%d]", mlu);
-        mlu_p = b;
+        snprintf(d, sizeof(d), "reserved [MLU=%d]", mlu);
+        mlu_p = d;
         break;
     }
-    printf("  Multiple Logical Units (MLU): %s\n", mlu_p);
+    sgj_pr_hr(jsp, "  Multiple Logical Units (MLU): %s\n", mlu_p);
     if (valid) {
-        printf("  Usage data: ");
+        n = 0;
+        n += sg_scnpr(b + n, blen - n, "  Usage data: ");
         bp = rsoc_buff + 4;
         for (k = 0; k < cd_len; ++k)
-            printf("%.2x ", bp[k]);
-        printf("\n");
+            n += sg_scnpr(b + n, blen - n, "%.2x ", bp[k]);
+        sgj_pr_hr(jsp, "%s\n", b);
     }
-    if (0x80 & rsoc_buff[1]) {      /* CTDP */
+    if (jsp->pr_as_json) {
+        int l;
+
+        snprintf(b, blen, "0x%x", op->opcode);
+        sgj_add_name_vs(jsp, jop, "operation_code", b);
+        if (rep_opts > 1) {
+            snprintf(b, blen, "0x%x", op->servact);
+            sgj_add_name_vs(jsp, jop, "service_action", b);
+        }
+        sgj_add_name_vi(jsp, jop, "rwcdlp", rwcdlp);
+        sgj_add_name_vi(jsp, jop, "ctdp", ctdp);
+        sgj_add_name_vi(jsp, jop, "mlu", mlu);
+        sgj_add_name_vi(jsp, jop, "cdlp", cdlp);
+        sgj_add_name_vi(jsp, jop, "support", support);
+        sgj_add_name_vs(jsp, jop, "support_str", cp);
+        sgj_add_name_vi(jsp, jop, "cdb_size", cd_len);
+        n = 0;
+        for (k = 0; k < cd_len; ++k)
+            n += sg_scnpr(b + n, blen - n, "%.2x ", rsoc_buff[k + 4]);
+        l = strlen(b);
+        if ((l > 0) && (' ' == b[l - 1]))
+            b[l - 1] = '\0';
+        sgj_add_name_vs(jsp, jop, "cdb_usage_data", b);
+    }
+    if (ctdp) {
+        jsp->userp = sgj_new_named_object(jsp, jsp->basep,
+                                          "command_timeouts_descriptor");
         bp = rsoc_buff + 4 + cd_len;
-        decode_cmd_timeout_desc(bp, NAME_BUFF_SZ, name_buff);
-        printf("  %s\n", name_buff);
+        decode_cmd_timeout_desc(bp, NAME_BUFF_SZ, name_buff, op);
+        sgj_pr_hr(jsp, "  %s\n", name_buff);
     }
 }
 
@@ -968,7 +1161,8 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
 int
 main(int argc, char * argv[])
 {
-    int cd_len, res, len, act_len, rq_len, vb;
+    bool as_json;
+    int cd_len, res, len, act_len, rq_len, in_len, vb;
     int rep_opts = 0;
     int sg_fd = -1;
     const char * cp;
@@ -977,6 +1171,8 @@ main(int argc, char * argv[])
     uint8_t * rsoc_buff = NULL;
     uint8_t * free_rsoc_buff = NULL;
     struct sg_pt_base * ptvp = NULL;
+    sg_json_state * jsp;
+    sg_json_opaque_p jop = NULL;
     char buff[48];
     char b[80];
     struct sg_simple_inquiry_resp inq_resp;
@@ -996,6 +1192,11 @@ main(int argc, char * argv[])
             usage_old();
         return 0;
     }
+    as_json = op->json_st.pr_as_json;
+    jsp = &op->json_st;
+    if (as_json) {
+        jop = sg_json_start(MY_NAME, version_str, argc, argv, &op->json_st);
+    }
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
     if (op->verbose_given && op->version_given) {
@@ -1014,35 +1215,9 @@ main(int argc, char * argv[])
 #endif
     if (op->version_given) {
         pr2serr("Version string: %s\n", version_str);
-        return 0;
+        goto fini;
     }
     vb = op->verbose;
-
-    if ((NULL == op->device_name) && (! op->do_enumerate)) {
-        pr2serr("No DEVICE argument given\n");
-        if (op->opt_new)
-            usage();
-        else
-            usage_old();
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    if ((-1 != op->servact) && (-1 == op->opcode)) {
-        pr2serr("When '-s' is chosen, so must '-o' be chosen\n");
-        if (op->opt_new)
-            usage();
-        else
-            usage_old();
-        return SG_LIB_CONTRADICT;
-    }
-    if (op->do_unsorted && op->do_alpha)
-        pr2serr("warning: unsorted ('-u') and alpha ('-a') options chosen, "
-                "ignoring alpha\n");
-    if (op->do_taskman && ((-1 != op->opcode) || op->do_alpha ||
-        op->do_unsorted)) {
-        pr2serr("warning: task management functions ('-t') chosen so alpha "
-                "('-a'),\n          unsorted ('-u') and opcode ('-o') "
-                "options ignored\n");
-    }
     if (op->do_enumerate) {
         char name_buff[NAME_BUFF_SZ];
 
@@ -1067,6 +1242,39 @@ main(int argc, char * argv[])
             printf("  %s\n", name_buff);
         }
         goto fini;
+    } else if (op->inhex_fn) {
+        if (op->device_name) {
+            if (! as_json)
+                pr2serr("ignoring DEVICE, best to give DEVICE or "
+                        "--inhex=FN, but not both\n");
+            op->device_name = NULL;
+        }
+    } else if (NULL == op->device_name) {
+        pr2serr("No DEVICE argument given\n\n");
+        if (op->opt_new)
+            usage();
+        else
+            usage_old();
+        res = SG_LIB_SYNTAX_ERROR;
+        goto err_out;
+    }
+    if ((-1 != op->servact) && (-1 == op->opcode)) {
+        pr2serr("When '-s' is chosen, so must '-o' be chosen\n");
+        if (op->opt_new)
+            usage();
+        else
+            usage_old();
+        res = SG_LIB_CONTRADICT;
+        goto err_out;
+    }
+    if (op->do_unsorted && op->do_alpha)
+        pr2serr("warning: unsorted ('-u') and alpha ('-a') options chosen, "
+                "ignoring alpha\n");
+    if (op->do_taskman && ((-1 != op->opcode) || op->do_alpha ||
+        op->do_unsorted)) {
+        pr2serr("warning: task management functions ('-t') chosen so alpha "
+                "('-a'),\n          unsorted ('-u') and opcode ('-o') "
+                "options ignored\n");
     }
     op_name = op->do_taskman ? "Report supported task management functions" :
               "Report supported operation codes";
@@ -1080,6 +1288,29 @@ main(int argc, char * argv[])
         goto err_out;
     }
 
+    if (op->inhex_fn) {
+        if ((res = sg_f2hex_arr(op->inhex_fn, op->do_raw, false, rsoc_buff,
+                                &in_len, MX_ALLOC_LEN))) {
+            if (SG_LIB_LBA_OUT_OF_RANGE == res)
+                pr2serr("decode buffer [%d] not large enough??\n",
+                        MX_ALLOC_LEN);
+            goto err_out;
+        }
+        if (op->verbose > 2)
+            pr2serr("Read %d [0x%x] bytes of user supplied data\n",
+                    in_len, in_len);
+        if (op->do_raw)
+            op->do_raw = false;    /* can interfere on decode */
+        if (in_len < 4) {
+            pr2serr("--inhex=%s only decoded %d bytes (needs 4 at "
+                    "least)\n", op->inhex_fn, in_len);
+            res = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
+        }
+        res = 0;
+        act_len = in_len;
+        goto start_response;
+    }
     if (op->opcode < 0) {
         /* Try to open read-only */
         if ((sg_fd = scsi_pt_open_device(op->device_name, true, vb)) < 0) {
@@ -1111,7 +1342,8 @@ main(int argc, char * argv[])
             ;
         else if (0 == sg_simple_inquiry_pt(ptvp, &inq_resp, true, vb)) {
             peri_dtype = inq_resp.peripheral_type;
-            if (! (op->do_raw || op->no_inquiry)) {
+            if (! (as_json || op->do_raw || op->no_inquiry ||
+                   (op->do_hex > 2))) {
                 printf("  %.8s  %.16s  %.4s\n", inq_resp.vendor,
                        inq_resp.product, inq_resp.revision);
                 cp = sg_get_pdt_str(peri_dtype, sizeof(buff), buff);
@@ -1168,38 +1400,63 @@ open_rw:                /* if not already open */
         goto err_out;
     }
     act_len = (rq_len < act_len) ? rq_len : act_len;
+
+start_response:
     if (op->do_taskman) {
         if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, act_len);
             goto fini;
         }
-        printf("\nTask Management Functions supported by device:\n");
         if (op->do_hex) {
-            hex2stdout(rsoc_buff, act_len, 1);
+            if (op->do_hex > 2)
+                hex2stdout(rsoc_buff, act_len, -1);
+            else  {
+                printf("\nTask Management Functions supported by device:\n");
+                if (2 == op->do_hex)
+                    hex2stdout(rsoc_buff, act_len, 0);
+                else
+                    hex2stdout(rsoc_buff, act_len, 1);
+            }
             goto fini;
         }
+        if (jsp->pr_as_json) {
+            sgj_add_name_vb(jsp, jop, "ats", rsoc_buff[0] & 0x80);
+            sgj_add_name_vb(jsp, jop, "atss", rsoc_buff[0] & 0x40);
+            sgj_add_name_vb(jsp, jop, "cacas", rsoc_buff[0] & 0x20);
+            sgj_add_name_vb(jsp, jop, "ctss", rsoc_buff[0] & 0x10);
+            sgj_add_name_vb(jsp, jop, "lurs", rsoc_buff[0] & 0x8);
+            sgj_add_name_vb(jsp, jop, "qts", rsoc_buff[0] & 0x4);
+            sgj_add_name_vb(jsp, jop, "trs", rsoc_buff[0] & 0x2);
+            sgj_add_name_vb(jsp, jop, "ws", rsoc_buff[0] & 0x1);
+            sgj_add_name_vb(jsp, jop, "qaes", rsoc_buff[1] & 0x4);
+            sgj_add_name_vb(jsp, jop, "qtss", rsoc_buff[1] & 0x2);
+            sgj_add_name_vb(jsp, jop, "itnrs", rsoc_buff[1] & 0x1);
+            if (! jsp->pr_output)
+                goto fini;
+        }
+        sgj_pr_hr(jsp, "\nTask Management Functions supported by device:\n");
         if (rsoc_buff[0] & 0x80)
-            printf("    Abort task\n");
+            sgj_pr_hr(jsp, "    Abort task\n");
         if (rsoc_buff[0] & 0x40)
-            printf("    Abort task set\n");
+            sgj_pr_hr(jsp, "    Abort task set\n");
         if (rsoc_buff[0] & 0x20)
-            printf("    Clear ACA\n");
+            sgj_pr_hr(jsp, "    Clear ACA\n");
         if (rsoc_buff[0] & 0x10)
-            printf("    Clear task set\n");
+            sgj_pr_hr(jsp, "    Clear task set\n");
         if (rsoc_buff[0] & 0x8)
-            printf("    Logical unit reset\n");
+            sgj_pr_hr(jsp, "    Logical unit reset\n");
         if (rsoc_buff[0] & 0x4)
-            printf("    Query task\n");
+            sgj_pr_hr(jsp, "    Query task\n");
         if (rsoc_buff[0] & 0x2)
-            printf("    Target reset (obsolete)\n");
+            sgj_pr_hr(jsp, "    Target reset (obsolete)\n");
         if (rsoc_buff[0] & 0x1)
-            printf("    Wakeup (obsolete)\n");
+            sgj_pr_hr(jsp, "    Wakeup (obsolete)\n");
         if (rsoc_buff[1] & 0x4)
-            printf("    Query asynchronous event\n");
+            sgj_pr_hr(jsp, "    Query asynchronous event\n");
         if (rsoc_buff[1] & 0x2)
-            printf("    Query task set\n");
+            sgj_pr_hr(jsp, "    Query task set\n");
         if (rsoc_buff[1] & 0x1)
-            printf("    I_T nexus reset\n");
+            sgj_pr_hr(jsp, "    I_T nexus reset\n");
         if (op->do_repd) {
             if (rsoc_buff[3] < 0xc) {
                 pr2serr("when REPD given, byte 3 of response should be >= "
@@ -1208,21 +1465,21 @@ open_rw:                /* if not already open */
                 no_final_msg = true;
                 goto err_out;
             } else
-                printf("  Extended parameter data:\n");
-            printf("    TMFTMOV=%d\n", !!(rsoc_buff[4] & 0x1));
-            printf("    ATTS=%d\n", !!(rsoc_buff[6] & 0x80));
-            printf("    ATSTS=%d\n", !!(rsoc_buff[6] & 0x40));
-            printf("    CACATS=%d\n", !!(rsoc_buff[6] & 0x20));
-            printf("    CTSTS=%d\n", !!(rsoc_buff[6] & 0x10));
-            printf("    LURTS=%d\n", !!(rsoc_buff[6] & 0x8));
-            printf("    QTTS=%d\n", !!(rsoc_buff[6] & 0x4));
-            printf("    QAETS=%d\n", !!(rsoc_buff[7] & 0x4));
-            printf("    QTSTS=%d\n", !!(rsoc_buff[7] & 0x2));
-            printf("    ITNRTS=%d\n", !!(rsoc_buff[7] & 0x1));
-            printf("    tmf long timeout: %u (100 ms units)\n",
-                   sg_get_unaligned_be32(rsoc_buff + 8));
-            printf("    tmf short timeout: %u (100 ms units)\n",
-                   sg_get_unaligned_be32(rsoc_buff + 12));
+                sgj_pr_hr(jsp, "  Extended parameter data:\n");
+            sgj_pr_hr(jsp, "    TMFTMOV=%d\n", !!(rsoc_buff[4] & 0x1));
+            sgj_pr_hr(jsp, "    ATTS=%d\n", !!(rsoc_buff[6] & 0x80));
+            sgj_pr_hr(jsp, "    ATSTS=%d\n", !!(rsoc_buff[6] & 0x40));
+            sgj_pr_hr(jsp, "    CACATS=%d\n", !!(rsoc_buff[6] & 0x20));
+            sgj_pr_hr(jsp, "    CTSTS=%d\n", !!(rsoc_buff[6] & 0x10));
+            sgj_pr_hr(jsp, "    LURTS=%d\n", !!(rsoc_buff[6] & 0x8));
+            sgj_pr_hr(jsp, "    QTTS=%d\n", !!(rsoc_buff[6] & 0x4));
+            sgj_pr_hr(jsp, "    QAETS=%d\n", !!(rsoc_buff[7] & 0x4));
+            sgj_pr_hr(jsp, "    QTSTS=%d\n", !!(rsoc_buff[7] & 0x2));
+            sgj_pr_hr(jsp, "    ITNRTS=%d\n", !!(rsoc_buff[7] & 0x1));
+            sgj_pr_hr(jsp, "    tmf long timeout: %u (100 ms units)\n",
+                      sg_get_unaligned_be32(rsoc_buff + 8));
+            sgj_pr_hr(jsp, "    tmf short timeout: %u (100 ms units)\n",
+                      sg_get_unaligned_be32(rsoc_buff + 12));
         }
     } else if (0 == rep_opts) {  /* list all supported operation codes */
         len = sg_get_unaligned_be32(rsoc_buff + 0) + 4;
@@ -1232,7 +1489,12 @@ open_rw:                /* if not already open */
             goto fini;
         }
         if (op->do_hex) {
-            hex2stdout(rsoc_buff, len, 1);
+            if (op->do_hex > 2)
+                hex2stdout(rsoc_buff, len, -1);
+            else if (2 == op->do_hex)
+                hex2stdout(rsoc_buff, len, 0);
+            else
+                hex2stdout(rsoc_buff, len, 1);
             goto fini;
         }
         list_all_codes(rsoc_buff, len, op, ptvp);
@@ -1246,7 +1508,12 @@ open_rw:                /* if not already open */
             goto fini;
         }
         if (op->do_hex) {
-            hex2stdout(rsoc_buff, len, 1);
+            if (op->do_hex > 2)
+                hex2stdout(rsoc_buff, len, -1);
+            else if (2 == op->do_hex)
+                hex2stdout(rsoc_buff, len, 0);
+            else
+                hex2stdout(rsoc_buff, len, 1);
             goto fini;
         }
         list_one(rsoc_buff, cd_len, rep_opts, op);
@@ -1257,10 +1524,17 @@ fini:
 err_out:
     if (free_rsoc_buff)
         free(free_rsoc_buff);
-    if (ptvp)
-        destruct_scsi_pt_obj(ptvp);
-    if (sg_fd >= 0)
-        scsi_pt_close_device(sg_fd);
+    if (! op->inhex_fn) {
+        if (ptvp)
+            destruct_scsi_pt_obj(ptvp);
+        if (sg_fd >= 0)
+            scsi_pt_close_device(sg_fd);
+    }
+    if (as_json && jop) {
+        if (0 == op->do_hex)
+            sgj_pr2file(jop, &op->json_st, stdout);
+        sg_json_free(jop);
+    }
     if ((0 == op->verbose) && (! no_final_msg)) {
         if (! sg_if_can2stderr("sg_opcodes failed: ", res))
             pr2serr("Some error occurred, try again with '-v' "

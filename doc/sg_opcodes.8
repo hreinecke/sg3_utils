@@ -1,19 +1,20 @@
-.TH SG_OPCODES "8" "October 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_OPCODES "8" "April 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_opcodes \- report supported SCSI commands or task management functions
 .SH SYNOPSIS
 .B sg_opcodes
 [\fI\-\-alpha\fR] [\fI\-\-compact\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR]
-[\fI\-\-hex\fR] [\fI\-\-mask\fR] [\fI\-\-mlu\fR] [\fI\-\-no-inquiry\fR]
-[\fI\-\-opcode=OP[,SA]\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR]
-[\fI\-\-rctd\fR] [\fI\-\-repd\fR] [\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR]
-[\fI\-\-unsorted\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO\fR]] [\fI\-\-mask\fR]
+[\fI\-\-mlu\fR] [\fI\-\-no-inquiry\fR] [\fI\-\-opcode=OP[,SA]\fR]
+[\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-repd\fR]
+[\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_opcodes
-[\fI\-a\fR] [\fI\-c\fR] [\fI\-e\fR] [\fI\-H\fR] [\fI\-m\fR] [\fI\-M\fR]
-[\fI\-n\fR] [\fI\-o=OP\fR] [\fI\-p=DT\fR] [\fI\-q\fR] [\fI\-R\fR]
-[\fI\-s=SA\fR] [\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR]
-\fIDEVICE\fR
+[\fI\-a\fR] [\fI\-c\fR] [\fI\-e\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-j\fR]
+[\fI\-m\fR] [\fI\-M\fR] [\fI\-n\fR] [\fI\-o=OP\fR] [\fI\-p=DT\fR] [\fI\-q\fR]
+[\fI\-R\fR] [\fI\-s=SA\fR] [\fI\-t\fR] [\fI\-u\fR] [\fI\-v\fR] [\fI\-V\fR]
+[\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -74,7 +75,27 @@ outputs the usage message summarizing command line options
 then exits. Ignores \fIDEVICE\fR if given.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-outputs the response in ASCII hexadecimal to stdout.
+outputs the response in ASCII hexadecimal to stdout. When used once or
+twice, each line starts with a relative (hex) address starting at 0
+on the first hex line output. The difference is when used twice the
+hexadecimal bytes are rendered in ASCII at the right of each line;
+non\-printable characters are replaced by "." .
+.br
+When used three or more times, there is no leading relative address
+on each line. This output is suitable for being redirected to a file
+which can later by given to the \fI\-\-inhex=FN\fR option.
+.TP
+\fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
+where \fIFN\fR is a file name whose contents are assumed to be ASCII
+hexadecimal. If \fIDEVICE\fR is also given then \fIDEVICE\fR is ignored,
+a warning is issued and the utility continues, decoding the file named
+\fIFN\fR. See the "FORMAT OF FILES CONTAINING ASCII HEX" section in the
+sg3_utils manpage for more information. If the \fI\-\-raw\fR option is
+also given then the contents of \fIFN\fR are treated as binary.
+.TP
+\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. This is an
+EXPERIMENTAL feature; more information to follow.
 .TP
 \fB\-m\fR, \fB\-\-mask\fR
 additionally prints out the cdb mask in hex. So a 12 byte cdb will have
@@ -127,8 +148,9 @@ suppress this utility doing an INQUIRY command since the main reason
 for doing that is to find the peripheral device type of the \fIDEVICE\fR.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
-output the response in binary to stdout. Error messages and warnings, if
-any, are sent to stderr.
+output response in binary (to stdout) unless the \fI\-\-inhex=FN\fR option
+is also given. In that case the input file name (\fIFN\fR) is decoded as
+binary (and the output is _not_ in binary (but may be hex)).
 .TP
 \fB\-R\fR, \fB\-\-rctd\fR
 set report command timeout descriptor (RCTD) bit in the cdb. The response
@@ -309,7 +331,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2021 Douglas Gilbert
+Copyright \(co 2004\-2022 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

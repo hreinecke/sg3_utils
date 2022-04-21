@@ -75,20 +75,6 @@ pr2ws(const char * fmt, ...)
     return n;
 }
 
-/* Users of the sg_pr2serr.h header need this function definition */
-int
-pr2serr(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
-
-
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
  * functions. Returns number of chars placed in cp excluding the
  * trailing null char. So for cp_max_len > 0 the return value is always
