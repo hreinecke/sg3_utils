@@ -3892,7 +3892,7 @@ sg_memalign(uint32_t num_bytes, uint32_t align_to, uint8_t ** buff_to_free,
             pr2ws("%s: hack, len=%d, ", __func__, num_bytes);
             if (buff_to_free)
                 pr2ws("buff_to_free=%p, ", wrkBuff);
-            pr2ws("align_1=%lu, rp=%p\n", align_1, (void *)res);
+            pr2ws("align_1=%" PRIuPTR "u, rp=%p\n", align_1, (void *)res);
         }
         return res;
     }

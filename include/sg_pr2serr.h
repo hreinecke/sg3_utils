@@ -25,7 +25,7 @@
  * assumes that cp[0] is the null character and does nothing (and returns
  * 0). Linux kernel has a similar function called  scnprintf().  */
 
-
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -65,50 +65,21 @@ typedef struct sg_json_state_t {
 } sg_json_state;
 
 
-#if defined(__GNUC__) || defined(__clang__)
-#ifdef SG_LIB_MINGW
-/* MinGW uses Microsoft's printf */
-int pr2serr(const char * fmt, ...);
-
-int pr2ws(const char * fmt, ...);
-
-/* Want safer, 'n += snprintf(b + n, blen - n, ...)' style sequence of
- * functions. Returns number of chars placed in cp excluding the trailing null
- * char. So for cp_max_len > 0 the return value is always < cp_max_len; for
- * cp_max_len <= 1 the return value is 0 and no chars are written to cp. Note
- * this means that when cp_max_len = 1, this function assumes that cp[0] is
- * the null character and does nothing (and returns 0). Linux kernel has a
- * similar function called  scnprintf(). */
-int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...);
-
-void sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...);
-
-#else   /* GNU/clang other than MinGW */
-
-int pr2serr(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-
-int pr2ws(const char * fmt, ...)
-        __attribute__ ((format (printf, 1, 2)));
-
-int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...)
-                 __attribute__ ((format (printf, 3, 4)));
-
-void sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...)
-               __attribute__ ((format (printf, 2, 3)));
+#if __USE_MINGW_ANSI_STDIO -0 == 1
+#define __printf(a, b) __attribute__((__format__(gnu_printf, a, b)))
+#elif defined(__GNUC__) || defined(__clang__)
+#define __printf(a, b) __attribute__((__format__(printf, a, b)))
+#else
+#define __printf(a, b)
 #endif
 
-#else   /* not GNU (and not clang) */
+int pr2serr(const char * fmt, ...) __printf(1, 2);
 
-int pr2serr(const char * fmt, ...);
+int pr2ws(const char * fmt, ...) __printf(1, 2);
 
-int pr2ws(const char * fmt, ...);
+int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...) __printf(3, 4);
 
-int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...);
-
-void sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...);
-
-#endif
+void sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...) __printf(2, 3);
 
 void sg_json_init_state(sg_json_state * jstp);
 

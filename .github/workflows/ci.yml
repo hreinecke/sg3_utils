@@ -1,0 +1,69 @@
+# See also https://docs.github.com/en/actions/learn-github-actions/expressions
+# See also https://github.com/marketplace/actions/setup-android-ndk
+
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build:
+        - android
+        - linux-gcc
+        - linux-clang
+        - linux-x86-gcc
+        - linux-powerpc64-gcc
+        - linux-mingw64-gcc
+        - macos
+        include:
+        - build: android
+          cc: clang
+          host: aarch64-linux-android32
+        - build: linux-gcc
+          cc: gcc
+        - build: linux-clang
+          cc: clang
+        - build: linux-x86-gcc
+          cc: gcc
+          arch: x86
+        - build: linux-powerpc64-gcc
+          cc: gcc
+          host: powerpc64-linux-gnu
+        - build: linux-mingw64-gcc
+          cc: gcc
+          host: x86_64-w64-mingw32
+        - build: macos
+          cc: clang
+          os: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Android NDK
+        run: |
+          if [ ${{matrix.build}} = android ]; then \
+              wget --quiet https://dl.google.com/android/repository/android-ndk-r24-linux.zip; \
+              unzip -q android-ndk-r24-linux.zip;  \
+          fi
+      - name: Install Ubuntu packages
+        run: |
+          sudo apt-get -q update
+          case "${{matrix.host}}" in                                        \
+            x86_64-w64-mingw32)                                             \
+              sudo apt-get -q install -y binutils-mingw-w64 gcc-mingw-w64;; \
+            powerpc64-linux-gnu)                                            \
+              sudo apt-get -q install -y binutils-powerpc64-linux-gnu       \
+              gcc-powerpc64-linux-gnu;;                                     \
+          esac
+      - name: Build
+        run: |
+          echo "HOST=${{matrix.host}}"
+          NDK=$PWD/android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64/bin
+          export PATH="$NDK:$PATH"
+          ./autogen.sh
+          ./configure --host=${{matrix.host}} \
+              CC=${{ matrix.host && format('{0}-{1}', matrix.host, matrix.cc) || matrix.cc }} \
+              CFLAGS="-Wall -Wextra -Werror -Wno-sign-compare -Wno-unused-function -Wno-unused-parameter ${{matrix.cflags}}"
+          make -j$(nproc)
