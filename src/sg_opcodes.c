@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.76 20220421";    /* spc6r06 */
+static const char * version_str = "0.77 20220423";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -374,11 +374,11 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             if (optarg) {
                 for (k = 0; optarg[k]; ++k) {
                     switch (optarg[k]) {
-                    case '0':
-                        op->json_st.pr_indent_size = 16;
-                        break;
                     case '2':
                         op->json_st.pr_indent_size = 2;
+                        break;
+                    case '3':
+                        op->json_st.pr_indent_size = 3;
                         break;
                     case '4':
                         op->json_st.pr_indent_size = 4;
