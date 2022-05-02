@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2021 Douglas Gilbert.
+ * Copyright (c) 2006-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -54,7 +54,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.18 20210630";
+static const char * version_str = "1.19 20220425";
 
 static struct option long_options[] = {
         {"ck-cond", no_argument, 0, 'c'},
@@ -136,21 +136,18 @@ do_identify_dev(int sg_fd, bool do_packet, int cdb_len, bool ck_cond,
     uint64_t ull;
     struct sg_scsi_sense_hdr ssh;
     uint8_t inBuff[ID_RESPONSE_LEN];
-    uint8_t sense_buffer[64];
-    uint8_t ata_return_desc[16];
+    uint8_t sense_buffer[64] = {0};
+    uint8_t ata_return_desc[16] = {0};
     uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
-    uint8_t apt32_cdb[SAT_ATA_PASS_THROUGH32_LEN];
+    uint8_t apt32_cdb[SAT_ATA_PASS_THROUGH32_LEN] = {0};
     const unsigned short * usp;
 
     sb_sz = sizeof(sense_buffer);
-    memset(sense_buffer, 0, sb_sz);
-    memset(apt32_cdb, 0, sizeof(apt32_cdb));
-    memset(ata_return_desc, 0, sizeof(ata_return_desc));
     ok = false;
     switch (cdb_len) {
     case SAT_ATA_PASS_THROUGH32_LEN:    /* SAT-4 revision 5 or later */

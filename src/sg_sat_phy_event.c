@@ -28,7 +28,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.14 20220118";
+static const char * version_str = "1.15 20220425";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -177,8 +177,8 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
     int resid = 0;
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
-    uint8_t sense_buffer[64];
-    uint8_t ata_return_desc[16];
+    uint8_t sense_buffer[64] = {0};
+    uint8_t ata_return_desc[16] = {0};
     uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
@@ -187,8 +187,6 @@ do_read_log_ext(int sg_fd, int log_addr, int page_in_log, int feature,
                  0, 0, 0, 0};
 
     sb_sz = sizeof(sense_buffer);
-    memset(sense_buffer, 0, sb_sz);
-    memset(ata_return_desc, 0, sizeof(ata_return_desc));
     ok = false;
     if (SAT_ATA_PASS_THROUGH16_LEN == cdb_len) {
         /* Prepare ATA PASS-THROUGH COMMAND (16) command */

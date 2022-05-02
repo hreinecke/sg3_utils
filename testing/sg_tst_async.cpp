@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 Douglas Gilbert.
+ * Copyright (c) 2014-2022 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -89,7 +89,7 @@
 #include "sg_pt.h"
 #include "sg_cmds.h"
 
-static const char * version_str = "1.41 20210331";
+static const char * version_str = "1.42 20220425";
 static const char * util_name = "sg_tst_async";
 
 /* This is a test program for checking the async usage of the Linux sg
@@ -467,7 +467,7 @@ start_sg3_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     uint8_t w16CmdBlk[WRITE16_CMD_LEN] =
                 {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
-    uint8_t sense_buffer[64];
+    uint8_t sense_buffer[64] = {0};
     const char * np = NULL;
     struct sg_io_hdr * ptp;
 
@@ -552,7 +552,7 @@ finish_sg3_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
 {
     bool ok;
     int res, k;
-    uint8_t sense_buffer[64];
+    uint8_t sense_buffer[64] = {0};
     const char * np = NULL;
     struct sg_io_hdr pt;
     struct sg_io_hdr * ptp;
@@ -652,7 +652,7 @@ start_sg4_cmd(int sg_fd, command2execute cmd2exe, int pack_id, uint64_t lba,
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     uint8_t w16CmdBlk[WRITE16_CMD_LEN] =
                 {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
-    uint8_t sense_buffer[64];
+    uint8_t sense_buffer[64] = {0};
     const char * np = NULL;
     struct sg_io_v4 * ptp;
 
@@ -730,7 +730,7 @@ finish_sg4_cmd(int sg_fd, command2execute cmd2exe, int & pack_id,
 {
     bool ok;
     int res, k;
-    uint8_t sense_buffer[64];
+    uint8_t sense_buffer[64] = {0};
     const char * np = NULL;
     struct sg_io_v4 * ptp;
     struct sg_io_v4 p4t;
@@ -869,7 +869,7 @@ work_sync_thread(int id, const char * dev_name, unsigned int /* hi_lba */,
     int thr_sync_starts = 0;
     struct sg_pt_base * ptp = NULL;
     uint8_t cdb[6];
-    uint8_t sense_b[32];
+    uint8_t sense_b[32] = {0};
     char b[120];
 
     if (is_rw) {
@@ -1610,7 +1610,7 @@ do_inquiry_prod_id(const char * dev_name, int block, int & sg_ver_num,
     uint8_t inqCmdBlk [INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     uint8_t inqBuff[INQ_REPLY_LEN];
-    uint8_t sense_buffer[64];
+    uint8_t sense_buffer[64] = {0};
     int open_flags = O_RDWR;    /* O_EXCL | O_RDONLY fails with EPERM */
 
     if (! block)
@@ -1689,7 +1689,7 @@ do_read_capacity(const char * dev_name, int block, unsigned int * last_lba,
     int res, sg_fd;
     uint8_t rcCmdBlk [10] = {0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t rcBuff[64];
-    uint8_t sense_b[64];
+    uint8_t sense_b[64] = {0};
     sg_io_hdr_t io_hdr;
     int open_flags = O_RDWR;    /* O_EXCL | O_RDONLY fails with EPERM */
 

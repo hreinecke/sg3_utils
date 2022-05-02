@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019 Douglas Gilbert.
+ * Copyright (c) 2013-2022 Douglas Gilbert.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@
 #include "sg_lib.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.05 20190917";
+static const char * version_str = "1.06 20220425";
 static const char * util_name = "sg_tst_context";
 
 /* This is a test program for checking that file handles keep their
@@ -183,7 +183,7 @@ do_tur(struct sg_pt_base * ptp, int id)
 {
     int slen, res, cat;
     unsigned char turCmdBlk [TUR_CMD_LEN] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
-    unsigned char sense_buffer[64];
+    unsigned char sense_buffer[64] = {0};
 
     clear_scsi_pt_obj(ptp);
     set_scsi_pt_cdb(ptp, turCmdBlk, sizeof(turCmdBlk));
@@ -228,7 +228,7 @@ do_ssu(struct sg_pt_base * ptp, int id, bool start)
 {
     int slen, res, cat;
     unsigned char ssuCmdBlk [SSU_CMD_LEN] = {0x1b, 0x0, 0x0, 0x0, 0x0, 0x0};
-    unsigned char sense_buffer[64];
+    unsigned char sense_buffer[64] = {0};
 
     if (start)
         ssuCmdBlk[4] |= 0x1;

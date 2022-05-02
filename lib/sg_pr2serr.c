@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "sg_pr2serr.h"
 #include "sg_json_builder.h"
@@ -36,6 +37,7 @@ static const json_serialize_opts def_out_settings = {
     4                                   /* indent size */
 };
 
+
 /* Users of the sg_pr2serr.h header need this function definition */
 int
 pr2serr(const char * fmt, ...)
@@ -49,64 +51,166 @@ pr2serr(const char * fmt, ...)
     return n;
 }
 
-void
-sg_json_init_state(sg_json_state * jstp)
+/* local copy of snprntf() variant */
+static int
+scnpr(char * cp, int cp_max_len, const char * fmt, ...)
 {
+    va_list args;
+    int n;
+
+    if (cp_max_len < 2)
+        return 0;
+    va_start(args, fmt);
+    n = vsnprintf(cp, cp_max_len, fmt, args);
+    va_end(args);
+    return (n < cp_max_len) ? n : (cp_max_len - 1);
+}
+
+bool
+sgj_init_state(sg_json_state * jstp, const char * j_optarg)
+{
+    bool bad_arg = false;
+    bool prev_exclam = false;
+    bool negate;
+    int k, c;
+
     jstp->pr_as_json = true;
     jstp->pr_pretty = true;
+    jstp->pr_header = true;
     jstp->pr_sorted = false;
     jstp->pr_output = false;
     jstp->pr_implemented = false;
     jstp->pr_unimplemented = false;
     jstp->pr_format = 0;
+    jstp->first_bad_char = 0;
     jstp->verbose = 0;
     jstp->pr_indent_size = 4;
     jstp->basep = NULL;
     jstp->outputp = NULL;
     jstp->userp = NULL;
+
+   if (j_optarg) {
+        for (k = 0; j_optarg[k]; ++k) {
+            c = j_optarg[k];
+            negate = false;
+            switch (c) {
+            case '!':
+                negate = true;
+                break;
+            case '~':
+                negate = true;
+                break;
+            case 'N':
+                negate = true;
+                break;
+            case '0':
+            case '2':
+                jstp->pr_indent_size = 2;
+                break;
+            case '3':
+                jstp->pr_indent_size = 3;
+                break;
+            case '4':
+                jstp->pr_indent_size = 4;
+                break;
+            case '8':
+                jstp->pr_indent_size = 8;
+                break;
+            case 'c':
+                jstp->pr_pretty = false;
+                break;
+            case 'g':
+                jstp->pr_format = 'g';
+                break;
+            case 'h':
+                jstp->pr_header = ! prev_exclam;
+                break;
+            case 'i':
+                jstp->pr_implemented = true;
+                break;
+            case 'o':
+                jstp->pr_output = true;
+                break;
+            case 's':
+                jstp->pr_sorted = true;
+                break;
+            case 'u':
+                jstp->pr_unimplemented = true;
+                break;
+            case 'v':
+                ++jstp->verbose;
+                break;
+            case 'y':
+                jstp->pr_format = 'g';
+                break;
+            default:
+                bad_arg = true;
+                if (0 == jstp->first_bad_char)
+                    jstp->first_bad_char = c;
+                break;
+            }
+            prev_exclam = negate ? !prev_exclam : false;
+        }
+    }
+    return ! bad_arg;
 }
 
 sg_json_opaque_p
-sg_json_start(const char * util_name, const char * ver_str, int argc,
-              char *argv[], sg_json_state * jstp)
+sgj_start(const char * util_name, const char * ver_str, int argc,
+          char *argv[], sg_json_state * jstp)
 {
     int k;
     json_value * jvp = json_object_new(0);
     json_value * jv2p;
-    json_value * jap = json_array_new(0);
+    json_value * jap = NULL;
 
-    if ((NULL == jvp) || (NULL == jap)) {
-        if (jvp)
-            json_builder_free(jvp);
-        if (jap)
-            json_builder_free(jap);
+
+    if (NULL == jvp)
         return NULL;
-    }
+
     jstp->basep = jvp;
-    json_array_push(jap, json_integer_new(1));
-    json_array_push(jap, json_integer_new(0));
-    json_object_push(jvp, "json_format_version", jap);
-    jap = json_array_new(0);
-    for (k = 0; k < argc; ++k)
-        json_array_push(jap, json_string_new(argv[k]));
-    jv2p = json_object_push(jvp, util_name, json_object_new(0));
-    if (ver_str)
-        json_object_push(jv2p, "version_date", json_string_new(ver_str));
-    else
-        json_object_push(jv2p, "version_date", json_string_new("0.0"));
-    json_object_push(jv2p, "argv", jap);
-    if (jstp->pr_output)
+    if (jstp->pr_header) {
+        jap = json_array_new(0);
+        if  (NULL == jap) {
+            json_builder_free(jvp);
+            return NULL;
+        }
+        json_array_push(jap, json_integer_new(1));
+        json_array_push(jap, json_integer_new(0));
+        json_object_push(jvp, "json_format_version", jap);
+        jap = json_array_new(0);
+        for (k = 0; k < argc; ++k)
+            json_array_push(jap, json_string_new(argv[k]));
+        jv2p = json_object_push(jvp, util_name, json_object_new(0));
+        if (ver_str)
+            json_object_push(jv2p, "version_date", json_string_new(ver_str));
+        else
+            json_object_push(jv2p, "version_date", json_string_new("0.0"));
+        json_object_push(jv2p, "argv", jap);
+    }
+    if (jstp->pr_output) {
+        if (! jstp->pr_header)
+            jv2p = json_object_push(jvp, util_name, json_object_new(0));
         jstp->outputp = json_object_push(jv2p, "output", json_array_new(0));
+    }
     return jvp;
 }
 
 void
-sgj_pr2file(sg_json_opaque_p jop, sg_json_state * jstp, FILE * fp)
+sgj_pr2file(sg_json_state * jstp, sg_json_opaque_p jop, int exit_status,
+            FILE * fp)
 {
     size_t len;
     char * b;
-    json_value * jvp = (json_value *)jop;
+    json_value * jvp = (json_value *)(jop ? jop : jstp->basep);
     json_serialize_opts out_settings;
+
+    if (NULL == jvp) {
+        fprintf(fp, "%s: all NULL pointers ??\n", __func__);
+        return;
+    }
+    if ((NULL == jop) && jstp->pr_header)
+         json_object_push(jvp, "exit_status", json_integer_new(exit_status));
 
     memcpy(&out_settings, &def_out_settings, sizeof(out_settings));
     if (jstp->pr_indent_size != def_out_settings.indent_size)
@@ -132,11 +236,14 @@ sgj_pr2file(sg_json_opaque_p jop, sg_json_state * jstp, FILE * fp)
 }
 
 void
-sg_json_free(sg_json_opaque_p jop)
+sgj_finish(sg_json_state * jsp)
 {
-    json_value * jvp = (json_value *)jop;
-
-    json_builder_free(jvp);
+    if (jsp && jsp->basep) {
+        json_builder_free(jsp->basep);
+        jsp->basep = NULL;
+        jsp->outputp = NULL;
+        jsp->userp = NULL;
+    }
 }
 
 void
@@ -153,10 +260,14 @@ sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...)
         if ((len > 0) && (len < sizeof(b))) {
             const char * cp = b;
 
+            /* remove up to two trailing linefeeds */
             if (b[len - 1] == '\n') {
-                b[len - 1] = '\0';
                 --len;
+                if (b[len - 1] == '\n')
+                    --len;
+                b[len] = '\0';
             }
+            /* remove leading linefeed, if present */
             if ((len > 0) && ('\n' == b[0]))
                 ++cp;
             json_array_push(jsp->outputp, json_string_new(cp));
@@ -174,34 +285,36 @@ sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...)
 
 sg_json_opaque_p
 sgj_new_named_object(sg_json_state * jsp, sg_json_opaque_p jop,
-		     const char * name)
+                     const char * name)
 {
     sg_json_opaque_p resp = NULL;
 
     if (jsp->pr_as_json)
-        resp = json_object_push(jop, name, json_object_new(0));
+        resp = json_object_push((jop ? jop : jsp->basep), name,
+                                json_object_new(0));
     return resp;
 }
 
 sg_json_opaque_p
 sgj_new_named_array(sg_json_state * jsp, sg_json_opaque_p jop,
-		    const char * name)
+                    const char * name)
 {
     sg_json_opaque_p resp = NULL;
 
     if (jsp->pr_as_json)
-        resp = json_object_push(jop, name, json_array_new(0));
+        resp = json_object_push((jop ? jop : jsp->basep), name,
+                                json_array_new(0));
     return resp;
 }
 
 sg_json_opaque_p
 sgj_add_array_element(sg_json_state * jsp, sg_json_opaque_p jap,
-		      sg_json_opaque_p ejop)
+                      sg_json_opaque_p ejop)
 {
     if (jsp->pr_as_json)
-	return json_array_push(jap, ejop);
+        return json_array_push(jap, ejop);
     else
-	return NULL;
+        return NULL;
 }
 
 /* Newly created object is un-attached */
@@ -213,30 +326,266 @@ sgj_new_object(sg_json_state * jsp)
 
 sg_json_opaque_p
 sgj_add_name_vs(sg_json_state * jsp, sg_json_opaque_p jop, const char * name,
-		const char * value)
+                const char * value)
 {
     if (jsp->pr_as_json)
-	return json_object_push(jop, name, json_string_new(value));
+        return json_object_push((jop ? jop : jsp->basep), name,
+                                json_string_new(value));
     else
-	return NULL;
+        return NULL;
 }
 
 sg_json_opaque_p
 sgj_add_name_vi(sg_json_state * jsp, sg_json_opaque_p jop, const char * name,
-		int64_t value)
+                int64_t value)
 {
     if (jsp->pr_as_json)
-	return json_object_push(jop, name, json_integer_new(value));
+        return json_object_push((jop ? jop : jsp->basep), name,
+                                json_integer_new(value));
     else
-	return NULL;
+        return NULL;
 }
 
 sg_json_opaque_p
 sgj_add_name_vb(sg_json_state * jsp, sg_json_opaque_p jop, const char * name,
-		bool value)
+                bool value)
 {
     if (jsp->pr_as_json)
-	return json_object_push(jop, name, json_boolean_new(value));
+        return json_object_push((jop ? jop : jsp->basep), name,
+                                json_boolean_new(value));
     else
-	return NULL;
+        return NULL;
 }
+
+void
+sgj_add_name_pair_ihex(sg_json_state * jsp, sg_json_opaque_p jop,
+                       const char * name, uint64_t value)
+{
+    if ((NULL == jsp) || (! jsp->pr_as_json))
+        return;
+    else {
+        sg_json_opaque_p jo2p =
+                 sgj_new_named_object(jsp, (jop ? jop : jsp->basep), name);
+        char b[64];
+
+        if (NULL == jo2p)
+            return;
+        sgj_add_name_vi(jsp, jo2p, "i", (int64_t)value);
+        snprintf(b, sizeof(b), "%" PRIx64, value);
+        sgj_add_name_vs(jsp, jo2p, "hex", b);
+    }
+}
+
+void
+sgj_add_name_pair_istr(sg_json_state * jsp, sg_json_opaque_p jop,
+                       const char * name, int64_t value, const char * str)
+{
+    if ((NULL == jsp) || (! jsp->pr_as_json))
+        return;
+    else {
+        sg_json_opaque_p jo2p =
+                 sgj_new_named_object(jsp, (jop ? jop : jsp->basep), name);
+        if (NULL == jo2p)
+            return;
+        sgj_add_name_vi(jsp, jo2p, "i", (int64_t)value);
+        if (str)
+        sgj_add_name_vs(jsp, jo2p, "string", str);
+    }
+}
+
+/* Returns number of characters placed in 'out' excluding trailing NULL */
+static int
+sgj_jsonify_name(const char * in, char * out, int maxlen_out)
+{
+    bool prev_underscore = false;
+    int c, k, j, inlen;
+
+    if (maxlen_out < 2) {
+        if (maxlen_out == 1)
+            out[0] = '\0';
+        return 0;
+    }
+    inlen = strlen(in);
+    for (k = 0, j = 0; (k < inlen) && (j < maxlen_out); ++k) {
+        c = in[k];
+        if (isalnum(c)) {
+            out[j++] = isupper(c) ? tolower(c) : c;
+            prev_underscore = false;
+        } else if ((j > 0) && (! prev_underscore)) {
+            out[j++] = '_';
+            prev_underscore = true;
+        }
+        /* else we are skipping character 'c' */
+    }
+    if (j == maxlen_out)
+        out[--j] = '\0';
+    /* trim of trailing underscores (might have been spaces) */
+    for (k = j - 1; k >= 0; --k) {
+        if (out[k] != '_')
+            break;
+    }
+    if (k < 0)
+        k = 0;
+    else
+        ++k;
+    out[k] = '\0';
+    return k;
+}
+
+static void
+sgj_pr_simple_xx(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
+                 const char * name, enum sg_json_separator_t sep,
+                 json_value * jvp)
+{
+    bool eaten = false;
+    bool as_json = (jsp && jsp->pr_as_json);
+    int n;
+    json_type jtype = jvp ? jvp->type : json_none;
+    char b[256];
+    char jname[96];
+    static const int blen = sizeof(b);
+
+    if (leadin_sp > 128)
+        leadin_sp = 128;
+    for (n = 0; n < leadin_sp; ++n)
+        b[n] = ' ';
+    b[n] = '\0';
+    if (NULL == name) {
+        switch (jtype) {
+        case json_string:
+            scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
+            break;
+        case json_integer:
+            scnpr(b + n, blen - n, "%" PRIi64, jvp->u.integer);
+            break;
+        case json_boolean:
+            scnpr(b + n, blen - n, "%s", jvp->u.boolean ? "true" : "false");
+            break;
+        case json_none:
+        default:
+            break;
+        }
+        printf("%s\n", b);
+        if (NULL == jop) {
+            if (as_json && jsp->pr_output) {
+                eaten = true;
+                json_array_push(jsp->outputp, jvp ? jvp : json_null_new());
+            }
+        } else {        /* assume jop points to named array */
+            if (as_json) {
+                eaten = true;
+                json_array_push(jop, jvp ? jvp : json_null_new());
+            }
+        }
+        if (jvp && (! eaten))
+            json_builder_free(jvp);
+        return;
+    }
+    n += scnpr(b + n, blen - n, "%s", name);
+    if (as_json) {
+        int k;
+
+        if (NULL == jop)
+            jop = jsp->basep;
+        k = sgj_jsonify_name(name, jname, sizeof(jname));
+        if (k > 0) {
+            eaten = true;
+            json_object_push(jop, jname, jvp ? jvp : json_null_new());
+        }
+    }
+    if (jvp && ((as_json && jsp->pr_output) || (! as_json))) {
+        switch (sep) {
+        case SG_JSON_SEP_NONE:
+            break;
+        case SG_JSON_SEP_SPACE_1:
+            n += scnpr(b + n, blen - n, " ");
+            break;
+        case SG_JSON_SEP_SPACE_2:
+            n += scnpr(b + n, blen - n, "  ");
+            break;
+        case SG_JSON_SEP_SPACE_3:
+            n += scnpr(b + n, blen - n, "   ");
+            break;
+        case SG_JSON_SEP_SPACE_4:
+            n += scnpr(b + n, blen - n, "    ");
+            break;
+        case SG_JSON_SEP_EQUAL_NO_SPACE:
+            n += scnpr(b + n, blen - n, "=");
+            break;
+        case SG_JSON_SEP_EQUAL_1_SPACE:
+            n += scnpr(b + n, blen - n, "= ");
+            break;
+        case SG_JSON_SEP_COLON_NO_SPACE:
+            n += scnpr(b + n, blen - n, ":");
+            break;
+        case SG_JSON_SEP_COLON_1_SPACE:
+            n += scnpr(b + n, blen - n, ": ");
+            break;
+        default:
+            break;
+        }
+        switch (jtype) {
+        case json_string:
+            n += scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
+            break;
+        case json_integer:
+            n += scnpr(b + n, blen - n, "%" PRIi64, jvp->u.integer);
+            break;
+        case json_boolean:
+            n += scnpr(b + n, blen - n, "%s",
+                       jvp->u.boolean ? "true" : "false");
+            break;
+        case json_none:
+        default:
+            break;
+        }
+    }
+    if (as_json && jsp->pr_output)
+        json_array_push(jsp->outputp, json_string_new(b));
+    else if (! as_json)
+        printf("%s\n", b);
+    if (jvp && (! eaten))
+        json_builder_free(jvp);
+}
+
+void
+sgj_pr_simple_vs(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
+                 const char * name, enum sg_json_separator_t sep,
+                 const char * value)
+{
+    json_value * jvp;
+
+    /* make json_value even if jsp->pr_as_json is false */
+    jvp = value ? json_string_new(value) : NULL;
+    sgj_pr_simple_xx(jsp, jop, leadin_sp, name, sep, jvp);
+}
+
+void
+sgj_pr_simple_vi(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
+                 const char * name, enum sg_json_separator_t sep,
+                 int64_t value)
+{
+    json_value * jvp;
+
+    jvp = json_integer_new(value);
+    sgj_pr_simple_xx(jsp, jop, leadin_sp, name, sep, jvp);
+}
+
+void
+sgj_pr_simple_vb(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
+                 const char * name, enum sg_json_separator_t sep,
+                 bool value)
+{
+    json_value * jvp;
+
+    jvp = json_boolean_new(value);
+    sgj_pr_simple_xx(jsp, jop, leadin_sp, name, sep, jvp);
+}
+
+#if 0
+void
+sgj_pr_hr_line_vs(sg_json_state * jsp, sg_json_opaque_p jop,
+                  const char * hr_line, const char * name, const char * value)
+{
+}
+#endif

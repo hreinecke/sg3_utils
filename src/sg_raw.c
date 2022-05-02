@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.38 (2022-01-18)"
+#define SG_RAW_VERSION "0.4.39 (2022-04-25)"
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -542,7 +542,7 @@ main(int argc, char *argv[])
     uint16_t sct_sc;
     uint32_t result;
     struct sg_pt_base *ptvp = NULL;
-    uint8_t sense_buffer[32];
+    uint8_t sense_buffer[32] = {0};
     uint8_t * dinp = NULL;
     uint8_t * doutp = NULL;
     uint8_t * free_buf_out = NULL;

@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2020 D. Gilbert
+ *  Copyright (C) 1999-2022 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -57,7 +57,7 @@
 #endif
 
 
-static const char * version_str = "5.08 20200501";
+static const char * version_str = "5.09 20220425";
 
 static struct option long_options[] = {
         {"buffer", required_argument, 0, 'b'},
@@ -368,8 +368,8 @@ main(int argc, char * argv[])
     struct opts_t * op;
     uint8_t * rbBuff = NULL;
     void * rawp = NULL;
-    uint8_t sense_buffer[32];
-    uint8_t rb_cdb [RB_CMD_LEN];
+    uint8_t sense_buffer[32] = {0};
+    uint8_t rb_cdb [RB_CMD_LEN] = {0};
     struct sg_io_hdr io_hdr;
     struct timeval start_tm, end_tm;
     struct opts_t opts;
@@ -436,7 +436,6 @@ main(int argc, char * argv[])
     }
     rbBuff = (uint8_t *)rawp;
 
-    memset(rb_cdb, 0, RB_CMD_LEN);
     rb_cdb[0] = RB_OPCODE;
     rb_cdb[1] = op->do_echo ? RB_MODE_ECHO_DESC : RB_MODE_DESC;
     rb_cdb[8] = RB_DESC_LEN;

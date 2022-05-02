@@ -54,7 +54,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.21 20220118";
+static const char * version_str = "1.22 20220425";
 
 struct opts_t {
     bool ck_cond;
@@ -139,8 +139,8 @@ do_read_gplog(int sg_fd, int ata_cmd, uint8_t *inbuff,
     int resid = 0;
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
-    uint8_t sense_buffer[64];
-    uint8_t ata_return_desc[16];
+    uint8_t sense_buffer[64] = {0};
+    uint8_t ata_return_desc[16] = {0};
     uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
@@ -157,8 +157,6 @@ do_read_gplog(int sg_fd, int ata_cmd, uint8_t *inbuff,
         protocol = 4; /* PIO Data-In */
     }
     sb_sz = sizeof(sense_buffer);
-    memset(sense_buffer, 0, sb_sz);
-    memset(ata_return_desc, 0, sizeof(ata_return_desc));
     memset(inbuff, 0, op->count * 512);
     if (op->verbose > 1)
         pr2serr("Building ATA READ LOG%s EXT command; la=0x%x, pn=0x%x\n",

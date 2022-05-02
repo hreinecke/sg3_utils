@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.77 20220423";    /* spc6r06 */
+static const char * version_str = "0.78 20220428";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -334,10 +334,7 @@ do_rstmf(struct sg_pt_base * ptvp, bool repd, void * resp, int mx_resp_len,
 static int
 new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
-    bool bad_arg = false;
-    bool pr_verbose = false;
-    char bad_ch;
-    int c, n, k;
+    int c, n;
     char * cp;
     char b[32];
 
@@ -370,52 +367,10 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->inhex_fn = optarg;
             break;
         case 'j':
-            sg_json_init_state(&op->json_st);
-            if (optarg) {
-                for (k = 0; optarg[k]; ++k) {
-                    switch (optarg[k]) {
-                    case '2':
-                        op->json_st.pr_indent_size = 2;
-                        break;
-                    case '3':
-                        op->json_st.pr_indent_size = 3;
-                        break;
-                    case '4':
-                        op->json_st.pr_indent_size = 4;
-                        break;
-                    case '8':
-                        op->json_st.pr_indent_size = 8;
-                        break;
-                    case 'c':
-                        op->json_st.pr_pretty = false;
-                        break;
-                    case 'g':
-                        op->json_st.pr_format = 'g';
-                        break;
-                    case 'i':
-                        op->json_st.pr_implemented = true;
-                        break;
-                    case 'o':
-                        op->json_st.pr_output = true;
-                        break;
-                    case 's':
-                        op->json_st.pr_sorted = true;
-                        break;
-                    case 'u':
-                        op->json_st.pr_unimplemented = true;
-                        break;
-                    case 'v':
-                        pr_verbose = true;
-                        break;
-                    case 'y':
-                        op->json_st.pr_format = 'g';
-                        break;
-                    default:
-                        bad_arg = true;
-                        bad_ch = optarg[k];
-                        break;
-                    }
-                }
+            if (! sgj_init_state(&op->json_st, optarg)) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n", op->json_st.first_bad_char);
+                return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 'm':
@@ -527,17 +482,6 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
-    if (pr_verbose) {
-        if (op->verbose_given)
-            op->json_st.verbose = op->verbose;
-        else
-            op->json_st.verbose = 4;
-    }
-    if (bad_arg) {
-        pr2serr("Unrecognized argument character: %c given to --json=\n",
-                bad_ch);
-        return SG_LIB_SYNTAX_ERROR;
-    }
     return 0;
 }
 
@@ -569,7 +513,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     ++op->do_hex;
                     break;
                 case 'j':    /* don't accept argument with this old syntax */
-                    sg_json_init_state(&op->json_st);
+                    sgj_init_state(&op->json_st, NULL);
                     break;
                 case 'm':
                     op->do_mask = true;
@@ -1195,7 +1139,7 @@ main(int argc, char * argv[])
     as_json = op->json_st.pr_as_json;
     jsp = &op->json_st;
     if (as_json) {
-        jop = sg_json_start(MY_NAME, version_str, argc, argv, &op->json_st);
+        jop = sgj_start(MY_NAME, version_str, argc, argv, &op->json_st);
     }
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
@@ -1530,15 +1474,16 @@ err_out:
         if (sg_fd >= 0)
             scsi_pt_close_device(sg_fd);
     }
-    if (as_json && jop) {
-        if (0 == op->do_hex)
-            sgj_pr2file(jop, &op->json_st, stdout);
-        sg_json_free(jop);
-    }
     if ((0 == op->verbose) && (! no_final_msg)) {
         if (! sg_if_can2stderr("sg_opcodes failed: ", res))
             pr2serr("Some error occurred, try again with '-v' "
                     "or '-vv' for more information\n");
     }
-    return (res >= 0) ? res : SG_LIB_CAT_OTHER;
+    res = (res >= 0) ? res : SG_LIB_CAT_OTHER;
+    if (as_json) {
+        if (0 == op->do_hex)
+            sgj_pr2file(&op->json_st, NULL, res, stdout);
+        sgj_finish(jsp);
+    }
+    return res;
 }

@@ -40,7 +40,9 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.34 20220416";
+static const char * version_str = "1.35 20220501";
+
+#define MY_NAME "sg_rep_zones"
 
 #define WILD_RZONES_BUFF_LEN (1 << 28)
 #define MAX_RZONES_BUFF_LEN (2 * 1024 * 1024)
@@ -82,6 +84,7 @@ struct opts_t {
     int vb;
     uint64_t st_lba;
     const char * in_fn;
+    sg_json_state json_st;
 };
 
 struct zt_num2abbrev_t {
@@ -99,6 +102,7 @@ static struct option long_options[] = {
         {"hex", no_argument, 0, 'H'},
         {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
         {"inhex", required_argument, 0, 'i'},
+        {"json", optional_argument, 0, 'j'},
         {"locator", required_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"num", required_argument, 0, 'n'},
@@ -156,13 +160,15 @@ usage(int h)
     pr2serr("Usage: "
             "sg_rep_zones  [--domain] [--find=ZT] [--force] [--help] "
             "[--hex]\n"
-            "                     [--inhex=FN] [--locator=LBA] "
-            "[--maxlen=LEN]\n"
-            "                     [--num=NUM] [--partial] [--raw] "
-            "[--readonly]\n"
-            "                     [--realm] [--report=OPT] [--start=LBA] "
-            "[--statistics]\n"
-            "                     [--verbose] [--version] [--wp] DEVICE\n");
+            "                     [--inhex=FN] [--json[=JO]] "
+            "[--locator=LBA]\n"
+            "                     [--maxlen=LEN] [--num=NUM] [--partial] "
+            "[--raw]\n"
+            "                     [--readonly] [--realm] [--report=OPT] "
+            "[--start=LBA]\n"
+            "                     [--statistics] [--verbose] [--version] "
+            "[--wp]\n"
+            "                     DEVICE\n");
     pr2serr("  where:\n"
             "    --domain|-d        sends a REPORT ZONE DOMAINS command\n"
             "    --find=ZT|-F ZT    find first zone with ZT zone type, "
@@ -178,6 +184,10 @@ usage(int h)
             "twice\n"
             "                       shows decoded values in hex\n"
             "    --inhex=FN|-i FN    decode contents of FN, ignore DEVICE\n"
+            "    --json[=JO]|-j[JO]    output in JSON instead of human "
+            "readable text.\n"
+            "                          Optional argument JO see sg3_utils "
+            "manpage\n"
             "    --locator=LBA|-l LBA    similar to --start= option\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
@@ -195,7 +205,7 @@ usage(int h)
             "zones)\n"
             "    --start=LBA|-s LBA    report zones from the LBA (def: 0)\n"
             "                          need not be a zone starting LBA\n"
-            "    --statistics       gather statistics by reviewing zones\n"
+            "    --statistics|-S    gather statistics by reviewing zones\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
             "    --wp|-w            output write pointer only\n\n"
@@ -371,38 +381,52 @@ static const char * same_desc_arr[16] = {
 };
 
 static uint64_t
-prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op)
+prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op,
+              sg_json_state * jsp, sg_json_opaque_p jop)
 {
     uint8_t zt, zc;
     uint64_t lba, len, wp;
     char b[80];
 
+    jop = jop ? jop : jsp->basep;
     zt = bp[0] & 0xf;
     zc = (bp[1] >> 4) & 0xf;
-    printf("   Zone type: %s\n", sg_get_zone_type_str(zt, sizeof(b), b));
-    printf("   Zone condition: %s\n", zone_condition_str(zc, b,
-           sizeof(b), op->vb));
-    printf("   PUEP: %d\n", !!(bp[1] & 0x4));   /* added in zbc2r07 */
-    printf("   Non_seq: %d\n", !!(bp[1] & 0x2));
-    printf("   Reset: %d\n", bp[1] & 0x1);
+    sg_get_zone_type_str(zt, sizeof(b), b);
+    sgj_pr_hr(jsp, "   Zone type: %s\n", b);
+    sgj_add_name_pair_istr(jsp, jop, "zone_type", zt, b);
+    zone_condition_str(zc, b, sizeof(b), op->vb);
+    sgj_pr_hr(jsp, "   Zone condition: %s\n", b);
+    sgj_add_name_pair_istr(jsp, jop, "zone_condition", zc, b);
+    sgj_pr_simple_vi(jsp, jop, 3, "PUEP", SG_JSON_SEP_COLON_1_SPACE,
+                     !!(bp[1] & 0x4));
+    sgj_pr_simple_vi(jsp, jop, 3, "NON_SEQ", SG_JSON_SEP_COLON_1_SPACE,
+                     !!(bp[1] & 0x2));
+    sgj_pr_simple_vi(jsp, jop, 3, "RESET", SG_JSON_SEP_COLON_1_SPACE,
+                     !!(bp[1] & 0x1));
     len = sg_get_unaligned_be64(bp + 8);
-    printf("   Zone Length: 0x%" PRIx64 "\n", len);
+    sgj_pr_hr(jsp, "   Zone Length: 0x%" PRIx64 "\n", len);
+    sgj_add_name_pair_ihex(jsp, jop, "zone_length", (int64_t)len);
     lba = sg_get_unaligned_be64(bp + 16);
-    printf("   Zone start LBA: 0x%" PRIx64 "\n", lba);
+    sgj_pr_hr(jsp, "   Zone start LBA: 0x%" PRIx64 "\n", lba);
+    sgj_add_name_pair_ihex(jsp, jop, "zone_start_lba", (int64_t)lba);
     wp = sg_get_unaligned_be64(bp + 24);
     if (sg_all_ffs((const uint8_t *)&wp, sizeof(wp)))
-        printf("   Write pointer LBA: -1\n");
+        sgj_pr_hr(jsp, "   Write pointer LBA: -1\n");
     else
-        printf("   Write pointer LBA: 0x%" PRIx64 "\n", wp);
+        sgj_pr_hr(jsp, "   Write pointer LBA: 0x%" PRIx64 "\n", wp);
+    sgj_add_name_pair_ihex(jsp, jop, "write_pointer_lba", (int64_t)wp);
     return lba + len;
 }
 
 static int
 decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
-                 const struct opts_t * op)
+                 const struct opts_t * op, sg_json_state * jsp)
 {
+    bool as_json = jsp ? jsp->pr_as_json : false;
     int k, same, num_zd;
     uint64_t wp, ul, mx_lba;
+    sg_json_opaque_p jop = jsp ? jsp->basep : NULL;
+    sg_json_opaque_p jap = NULL;
     const uint8_t * bp;
 
     if ((uint32_t)act_len < decod_len) {
@@ -426,10 +450,16 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
         hex2stdout(rzBuff, 64, -1);
         printf("\n");
     } else {
-        printf("  Same=%d: %s\n", same, same_desc_arr[same]);
-        printf("  Maximum LBA: 0x%" PRIx64 "\n\n", mx_lba);
-        printf("  Reported zone starting LBA granularity: 0x%" PRIx64 "\n\n",
-               sg_get_unaligned_be64(rzBuff + 16));     /* zbc2r12 */
+        uint64_t rzslbag = sg_get_unaligned_be64(rzBuff + 16);
+        static const char * rzslbag_s = "Reported zone starting LBA "
+                                        "granularity";
+
+        sgj_pr_hr(jsp, "  Same=%d: %s\n", same, same_desc_arr[same]);
+        sgj_add_name_pair_istr(jsp, jop, "same", same, same_desc_arr[same]);
+        sgj_pr_hr(jsp, "  Maximum LBA: 0x%" PRIx64 "\n\n", mx_lba);
+        sgj_add_name_pair_ihex(jsp, jop, "maximum_lba", mx_lba);
+        sgj_pr_hr(jsp, "  %s: 0x%" PRIx64 "\n\n", rzslbag_s, rzslbag);
+        sgj_add_name_pair_ihex(jsp, jop, rzslbag_s, rzslbag);
     }
     if (op->do_num > 0)
             num_zd = (num_zd > op->do_num) ? op->do_num : num_zd;
@@ -450,17 +480,21 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
         }
         printf("From last descriptor in this response:\n");
         printf(" %s%d\n", zn_dnum_s, num_zd - 1);
-        ul = prt_a_zn_desc(bp, op);
+        ul = prt_a_zn_desc(bp, op, jsp, jop);
         if (ul > mx_lba)
             printf("   >> This zone seems to be the last one\n");
         else
             printf("   >> Probable next Zone start LBA: 0x%" PRIx64 "\n", ul);
         return 0;
     }
+    if (as_json)
+        jap = sgj_new_named_array(jsp, NULL, "zone_descriptor_list");
     for (k = 0, bp = rzBuff + 64; k < num_zd;
          ++k, bp += REPORT_ZONES_DESC_LEN) {
+        sg_json_opaque_p jo2p;
+
         if (! op->wp_only)
-            printf(" %s%d\n", zn_dnum_s, k);
+             sgj_pr_hr(jsp, " %s%d\n", zn_dnum_s, k);
         if (op->do_hex) {
             hex2stdout(bp, 64, -1);
             continue;
@@ -477,7 +511,10 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
             }
             continue;
         }
-        prt_a_zn_desc(bp, op);
+        jo2p = as_json ? sgj_new_object(jsp) : NULL;
+        prt_a_zn_desc(bp, op, jsp, jo2p);
+        if (jo2p)
+            sgj_add_array_element(jsp, jap, jo2p);
     }
     if ((op->do_num == 0) && (! op->wp_only) && (! op->do_hex)) {
         if ((64 + (REPORT_ZONES_DESC_LEN * (uint32_t)num_zd)) < decod_len)
@@ -611,8 +648,9 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
 
 static int
 find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
-                  struct opts_t * op)
+                  struct opts_t * op, sg_json_state * jsp)
 {
+    bool as_json = (jsp && (0 == op->do_hex)) ?  jsp->pr_as_json : false;
     bool found = false;
     uint8_t zt;
     int k, res, resid, rlen, num_zd, num_rem;
@@ -669,25 +707,35 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
             break;
     }           /* end of outer for loop */
     if (res == 0) {
+        sg_json_opaque_p jo2p = as_json ?
+                sgj_new_named_object(jsp, NULL, "find_condition") : NULL;
+
         if (found) {
             if (op->do_hex) {
                 hex2stdout(rzBuff, 64, -1);
                 printf("\n");
                 hex2stdout(bp, 64, -1);
             } else {
-                printf("Condition met at:\n");
-                printf(" %s: %d\n", zn_dnum_s, zn_dnum);
-                prt_a_zn_desc(bp, op);
+                sgj_pr_hr(jsp, "Condition met at:\n");
+                sgj_pr_hr(jsp, " %s: %d\n", zn_dnum_s, zn_dnum);
+                sgj_add_name_vb(jsp, jo2p, "met", true);
+                sgj_add_name_vi(jsp, jo2p, "zone_descriptor_index", zn_dnum);
+                prt_a_zn_desc(bp, op, jsp, jo2p);
             }
         } else {
             if (op->do_hex) {
                 memset(b, 0xff, 64);
                 hex2stdout((const uint8_t *)b, 64, -1);
-            } else if (num_rem < 1)
-                printf("Condition NOT met, checked %d zones; next %s%u\n",
-                       op->do_num, zn_dnum_s, zn_dnum);
-            else
-                printf("Condition NOT met; next %s%u\n", zn_dnum_s, zn_dnum);
+            } else {
+                sgj_add_name_vb(jsp, jo2p, "met", false);
+                sgj_add_name_vi(jsp, jo2p, "zone_descriptor_index", zn_dnum);
+                if (num_rem < 1)
+                    sgj_pr_hr(jsp, "Condition NOT met, checked %d zones; "
+                              "next %s%u\n", op->do_num, zn_dnum_s, zn_dnum);
+                else
+                    sgj_pr_hr(jsp, "Condition NOT met; next %s%u\n",
+                              zn_dnum_s, zn_dnum);
+            }
         }
     }
     return res;
@@ -1037,6 +1085,7 @@ int
 main(int argc, char * argv[])
 {
     bool no_final_msg = false;
+    bool as_json;
     int res, c, act_len, rlen, in_len, off;
     int sg_fd = -1;
     int resid = 0;
@@ -1047,6 +1096,8 @@ main(int argc, char * argv[])
     uint8_t * rzBuff = NULL;
     uint8_t * free_rzbp = NULL;
     const char * cmd_name = "Report zones";
+    sg_json_state * jsp;
+    sg_json_opaque_p jop = NULL;
     char b[80];
     struct opts_t opts = {0};
     struct opts_t * op = &opts;
@@ -1055,7 +1106,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bdefF:hHi:l:m:n:o:prRs:SvVw",
+        c = getopt_long(argc, argv, "bdefF:hHi:j::l:m:n:o:prRs:SvVw",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1109,6 +1160,13 @@ main(int argc, char * argv[])
             break;
        case 'i':
             op->in_fn = optarg;
+            break;
+       case 'j':
+            if (! sgj_init_state(&op->json_st, optarg)) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n", op->json_st.first_bad_char);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         /* case 'l': is under case 's': */
         case 'm':
@@ -1213,6 +1271,11 @@ main(int argc, char * argv[])
         usage(op->do_help);
         return 0;
     }
+    as_json = op->json_st.pr_as_json;
+    jsp = &op->json_st;
+    if (as_json)
+        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
+
     if (op->do_zdomains && op->do_realms) {
         pr2serr("Can't have both --domain and --realm\n");
         return SG_LIB_SYNTAX_ERROR;
@@ -1220,6 +1283,8 @@ main(int argc, char * argv[])
         cmd_name = "Report zone domains";
     else if (op->do_realms)
         cmd_name = "Report realms";
+    if (as_json)
+        sgj_add_name_vs(jsp, jop, "scsi_command_name", cmd_name);
     if ((op->serv_act != REPORT_ZONES_SA) && op->do_partial) {
         pr2serr("Can only use --partial with REPORT ZONES\n");
         return SG_LIB_SYNTAX_ERROR;
@@ -1260,6 +1325,15 @@ main(int argc, char * argv[])
                 goto the_end;
             }
             res = 0;
+            if (op->find_zt) {  /* so '-F none' will drop through */
+                op->maxlen = in_len;
+                ret = find_report_zones(sg_fd, rzBuff, cmd_name, op, jsp);
+                goto the_end;
+            } else if (op->statistics) {
+                op->maxlen = in_len;
+                ret = gather_statistics(sg_fd, rzBuff, cmd_name, op);
+                goto the_end;
+            }
             goto start_response;
         } else {
             pr2serr("missing device name!\n\n");
@@ -1273,7 +1347,8 @@ main(int argc, char * argv[])
     if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
-            return SG_LIB_FILE_ERROR;
+            ret = SG_LIB_FILE_ERROR;
+            goto the_end;
         }
     }
 
@@ -1287,7 +1362,7 @@ main(int argc, char * argv[])
     }
 
     if (op->find_zt) {  /* so '-F none' will drop through */
-        ret = find_report_zones(sg_fd, rzBuff, cmd_name, op);
+        ret = find_report_zones(sg_fd, rzBuff, cmd_name, op, jsp);
         goto the_end;
     } else if (op->statistics) {
         ret = gather_statistics(sg_fd, rzBuff, cmd_name, op);
@@ -1310,15 +1385,16 @@ start_response:
             if (! op->do_force) {
                 pr2serr("decode length [%u bytes] seems wild, use --force "
                         "override\n", decod_len);
-                return SG_LIB_CAT_MALFORMED;
+                ret = SG_LIB_CAT_MALFORMED;
+                goto the_end;
             }
         }
         if (decod_len > (uint32_t)rlen) {
             if ((REPORT_ZONES_SA == op->serv_act) && (! op->do_partial)) {
-                printf("%u zones starting from LBA 0x%" PRIx64 " available "
-                       "but only %d zones returned\n",
-                       (decod_len - 64) / REPORT_ZONES_DESC_LEN, op->st_lba,
-                       (rlen - 64) / REPORT_ZONES_DESC_LEN);
+                pr2serr("%u zones starting from LBA 0x%" PRIx64 " available "
+                        "but only %d zones returned\n",
+                        (decod_len - 64) / REPORT_ZONES_DESC_LEN, op->st_lba,
+                        (rlen - 64) / REPORT_ZONES_DESC_LEN);
                 decod_len = rlen;
                 act_len = rlen;
             } else {
@@ -1343,7 +1419,8 @@ start_response:
             goto the_end;
         }
         if (! op->wp_only && (! op->do_hex))
-            printf("%s response:\n", cmd_name);
+            sgj_pr_hr(jsp, "%s response:\n", cmd_name);
+
         if (act_len < 64) {
             pr2serr("Zone length [%d] too short (perhaps after truncation\n)",
                     act_len);
@@ -1351,7 +1428,7 @@ start_response:
             goto the_end;
         }
         if (REPORT_ZONES_SA == op->serv_act)
-            ret = decode_rep_zones(rzBuff, act_len, decod_len, op);
+            ret = decode_rep_zones(rzBuff, act_len, decod_len, op, jsp);
         else if (op->do_realms)
             ret = decode_rep_realms(rzBuff, act_len, op);
         else if (op->do_zdomains)
@@ -1379,5 +1456,11 @@ the_end:
             pr2serr("Some error occurred, try again with '-v' "
                     "or '-vv' for more information\n");
     }
-    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    if (as_json) {
+        if (0 == op->do_hex)
+            sgj_pr2file(&op->json_st, NULL, ret, stdout);
+        sgj_finish(jsp);
+    }
+    return ret;
 }

@@ -2,7 +2,7 @@
 #define SG_PR2SERR_H
 
 /*
- * Copyright (c) 2004-2018 Douglas Gilbert.
+ * Copyright (c) 2004-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -15,15 +15,6 @@
  * library use and may place its output somewhere other than stderr; it
  * depends on the external variable sg_warnings_strm which can be set
  * with sg_set_warnings_strm(). By default it uses stderr. */
-
-/* With regard to sg_scnpr():
- * Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
- * functions. Returns number of chars placed in cp excluding the
- * trailing null char. So for cp_max_len > 0 the return value is always
- * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars are
- * written to cp. Note this means that when cp_max_len = 1, this function
- * assumes that cp[0] is the null character and does nothing (and returns
- * 0). Linux kernel has a similar function called  scnprintf().  */
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -52,16 +43,19 @@ typedef void * sg_json_opaque_p;
 typedef struct sg_json_state_t {
     bool pr_as_json;
     bool pr_pretty;
+    bool pr_header;
     bool pr_sorted;
     bool pr_output;
     bool pr_implemented;
     bool pr_unimplemented;
     char pr_format;
     int pr_indent_size;
+    int first_bad_char;
     int verbose;
-    sg_json_opaque_p basep;
-    sg_json_opaque_p outputp;
-    sg_json_opaque_p userp;
+    /* the following hold state information */
+    sg_json_opaque_p basep;     /* base JSON object pointer */
+    sg_json_opaque_p outputp;   /* 'output' named JSON array pointer */
+    sg_json_opaque_p userp;     /* for temporary usage */
 } sg_json_state;
 
 
@@ -77,13 +71,20 @@ int pr2serr(const char * fmt, ...) __printf(1, 2);
 
 int pr2ws(const char * fmt, ...) __printf(1, 2);
 
+/* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
+ * functions. Returns number of chars placed in cp excluding the
+ * trailing null char. So for cp_max_len > 0 the return value is always
+ * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars are
+ * written to cp. Note this means that when cp_max_len = 1, this function
+ * assumes that cp[0] is the null character and does nothing (and returns
+ * 0). Linux kernel has a similar function called  scnprintf().  */
 int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...) __printf(3, 4);
 
 void sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...) __printf(2, 3);
 
-void sg_json_init_state(sg_json_state * jstp);
+bool sgj_init_state(sg_json_state * jstp, const char * j_optarg);
 
-sg_json_opaque_p sg_json_start(const char * util_name, const char * ver_str,
+sg_json_opaque_p sgj_start(const char * util_name, const char * ver_str,
                                int argc, char *argv[], sg_json_state * jstp);
 
 /* Newly created object is un-attached */
@@ -110,19 +111,35 @@ sg_json_opaque_p sgj_add_name_vi(sg_json_state * jsp, sg_json_opaque_p jop,
 sg_json_opaque_p sgj_add_name_vb(sg_json_state * jsp, sg_json_opaque_p jop,
                                  const char * name, bool value);
 
-void sgj_pr2file(sg_json_opaque_p jop, sg_json_state * jstp, FILE * fp);
+void sgj_pr_simple_vs(sg_json_state * jsp, sg_json_opaque_p jop,
+                      int leadin_sp, const char * name,
+                      enum sg_json_separator_t sep, const char * value);
 
-void sg_json_free(sg_json_opaque_p jop);
+void sgj_pr_simple_vi(sg_json_state * jsp, sg_json_opaque_p jop,
+                      int leadin_sp, const char * name,
+                      enum sg_json_separator_t sep, int64_t value);
 
-#if 1
-/* Print function for normal and/or json output. "hr" stands for human
- * readable (only); "j" for JSON (only). */
-void pr_j_simple(sg_json_opaque_p jop, int leadin_sp, const char * name,
-                 enum sg_json_separator_t sep, const char * value);
-void pr_j_hr_line(sg_json_opaque_p jop, const char * hr_line,
-                  const char * name, const char * value);
+void sgj_pr_simple_vb(sg_json_state * jsp, sg_json_opaque_p jop,
+                      int leadin_sp, const char * name,
+                      enum sg_json_separator_t sep, bool value);
 
+void sgj_add_name_pair_ihex(sg_json_state * jsp, sg_json_opaque_p jop,
+                            const char * name, uint64_t value);
+
+void sgj_add_name_pair_istr(sg_json_state * jsp, sg_json_opaque_p jop,
+                            const char * name, int64_t value,
+                            const char * str);
+
+#if 0
+void sgj_pr_hr_line_vs(sg_json_state * jsp, sg_json_opaque_p jop,
+                       const char * hr_line, const char * name,
+                       const char * value);
 #endif
+
+void sgj_pr2file(sg_json_state * jsp, sg_json_opaque_p jop, int exit_status,
+                 FILE * fp);
+
+void sgj_finish(sg_json_state * jstp);
 
 
 #ifdef __cplusplus

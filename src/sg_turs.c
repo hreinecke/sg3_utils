@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.50 20220418";
+static const char * version_str = "3.51 20220425";
 
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
@@ -386,7 +386,7 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
     int packet_id = 0;
     int vb = op->verbose;
     char b[80];
-    uint8_t sense_b[32];
+    uint8_t sense_b[32] = {0};
 
     if (op->do_low) {
         int rs, n, sense_cat;
