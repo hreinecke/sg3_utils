@@ -51,7 +51,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * version_str = "2.16 20220217";  /* spc6r06 */
+static const char * version_str = "2.17 20220504";  /* spc6r06 */
 
 /* INQUIRY notes:
  * It is recommended that the initial allocation length given to a
@@ -2029,7 +2029,7 @@ decode_softw_inf_id(uint8_t * buff, int len, int do_hex)
     buff += 4;
     for ( ; len > 5; len -= 6, buff += 6)
         printf("    IEEE identifier: 0x%" PRIx64 "\n",
-	       sg_get_unaligned_be48(buff + 0));
+               sg_get_unaligned_be48(buff + 0));
 }
 
 /* VPD_ATA_INFO [0x89] */
@@ -2927,6 +2927,16 @@ std_inq_decode(const struct opts_t * op, int act_len)
                     printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
             } else
                 printf(" Vendor specific: %s\n", xtra_buff);
+        }
+        if (op->do_vendor && (act_len > 243) &&
+            (0 == strncmp("OPEN-V", (const char *)&rp[16], 6))) {
+           memcpy(xtra_buff, &rp[212], 32);
+           if (op->do_export) {
+                len = encode_whitespaces((uint8_t *)xtra_buff, 32);
+                if (len > 0)
+                    printf("VENDOR_SPECIFIC_OPEN-V_LDEV_NAME=%s\n", xtra_buff);
+            } else
+                printf(" Vendor specific OPEN-V LDEV Name: %s\n", xtra_buff);
         }
     }
     if (! op->do_export) {

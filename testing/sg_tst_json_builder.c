@@ -5,7 +5,7 @@
  * This takes care of the annoying bits of JSON syntax like the commas
  * after elements
  *
- * Authors:	Stephen Hemminger <stephen@networkplumber.org>
+ * Authors:     Stephen Hemminger <stephen@networkplumber.org>
  *
  * Borrowed from Linux kernel [5.17.0]: tools/bpf/bpftool/json_writer.[hc]
  */
@@ -34,8 +34,8 @@ int
 main(int argc, char * argv[])
 {
     size_t len;
-    sg_json_state jstate;
-    sg_json_state * jstp = &jstate;
+    sgj_state jstate;
+    sgj_state * jstp = &jstate;
     json_value * jv1p;
     json_value * jv2p;
     json_value * jv3p = json_object_new(0);
@@ -52,15 +52,15 @@ main(int argc, char * argv[])
     json_value * js12 = json_string_new("duplicate name 1");
     char b[8192];
 
-    sg_json_init_state(jstp);
-    jvp = sg_json_start(MY_NAME, "0.01 20220421", argc, argv, jstp);
+    sgj_init_state(jstp, NULL);
+    jvp = sgj_start(MY_NAME, "0.02 20220503", argc, argv, jstp);
     jv1p = json_object_push(jvp, "contents", jsp);
 
     if (jvp == jv1p)
         printf("jvp == jv1p\n");
     else
         printf("jvp != jv1p\n");
-    
+
 #if 1
     json_array_push(ja1p, js2p);
     jv2p = json_object_push(jvp, "extra", js3p);
@@ -89,8 +89,6 @@ main(int argc, char * argv[])
 #endif
     jv5p = jvp;
 
-    jv1p = json_string_new("boo");
-
     len = json_measure_ex(jv5p, out_settings);
     printf("jvp length: %zu bytes\n", len);
     if (len < sizeof(b)) {
@@ -109,54 +107,53 @@ main(int argc, char * argv[])
 #if 0
 int main(int argc, char **argv)
 {
-	json_writer_t *wr = jsonw_new(stdout);
+        json_writer_t *wr = jsonw_new(stdout);
 
-	jsonw_start_object(wr);
-	jsonw_pretty(wr, true);
-	jsonw_name(wr, "Vyatta");
-	jsonw_start_object(wr);
-	jsonw_string_field(wr, "url", "http://vyatta.com");
-	jsonw_uint_field(wr, "downloads", 2000000ul);
-	jsonw_float_field(wr, "stock", 8.16);
+        jsonw_start_object(wr);
+        jsonw_pretty(wr, true);
+        jsonw_name(wr, "Vyatta");
+        jsonw_start_object(wr);
+        jsonw_string_field(wr, "url", "http://vyatta.com");
+        jsonw_uint_field(wr, "downloads", 2000000ul);
+        jsonw_float_field(wr, "stock", 8.16);
 
-	jsonw_name(wr, "ARGV");
-	jsonw_start_array(wr);
-	while (--argc)
-		jsonw_string(wr, *++argv);
-	jsonw_end_array(wr);
+        jsonw_name(wr, "ARGV");
+        jsonw_start_array(wr);
+        while (--argc)
+                jsonw_string(wr, *++argv);
+        jsonw_end_array(wr);
 
-	jsonw_name(wr, "empty");
-	jsonw_start_array(wr);
-	jsonw_end_array(wr);
+        jsonw_name(wr, "empty");
+        jsonw_start_array(wr);
+        jsonw_end_array(wr);
 
-	jsonw_name(wr, "NIL");
-	jsonw_start_object(wr);
-	jsonw_end_object(wr);
+        jsonw_name(wr, "NIL");
+        jsonw_start_object(wr);
+        jsonw_end_object(wr);
 
-	jsonw_null_field(wr, "my_null");
+        jsonw_null_field(wr, "my_null");
 
-	jsonw_name(wr, "special chars");
-	jsonw_start_array(wr);
-	jsonw_string_field(wr, "slash", "/");
-	jsonw_string_field(wr, "newline", "\n");
-	jsonw_string_field(wr, "tab", "\t");
-	jsonw_string_field(wr, "ff", "\f");
-	jsonw_string_field(wr, "quote", "\"");
-	jsonw_string_field(wr, "tick", "\'");
-	jsonw_string_field(wr, "backslash", "\\");
-	jsonw_end_array(wr);
+        jsonw_name(wr, "special chars");
+        jsonw_start_array(wr);
+        jsonw_string_field(wr, "slash", "/");
+        jsonw_string_field(wr, "newline", "\n");
+        jsonw_string_field(wr, "tab", "\t");
+        jsonw_string_field(wr, "ff", "\f");
+        jsonw_string_field(wr, "quote", "\"");
+        jsonw_string_field(wr, "tick", "\'");
+        jsonw_string_field(wr, "backslash", "\\");
+        jsonw_end_array(wr);
 
 jsonw_name(wr, "ARGV");
 jsonw_start_array(wr);
 jsonw_string(wr, "boo: appended or new entry?");
 jsonw_end_array(wr);
 
-	jsonw_end_object(wr);
+        jsonw_end_object(wr);
 
-	jsonw_end_object(wr);
-	jsonw_destroy(&wr);
-	return 0;
+        jsonw_end_object(wr);
+        jsonw_destroy(&wr);
+        return 0;
 }
 
 #endif
-

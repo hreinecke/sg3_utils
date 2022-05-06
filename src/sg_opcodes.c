@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.78 20220428";    /* spc6r06 */
+static const char * version_str = "0.80 20220505";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -104,7 +104,7 @@ struct opts_t {
     int verbose;
     const char * device_name;
     const char * inhex_fn;
-    sg_json_state json_st;
+    sgj_state json_st;
 };
 
 
@@ -712,9 +712,9 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
     unsigned int timeout;
     uint8_t * bp;
     uint8_t ** sort_arr = NULL;
-    sg_json_state * jsp = &op->json_st;
-    sg_json_opaque_p jap = NULL;
-    sg_json_opaque_p jop = NULL;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p jop = NULL;
     char name_buff[NAME_BUFF_SZ];
     char sa_buff[8];
     char b[192];
@@ -781,7 +781,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
 
     jap = sgj_new_named_array(jsp, jsp->basep, "all_command_descriptor");
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
-        jop = sgj_new_object(jsp);
+        jop = sgj_new_unattached_object(jsp);
 
         bp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
         byt5 = bp[5];
@@ -897,7 +897,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                     if (jsp->pr_as_json) {
                         int l;
                         char *b2p = b + nn;
-                        sg_json_opaque_p jo2p = sgj_new_named_object(jsp, jop,
+                        sgj_opaque_p jo2p = sgj_new_named_object(jsp, jop,
                                          "one_command_descriptor");
 
                         l = strlen(b2p);
@@ -924,7 +924,7 @@ decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b,
 {
     int len;
     unsigned int timeout;
-    sg_json_state * jsp = &op->json_st;
+    sgj_state * jsp = &op->json_st;
 
     if ((max_b_len < 2) || (NULL == dp))
         return;
@@ -973,8 +973,8 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
     const char * cp;
     const char * dlp;
     const char * mlu_p;
-    sg_json_state * jsp = &op->json_st;
-    sg_json_opaque_p jop = NULL;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jop = NULL;
     char name_buff[NAME_BUFF_SZ];
     char d[64];
     char b[192];
@@ -1115,8 +1115,8 @@ main(int argc, char * argv[])
     uint8_t * rsoc_buff = NULL;
     uint8_t * free_rsoc_buff = NULL;
     struct sg_pt_base * ptvp = NULL;
-    sg_json_state * jsp;
-    sg_json_opaque_p jop = NULL;
+    sgj_state * jsp;
+    sgj_opaque_p jop = NULL;
     char buff[48];
     char b[80];
     struct sg_simple_inquiry_resp inq_resp;

@@ -67,7 +67,7 @@ scnpr(char * cp, int cp_max_len, const char * fmt, ...)
 }
 
 bool
-sgj_init_state(sg_json_state * jstp, const char * j_optarg)
+sgj_init_state(sgj_state * jstp, const char * j_optarg)
 {
     bool bad_arg = false;
     bool prev_exclam = false;
@@ -155,18 +155,20 @@ sgj_init_state(sg_json_state * jstp, const char * j_optarg)
     return ! bad_arg;
 }
 
-sg_json_opaque_p
+sgj_opaque_p
 sgj_start(const char * util_name, const char * ver_str, int argc,
-          char *argv[], sg_json_state * jstp)
+          char *argv[], sgj_state * jstp)
 {
     int k;
     json_value * jvp = json_object_new(0);
-    json_value * jv2p;
+    json_value * jv2p = NULL;
     json_value * jap = NULL;
 
 
     if (NULL == jvp)
         return NULL;
+    if (NULL == jstp)
+        return jvp;
 
     jstp->basep = jvp;
     if (jstp->pr_header) {
@@ -175,30 +177,36 @@ sgj_start(const char * util_name, const char * ver_str, int argc,
             json_builder_free(jvp);
             return NULL;
         }
+        /* assume rest of json_*_new() calls succeed */
         json_array_push(jap, json_integer_new(1));
         json_array_push(jap, json_integer_new(0));
         json_object_push(jvp, "json_format_version", jap);
-        jap = json_array_new(0);
-        for (k = 0; k < argc; ++k)
-            json_array_push(jap, json_string_new(argv[k]));
-        jv2p = json_object_push(jvp, util_name, json_object_new(0));
-        if (ver_str)
-            json_object_push(jv2p, "version_date", json_string_new(ver_str));
-        else
-            json_object_push(jv2p, "version_date", json_string_new("0.0"));
-        json_object_push(jv2p, "argv", jap);
+        if (util_name) {
+            jap = json_array_new(0);
+            for (k = 0; k < argc; ++k)
+                json_array_push(jap, json_string_new(argv[k]));
+            jv2p = json_object_push(jvp, "utility_invoked",
+                                    json_object_new(0));
+            json_object_push(jv2p, "name", json_string_new(util_name));
+            if (ver_str)
+                json_object_push(jv2p, "version_date",
+                                 json_string_new(ver_str));
+            else
+                json_object_push(jv2p, "version_date", json_string_new("0.0"));
+            json_object_push(jv2p, "argv", jap);
+        }
+    } else {
+        if (jstp->pr_output && util_name)
+            jv2p = json_object_push(jvp, "utility_invoked",
+                                    json_object_new(0));
     }
-    if (jstp->pr_output) {
-        if (! jstp->pr_header)
-            jv2p = json_object_push(jvp, util_name, json_object_new(0));
+    if (jstp->pr_output && jv2p)
         jstp->outputp = json_object_push(jv2p, "output", json_array_new(0));
-    }
     return jvp;
 }
 
 void
-sgj_pr2file(sg_json_state * jstp, sg_json_opaque_p jop, int exit_status,
-            FILE * fp)
+sgj_pr2file(sgj_state * jstp, sgj_opaque_p jop, int exit_status, FILE * fp)
 {
     size_t len;
     char * b;
@@ -236,7 +244,7 @@ sgj_pr2file(sg_json_state * jstp, sg_json_opaque_p jop, int exit_status,
 }
 
 void
-sgj_finish(sg_json_state * jsp)
+sgj_finish(sgj_state * jsp)
 {
     if (jsp && jsp->basep) {
         json_builder_free(jsp->basep);
@@ -247,7 +255,14 @@ sgj_finish(sg_json_state * jsp)
 }
 
 void
-sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...)
+sgj_free_unattached(sgj_opaque_p jop)
+{
+    if (jop)
+        json_builder_free(jop);
+}
+
+void
+sgj_pr_hr(sgj_state * jsp, const char * fmt, ...)
 {
     va_list args;
 
@@ -283,88 +298,105 @@ sgj_pr_hr(sg_json_state * jsp, const char * fmt, ...)
     }
 }
 
-sg_json_opaque_p
-sgj_new_named_object(sg_json_state * jsp, sg_json_opaque_p jop,
-                     const char * name)
+/* jop will 'own' returned value (if non-NULL) */
+sgj_opaque_p
+sgj_new_named_object(sgj_state * jsp, sgj_opaque_p jop, const char * name)
 {
-    sg_json_opaque_p resp = NULL;
+    sgj_opaque_p resp = NULL;
 
-    if (jsp->pr_as_json)
+    if (jsp && jsp->pr_as_json)
         resp = json_object_push((jop ? jop : jsp->basep), name,
                                 json_object_new(0));
     return resp;
 }
 
-sg_json_opaque_p
-sgj_new_named_array(sg_json_state * jsp, sg_json_opaque_p jop,
-                    const char * name)
+/* jop will 'own' returned value (if non-NULL) */
+sgj_opaque_p
+sgj_new_named_array(sgj_state * jsp, sgj_opaque_p jop, const char * name)
 {
-    sg_json_opaque_p resp = NULL;
+    sgj_opaque_p resp = NULL;
 
-    if (jsp->pr_as_json)
+    if (jsp && jsp->pr_as_json)
         resp = json_object_push((jop ? jop : jsp->basep), name,
                                 json_array_new(0));
     return resp;
 }
 
-sg_json_opaque_p
-sgj_add_array_element(sg_json_state * jsp, sg_json_opaque_p jap,
-                      sg_json_opaque_p ejop)
+/* jap will 'own' ua_jop (if returned value is non-NULL) */
+sgj_opaque_p
+sgj_add_array_element(sgj_state * jsp, sgj_opaque_p jap, sgj_opaque_p ua_jop)
 {
-    if (jsp->pr_as_json)
-        return json_array_push(jap, ejop);
+    if (jsp && ua_jop && jsp->pr_as_json)
+        return json_array_push(jap, ua_jop);
     else
         return NULL;
 }
 
-/* Newly created object is un-attached */
-sg_json_opaque_p
-sgj_new_object(sg_json_state * jsp)
+/* Newly created object is un-attached to jsp->basep tree */
+sgj_opaque_p
+sgj_new_unattached_object(sgj_state * jsp)
 {
-    return jsp->pr_as_json ? json_object_new(0) : NULL;
+    return (jsp && jsp->pr_as_json) ? json_object_new(0) : NULL;
 }
 
-sg_json_opaque_p
-sgj_add_name_vs(sg_json_state * jsp, sg_json_opaque_p jop, const char * name,
+/* Newly created array is un-attached to jsp->basep tree */
+sgj_opaque_p
+sgj_new_unattached_array(sgj_state * jsp)
+{
+    return (jsp && jsp->pr_as_json) ? json_array_new(0) : NULL;
+}
+
+sgj_opaque_p
+sgj_add_name_vs(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                 const char * value)
 {
-    if (jsp->pr_as_json)
+    if (jsp && jsp->pr_as_json)
         return json_object_push((jop ? jop : jsp->basep), name,
                                 json_string_new(value));
     else
         return NULL;
 }
 
-sg_json_opaque_p
-sgj_add_name_vi(sg_json_state * jsp, sg_json_opaque_p jop, const char * name,
+sgj_opaque_p
+sgj_add_name_vi(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                 int64_t value)
 {
-    if (jsp->pr_as_json)
+    if (jsp && jsp->pr_as_json)
         return json_object_push((jop ? jop : jsp->basep), name,
                                 json_integer_new(value));
     else
         return NULL;
 }
 
-sg_json_opaque_p
-sgj_add_name_vb(sg_json_state * jsp, sg_json_opaque_p jop, const char * name,
+sgj_opaque_p
+sgj_add_name_vb(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                 bool value)
 {
-    if (jsp->pr_as_json)
+    if (jsp && jsp->pr_as_json)
         return json_object_push((jop ? jop : jsp->basep), name,
                                 json_boolean_new(value));
     else
         return NULL;
 }
 
+sgj_opaque_p
+sgj_add_name_obj(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                 sgj_opaque_p ua_jop)
+{
+    if (jsp && jsp->pr_as_json && ua_jop)
+        return json_object_push((jop ? jop : jsp->basep), name, ua_jop);
+    else
+        return NULL;
+}
+
 void
-sgj_add_name_pair_ihex(sg_json_state * jsp, sg_json_opaque_p jop,
-                       const char * name, uint64_t value)
+sgj_add_name_pair_ihex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                       uint64_t value)
 {
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
     else {
-        sg_json_opaque_p jo2p =
+        sgj_opaque_p jo2p =
                  sgj_new_named_object(jsp, (jop ? jop : jsp->basep), name);
         char b[64];
 
@@ -377,13 +409,13 @@ sgj_add_name_pair_ihex(sg_json_state * jsp, sg_json_opaque_p jop,
 }
 
 void
-sgj_add_name_pair_istr(sg_json_state * jsp, sg_json_opaque_p jop,
+sgj_add_name_pair_istr(sgj_state * jsp, sgj_opaque_p jop,
                        const char * name, int64_t value, const char * str)
 {
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
     else {
-        sg_json_opaque_p jo2p =
+        sgj_opaque_p jo2p =
                  sgj_new_named_object(jsp, (jop ? jop : jsp->basep), name);
         if (NULL == jo2p)
             return;
@@ -433,9 +465,8 @@ sgj_jsonify_name(const char * in, char * out, int maxlen_out)
 }
 
 static void
-sgj_pr_simple_xx(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
-                 const char * name, enum sg_json_separator_t sep,
-                 json_value * jvp)
+sgj_pr_twin_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+               const char * name, enum sgj_separator_t sep, json_value * jvp)
 {
     bool eaten = false;
     bool as_json = (jsp && jsp->pr_as_json);
@@ -495,30 +526,30 @@ sgj_pr_simple_xx(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
     }
     if (jvp && ((as_json && jsp->pr_output) || (! as_json))) {
         switch (sep) {
-        case SG_JSON_SEP_NONE:
+        case SGJ_SEP_NONE:
             break;
-        case SG_JSON_SEP_SPACE_1:
+        case SGJ_SEP_SPACE_1:
             n += scnpr(b + n, blen - n, " ");
             break;
-        case SG_JSON_SEP_SPACE_2:
+        case SGJ_SEP_SPACE_2:
             n += scnpr(b + n, blen - n, "  ");
             break;
-        case SG_JSON_SEP_SPACE_3:
+        case SGJ_SEP_SPACE_3:
             n += scnpr(b + n, blen - n, "   ");
             break;
-        case SG_JSON_SEP_SPACE_4:
+        case SGJ_SEP_SPACE_4:
             n += scnpr(b + n, blen - n, "    ");
             break;
-        case SG_JSON_SEP_EQUAL_NO_SPACE:
+        case SGJ_SEP_EQUAL_NO_SPACE:
             n += scnpr(b + n, blen - n, "=");
             break;
-        case SG_JSON_SEP_EQUAL_1_SPACE:
+        case SGJ_SEP_EQUAL_1_SPACE:
             n += scnpr(b + n, blen - n, "= ");
             break;
-        case SG_JSON_SEP_COLON_NO_SPACE:
+        case SGJ_SEP_COLON_NO_SPACE:
             n += scnpr(b + n, blen - n, ":");
             break;
-        case SG_JSON_SEP_COLON_1_SPACE:
+        case SGJ_SEP_COLON_1_SPACE:
             n += scnpr(b + n, blen - n, ": ");
             break;
         default:
@@ -549,43 +580,41 @@ sgj_pr_simple_xx(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
 }
 
 void
-sgj_pr_simple_vs(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
-                 const char * name, enum sg_json_separator_t sep,
-                 const char * value)
+sgj_pr_twin_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+               const char * name, enum sgj_separator_t sep,
+               const char * value)
 {
     json_value * jvp;
 
     /* make json_value even if jsp->pr_as_json is false */
     jvp = value ? json_string_new(value) : NULL;
-    sgj_pr_simple_xx(jsp, jop, leadin_sp, name, sep, jvp);
+    sgj_pr_twin_xx(jsp, jop, leadin_sp, name, sep, jvp);
 }
 
 void
-sgj_pr_simple_vi(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
-                 const char * name, enum sg_json_separator_t sep,
-                 int64_t value)
+sgj_pr_twin_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+               const char * name, enum sgj_separator_t sep, int64_t value)
 {
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_pr_simple_xx(jsp, jop, leadin_sp, name, sep, jvp);
+    sgj_pr_twin_xx(jsp, jop, leadin_sp, name, sep, jvp);
 }
 
 void
-sgj_pr_simple_vb(sg_json_state * jsp, sg_json_opaque_p jop, int leadin_sp,
-                 const char * name, enum sg_json_separator_t sep,
-                 bool value)
+sgj_pr_twin_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+               const char * name, enum sgj_separator_t sep, bool value)
 {
     json_value * jvp;
 
     jvp = json_boolean_new(value);
-    sgj_pr_simple_xx(jsp, jop, leadin_sp, name, sep, jvp);
+    sgj_pr_twin_xx(jsp, jop, leadin_sp, name, sep, jvp);
 }
 
 #if 0
 void
-sgj_pr_hr_line_vs(sg_json_state * jsp, sg_json_opaque_p jop,
-                  const char * hr_line, const char * name, const char * value)
+sgj_pr_hr_line_vs(sgj_state * jsp, sgj_opaque_p jop, const char * hr_line,
+                  const char * name, const char * value)
 {
 }
 #endif

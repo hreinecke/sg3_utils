@@ -40,7 +40,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.35 20220501";
+static const char * version_str = "1.36 20220505";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -84,7 +84,7 @@ struct opts_t {
     int vb;
     uint64_t st_lba;
     const char * in_fn;
-    sg_json_state json_st;
+    sgj_state json_st;
 };
 
 struct zt_num2abbrev_t {
@@ -382,7 +382,7 @@ static const char * same_desc_arr[16] = {
 
 static uint64_t
 prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op,
-              sg_json_state * jsp, sg_json_opaque_p jop)
+              sgj_state * jsp, sgj_opaque_p jop)
 {
     uint8_t zt, zc;
     uint64_t lba, len, wp;
@@ -397,12 +397,12 @@ prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op,
     zone_condition_str(zc, b, sizeof(b), op->vb);
     sgj_pr_hr(jsp, "   Zone condition: %s\n", b);
     sgj_add_name_pair_istr(jsp, jop, "zone_condition", zc, b);
-    sgj_pr_simple_vi(jsp, jop, 3, "PUEP", SG_JSON_SEP_COLON_1_SPACE,
-                     !!(bp[1] & 0x4));
-    sgj_pr_simple_vi(jsp, jop, 3, "NON_SEQ", SG_JSON_SEP_COLON_1_SPACE,
-                     !!(bp[1] & 0x2));
-    sgj_pr_simple_vi(jsp, jop, 3, "RESET", SG_JSON_SEP_COLON_1_SPACE,
-                     !!(bp[1] & 0x1));
+    sgj_pr_twin_vi(jsp, jop, 3, "PUEP", SGJ_SEP_COLON_1_SPACE,
+                   !!(bp[1] & 0x4));
+    sgj_pr_twin_vi(jsp, jop, 3, "NON_SEQ", SGJ_SEP_COLON_1_SPACE,
+                   !!(bp[1] & 0x2));
+    sgj_pr_twin_vi(jsp, jop, 3, "RESET", SGJ_SEP_COLON_1_SPACE,
+                   !!(bp[1] & 0x1));
     len = sg_get_unaligned_be64(bp + 8);
     sgj_pr_hr(jsp, "   Zone Length: 0x%" PRIx64 "\n", len);
     sgj_add_name_pair_ihex(jsp, jop, "zone_length", (int64_t)len);
@@ -420,13 +420,13 @@ prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op,
 
 static int
 decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
-                 const struct opts_t * op, sg_json_state * jsp)
+                 const struct opts_t * op, sgj_state * jsp)
 {
     bool as_json = jsp ? jsp->pr_as_json : false;
     int k, same, num_zd;
     uint64_t wp, ul, mx_lba;
-    sg_json_opaque_p jop = jsp ? jsp->basep : NULL;
-    sg_json_opaque_p jap = NULL;
+    sgj_opaque_p jop = jsp ? jsp->basep : NULL;
+    sgj_opaque_p jap = NULL;
     const uint8_t * bp;
 
     if ((uint32_t)act_len < decod_len) {
@@ -478,20 +478,22 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
                 hex2stdout(bp, 64, -1);
             return 0;
         }
-        printf("From last descriptor in this response:\n");
-        printf(" %s%d\n", zn_dnum_s, num_zd - 1);
+        sgj_pr_hr(jsp, "From last descriptor in this response:\n");
+        sgj_pr_hr(jsp, " %s%d\n", zn_dnum_s, num_zd - 1);
+        sgj_add_name_vi(jsp, jop, "zone_descriptor_index", num_zd - 1);
         ul = prt_a_zn_desc(bp, op, jsp, jop);
         if (ul > mx_lba)
-            printf("   >> This zone seems to be the last one\n");
+            sgj_pr_hr(jsp, "   >> This zone seems to be the last one\n");
         else
-            printf("   >> Probable next Zone start LBA: 0x%" PRIx64 "\n", ul);
+            sgj_pr_hr(jsp, "   >> Probable next Zone start LBA: 0x%" PRIx64
+                      "\n", ul);
         return 0;
     }
     if (as_json)
-        jap = sgj_new_named_array(jsp, NULL, "zone_descriptor_list");
+        jap = sgj_new_named_array(jsp, NULL, "zone_descriptors_list");
     for (k = 0, bp = rzBuff + 64; k < num_zd;
          ++k, bp += REPORT_ZONES_DESC_LEN) {
-        sg_json_opaque_p jo2p;
+        sgj_opaque_p jo2p;
 
         if (! op->wp_only)
              sgj_pr_hr(jsp, " %s%d\n", zn_dnum_s, k);
@@ -505,33 +507,39 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
             else {
                 wp = sg_get_unaligned_be64(bp + 24);
                 if (sg_all_ffs((const uint8_t *)&wp, sizeof(wp)))
-                    printf("-1\n");
+                    sgj_pr_hr(jsp, "-1\n");
                 else
-                    printf("0x%" PRIx64 "\n", wp);
+                    sgj_pr_hr(jsp, "0x%" PRIx64 "\n", wp);
+                jo2p = sgj_new_unattached_object(jsp);
+                sgj_add_name_pair_ihex(jsp, jo2p, "write_pointer_lba",
+                                       (int64_t)wp);
+                sgj_add_array_element(jsp, jap, jo2p);
             }
             continue;
         }
-        jo2p = as_json ? sgj_new_object(jsp) : NULL;
+        jo2p = sgj_new_unattached_object(jsp);
         prt_a_zn_desc(bp, op, jsp, jo2p);
-        if (jo2p)
-            sgj_add_array_element(jsp, jap, jo2p);
+        sgj_add_array_element(jsp, jap, jo2p);
     }
     if ((op->do_num == 0) && (! op->wp_only) && (! op->do_hex)) {
         if ((64 + (REPORT_ZONES_DESC_LEN * (uint32_t)num_zd)) < decod_len)
-            printf("\n>>> Beware: Zone list truncated, may need another "
-                   "call\n");
+            sgj_pr_hr(jsp, "\n>>> Beware: Zone list truncated, may need "
+                      "another call\n");
     }
     return 0;
 }
 
 static int
 decode_rep_realms(const uint8_t * rzBuff, int act_len,
-                  const struct opts_t * op)
+                  const struct opts_t * op, sgj_state * jsp)
 {
     uint32_t k, realms_count, derived_realms_count, r_desc_len,
              zdomains_count;
     uint64_t nr_locator;
     const uint8_t * bp;
+    sgj_opaque_p jop = jsp ? jsp->basep : NULL;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p ja2p = NULL;
 
     if (act_len < 12) {
         pr2serr("need more than 12 bytes to decode, got %u\n", act_len);
@@ -543,9 +551,12 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
         nr_locator = sg_get_unaligned_be64(rzBuff + 12);
     else
         nr_locator = 0;
-    printf("Realms_count=%u\n", realms_count);
-    printf("realms_descriptor_length=%u\n", r_desc_len);
-    printf("next_realm_locator=0x%" PRIx64 "\n", nr_locator);
+    sgj_pr_twin_vi(jsp, jop, 0, "Realms_count", SGJ_SEP_EQUAL_NO_SPACE,
+                   realms_count);
+    sgj_pr_twin_vi(jsp, jop, 0, "Realms_descriptor_length",
+                   SGJ_SEP_EQUAL_NO_SPACE, r_desc_len);
+    sgj_pr_hr(jsp, "Next_realm_locator=0x%" PRIx64 "\n", nr_locator);
+    sgj_add_name_pair_ihex(jsp, jop, "Next_realm_locator", nr_locator);
     if ((realms_count < 1) || (act_len < (64 + 16)) || (r_desc_len < 16)) {
         if (op->vb) {
             pr2serr("%s: exiting early because ", __func__);
@@ -575,37 +586,60 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
     if (op->do_num > 0)
             realms_count = (realms_count > (uint32_t)op->do_num) ?
                                 (uint32_t)op->do_num : realms_count;
+    jap = sgj_new_named_array(jsp, jop, "realm_descriptors_list");
 
     for (k = 0, bp = rzBuff + 64; k < realms_count; ++k, bp += r_desc_len) {
         uint32_t j;
+        uint16_t restrictions;
         const uint8_t * zp;
+        sgj_opaque_p jo2p;
 
-        printf(" Realm_id=%u\n", sg_get_unaligned_be32(bp + 0));
+        jo2p = sgj_new_unattached_object(jsp);
+        sgj_pr_twin_vi(jsp, jo2p, 1, "Realms_id", SGJ_SEP_EQUAL_NO_SPACE,
+                       sg_get_unaligned_be32(bp + 0));
         if (op->do_hex) {
             hex2stdout(bp, r_desc_len, -1);
             continue;
         }
-        printf("   realm_restrictions=0x%hu\n",
-               sg_get_unaligned_be16(bp + 4));
-        printf("   active_zone_domain_id=%u\n", (uint32_t)bp[7]);
+        restrictions = sg_get_unaligned_be16(bp + 4);
+        sgj_pr_hr(jsp, "   realm_restrictions=0x%hu\n", restrictions);
+        sgj_add_name_pair_ihex(jsp, jo2p, "realm_restrictions", restrictions);
+        sgj_pr_twin_vi(jsp, jo2p, 3, "active_zone_domain_id",
+                       SGJ_SEP_EQUAL_NO_SPACE, bp[7]);
+
+        ja2p = sgj_new_named_array(jsp, jo2p,
+                                   "realm_start_end_descriptors_list");
         for (j = 0, zp = bp + 16; j < zdomains_count; ++j, zp += 16) {
-            printf("   zone_domain=%u\n", j);
-            printf("     starting_lba=0x%" PRIx64 "\n",
-                   sg_get_unaligned_be64(zp + 0));
-            printf("     ending_lba=0x%" PRIx64 "\n",
-                   sg_get_unaligned_be64(zp + 8));
+            uint64_t lba;
+            sgj_opaque_p jo3p;
+
+            jo3p = sgj_new_unattached_object(jsp);
+            sgj_pr_hr(jsp, "   zone_domain=%u\n", j);
+            sgj_add_name_vi(jsp, jo3p, "corresponding_zone_domain_id", j);
+            lba = sg_get_unaligned_be64(zp + 0);
+            sgj_pr_hr(jsp, "     starting_lba=0x%" PRIx64 "\n", lba);
+            sgj_add_name_pair_ihex(jsp, jo3p, "realm_starting_lba",
+                                   (int64_t)lba);
+            lba = sg_get_unaligned_be64(zp + 8);
+            sgj_pr_hr(jsp, "     ending_lba=0x%" PRIx64 "\n", lba);
+            sgj_add_name_pair_ihex(jsp, jo3p, "realm_ending_lba",
+                                   (int64_t)lba);
+            sgj_add_array_element(jsp, ja2p, jo3p);
         }
+        sgj_add_array_element(jsp, jap, jo2p);
     }
     return 0;
 }
 
 static int
 decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
-                  const struct opts_t * op)
+                   const struct opts_t * op, sgj_state * jsp)
 {
     uint32_t k, zd_len, zd_ret_len, zdoms_sup, zdoms_rep, zd_rep_opts;
     uint32_t num, der_zdoms;
     uint64_t zd_locator;
+    sgj_opaque_p jop = jsp ? jsp->basep : NULL;
+    sgj_opaque_p jap = NULL;
     const uint8_t * bp;
 
     if (act_len < 12) {
@@ -621,34 +655,53 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
         zd_locator = sg_get_unaligned_be64(rzBuff + 16);
     else
         zd_locator = 0;
-    printf("Zone_domains_returned_list_length=%u\n", zd_ret_len);
-    printf("Zone_domains_supported=%u\n", zdoms_sup);
-    printf("Zone_domains_reported=%u\n", zdoms_rep);
-    printf("Reporting_options=0x%x\n", zd_rep_opts);
-    printf("Zone_domain_locator=0x%" PRIx64 "\n", zd_locator);
+    sgj_pr_twin_vi(jsp, jop, 0, "Zone_domains_returned_list_length=",
+                   SGJ_SEP_EQUAL_NO_SPACE, zd_ret_len);
+    sgj_pr_twin_vi(jsp, jop, 0, "Zone_domains_supported",
+                   SGJ_SEP_EQUAL_NO_SPACE, zdoms_sup);
+    sgj_pr_twin_vi(jsp, jop, 0, "Zone_domains_reported",
+                   SGJ_SEP_EQUAL_NO_SPACE, zdoms_rep);
+    sgj_pr_hr(jsp, "Reporting_options=0x%x\n", zd_rep_opts);
+    sgj_add_name_pair_ihex(jsp, jop, "Reporting_options", zd_rep_opts);
+    sgj_pr_hr(jsp, "Zone_domain_locator=0x%" PRIx64 "\n", zd_locator);
+    sgj_add_name_pair_ihex(jsp, jop, "Zone_domain_locator", zd_locator);
 
     der_zdoms = zd_len / 96;
-    if (op->vb)
+    if (op->vb > 1)
         pr2serr("Derived zdomains=%u\n", der_zdoms);
     num = ((der_zdoms < zdoms_rep) ? der_zdoms : zdoms_rep) * 96;
+    jap = sgj_new_named_array(jsp, jop, "zone_domain_descriptors_list");
+
     for (k = 0, bp = rzBuff + 64; k < num; k += 96, bp += 96) {
-        printf("   zone_domain=%u\n", bp[0]);
-        printf("     zone_count=%" PRIu64 "\n",
-               sg_get_unaligned_be64(bp + 16));
-        printf("     starting_lba=0x%" PRIx64 "\n",
-               sg_get_unaligned_be64(bp + 24));
-        printf("     ending_lba=0x%" PRIx64 "\n",
-               sg_get_unaligned_be64(bp + 32));
-        printf("     zone_domain_zone_type=0x%x\n", bp[40]);
-        printf("     VZDZT=%u\n", !!(0x2 & bp[42]));
-        printf("     SRB=%u\n", !!(0x1 & bp[42]));
+        uint64_t lba;
+        sgj_opaque_p jo2p;
+
+        jo2p = sgj_new_unattached_object(jsp);
+        sgj_pr_twin_vi(jsp, jo2p, 3, "zone_domain",
+                       SGJ_SEP_EQUAL_NO_SPACE, bp[0]);
+        lba = sg_get_unaligned_be64(bp + 16);
+        sgj_pr_hr(jsp, "     zone_count=%" PRIu64 "\n", lba);
+        sgj_add_name_pair_ihex(jsp, jo2p, "zone_count", lba);
+        lba = sg_get_unaligned_be64(bp + 24);
+        sgj_pr_hr(jsp, "     starting_lba=0x%" PRIx64 "\n", lba);
+        sgj_add_name_pair_ihex(jsp, jo2p, "starting_lba", lba);
+        lba = sg_get_unaligned_be64(bp + 32);
+        sgj_pr_hr(jsp, "     ending_lba=0x%" PRIx64 "\n", lba);
+        sgj_add_name_pair_ihex(jsp, jo2p, "ending_lba", lba);
+        sgj_pr_hr(jsp, "     zone_domain_zone_type=0x%x\n", bp[40]);
+        sgj_add_name_pair_ihex(jsp, jo2p, "zone_domain_zone_type", bp[40]);
+        sgj_pr_twin_vi(jsp, jo2p, 5, "VZDZT", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(0x2 & bp[42]));
+        sgj_pr_twin_vi(jsp, jo2p, 5, "SRB", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(0x1 & bp[42]));
+        sgj_add_array_element(jsp, jap, jo2p);
     }
     return 0;
 }
 
 static int
 find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
-                  struct opts_t * op, sg_json_state * jsp)
+                  struct opts_t * op, sgj_state * jsp)
 {
     bool as_json = (jsp && (0 == op->do_hex)) ?  jsp->pr_as_json : false;
     bool found = false;
@@ -707,7 +760,7 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
             break;
     }           /* end of outer for loop */
     if (res == 0) {
-        sg_json_opaque_p jo2p = as_json ?
+        sgj_opaque_p jo2p = as_json ?
                 sgj_new_named_object(jsp, NULL, "find_condition") : NULL;
 
         if (found) {
@@ -1096,8 +1149,8 @@ main(int argc, char * argv[])
     uint8_t * rzBuff = NULL;
     uint8_t * free_rzbp = NULL;
     const char * cmd_name = "Report zones";
-    sg_json_state * jsp;
-    sg_json_opaque_p jop = NULL;
+    sgj_state * jsp;
+    sgj_opaque_p jop = NULL;
     char b[80];
     struct opts_t opts = {0};
     struct opts_t * op = &opts;
@@ -1430,9 +1483,9 @@ start_response:
         if (REPORT_ZONES_SA == op->serv_act)
             ret = decode_rep_zones(rzBuff, act_len, decod_len, op, jsp);
         else if (op->do_realms)
-            ret = decode_rep_realms(rzBuff, act_len, op);
+            ret = decode_rep_realms(rzBuff, act_len, op, jsp);
         else if (op->do_zdomains)
-            ret = decode_rep_zdomains(rzBuff, act_len, op);
+            ret = decode_rep_zdomains(rzBuff, act_len, op, jsp);
     } else if (SG_LIB_CAT_INVALID_OP == res)
         pr2serr("%s command not supported\n", cmd_name);
     else {
