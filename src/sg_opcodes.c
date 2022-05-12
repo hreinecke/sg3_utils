@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.80 20220505";    /* spc6r06 */
+static const char * version_str = "0.81 20220506";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -852,22 +852,22 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
         }
         if (jsp->pr_as_json) {
             snprintf(b, blen, "0x%x", opcode);
-            sgj_add_name_vs(jsp, jop, "operation_code", b);
+            sgj_add_val_s(jsp, jop, "operation_code", b);
             if (sa_v) {
                 snprintf(b, blen, "0x%x", serv_act);
-                sgj_add_name_vs(jsp, jop, "service_action", b);
+                sgj_add_val_s(jsp, jop, "service_action", b);
             }
             if (name_buff[0])
-                sgj_add_name_vs(jsp, jop, "name", name_buff);
-            sgj_add_name_vi(jsp, jop, "rwcdlp", (byt5 >> 6) & 0x1);
-            sgj_add_name_vi(jsp, jop, "mlu", (byt5 >> 4) & 0x3);
-            sgj_add_name_vi(jsp, jop, "cdlp", (byt5 >> 2) & 0x3);
-            sgj_add_name_vi(jsp, jop, "ctdp", (byt5 >> 1) & 0x1);
-            sgj_add_name_vi(jsp, jop, "servactv", byt5 & 0x1);
-            sgj_add_name_vi(jsp, jop, "cdb_length",
-                            sg_get_unaligned_be16(bp + 6));
+                sgj_add_val_s(jsp, jop, "name", name_buff);
+            sgj_add_val_i(jsp, jop, "rwcdlp", (byt5 >> 6) & 0x1);
+            sgj_add_val_i(jsp, jop, "mlu", (byt5 >> 4) & 0x3);
+            sgj_add_val_i(jsp, jop, "cdlp", (byt5 >> 2) & 0x3);
+            sgj_add_val_i(jsp, jop, "ctdp", (byt5 >> 1) & 0x1);
+            sgj_add_val_i(jsp, jop, "servactv", byt5 & 0x1);
+            sgj_add_val_i(jsp, jop, "cdb_length",
+                          sg_get_unaligned_be16(bp + 6));
 
-            sgj_add_array_element(jsp, jap, jop);
+            sgj_add_val_o(jsp, jap, NULL /* implies an array add */, jop);
         }
 
         if (op->do_mask && ptvp) {
@@ -903,8 +903,8 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                         l = strlen(b2p);
                         if ((l > 0) && (' ' == b2p[l - 1]))
                             b2p[l - 1] = '\0';
-                        sgj_add_name_vi(jsp, jo2p, "cdb_size", cdb_sz);
-                        sgj_add_name_vs(jsp, jo2p, "cdb_usage_data", b2p);
+                        sgj_add_val_i(jsp, jo2p, "cdb_size", cdb_sz);
+                        sgj_add_val_s(jsp, jo2p, "cdb_usage_data", b2p);
                     }
                 }
             } else
@@ -942,9 +942,9 @@ decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b,
     else
         snprintf(b, max_b_len, "nominal timeout: %u secs, ", timeout);
     if (jsp->pr_as_json) {
-        sgj_add_name_vi(jsp, jsp->userp, "command_specific", dp[3]);
-        sgj_add_name_vi(jsp, jsp->userp,
-                        "nominal_command_processing_timeout", timeout);
+        sgj_add_val_i(jsp, jsp->userp, "command_specific", dp[3]);
+        sgj_add_val_i(jsp, jsp->userp,
+                      "nominal_command_processing_timeout", timeout);
     }
     len = strlen(b);
     max_b_len -= len;
@@ -955,8 +955,8 @@ decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b,
     else
         snprintf(b, max_b_len, "recommended timeout: %u secs", timeout);
     if (jsp->pr_as_json)
-        sgj_add_name_vi(jsp, jsp->userp,
-                        "recommended_command_timeout", timeout);
+        sgj_add_val_i(jsp, jsp->userp,
+                      "recommended_command_timeout", timeout);
     return;
 }
 
@@ -1072,25 +1072,25 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         int l;
 
         snprintf(b, blen, "0x%x", op->opcode);
-        sgj_add_name_vs(jsp, jop, "operation_code", b);
+        sgj_add_val_s(jsp, jop, "operation_code", b);
         if (rep_opts > 1) {
             snprintf(b, blen, "0x%x", op->servact);
-            sgj_add_name_vs(jsp, jop, "service_action", b);
+            sgj_add_val_s(jsp, jop, "service_action", b);
         }
-        sgj_add_name_vi(jsp, jop, "rwcdlp", rwcdlp);
-        sgj_add_name_vi(jsp, jop, "ctdp", ctdp);
-        sgj_add_name_vi(jsp, jop, "mlu", mlu);
-        sgj_add_name_vi(jsp, jop, "cdlp", cdlp);
-        sgj_add_name_vi(jsp, jop, "support", support);
-        sgj_add_name_vs(jsp, jop, "support_str", cp);
-        sgj_add_name_vi(jsp, jop, "cdb_size", cd_len);
+        sgj_add_val_i(jsp, jop, "rwcdlp", rwcdlp);
+        sgj_add_val_i(jsp, jop, "ctdp", ctdp);
+        sgj_add_val_i(jsp, jop, "mlu", mlu);
+        sgj_add_val_i(jsp, jop, "cdlp", cdlp);
+        sgj_add_val_i(jsp, jop, "support", support);
+        sgj_add_val_s(jsp, jop, "support_str", cp);
+        sgj_add_val_i(jsp, jop, "cdb_size", cd_len);
         n = 0;
         for (k = 0; k < cd_len; ++k)
             n += sg_scnpr(b + n, blen - n, "%.2x ", rsoc_buff[k + 4]);
         l = strlen(b);
         if ((l > 0) && (' ' == b[l - 1]))
             b[l - 1] = '\0';
-        sgj_add_name_vs(jsp, jop, "cdb_usage_data", b);
+        sgj_add_val_s(jsp, jop, "cdb_usage_data", b);
     }
     if (ctdp) {
         jsp->userp = sgj_new_named_object(jsp, jsp->basep,
@@ -1364,17 +1364,17 @@ start_response:
             goto fini;
         }
         if (jsp->pr_as_json) {
-            sgj_add_name_vb(jsp, jop, "ats", rsoc_buff[0] & 0x80);
-            sgj_add_name_vb(jsp, jop, "atss", rsoc_buff[0] & 0x40);
-            sgj_add_name_vb(jsp, jop, "cacas", rsoc_buff[0] & 0x20);
-            sgj_add_name_vb(jsp, jop, "ctss", rsoc_buff[0] & 0x10);
-            sgj_add_name_vb(jsp, jop, "lurs", rsoc_buff[0] & 0x8);
-            sgj_add_name_vb(jsp, jop, "qts", rsoc_buff[0] & 0x4);
-            sgj_add_name_vb(jsp, jop, "trs", rsoc_buff[0] & 0x2);
-            sgj_add_name_vb(jsp, jop, "ws", rsoc_buff[0] & 0x1);
-            sgj_add_name_vb(jsp, jop, "qaes", rsoc_buff[1] & 0x4);
-            sgj_add_name_vb(jsp, jop, "qtss", rsoc_buff[1] & 0x2);
-            sgj_add_name_vb(jsp, jop, "itnrs", rsoc_buff[1] & 0x1);
+            sgj_add_val_b(jsp, jop, "ats", rsoc_buff[0] & 0x80);
+            sgj_add_val_b(jsp, jop, "atss", rsoc_buff[0] & 0x40);
+            sgj_add_val_b(jsp, jop, "cacas", rsoc_buff[0] & 0x20);
+            sgj_add_val_b(jsp, jop, "ctss", rsoc_buff[0] & 0x10);
+            sgj_add_val_b(jsp, jop, "lurs", rsoc_buff[0] & 0x8);
+            sgj_add_val_b(jsp, jop, "qts", rsoc_buff[0] & 0x4);
+            sgj_add_val_b(jsp, jop, "trs", rsoc_buff[0] & 0x2);
+            sgj_add_val_b(jsp, jop, "ws", rsoc_buff[0] & 0x1);
+            sgj_add_val_b(jsp, jop, "qaes", rsoc_buff[1] & 0x4);
+            sgj_add_val_b(jsp, jop, "qtss", rsoc_buff[1] & 0x2);
+            sgj_add_val_b(jsp, jop, "itnrs", rsoc_buff[1] & 0x1);
             if (! jsp->pr_output)
                 goto fini;
         }

@@ -1631,7 +1631,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len, int do_hex,
                 printf("          [or device number: 0x%x, function number: "
                        "0x%x]\n", (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
             } else
-                printf("      >>>> unexpected protocol indentifier: %s\n"
+                printf("      >>>> unexpected protocol identifier: %s\n"
                        "           with Protocol specific port "
                        "identifier\n",
                        sg_get_trans_proto_str(p_id, sizeof(b), b));

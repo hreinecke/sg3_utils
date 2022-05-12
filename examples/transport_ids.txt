@@ -1,6 +1,6 @@
 # This file is an example for the sg_persist utility.
 # It discusses using "TransportID"s which are defined (most recently)
-# in SPC-4 revison 20 section 7.5.4 titled: "TransportID identifiers".
+# in SPC-4 revision 20 section 7.5.4 titled: "TransportID identifiers".
 #
 # The sg_persist utility can take one or more "transportID"s from stdin when
 # either the '--transport-id=-" or "-X -" option is given on the command

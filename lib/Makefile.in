@@ -394,7 +394,6 @@ libsgutils2_la_SOURCES = sg_lib.c sg_pr2serr.c sg_lib_data.c \
 @DEBUG_TRUE@DBG_CPPFLAGS = -DDEBUG
 
 # For C++/clang testing
-CXX = g++
 
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu11 for C code
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more

@@ -426,7 +426,7 @@ static struct log_elem log_arr[] = {
     {STATS_LPAGE, CACHE_STATS_SUBPG, 0, -1, MVP_STD,    /* 0x19, 0x20  */
      "Cache memory statistics", "cms", show_cache_stats_page},
     {STATS_LPAGE, CMD_DUR_LIMITS_SUBPG, 0, -1, MVP_STD, /* 0x19, 0x21  */
-     "Commmand duration limits statistics", "cdl",
+     "Command duration limits statistics", "cdl",
      show_cmd_dur_limits_page /* spc6r01 */ },
     {PCT_LPAGE, 0, 0, -1, MVP_STD, "Power condition transitions", "pct",
      show_power_condition_transitions_page}, /* 0x1a, 0  */
@@ -3506,7 +3506,7 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val)
         printf("     Received retry-class OPEN_REJECT count: %u\n", val);
         break;
     case 0x25:
-        printf("     Received AIP (WATING ON PARTIAL) count: %u\n", val);
+        printf("     Received AIP (WAITING ON PARTIAL) count: %u\n", val);
         break;
     case 0x26:
         printf("     Received AIP (WAITING ON CONNECTION) count: %u\n", val);

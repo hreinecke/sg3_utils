@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220505] [svn: r951]
+Changelog for pre-release sg3_utils-1.48 [20220512] [svn: r952]
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
   - sg_rep_density: new utility for decoding the response of
@@ -57,6 +57,7 @@ Changelog for pre-release sg3_utils-1.48 [20220505] [svn: r951]
     - add hex2fp(), similar to hex2str() but outputs to FILE
     - cleanup masks for PDT [0x1f] and group_number [0x3f]
     - new sg_json_builder.[hc] files local to lib folder
+    - document internal json interface in include/sg_pr2serr.h
   - initialize all sense buffers to 0
   - rework main README file
   - rev 921+922 are bugfix revs on release 1.47 [r919,920]
@@ -68,6 +69,7 @@ Changelog for pre-release sg3_utils-1.48 [20220505] [svn: r951]
   - round of coverity identified issue fixes (and non-issues)
   - autoconf: upgrade version 2.70 to 2.71; automake upgrade
     to version 1.16.5
+  - codespell fixes
 
 Changelog for released sg3_utils-1.47 [20211110] [svn: r919]
   - sg_rep_zones: add support for REPORT ZONE DOMAINS and
@@ -1166,7 +1168,7 @@ Changelog for sg3_utils-1.25 [20071016] [svn: r115]
       Makefiles
 
 Changelog for sg3_utils-1.24 [20070507] [svn: r77]
-  - sg_raw: new utility to send arbirary SCSI commands
+  - sg_raw: new utility to send arbitrary SCSI commands
   - sg_luns: increase number of luns that can be fetched
     - fix length of raw and hex output
     - add '--quiet' option to output only ASCII hex

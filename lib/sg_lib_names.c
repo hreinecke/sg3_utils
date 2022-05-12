@@ -35,7 +35,7 @@ struct sg_lib_simple_value_name_t sg_lib_names_mode_arr[] = {
     {0x0900, "Peripheral device (obsolete)"},   /* SPC */
     {0x0a00, "Control"},                        /* SPC */
     {0x0a01, "Control extension"},              /* SPC */
-    {0x0a02, "Application tage"},               /* SBC */
+    {0x0a02, "Application tag"},                /* SBC */
     {0x0a03, "Command duration limit A"},       /* SPC */
     {0x0a04, "Command duration limit B"},       /* SPC */
     {0x0a05, "IO Advice Hints Grouping"},       /* SBC */

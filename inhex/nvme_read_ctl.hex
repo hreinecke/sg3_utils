@@ -13,7 +13,7 @@
 #
 # 512 byte logical block size is assumed. Read 4 blocks hence 2048 bytes.
 # The first LBA read is 0x12345 and the namespace is 1. If successful
-# the four blocks will be read into the data-in buffer. Submission queu
+# the four blocks will be read into the data-in buffer. Submission queue
 # 0 is used (the same queue that Admin commands use). The NVM opcode for
 # the Read command is 0x2 and appears in the first command byte.
 
@@ -30,7 +30,7 @@
 #           --outfile=t.bin /dev/nvme0n1
 # In FreeBSD the device name would be /dev/nvme0ns1
 #
-# Notice the '--nvm' option which is needed to distiguish a NVM
+# Notice the '--nvm' option which is needed to distinguish a NVM
 # command from an Admin command as Admin commands are the default
 # in this utility.
 #

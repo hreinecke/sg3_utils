@@ -133,7 +133,7 @@ int main(int argc, char * argv[])
                 dev_arr[next_vacant_dev_idx] = argv[optind];
                 ++next_vacant_dev_idx;
             } else if (next_vacant_dev_idx == SG_TAKE_MAX_DEVS) {
-                pr2serr("Maximim of %d DEVICEs on command line\n",
+                pr2serr("Maximum of %d DEVICEs on command line\n",
                         next_vacant_dev_idx);
                 usage();
                 return SG_LIB_SYNTAX_ERROR;

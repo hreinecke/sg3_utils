@@ -284,7 +284,7 @@ encode_tpgs_states(uint8_t *buff, struct tgtgrp *tgtState, int numgrp)
 }
 
 /* Read numbers (up to 32 bits in size) from command line (comma separated
- * list). Assumed decimal unless prefixed by '0x', '0X' or contains traling
+ * list). Assumed decimal unless prefixed by '0x', '0X' or contains trailing
  * 'h' or 'H' (which indicate hex). Returns 0 if ok, else error code. */
 static int
 build_port_arr(const char * inp, int * port_arr, int * port_arr_len,

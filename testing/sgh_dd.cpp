@@ -674,7 +674,7 @@ page4:
             "example,\nit has been observed that both the read- and write- "
             "sides of a request\nshare show they are in 'active' state "
             "which should not be possible.\nIt occurs because the read-"
-            "sie probably jumped out of active state and\nthe write-side "
+            "side probably jumped out of active state and\nthe write-side "
             "request entered it while some other nodes were being "
             "printed.\n\n");
     pr2serr("Busy state:\n"

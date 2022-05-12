@@ -347,7 +347,7 @@ err_out:
  * is non-NULL). Assumed decimal (and may have suffix multipliers) when
  * def_hex==false; if a number is prefixed by '0x', '0X' or contains trailing
  * 'h' or 'H' that denotes a hex number. When def_hex==true all numbers are
- * assumed to be hex (ignored '0x' prefixes and 'h' suffixes) and multiplers
+ * assumed to be hex (ignored '0x' prefixes and 'h' suffixes) and multipliers
  * are not permitted. Heap allocates an array just big enough to hold all
  * elements if the file is countable. Pipes and stdin are not considered
  * countable. In the non-countable case an array of MAX_FIXED_SGL_ELEMS

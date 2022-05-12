@@ -1435,7 +1435,7 @@ static const char * dd_usage_reason_str_arr[] = {
     "Unknown",
     "resend this and further commands to:",
     "resend this command to:",
-    "new subsiduary lu added to this administrative lu:",
+    "new subsidiary lu added to this administrative lu:",
     "administrative lu associated with a preferred binding:",
    };
 
@@ -2610,7 +2610,7 @@ sg_get_sfs_str(uint16_t sfs_code, int peri_type, int buff_len, char * buff,
  * structures that are sent across the wire. The FIS register structure is
  * used to move a command from a SATA host to device, but the ATA 'command'
  * is not the first byte. So it is harder to say what will happen if a
- * FIS structure is presented as a SCSI command, hopfully there is a low
+ * FIS structure is presented as a SCSI command, hopefully there is a low
  * probability this function will yield true in that case. */
 bool
 sg_is_scsi_cdb(const uint8_t * cdbp, int clen)

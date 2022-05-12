@@ -138,7 +138,7 @@ usage()
           "field\n"
           "                         (def: clear 'desc' field)\n"
           "    --dry-run|-D         to preparation but bypass SANITIZE "
-          "commnd\n"
+          "command\n"
           "    --early|-e           exit once sanitize started (IMMED set "
           "in cdb)\n"
           "                         user can monitor progress with REQUEST "

@@ -131,12 +131,12 @@ the \fIDEVICE\fR will be queried for the given operation code (i.e. the
 \fIOP\fR value) which is the first byte of a SCSI command. Optionally, if
 a \fISA\fR value is given, it will be used as that SCSI command's service
 action. Note that \fIOP\fR and \fIOP,0\fR are not the same thing, as SCSI
-does allow the service action to be 0 (but it is not comman). \fIOP\fR and
-\fISA\fR are decimal unless prefixed by "0x" or they have a trailing "h".
-\fIOP\fR should be in the range 0 to 255 (0xff) inclusive. \fISA\fR should
-be in the range 0 to 65535 (0xffff) inclusive. When this option is not
-given then all available SCSI commands supported by the \fIDEVICE\fR are
-listed.
+does allow the service action to be 0 (but not in this command). \fIOP\fR
+and \fISA\fR are decimal unless prefixed by "0x" or they have a
+trailing "h". \fIOP\fR should be in the range 0 to 255 (0xff) inclusive.
+\fISA\fR should be in the range 0 to 65535 (0xffff) inclusive. When this
+option is not given then all available SCSI commands supported by the
+\fIDEVICE\fR are listed.
 .TP
 \fB\-p\fR, \fB\-\-pdt\fR=\fIDT\fR
 where \fIDT\fR is the peripheral device type. This is used together with

@@ -63,7 +63,7 @@ static const char * version_str = "1.35 20220217";      /* spc6r06 */
 #define MAX_DEF_INHEX_LEN 8192
 #define SENSE_BUFF_LEN  64      /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
-#define DEF_RESPONSE_LEN 4      /* increased to 64 fo MODE_ERR_HISTORY */
+#define DEF_RESPONSE_LEN 4      /* increased to 64 for MODE_ERR_HISTORY */
 
 
 static struct option long_options[] = {

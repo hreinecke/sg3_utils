@@ -29,7 +29,7 @@
 #    sg_raw --cmdfile=nvme_write_ctl.hex --nvm -s 2048
 #           --infile=t.bin /dev/nvme0
 #
-# Notice the '--nvm' option which is needed to distiguish a NVM
+# Notice the '--nvm' option which is needed to distinguish a NVM
 # command from an Admin command as Admin commands are the default
 # in this utility.
 #

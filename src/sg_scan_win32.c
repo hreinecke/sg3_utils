@@ -103,7 +103,7 @@ usage()
             "scan after\n"
             "                       device scan; default: show no "
             "adapters;\n"
-            "                       used twice: show only adapaters\n"
+            "                       used twice: show only adapters\n"
             "       --verbose|-v    increase verbosity\n"
             "       --version|-V    print version string and exit\n\n"
             "Scan for storage and related device names\n");

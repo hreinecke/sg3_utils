@@ -70,7 +70,7 @@ static char * version_str = "0.63 20190324";
 #define MAX_NUM_THREADS 1024
 
 #ifndef RAW_MAJOR
-#define RAW_MAJOR 255   /*unlikey value */
+#define RAW_MAJOR 255   /*unlikely value */
 #endif
 
 #define FT_OTHER 0              /* filetype other than sg or raw device */

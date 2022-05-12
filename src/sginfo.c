@@ -3012,7 +3012,7 @@ spi4_report_xfer(struct mpage_info * mpi, const char * prefix)
                mpi->subpage);
         printf("--------------------------------------------\n");
     }
-    intfield(pagestart + 6, 1, "Mimimum transfer period factor");
+    intfield(pagestart + 6, 1, "Minimum transfer period factor");
     intfield(pagestart + 8, 1, "Maximum REQ/ACK offset");
     intfield(pagestart + 9, 1, "Maximum transfer width exponent");
     bitfield(pagestart + 10, "Protocol option bits supported", 0xff, 0);

@@ -202,7 +202,7 @@ usage()
             "    fua      1-> set force unit access (FUA) in SCSI READs\n"
             "    if       an sg, block or raw device, or a seekable file (not "
             "stdin)\n"
-            "    mmap     1->perform mmaped IO on sg device, 0->indirect IO "
+            "    mmap     1->perform mmap-ed IO on sg device, 0->indirect IO "
             "(def)\n"
             "    no_dxfer 1->DMA to kernel buffers only, not user space, "
             "0->normal(def)\n"
