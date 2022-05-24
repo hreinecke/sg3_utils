@@ -4,11 +4,11 @@ sg_rep_zones \- send SCSI REPORT ZONES, REALMS or ZONE DOMAINS command
 .SH SYNOPSIS
 .B sg_rep_zones
 [\fI\-\-brief\fR] [\fI\-\-domain\fR] [\fI\-\-find=ZT\fR] [\fI\-\-force\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-locator=LBA\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR] [\fI\-\-partial\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-realm\fR] [\fI\-\-report=OPT\fR]
-[\fI\-\-start=LBA\fR] [\fI\-\-statistics\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-wp\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO\fR]]
+[\fI\-\-locator=LBA\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR]
+[\fI\-\-partial\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-realm\fR]
+[\fI\-\-report=OPT\fR] [\fI\-\-start=LBA\fR] [\fI\-\-statistics\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wp\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -101,6 +101,10 @@ also given then the contents of \fIFN\fR are treated as binary.
 Note that by default this utility assumes then contents are the response
 from a REPORT ZONES command. Use the \fI\-\-domain\fR or \fI\-\-realm\fR
 option for decoding the other two commands.
+.TP
+\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. This is an
+EXPERIMENTAL feature; more information to follow.
 .TP
 \fB\-l\fR, \fB\-\-locator\fR=\fILBA\fR
 where \fILBA\fR plays a similar role as it does in \fI\-\-start=LBA\fR.

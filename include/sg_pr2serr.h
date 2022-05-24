@@ -66,12 +66,15 @@ typedef void * sgj_opaque_p;
  * from the argument given to --json= . If there is no argument then
  * they initialized as shown. */
 typedef struct sgj_state_t {
+    /* the following set by default, the SG3_UTILS_JSON_OPTS envirinment
+     * variable or command line argument to --json option, in that order. */
     bool pr_as_json;            /* = false */
-    bool pr_hex;                /* 'h' (def: true) */
+    bool pr_exit_status;        /* 'e' (def: true) */
+    bool pr_hex;                /* 'h' (def: false) */
     bool pr_leadin;             /* 'l' (def: true) */
     bool pr_output;             /* 'o' (def: false) */
     bool pr_pretty;             /* 'p' (def: true) */
-    bool pr_trailer;            /* 't' (def: true) */
+    bool pr_string;             /* 's' (def: true) */
     char pr_format;             /*  (def: '\0') */
     int pr_indent_size;         /* digit (def: 4) */
     int verbose;                /* 'v' (def: 0) incremented each appearance */
@@ -220,18 +223,19 @@ void sgj_add_name_pair_ihex(sgj_state * jsp, sgj_opaque_p jop,
 
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
- * if jop is NULL) along with a value that has two sub-objects. One is
- * named "i" with 'val_i' rendered as a JSON integer. The other is named
- * 'str_name' (or "string" if that is NULL) with 'val_s' randered as a
- * JSON string. */
+ * if jop is NULL) along with a value. If jsp->pr_string is true then that
+ * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
+ * the other one named str_name with val_s rendered as a JSON string.
+ * If jsp->pr_string is false the there are no sub-objects and the 'val_i' is
+ * rendered as JSON integer. */
 void sgj_add_name_pair_istr(sgj_state * jsp, sgj_opaque_p jop,
                             const char * name, int64_t val_i,
                             const char * str_name, const char * val_s);
 
 /* Nothing in the in-core JSON tree is actually printed to 'fp' (typically
  * stdout) until this call is made. If jsp is NULL, jsp->pr_as_json is false
- * or jsp->basep is NULL then this function does nothing. If jsp->trailer is
- * true then a new JSON object named "exit_status" and the 'exit_status'
+ * or jsp->basep is NULL then this function does nothing. If jsp->exit_status
+ * is true then a new JSON object named "exit_status" and the 'exit_status'
  * value rendered as a JSON integer is appended to jsp->basep. The in-core
  * JSON tree with jsp->basep as its root is streamed to 'fp'. */
 void sgj_pr2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status,

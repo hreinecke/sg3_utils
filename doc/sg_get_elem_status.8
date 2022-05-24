@@ -1,22 +1,32 @@
-.TH SG_GET_ELEM_STATUS "8" "August 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_GET_ELEM_STATUS "8" "May 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_get_elem_status \- send SCSI GET PHYSICAL ELEMENT STATUS command
 .SH SYNOPSIS
 .B sg_get_elem_status
 [\fI\-\-brief\fR] [\fI\-\-filter=FLT\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-inhex=FN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-report\-type=RT\fR] [\fI\-\-starting=ELEM\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO\fR]] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-report\-type=RT\fR]
+[\fI\-\-starting=ELEM\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
 Send the SCSI GET PHYSICAL ELEMENT STATUS command to the \fIDEVICE\fR and
-output the response. The command was introduced in (draft) SBC\-4 revision
+output the response. That command was introduced in (draft) SBC\-4 revision
 16.
 .PP
-The default action is to decode the response into one physical element
-status descriptor per line then output a header and the status descriptors
-to stdout.  The amount of output can be reduced by the \fI\-\-brief\fR option.
+T10 drafts now speak on both physical and storage elements. The latter term
+is more specific and refers to some part of the device that controls storage
+and may or may not be addressable with LBAs. An example of storage elements
+is the heads on a spinning hard disk, with each head being associated with a
+different storage element identifier. When a storage element has been
+"depopulated" its former storage accessed by LBAs are no longer available.
+Physical elements are more general and includes storage elements and might
+include disk storage used for "saved" mode page settings amongst other things.
+.PP
+The default action is to decode the response into a header and up to 32
+physical element status descriptors. The status descriptors are output one
+per line. The amount of output can be reduced by the \fI\-\-brief\fR option.
 .PP
 Rather than send this SCSI command to \fIDEVICE\fR, if the \fI\-\-inhex=FN\fR
 option is given, then the contents of the file named \fIFN\fR are decoded
@@ -26,7 +36,11 @@ as if it was the response of this command.
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-b\fR, \fB\-\-brief\fR
-tbd
+when used once, the output of each physical element status descriptor is
+reduced to: <element_id>: <element_type>,<element_health> . All three are
+output as decimal integers. When used twice the "Element descriptors:"
+lines introducing the status descriptors is not output. When used three
+or more times only the response header is output.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR=\fIFLT\fR
 where \fIFLT\fR is placed in a two bit field called FILTER in the GET
@@ -40,7 +54,14 @@ the number of element descriptors returned. The default value is zero.
 output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-output response to this command in ASCII hex.
+output response to this command in ASCII hex. Each line of 16 bytes is
+preceded by an address or index, starting at 0 and the address is also in
+hex. If given twice then an ASCII rendering of each byte is appended to
+the line output. If given three or more times then only the ASCII hex
+of each byte is output, 16 bytes per line (i.e. so no leading address nor
+trailing ASCII rendering). This latter form is suitable for placing in
+a file and being used with the \fI\-\-inhex=FN\fR option in a later
+invocation.
 .TP
 \fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
 where \fIFN\fR is a file name whose contents are assumed to be ASCII
@@ -50,11 +71,16 @@ a warning is issued and the utility continues, decoding the file named
 sg3_utils manpage for more information. If the \fI\-\-raw\fR option is
 also given then the contents of \fIFN\fR are treated as binary.
 .TP
+\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. This is an
+EXPERIMENTAL feature; more information to follow.
+.TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
-the cdb's "allocation length" field. If not given then 32 is used. 32 is
-enough space for the response header only.
-\fILEN\fR should be a multiple of 32 (e.g. 32, 64, and 96 are suitable).
+the cdb's "allocation length" field. If not given then 1056 is used. 1056 is
+enough space for the response header and 32 physical element status
+descriptors. \fILEN\fR should be a multiple of 32 (e.g. 32, 64, and 96 are
+suitable).
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary (to stdout) unless the \fI\-\-inhex=FN\fR option
@@ -85,6 +111,19 @@ caused by this option is sent to stderr.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
+.SH NOTES
+The "Warning - physical element status change" additional sense
+code [0xb,0x14] is special and should prompt an application client to call
+this SCSI command. How this is triggered depends on the setting in the
+Informational Exceptions Control mode page [0xc, 0x0]. Reports about hard
+disks reporting this warning suggest that the following invocation of
+this utility should use \fI\-\-filter=1 \-\-report\-type=1\fR to try and
+locate an "out\-of\-spec" _storage_ element.
+.PP
+After detecting one or more out\-of\-spec storage elements the disk in
+question should either be decommissioned or have the REMOVE ELEMENT AND
+TRUNCATE (or ... AND MODIFY ZONES) command invoked to repair (and reduce
+the storge capacity) of the disk.
 .SH EXIT STATUS
 The exit status of sg_get_elem_status is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.
@@ -93,7 +132,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2019\-2021 Douglas Gilbert
+Copyright \(co 2019\-2022 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -318,6 +318,7 @@ parse_cmd_line(struct opts_t * op, int argc, char *argv[])
         char *opt = argv[optind++];
         char *endptr;
         int cmd = strtol(opt, &endptr, 16);
+
         if (*opt == '\0' || *endptr != '\0' || cmd < 0x00 || cmd > 0xff) {
             pr2serr("Invalid command byte '%s'\n", opt);
             return SG_LIB_SYNTAX_ERROR;

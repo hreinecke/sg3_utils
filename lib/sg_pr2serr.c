@@ -18,6 +18,9 @@
 #include "sg_pr2serr.h"
 #include "sg_json_builder.h"
 
+
+#define sgj_opts_ev "SG3_UTILS_JSON_OPTS"
+
 /*
  * #define json_serialize_mode_multiline     0
  * #define json_serialize_mode_single_line   1
@@ -74,25 +77,24 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
     bool negate;
     int k, c;
 
-    for (k = 0; j_optarg[k]; ++k) {
+    for (k = 0; j_optarg[k]; ++k) {     /* step over leading whitespace */
+        if (! isspace(j_optarg[k]))
+            break;
+    }
+    for ( ; j_optarg[k]; ++k) {
         c = j_optarg[k];
         negate = false;
         switch (c) {
         case '=':
-        case ' ':
             if (0 == k)
-                break;  /* allow and ignore leading '=' or ' ' */
+                break;  /* allow and ignore leading '=' */
             bad_arg = true;
             if (0 == jsp->first_bad_char)
                 jsp->first_bad_char = c;
             break;
         case '!':
-            negate = true;
-            break;
         case '~':
-            negate = true;
-            break;
-        case 'N':
+        case '-':       /* '-' is probably most practical negation symbol */
             negate = true;
             break;
         case '0':
@@ -107,6 +109,9 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
             break;
         case '8':
             jsp->pr_indent_size = 8;
+            break;
+        case 'e':
+            jsp->pr_exit_status = ! prev_negate;
             break;
         case 'g':
             jsp->pr_format = 'g';
@@ -123,8 +128,8 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
         case 'p':
             jsp->pr_pretty = ! prev_negate;
             break;
-        case 't':
-            jsp->pr_trailer = ! prev_negate;
+        case 's':
+            jsp->pr_string = ! prev_negate;
             break;
         case 'v':
             ++jsp->verbose;
@@ -143,23 +148,40 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
     return ! bad_arg;
 }
 
-bool
-sgj_init_state(sgj_state * jsp, const char * j_optarg)
+static void
+sgj_def_opts(sgj_state * jsp)
 {
     jsp->pr_as_json = true;
+    jsp->pr_exit_status = true;
     jsp->pr_hex = false;
     jsp->pr_leadin = true;
     jsp->pr_output = false;
     jsp->pr_pretty = true;
-    jsp->pr_trailer = true;
+    jsp->pr_string = true;
     jsp->pr_format = 0;
     jsp->first_bad_char = 0;
     jsp->verbose = 0;
     jsp->pr_indent_size = 4;
+}
+
+bool
+sgj_init_state(sgj_state * jsp, const char * j_optarg)
+{
+    const char * cp;
+
+    sgj_def_opts(jsp);
     jsp->basep = NULL;
     jsp->outputp = NULL;
     jsp->userp = NULL;
 
+    cp = getenv(sgj_opts_ev);
+    if (cp) {
+        if (! sgj_parse_opts(jsp, cp)) {
+            pr2ws("error parsing %s environment variable, ignore\n",
+                  sgj_opts_ev);
+            sgj_def_opts(jsp);
+        }
+    }
     return j_optarg ? sgj_parse_opts(jsp, j_optarg) : true;
 }
 
@@ -229,7 +251,7 @@ sgj_pr2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
         fprintf(fp, "%s: all NULL pointers ??\n", __func__);
         return;
     }
-    if ((NULL == jop) && jsp->pr_leadin)
+    if ((NULL == jop) && jsp->pr_exit_status)
          json_object_push(jvp, "exit_status", json_integer_new(exit_status));
 
     memcpy(&out_settings, &def_out_settings, sizeof(out_settings));
@@ -437,7 +459,7 @@ sgj_add_name_pair_istr(sgj_state * jsp, sgj_opaque_p jop,
 {
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
-    else {
+    else if (jsp->pr_string) {
         sgj_opaque_p jo2p =
                  sgj_new_named_object(jsp, (jop ? jop : jsp->basep), name);
         if (NULL == jo2p)
@@ -445,7 +467,8 @@ sgj_add_name_pair_istr(sgj_state * jsp, sgj_opaque_p jop,
         sgj_add_val_i(jsp, jo2p, "i", (int64_t)value);
         if (str)
             sgj_add_val_s(jsp, jo2p, str_name ? str_name : "string", str);
-    }
+    } else
+        sgj_add_val_i(jsp, jop, name, value);
 }
 
 /* Returns number of characters placed in 'out' excluding trailing NULL */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2021 Douglas Gilbert.
+ * Copyright (c) 2019-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,9 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.08 20211114";      /* sbc5r01 */
+static const char * version_str = "1.09 20220524";      /* sbc5r01 */
+
+#define MY_NAME "sg_get_elem_status"
 
 
 #ifndef UINT32_MAX
@@ -45,7 +47,7 @@ static const char * version_str = "1.08 20211114";      /* sbc5r01 */
 #endif
 
 #define GET_PHY_ELEM_STATUS_SA 0x17
-#define DEF_GPES_BUFF_LEN 32
+#define DEF_GPES_BUFF_LEN (1024 + 32)
 #define MAX_GPES_BUFF_LEN ((1024 * 1024) + DEF_GPES_BUFF_LEN)
 #define GPES_DESC_OFFSET 32     /* descriptors starts at this byte offset */
 #define GPES_DESC_LEN 32
@@ -66,21 +68,22 @@ static uint8_t gpesBuff[DEF_GPES_BUFF_LEN];
 
 
 static struct option long_options[] = {
-        {"brief", no_argument, 0, 'b'},
-        {"filter", required_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
-        {"inhex", required_argument, 0, 'i'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"report-type", required_argument, 0, 't'},
-        {"report_type", required_argument, 0, 't'},
-        {"starting", required_argument, 0, 's'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+    {"brief", no_argument, 0, 'b'},
+    {"filter", required_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
+    {"inhex", required_argument, 0, 'i'},
+    {"json", optional_argument, 0, 'j'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"report-type", required_argument, 0, 't'},
+    {"report_type", required_argument, 0, 't'},
+    {"starting", required_argument, 0, 's'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 static void
@@ -88,11 +91,13 @@ usage()
 {
     pr2serr("Usage: sg_get_elem_status  [--brief] [--filter=FLT] [--help] "
             "[--hex]\n"
-            "                           [--inhex=FN] [--maxlen=LEN] [--raw] "
-            "[--readonly]\n"
-            "                           [--report-type=RT] [--starting=ELEM] "
-            "[--verbose]\n"
-            "                           [--version] DEVICE\n"
+            "                           [--inhex=FN] [--json[=JO]] "
+            "[--maxlen=LEN]\n"
+            "                           [--raw] [--readonly] "
+            "[--report-type=RT]\n"
+            "                           [--starting=ELEM] [--verbose] "
+            "[--version]\n"
+            "                           DEVICE\n"
             "  where:\n"
             "    --brief|-b        one descriptor per line\n"
             "    --filter=FLT|-f FLT    FLT is 0 (def) for all physical "
@@ -105,6 +110,8 @@ usage()
             "DEVICE,\n"
             "                        assumed to be ASCII hex or, if --raw, "
             "in binary\n"
+            "    --json[=JO]|-j[JO]     output in JSON instead of human "
+            "readable text\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
@@ -225,6 +232,40 @@ decode_elem_status_desc(const uint8_t * bp, struct gpes_desc_t * pedp)
     pedp->assoc_cap = sg_get_unaligned_be64(bp + 16);
 }
 
+static bool
+fetch_health_str(uint8_t health, char * bp, int max_blen)
+{
+    bool add_val = false;
+    const char * cp = NULL;
+
+    if  (0 == health)
+        cp = "not reported";
+    else if (health < 0x64) {
+        cp = "within manufacturer's specification limits";
+        add_val = true;
+    } else if (0x64 == health) {
+        cp = "at manufacturer's specification limits";
+        add_val = true;
+    } else if (health < 0xd0) {
+        cp = "outside manufacturer's specification limits";
+        add_val = true;
+    } else if (health < 0xfb) {
+        cp = "reserved";
+        add_val = true;
+    } else if (0xfb == health)
+        cp = "depopulation revocation completed, errors detected";
+    else if (0xfc == health)
+        cp = "depopulation revocation in progress";
+    else if (0xfd == health)
+        cp = "depopulation completed, errors detected";
+    else if (0xfe == health)
+        cp = "depopulation operations in progress";
+    else if (0xff == health)
+        cp = "depopulation completed, no errors";
+    snprintf(bp, max_blen, "%s", cp);
+    return add_val;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -234,7 +275,7 @@ main(int argc, char * argv[])
     bool o_readonly = false;
     bool verbose_given = false;
     bool version_given = false;
-    int k, j, n, res, c, rlen, in_len;
+    int k, j, m, n, res, c, rlen, in_len;
     int sg_fd = -1;
     int do_brief = 0;
     int do_hex = 0;
@@ -245,20 +286,27 @@ main(int argc, char * argv[])
     uint8_t filter = 0;
     uint8_t rt = 0;
     uint32_t num_desc, num_desc_ret, id_elem_depop;
-    uint32_t d_blocks = 0;
     uint32_t starting_elem = 0;
     int64_t ll;
     const char * device_name = NULL;
     const char * in_fn = NULL;
+    const char * cp;
     const uint8_t * bp;
     uint8_t * gpesBuffp = gpesBuff;
     uint8_t * free_gpesBuffp = NULL;
+    sgj_opaque_p jop = NULL;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jap = NULL;
     struct gpes_desc_t a_ped;
+    sgj_state json_st = {0};
+    sgj_state * jsp = &json_st;
+    char b[64];
+    static const int blen = sizeof(b);
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bf:hHi:m:rRs:St:TvV", long_options,
+        c = getopt_long(argc, argv, "bf:hHi:j::m:rRs:St:TvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -285,6 +333,13 @@ main(int argc, char * argv[])
             break;
         case 'i':
             in_fn = optarg;
+            break;
+        case 'j':
+            if (! sgj_init_state(&json_st, optarg)) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n", json_st.first_bad_char);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'm':
             maxlen = sg_get_num(optarg);
@@ -370,6 +425,8 @@ main(int argc, char * argv[])
         pr2serr("version: %s\n", version_str);
         return 0;
     }
+    if (jsp->pr_as_json)
+        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
 
     if (maxlen > DEF_GPES_BUFF_LEN) {
         gpesBuffp = (uint8_t *)sg_memalign(maxlen, 0, &free_gpesBuffp,
@@ -448,9 +505,12 @@ start_response:
         pr2serr("Response too short (%d bytes) due to resid (%d)\n", k,
                 resid);
         if ((k > 0) && (do_raw || do_hex)) {
-            if (do_hex)
-                hex2stdout(gpesBuffp, k, 1);
-            else
+            if (do_hex) {
+                if (do_hex > 2)
+                    hex2stdout(gpesBuffp, k, -1);
+                else
+                    hex2stdout(gpesBuffp, k, (2 == do_hex) ? 0 : 1);
+            } else
                 dStrRaw((const char *)gpesBuffp, k);
         }
         ret = SG_LIB_CAT_MALFORMED;
@@ -480,91 +540,77 @@ start_response:
         goto fini;
     }
     if (do_hex) {
-        hex2stdout(gpesBuffp, rlen, 1);
+        if (do_hex > 2)
+            hex2stdout(gpesBuffp, rlen, -1);
+        else
+            hex2stdout(gpesBuffp, rlen,  (2 == do_hex) ? 0 : 1);
         goto fini;
     }
 
-#if 0
-    if (do_brief > 1) {
-        if (rlen < 24) {
-            pr2serr("Need maxlen and response length to be at least 24, "
-                    "have %d bytes\n", rlen);
-            ret = SG_LIB_CAT_OTHER;
-            goto fini;
-        }
-        res = decode_lba_status_desc(gpesBuffp + 8, &d_lba, &d_blocks,
-                                     &add_status);
-        if ((res < 0) || (res > 15)) {
-            pr2serr("first LBA status descriptor returned %d ??\n", res);
-            ret = SG_LIB_LOGIC_ERROR;
-            goto fini;
-        }
-        if ((lba < d_lba) || (lba >= (d_lba + d_blocks))) {
-            pr2serr("given LBA not in range of first descriptor:\n"
-                    "  descriptor LBA: 0x");
-            for (j = 0; j < 8; ++j)
-                pr2serr("%02x", gpesBuffp[8 + j]);
-            pr2serr("  blocks: 0x%x  p_status: %d  add_status: 0x%x\n",
-                    (unsigned int)d_blocks, res,
-                    (unsigned int)add_status);
-            ret = SG_LIB_CAT_OTHER;
-            goto fini;
-        }
-        printf("%d\n", res);
-        goto fini;
-    }
-#endif
-
-    printf("Number of descriptors: %u\n", num_desc);
-    printf("Number of descriptors returned: %u\n", num_desc_ret);
-    printf("Identifier of element being depopulated: %u\n", id_elem_depop);
+    sgj_pr_twin_vi(jsp, jop, 0, "Number of descriptors",
+                   SGJ_SEP_COLON_1_SPACE, num_desc);
+    sgj_pr_twin_vi(jsp, jop, 0, "Number of descriptors returned",
+                   SGJ_SEP_COLON_1_SPACE, num_desc_ret);
+    sgj_pr_twin_vi(jsp, jop, 0, "Identifier of element being depopulated",
+                   SGJ_SEP_COLON_1_SPACE, id_elem_depop);
     if (rlen < 64) {
-        printf("No complete physical element status descriptors available\n");
+        sgj_pr_hr(jsp, "No complete physical element status descriptors "
+                  "available\n");
         goto fini;
-    } else
-        printf("\n");
+    } else {
+        if (do_brief > 2)
+            goto fini;
+        sgj_pr_hr(jsp, "\n");
+    }
 
+    if (jsp->pr_as_json)
+        jap = sgj_new_named_array(jsp, jop,
+                                  "physical_element_status_descriptor");
     for (bp = gpesBuffp + GPES_DESC_OFFSET, k = 0; k < (int)num_desc_ret;
          bp += GPES_DESC_LEN, ++k) {
-        if (0 == k)
-            printf("Element descriptors:\n");
+        if ((0 == k) && (do_brief < 2))
+            sgj_pr_hr(jsp, "Element descriptors:\n");
         decode_elem_status_desc(bp, &a_ped);
-        if (do_brief) {
-            printf("0x");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", bp[j]);
-            printf("  0x%x  %d\n", (unsigned int)d_blocks, res);
-        } else {
-            printf("[%d] identifier: 0x%06x", k + 1, a_ped.elem_id);
-            if (sg_all_ffs((const uint8_t *)&a_ped.assoc_cap, 8))
-                printf("  associated LBs: not specified  ");
-            else
-                printf("  associated LBs: 0x%" PRIx64 "  ", a_ped.assoc_cap);
-            printf("health: ");
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object(jsp);
+            sgj_add_name_pair_ihex(jsp, jo2p, "element_identifier",
+                                   (int64_t)a_ped.elem_id);
+            cp = (1 == a_ped.phys_elem_type) ? "storage" : "reserved";
+            sgj_add_name_pair_istr(jsp, jo2p, "physical_element_type",
+                                   a_ped.phys_elem_type, "meaning", cp);
             j = a_ped.phys_elem_health;
-            if  (0 == j)
-                printf("not reported");
-            else if (j < 0x64)
-                printf("within manufacturer's specification limits <%d>", j);
-            else if (0x64 == j)
-                printf("at manufacturer's specification limits <%d>", j);
-            else if (j < 0xd0)
-                printf("outside manufacturer's specification limits <%d>", j);
-            else if (j < 0xfb)
-                printf("reserved [0x%x]", j);
-            else if (0xfb == j)
-                printf("depopulation revocation completed, errors detected");
-            else if (0xfc == j)
-                printf("depopulation revocation in progress");
-            else if (0xfd == j)
-                printf("depopulation completed, errors detected");
-            else if (0xfe == j)
-                printf("depopulation operations in progress");
-            else if (0xff == j)
-                printf("depopulation completed, no errors");
+            fetch_health_str(j, b, blen);
+            sgj_add_name_pair_istr(jsp, jo2p, "physical_element_health", j,
+                                   "meaning", b);
+            sgj_add_name_pair_ihex(jsp, jo2p, "associated_capacity",
+                                   (int64_t)a_ped.assoc_cap);
+            sgj_add_val_o(jsp, jap, NULL /* name */, jo2p);
+        } else if (do_brief) {
+            sgj_pr_hr(jsp, "%u: %u,%u\n", a_ped.elem_id, a_ped.phys_elem_type,
+                      a_ped.phys_elem_health);
+        } else {
+            char b2[144];
+            static const int b2len = sizeof(b2);
+
+            m = 0;
+            m += sg_scnpr(b2 + m, b2len - m, "[%d] identifier: 0x%06x",
+                          k + 1, a_ped.elem_id);
+            if (sg_all_ffs((const uint8_t *)&a_ped.assoc_cap, 8))
+                m += sg_scnpr(b2 + m, b2len - m,
+                              "  associated LBs: not specified;  ");
+            else
+                m += sg_scnpr(b2 + m, b2len - m, "  associated LBs: 0x%"
+                              PRIx64 ";  ", a_ped.assoc_cap);
+            m += sg_scnpr(b2 + m, b2len - m, "health: ");
+            j = a_ped.phys_elem_health;
+            if (fetch_health_str(j, b, blen))
+                m += sg_scnpr(b2 + m, b2len - m, "%s <%d>", b, j);
+            else
+                m += sg_scnpr(b2 + m, b2len - m, "%s", b);
             if (a_ped.restoration_allowed)
-                printf(" [restoration allowed [RALWD]]");
-            printf("\n");
+                m += sg_scnpr(b2 + m, b2len - m,
+                              " [restoration allowed [RALWD]]");
+            sgj_pr_hr(jsp, "%s\n", b2);
         }
     }
     goto fini;
@@ -597,5 +643,11 @@ fini:
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
     }
-    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    if (jsp->pr_as_json) {
+        if (0 == do_hex)
+            sgj_pr2file(jsp, NULL, ret, stdout);
+        sgj_finish(jsp);
+    }
+    return ret;
 }

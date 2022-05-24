@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.24 20220218";      /* sbc4r15 */
+static const char * version_str = "1.25 20220520";      /* sbc4r15 */
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
@@ -416,7 +416,10 @@ start_response:
         goto fini;
     }
     if (do_hex) {
-        hex2stdout(glbasBuffp, k, 1);
+	if (do_hex > 2)
+	    hex2stdout(glbasBuffp, k, -1);
+	else
+	    hex2stdout(glbasBuffp, k, (2 == do_hex) ? 0 : 1);
         goto fini;
     }
     if (maxlen < 4) {
