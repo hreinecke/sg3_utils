@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.81 20220506";    /* spc6r06 */
+static const char * version_str = "0.82 20220528";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -1346,6 +1346,12 @@ open_rw:                /* if not already open */
     act_len = (rq_len < act_len) ? rq_len : act_len;
 
 start_response:
+    if (act_len < 4) {
+        pr2serr("Actual length of response [%d] is too small\n", act_len);
+        res = SG_LIB_CAT_OTHER;
+        no_final_msg = true;
+        goto err_out;
+    }
     if (op->do_taskman) {
         if (op->do_raw) {
             dStrRaw((const char *)rsoc_buff, act_len);

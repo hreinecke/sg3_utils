@@ -15,23 +15,24 @@ Send the SCSI GET PHYSICAL ELEMENT STATUS command to the \fIDEVICE\fR and
 output the response. That command was introduced in (draft) SBC\-4 revision
 16.
 .PP
-T10 drafts now speak on both physical and storage elements. The latter term
-is more specific and refers to some part of the device that controls storage
-and may or may not be addressable with LBAs. An example of storage elements
-is the heads on a spinning hard disk, with each head being associated with a
-different storage element identifier. When a storage element has been
-"depopulated" its former storage accessed by LBAs are no longer available.
-Physical elements are more general and includes storage elements and might
-include disk storage used for "saved" mode page settings amongst other things.
+T10 drafts now speak of both 'physical' and 'storage' elements. The latter
+term is more specific (i.e. storage elements are a sub\-set of physical
+elements) and refers to disk resources that control user data storage. An
+example of a storage element is the user data associated with a head on a
+spinning hard disk. When a storage element has been "depopulated" its former
+storage accessed via LBAs is no longer available. Physical elements are more
+general and includes storage elements and might include disk resources used
+for "saved" mode page settings amongst other things.
 .PP
-The default action is to decode the response into a header and up to 32
-physical element status descriptors. The status descriptors are output one
-per line. The amount of output can be reduced by the \fI\-\-brief\fR option.
+The default action of this utility is to decode the response into a header
+and up to 32 physical element status descriptors. The status descriptors are
+output one per line. The amount of output can be reduced by the
+\fI\-\-brief\fR option.
 .PP
 Rather than send this SCSI command to \fIDEVICE\fR, if the \fI\-\-inhex=FN\fR
 option is given, then the contents of the file named \fIFN\fR are decoded
 as ASCII hex (or binary if \fI\-\-raw\fR is also given) and then processed
-as if it was the response of this command.
+as if it was the response of the GET PHYSICAL ELEMENT STATUS command.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -39,7 +40,7 @@ Arguments to long options are mandatory for short options as well.
 when used once, the output of each physical element status descriptor is
 reduced to: <element_id>: <element_type>,<element_health> . All three are
 output as decimal integers. When used twice the "Element descriptors:"
-lines introducing the status descriptors is not output. When used three
+line introducing the status descriptors is not output. When used three
 or more times only the response header is output.
 .TP
 \fB\-f\fR, \fB\-\-filter\fR=\fIFLT\fR
@@ -56,12 +57,11 @@ output the usage message then exit.
 \fB\-H\fR, \fB\-\-hex\fR
 output response to this command in ASCII hex. Each line of 16 bytes is
 preceded by an address or index, starting at 0 and the address is also in
-hex. If given twice then an ASCII rendering of each byte is appended to
-the line output. If given three or more times then only the ASCII hex
-of each byte is output, 16 bytes per line (i.e. so no leading address nor
-trailing ASCII rendering). This latter form is suitable for placing in
-a file and being used with the \fI\-\-inhex=FN\fR option in a later
-invocation.
+hex. If given twice then an ASCII rendering of each byte is appended to the
+line output. If given three or more times then only the ASCII hex of each
+byte is output, 16 bytes per line (i.e. so no leading address nor trailing
+ASCII rendering). This latter form is suitable for placing in a file and
+being used with the \fI\-\-inhex=FN\fR option in a later invocation.
 .TP
 \fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
 where \fIFN\fR is a file name whose contents are assumed to be ASCII
@@ -78,7 +78,7 @@ EXPERIMENTAL feature; more information to follow.
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
 the cdb's "allocation length" field. If not given then 1056 is used. 1056 is
-enough space for the response header and 32 physical element status
+enough space for the response header plus 32 physical element status
 descriptors. \fILEN\fR should be a multiple of 32 (e.g. 32, 64, and 96 are
 suitable).
 .TP
@@ -95,14 +95,14 @@ The default is to open it read\-write.
 where \fIRT\fR will be placed in the REPORT TYPE field of the GET PHYSICAL
 ELEMENT STATUS command. Currently only two values are defined: 0
 for 'physical element' and 1: for 'storage element'. The default value
-is 1 .
+is 0 .
 .TP
 \fB\-s\fR, \fB\-\-starting\fR=\fIELEM\fR
-where \fIELEM\fR is the placed in the STARTING ELEMENT field of the GET
-PHYSICAL ELEMENT STATUS command. Only physical elements with identifiers
-equal to or greater than \fIELEM\fR are returned. The default value is zero
-which while it isn't a valid element identifier (since they must be
-non\-zero) is given in an example in Annex L of SBC\-4 revision 17. So
+where \fIELEM\fR is placed in the STARTING ELEMENT field of the GET PHYSICAL
+ELEMENT STATUS command. Only physical elements with identifiers greater
+than, or equal to \fIELEM\fR are returned. The default value is zero
+which, while it isn't a valid element identifier (since they must be
+non\-zero), is given in an example in Annex L of SBC\-4 revision 17. So
 an \fIELEM\fR of zero is assumed to be valid in this context.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
@@ -112,13 +112,10 @@ caused by this option is sent to stderr.
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
 .SH NOTES
-The "Warning - physical element status change" additional sense
-code [0xb,0x14] is special and should prompt an application client to call
-this SCSI command. How this is triggered depends on the setting in the
-Informational Exceptions Control mode page [0xc, 0x0]. Reports about hard
-disks reporting this warning suggest that the following invocation of
-this utility should use \fI\-\-filter=1 \-\-report\-type=1\fR to try and
-locate an "out\-of\-spec" _storage_ element.
+The "Warning - physical element status change" additional sense code [0xb,
+0x14] is special and should prompt an application client to call the GET
+PHYSICAL ELEMENT STATUS command. How this warning is triggered depends on
+the settings in the Informational Exceptions Control mode page [0xc, 0x0].
 .PP
 After detecting one or more out\-of\-spec storage elements the disk in
 question should either be decommissioned or have the REMOVE ELEMENT AND

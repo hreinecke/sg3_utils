@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.09 20220524";      /* sbc5r01 */
+static const char * version_str = "1.10 20220527";      /* sbc5r01 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -132,9 +132,11 @@ usage()
             "    --verbose|-v      increase verbosity\n"
             "    --version|-V      print version string and exit\n\n"
             "Performs a SCSI GET PHYSICAL ELEMENT STATUS command (see SBC-3 "
-            "or SBC-4).\nIf --inhex=FN is given then contents of FN is "
-            "assumed to be a response\nto this command in ASCII hex. "
-            "Returned element descriptors should be\nin ascending "
+            "or SBC-4).\nStorage elements are a sub-set of physical "
+            "elements. Currently the only\ntype of physical element is a "
+            "storage element. If --inhex=FN is given then\ncontents of FN "
+            "is assumed to be a response to this command in ASCII hex.\n"
+            "Returned element descriptors should be in ascending "
             "identifier order.\n"
             );
 }

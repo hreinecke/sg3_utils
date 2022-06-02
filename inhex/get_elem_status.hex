@@ -1,9 +1,51 @@
 #
-# This is a real response to the SCSI GET PHYSICAL ELEMENT STATUS command.
-#    sg_get_elem_status --filter=1 --maxlen=1k --report-type=1 -HHH <dev>
+# The is a real response to the SCSI GET PHYSICAL ELEMENT STATUS command.
+# The storage elements are associated with heads on this hard disk and
+# one of them (element_id: 10) is "out of spec". The same output was
+# obtained with --report-type=1 (report only storage elements) as this
+# invocation (where --report-type defaults to 0: report all physical
+# elements):
+#    sg_get_elem_status -HHH <dev>
+#
+# The hard disk had 9 platters and thus had 18 heads as both side of each
+# platter are used.
 
-00 00 00 01 00 00 00 01  00 00 00 00 00 00 00 00
+00 00 00 12 00 00 00 12  00 00 00 00 00 00 00 00
 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 01  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 02  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 03  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 04  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 05  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 06  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 07  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 08  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 09  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
 00 00 00 00 00 00 00 0a  00 00 00 00 00 00 01 65
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 0b  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 0c  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 0d  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 0e  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 0f  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 10  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 11  00 00 00 00 00 00 01 01
+ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 12  00 00 00 00 00 00 01 01
 ff ff ff ff ff ff ff ff  00 00 00 00 00 00 00 00
 
