@@ -148,7 +148,7 @@ set_scsi_pt_cdb(struct sg_pt_base * vp, const unsigned char * cdb,
         if (ptp->raw_command.command[i])
             ++ptp->in_err;
     memcpy(ptp->raw_command.command, cdb, cdb_len);
-    ptp->raw_command.command_length = (uint8)cdb_len;
+    ptp->raw_command.command_length = (uint8_t)cdb_len;
 }
 
 void

@@ -65,10 +65,10 @@ feed. All other command line options and arguments are ignored.
 \fB\-f\fR, \fB\-\-file\fR=\fIHFN\fR
 the sense data is read in ASCII hexadecimal from a file called \fIHFN\fR.
 The sense data should appear as a sequence of bytes separated by space,
-comma, tab or newline. Everything from and including a hash symbol to the
-end of that line is ignored. If \fI\-\-nospace\fR is set then no separator
-is required between the ASCII hexadecimal digits in \fIHFN\fR with bytes
-decoded from pairs of ASCII hexadecimal digits.
+comma, tab, hyphen or newline. Everything from and including a hash symbol
+to the end of that line is ignored. If \fI\-\-nospace\fR is set then no
+separator is required between the ASCII hexadecimal digits in \fIHFN\fR
+with bytes decoded from pairs of ASCII hexadecimal digits.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 output the usage message then exit.
@@ -82,6 +82,11 @@ starting with "0x3b,0x07,0x00,0xff").
 In other cases (i.e. when \fI\-\-write=WFN\fR is not given, or this option
 is given more than once) then the output is as described in the sg3_utils(8)
 manpage.
+.br
+The combination of \fI\-\-inhex=HFN\fR and this option used three times
+can be useful to converting hexadecimal bytes (e.g. hyphen separated) into
+a more regular form. The short option form is more convenient for invoking
+this option three times (e.g. '\-HHH').
 .TP
 \fB\-i\fR, \fB\-\-inhex\fR=\fIHFN\fR
 same action as \fI\-\-file=HFN\fR. This option was added for compatibility

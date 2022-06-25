@@ -1,0 +1,94 @@
+.TH SG_REM_REST_ELEM "8" "June 2022" "sg3_utils\-1.48" SG3_UTILS
+.SH NAME
+sg_rem_rest_elem \- send SCSI remove or restore element command
+.SH SYNOPSIS
+.B sg_rem_rest_elem
+[\fI\-\-capacity=RC\fR] [\fI\-\-element=EID\fR] [\fI\-\-help\fR]
+[\fI\-\-quick\fR] [\fI\-\-remove\fR] [\fI\-\-restore\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+.PP
+Sends a SCSI REMOVE ELEMENT AND TRUNCATE [RMEAT] or RESTORE ELEMENTS AND
+REBUILD [RSEAB] command to the \fIDEVICE\fR. Since both these commands have
+a potentially huge impact on the \fIDEVICE\fR (similar to the FORMAT UNIT
+command: destroying data and taking a long time to complete fully),
+neither is executed by default.
+.PP
+Unlike the FORMAT UNIT command, these commands seem designed to work in
+the background. So they will return quickly (although sbc5r01.pdf does not
+state that) and the disk will be placed in a reduced functionality state
+where only a specified number of commands will be executed (e.g. INQUIRY and
+REPORT LUNS) until the operation is complete. Other commands will receive
+sense data with a sense key of NOT READY and an additional sense code
+of 'Depopulation in progress' (for RMEAT) or 'Depopulation restoration in
+progress' (for RSEAB).
+.PP
+The REMOVE ELEMENT AND TRUNCATE has a close relative in ZBC\-2 called the
+REMOVE ELEMENT AND MODIFY ZONES [RMEMZ] command. See the sg_zone utility
+for an implementation of the latter command.
+.br
+The difference between RMEAT and RMEMZ is that the former "changes the
+association between LBAs and physical blocks" and the latter does not
+change that association. Zones affected by the RMEMZ command are placed
+into the zone condition: "Offline".
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-c\fR, \fB\-\-capacity\fR=\fIRC\fR
+RC stands for Requested Capacity and is the number of logical blocks the
+\fIDEVICE\fR should have after the element is removed with the RMEAT
+command. The default value is 0 which allows the \fIDEVICE\fR to decide
+what the reduced capacity will be after the element removal. The RSEAB
+command ignores this value.
+.TP
+\fB\-e\fR, \fB\-\-element\fR=\fIEID\fR
+where \fIEID\fR is an element identifier which is a 32 bit unsigned integer
+starting at one. This field is used by the RMEAT command and ignored
+otherwise. The default value is zero (which is invalid). So the user needs
+to supply a valid element identifier when \fI\-\-remove\fR is used.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-q\fR, \fB\-\-quick\fR
+the default action (i.e. when this option is not given) is to give the user
+15 seconds to reconsider doing a remove or restore element operation on the
+\fIDEVICE\fR.  When this option is given that step (i.e. the 15 second
+warning period) is bypassed.
+.TP
+\fB\-r\fR, \fB\-\-remove\fR
+causes the REMOVE ELEMENT AND TRUNCATE command to be sent to the
+\fIDEVICE\fR. In practice, \fI\-\-element=EID\fR needs to be also given.
+.TP
+\fB\-R\fR, \fB\-\-restore\fR
+causes the RESTORE ELEMENTS AND REBUILD command to be sent to the
+\fIDEVICE\fR.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH NOTES
+Once an element is removed successfully it is termed as "depopulated".
+Depopulated elements that have the 'Restoration Allowed' (RALWD) bit
+set (see sg_get_elem_status) are candidates for future restoration.
+.PP
+A (storage) element of a rotating hard disk is once side of a platter
+typically associated with one head. Such hard disks typically have multiple
+platters with two heads per platter (i.e. one head each side of the platter).
+.SH EXIT STATUS
+The exit status of sg_rem_rest_elem is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2022 Douglas Gilbert
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_get_elem_status,sg_zone(sg3_utils)

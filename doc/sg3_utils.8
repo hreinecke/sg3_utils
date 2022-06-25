@@ -739,10 +739,10 @@ be given as "0x100" or "100h".
 .SH FORMAT OF FILES CONTAINING ASCII HEX
 Such a file is assumed to contain a sequence of one or two digit ASCII
 hexadecimal values separated by whitespace. "Whitespace consists of either
-spaces, tabs, blank lines, or any combination thereof". Each one or two digit
-ASCII hex pair is decoded into a byte (i.e. 8 bits). The following will be
-decoded to valid (ascending valued)
-bytes: '0', '01', '3', 'c', 'F', '4a', 'cC', 'ff'.
+spaces, tabs, blank lines, or any combination thereof". Hyphens (e.g. '\-')
+are also allowed as separators. Each one or two digit ASCII hex pair is
+decoded into a byte (i.e. 8 bits). The following will be decoded to
+valid (ascending valued) bytes: '0', '01', '3', 'c', 'F', '4a', 'cC', 'ff'.
 Lines containing only whitespace are ignored. The contents of any line
 containing a hash mark ('#') is ignored from that point until the end of that
 line. Users are encouraged to use hash marks to introduce comments in hex

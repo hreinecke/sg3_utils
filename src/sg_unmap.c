@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2018 Douglas Gilbert.
+ * Copyright (c) 2009-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,16 +29,6 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-#if defined(MSC_VER) || defined(__MINGW32__)
-#define HAVE_MS_SLEEP
-#endif
-
-#ifdef HAVE_MS_SLEEP
-#include <windows.h>
-#define sleep_for(seconds)    Sleep( (seconds) * 1000)
-#else
-#define sleep_for(seconds)    sleep(seconds)
-#endif
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -46,7 +36,7 @@
  * logical blocks. Note that DATA MAY BE LOST.
  */
 
-static const char * version_str = "1.17 20180628";
+static const char * version_str = "1.18 20220608";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -676,25 +666,14 @@ main(int argc, char * argv[])
 
             printf("%s is:  %.8s  %.16s  %.4s\n", device_name,
                    inq_resp.vendor, inq_resp.product, inq_resp.revision);
-            sleep_for(3);
+            sg_sleep_secs(3);
             if (to_end_of_device)
-                snprintf(b, sizeof(b), "LBA 0x%" PRIx64 " to end of %s "
-                         "(0x%" PRIx64 ")", all_start, device_name, all_last);
+                snprintf(b, sizeof(b), "%s from LBA 0x%" PRIx64 " to end "
+                         "(0x%" PRIx64 ")", device_name, all_start, all_last);
             else
-                snprintf(b, sizeof(b), "LBA 0x%" PRIx64 " to 0x%" PRIx64
-                         " on %s", all_start, all_last, device_name);
-            printf("\nAn UNMAP (a.k.a. trim) will commence in 15 seconds\n");
-            printf("    ALL data from %s will be LOST\n", b);
-            printf("        Press control-C to abort\n");
-            sleep_for(5);
-            printf("\nAn UNMAP will commence in 10 seconds\n");
-            printf("    ALL data from %s will be LOST\n", b);
-            printf("        Press control-C to abort\n");
-            sleep_for(5);
-            printf("\nAn UNMAP (a.k.a. trim) will commence in 5 seconds\n");
-            printf("    ALL data from %s will be LOST\n", b);
-            printf("        Press control-C to abort\n");
-            sleep_for(7);
+                snprintf(b, sizeof(b), "%s from LBA 0x%" PRIx64 " to 0x%"
+                         PRIx64, device_name, all_start, all_last);
+            sg_warn_and_wait("UNMAP (a.k.a. trim)", b, false);
         }
         if (dry_run) {
             pr2serr("Doing dry-run, would have unmapped from LBA 0x%" PRIx64
@@ -757,19 +736,19 @@ retry:
         if (! do_force) {
             printf("%s is:  %.8s  %.16s  %.4s\n", device_name,
                    inq_resp.vendor, inq_resp.product, inq_resp.revision);
-            sleep_for(3);
+            sg_sleep_secs(3);
             printf("\nAn UNMAP (a.k.a. trim) will commence in 15 seconds\n");
             printf("    Some data will be LOST\n");
             printf("        Press control-C to abort\n");
-            sleep_for(5);
+            sg_sleep_secs(5);
             printf("\nAn UNMAP will commence in 10 seconds\n");
             printf("    Some data will be LOST\n");
             printf("        Press control-C to abort\n");
-            sleep_for(5);
+            sg_sleep_secs(5);
             printf("\nAn UNMAP (a.k.a. trim) will commence in 5 seconds\n");
             printf("    Some data will be LOST\n");
             printf("        Press control-C to abort\n");
-            sleep_for(7);
+            sg_sleep_secs(7);
         }
         res = sg_ll_unmap_v2(sg_fd, anchor, grpnum, timeout, param_arr,
                              param_len, true, vb);

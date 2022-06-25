@@ -263,13 +263,14 @@ subdirectory of the sg3_utils package:
     sg_luns, sg_map, sg_map26, sg_modes, sg_opcodes, sg_persist, sg_prevent,
     sg_raw, sg_rbuf, sg_rdac, sg_read, sg_read_attr, sg_readcap,
     sg_read_block_limits, sg_read_buffer, sg_read_long, sg_reassign,
-    sg_referrals, sg_rep_pip, sg_rep_zones, sg_request, sg_reset, sg_rmsn,
-    sg_rtpg, sg_safte, sg_sanitize, sg_sat_identify, sg_sat_phy_event,
-    sg_sat_read_gplog, sg_sat_set_features, sg_scan, sg_seek, sg_senddiag,
-    sg_ses, sg_ses_microcode, sg_start, sg_stpg, sg_stream_ctl, sg_sync,
-    sg_test_rwbuff, sg_timestamp, sg_turs, sg_unmap, sg_verify, sg_vpd,
-    sg_write_buffer, sg_write_long, sg_write_same, sg_write_verify,
-    sg_write_x, sg_wr_mode, sg_xcopy, sg_zone, sg_z_act_query
+    sg_referrals, sg_rem_rest_elem, sg_rep_density, sg_rep_pip, sg_rep_zones,
+    sg_request, sg_reset, sg_rmsn, sg_rtpg, sg_safte, sg_sanitize,
+    sg_sat_identify, sg_sat_phy_event, sg_sat_read_gplog, sg_sat_set_features,
+    sg_scan, sg_seek, sg_senddiag, sg_ses, sg_ses_microcode, sg_start,
+    sg_stpg, sg_stream_ctl, sg_sync, sg_test_rwbuff, sg_timestamp, sg_turs,
+    sg_unmap, sg_verify, sg_vpd, sg_write_buffer, sg_write_long,
+    sg_write_same, sg_write_verify, sg_write_x, sg_wr_mode, sg_xcopy, sg_zone,
+    sg_z_act_query
 
 Each of the above utilities depends on header files found in the 'include'
 subdirectory and library code found in the 'lib' subdirectory. Associated
@@ -541,4 +542,4 @@ See https://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert		dgilbert@interlog.com
-18th November 2021
+10th June 2022

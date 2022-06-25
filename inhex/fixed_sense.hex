@@ -1,0 +1,5 @@
+# Test fixed format sense data. Values are in hex.
+# Invocation: 'sg_decode_sense -f fixed_sense.hex'   [dpg 20220622]
+
+f0 00 03 00 00 12 34 0a  00 00 00 00 11 00 77 80
+01 98

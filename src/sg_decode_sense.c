@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2021 Douglas Gilbert.
+ * Copyright (c) 2010-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,9 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.25 20211119";
+static const char * version_str = "1.27 20220624";
+
+#define MY_NAME "sg_decode_sense"
 
 #define MAX_SENSE_LEN 4096 /* max descriptor format actually: 255+8 */
 
@@ -44,6 +46,7 @@ static struct option long_options[] = {
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
     {"in", required_argument, 0, 'i'},          /* don't advertise */
+    {"json", optional_argument, 0, 'j'},
     {"inhex", required_argument, 0, 'i'},       /* same as --file */
     {"nodecode", no_argument, 0, 'N'},
     {"nospace", no_argument, 0, 'n'},
@@ -73,6 +76,7 @@ struct opts_t {
     int verbose;
     const char * wfname;
     const char * no_space_str;
+    sgj_state json_st;
     uint8_t sense[MAX_SENSE_LEN + 4];
 };
 
@@ -85,10 +89,10 @@ usage()
   pr2serr("Usage: sg_decode_sense [--binary=BFN] [--cdb] [--err=ES] "
           "[--file=HFN]\n"
           "                       [--help] [--hex] [--inhex=HFN] "
-          "[--nodecode]\n"
-          "                       [--nospace] [--status=SS] [--verbose] "
-          "[--version]\n"
-          "                       [--write=WFN] H1 H2 H3 ...\n"
+          "[--json[=JO]]\n"
+          "                       [--nodecode] [--nospace] [--status=SS] "
+          "[--verbose]\n"
+          "                       [--version] [--write=WFN] H1 H2 H3 ...\n"
           "  where:\n"
           "    --binary=BFN|-b BFN    BFN is a file name to read sense "
           "data in\n"
@@ -106,8 +110,16 @@ usage()
           "    --hex|-H              used together with --write=WFN, to "
           "write out\n"
           "                          C language style ASCII hex (instead "
-          "of binary)\n"
+          "of binary).\n"
+          "                          Otherwise don't decode, output incoming "
+          "data in\n"
+          "                          hex (used '-HH' or '-HHH' for different "
+          "formats)\n"
           "    --inhex=HFN|-i HFN    same as action as --file=HFN\n"
+          "    --json[=JO]|-j[JO]    output in JSON instead of human "
+          "readable text.\n"
+          "                          Optional argument JO see sg3_utils "
+          "manpage\n"
           "    --nodecode|-N         do not decode, may be neither sense "
           "nor cdb\n"
           "    --nospace|-n          no spaces or other separators between "
@@ -138,7 +150,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     char *endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:ce:f:hHi:nNs:vVw:", long_options,
+        c = getopt_long(argc, argv, "b:ce:f:hHi:j::nNs:vVw:", long_options,
                         NULL);
         if (c == -1)
             break;
@@ -178,6 +190,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case '?':
             op->do_help = true;
             return 0;
+        case 'H':
+            op->hex_count++;
+            break;
         case 'i':
             if (op->fname) {
                 pr2serr("expect only one '--binary=BFN', '--file=HFN' or "
@@ -187,8 +202,12 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->file_given = true;
             op->fname = optarg;
             break;
-        case 'H':
-            op->hex_count++;
+       case 'j':
+            if (! sgj_init_state(&op->json_st, optarg)) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n", op->json_st.first_bad_char);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'n':
             op->no_space = true;
@@ -298,6 +317,7 @@ write2wfn(FILE * fp, struct opts_t * op)
 int
 main(int argc, char *argv[])
 {
+    bool as_json;
     int k, err, blen;
     int ret = 0;
     unsigned int ui;
@@ -305,6 +325,9 @@ main(int argc, char *argv[])
     struct opts_t * op;
     FILE * fp = NULL;
     const char * cp;
+    sgj_state * jsp;
+    sgj_opaque_p jop = NULL;
+    sgj_opaque_p jo2p;
     char b[2048];
     struct opts_t opts;
 
@@ -341,6 +364,10 @@ main(int argc, char *argv[])
         usage();
         return 0;
     }
+    as_json = op->json_st.pr_as_json;
+    jsp = &op->json_st;
+    if (as_json)
+        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
 
     if (op->err_given) {
         char d[128];
@@ -368,29 +395,35 @@ main(int argc, char *argv[])
                     isxdigit((uint8_t)cp[k + 1]); k += 2) {
             if (1 != sscanf(cp + k, "%2x", &ui)) {
                 pr2serr("bad no_space hex string: %s\n", cp);
-                return SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_SYNTAX_ERROR;
+                goto fini;
             }
             op->sense[op->sense_len++] = (uint8_t)ui;
         }
     }
 
     if ((0 == op->sense_len) && (! op->do_binary) && (! op->file_given)) {
-        if (op->do_status)
-            return 0;
+        if (op->do_status) {
+            ret = 0;
+            goto fini;
+        }
         pr2serr(">> Need sense/cdb/arbitrary data on the command line or "
                 "in a file\n\n");
         usage();
-        return SG_LIB_SYNTAX_ERROR;
+        ret = SG_LIB_SYNTAX_ERROR;
+        goto fini;
     }
     if (op->sense_len && (op->do_binary || op->file_given)) {
         pr2serr(">> Need sense data on command line or in a file, not "
                 "both\n\n");
-        return SG_LIB_CONTRADICT;
+        ret = SG_LIB_CONTRADICT;
+        goto fini;
     }
     if (op->do_binary && op->file_given) {
         pr2serr(">> Either a binary file or a ASCII hexadecimal, file not "
                 "both\n\n");
-        return SG_LIB_CONTRADICT;
+        ret = SG_LIB_CONTRADICT;
+        goto fini;
     }
 
     if (op->do_binary) {
@@ -399,13 +432,15 @@ main(int argc, char *argv[])
             err = errno;
             pr2serr("unable to open file: %s: %s\n", op->fname,
                     safe_strerror(err));
-            return sg_convert_errno(err);
+            ret = sg_convert_errno(err);
+            goto fini;
         }
         s = fread(op->sense, 1, MAX_SENSE_LEN, fp);
         fclose(fp);
         if (0 == s) {
             pr2serr("read nothing from file: %s\n", op->fname);
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto fini;
         }
         op->sense_len = s;
     } else if (op->file_given) {
@@ -413,7 +448,7 @@ main(int argc, char *argv[])
                            &op->sense_len, MAX_SENSE_LEN);
         if (ret) {
             pr2serr("unable to decode ASCII hex from file: %s\n", op->fname);
-            return ret;
+            goto fini;
         }
     }
 
@@ -463,11 +498,39 @@ main(int argc, char *argv[])
             sg_get_opcode_sa_name(opcode, sa, 0, blen, b);
             printf("%s\n", b);
         } else {
-            sg_get_sense_str(NULL, op->sense, op->sense_len,
-                             op->verbose, blen, b);
+            if (as_json)
+                sgj_get_sense(jsp, jop, op->sense, op->sense_len);
+            else
+                sg_get_sense_str(NULL, op->sense, op->sense_len,
+                                 op->verbose, blen, b);
             printf("%s\n", b);
         }
     }
 fini:
+   if (as_json) {
+
+#if 0
+// <<<<   testing
+// uint8_t dd[] = {0x1, 0x0, 0x0, 0x6, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+
+uint8_t dd[] = {0x01, 0x00, 0x00, 0x16, 0x11, 0x22, 0x33, 0x44 , 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
+                0xdd, 0xee, 0xff, 0xed, 0xcb, 0xa9, 0x87, 0x65 , 0x43, 0x21};
+
+// uint8_t dd[] = {0x2, 0x1, 0x0, 0x14,
+//              0x41, 0x42, 0x43, 0x20, 0x20, 0x20, 0x20, 0x20,
+//              0x58, 0x59, 0x5a, 0x31, 0x32, 0x33, 0x34, 0x35,  0x36, 0x37, 0x38, 0x39};
+
+// uint8_t dd[] = {0x01, 0x03, 0x00, 0x08, 0x51, 0x22, 0x33, 0x44,  0x55, 0x66, 0x77, 0x88};
+// uint8_t dd[] = {0x01, 0x03, 0x00, 0x10, 0x61, 0x22, 0x33, 0x44,  0x55, 0x66, 0x77, 0x88, 0xaa, 0xbb, 0xcc, 0xdd,  0xee, 0xff, 0xee, 0xdd};
+
+jo2p = sgj_new_named_object(jsp, jop, "designation_descriptor");
+sgj_get_designation_descriptor(jsp, jo2p, dd, sizeof(dd));
+// <<<< end of testing
+#endif
+
+        if (0 == op->hex_count)
+            sgj_pr2file(&op->json_st, NULL, ret, stdout);
+        sgj_finish(jsp);
+    }
     return ret;
 }

@@ -23,6 +23,8 @@ https://sg.danny.cz/sg/sg_io.html
 https://sg.danny.cz/sg/tools.html
     - overview of around 25 storage and SCSI tools
 
+Many of those pages are also found at: https://doug-gilbert.github.io/
+
 
 There are two versions of sg_scan: one for Linux and the other for Windows.
 They have different man pages: sg_scan.8.linux and sg_scan.8.win32 with
@@ -31,4 +33,4 @@ sg_scan.8 . sg_scan is not supported for other ports.
 
 
 Douglas Gilbert
-16th April 2021
+10th June 2022

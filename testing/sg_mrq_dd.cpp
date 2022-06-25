@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.41 20220413";
+static const char * version_str = "1.42 20220615";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -1912,7 +1912,7 @@ normal_in_rd(Rq_elem * rep, int64_t lba, int blocks, int d_boff)
 
         if (clp->in_flags.zero && clp->in_flags.ff && (rep->bs >= 4)) {
             uint32_t pos = (uint32_t)lba;
-            uint off;
+            uint32_t off;
 
             for (k = 0, off = 0; k < blocks; ++k, off += rep->bs, ++pos) {
                 for (j = 0; j < (rep->bs - 3); j += 4)

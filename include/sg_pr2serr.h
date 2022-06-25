@@ -69,6 +69,7 @@ typedef struct sgj_state_t {
     /* the following set by default, the SG3_UTILS_JSON_OPTS envirinment
      * variable or command line argument to --json option, in that order. */
     bool pr_as_json;            /* = false */
+    bool pr_ane;        /* 'a' abbreviated name expansion (def: false) */
     bool pr_exit_status;        /* 'e' (def: true) */
     bool pr_hex;                /* 'h' (def: false) */
     bool pr_leadin;             /* 'l' (def: true) */
@@ -121,7 +122,7 @@ sgj_opaque_p sgj_start(const char * util_name, const char * ver_str,
  * object or array. If jsp is NULL or jsp->pr_as_json is false nothing happens
  * and NULL is returned. Note that this JSON object is _not_ placed in the
  * in-core tree controlled by jsp (jsp->basep); it may be added later as the
- * third argument to sgj_add_array_element(), for example. */
+ * fourth argument to sgj_add_nv_o(), for example. */
 sgj_opaque_p sgj_new_unattached_object(sgj_state * jsp);
 sgj_opaque_p sgj_new_unattached_array(sgj_state * jsp);
 
@@ -150,8 +151,8 @@ sgj_opaque_p sgj_new_named_array(sgj_state * jsp, sgj_opaque_p jop,
  * 'value'. If 'name' is NULL then 'jop' is assumed to be a JSON array and
  * a JSON string formed from 'value' is added. If successful returns a
  * a pointer newly formed JSON string. */
-sgj_opaque_p sgj_add_val_s(sgj_state * jsp, sgj_opaque_p jop,
-                           const char * name, const char * value);
+sgj_opaque_p sgj_add_nv_s(sgj_state * jsp, sgj_opaque_p jop,
+                          const char * name, const char * value);
 
 /* If either jsp is NULL or jsp->pr_as_json is false then nothing happens and
  * NULL is returned. The insertion point is at jop but if it is NULL
@@ -160,8 +161,8 @@ sgj_opaque_p sgj_add_val_s(sgj_state * jsp, sgj_opaque_p jop,
  * 'value'. If 'name' is NULL then 'jop' is assumed to be a JSON array and
  * a JSON integer formed from 'value' is added. If successful returns a
  * a pointer newly formed JSON integer. */
-sgj_opaque_p sgj_add_val_i(sgj_state * jsp, sgj_opaque_p jop,
-                           const char * name, int64_t value);
+sgj_opaque_p sgj_add_nv_i(sgj_state * jsp, sgj_opaque_p jop,
+                          const char * name, int64_t value);
 
 /* If either jsp is NULL or jsp->pr_as_json is false then nothing happens and
  * NULL is returned. The insertion point is at jop but if it is NULL
@@ -170,8 +171,8 @@ sgj_opaque_p sgj_add_val_i(sgj_state * jsp, sgj_opaque_p jop,
  * 'value'. If 'name' is NULL then 'jop' is assumed to be a JSON array and
  * a JSON boolean formed from 'value' is added. If successful returns a
  * a pointer newly formed JSON boolean. */
-sgj_opaque_p sgj_add_val_b(sgj_state * jsp, sgj_opaque_p jop,
-                           const char * name, bool value);
+sgj_opaque_p sgj_add_nv_b(sgj_state * jsp, sgj_opaque_p jop,
+                          const char * name, bool value);
 
 /* If jsp is NULL, jsp->pr_as_json is false or ua_jop is NULL nothing then
  * happens and NULL is returned. 'jop' is the insertion point but if it is
@@ -179,13 +180,13 @@ sgj_opaque_p sgj_add_val_b(sgj_state * jsp, sgj_opaque_p jop,
  * object is added using 'name' and the associated value is ua_jop. If 'name'
  * is NULL then 'jop' is assumed to be a JSON array and ua_jop is added to
  * it. If successful returns ua_jop . The "ua_" prefix stands for unattached.
- * Tha should be the case before invocation and it will be attached to jop
+ * That should be the case before invocation and it will be attached to jop
  * after a successful invocation. This means that ua_jop must have been
  * created by sgj_new_unattached_object() or similar. */
-sgj_opaque_p sgj_add_val_o(sgj_state * jsp, sgj_opaque_p jop,
-                           const char * name, sgj_opaque_p ua_jop);
+sgj_opaque_p sgj_add_nv_o(sgj_state * jsp, sgj_opaque_p jop,
+                          const char * name, sgj_opaque_p ua_jop);
 
-/* The '_twin_' refers to generating output both for human readable and/or
+/* The '_hr_js_' refers to generating output both for human readable and/or
  * JSON with a single invocation. If jsp is non_NULL and jsp->pr_output is
  * true then both JSON and human readable output is formed (and the latter is
  * placed in the jsp->outputp JSON array). The human readable form will have
@@ -196,41 +197,74 @@ sgj_opaque_p sgj_add_val_o(sgj_state * jsp, sgj_opaque_p jop,
  * made from 'value' is added to the JSON array pointed to by 'jop'.
  * Otherwise a 'name'-d JSON object whose value is a JSON string object made
  * from 'value' is added at 'jop'. */
-void sgj_pr_twin_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                    const char * name, enum sgj_separator_t sep,
-                    const char * value);
+void sgj_pr_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                     const char * name, enum sgj_separator_t sep,
+                     const char * value);
 
-/* Similar to sgj_pr_twin_vs()'s description with 'JSON string object'
+/* Similar to sgj_pr_hr_js_vs()'s description with 'JSON string object'
  * replaced by 'JSON integer object'. */
-void sgj_pr_twin_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                    const char * name, enum sgj_separator_t sep,
-                    int64_t value);
+void sgj_pr_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                     const char * name, enum sgj_separator_t sep,
+                     int64_t value);
 
-/* Similar to sgj_pr_twin_vs()'s description with 'JSON string object'
+/* Similar to sgj_pr_hr_js_vs()'s description with 'JSON string object'
  * replaced by 'JSON boolean object'. */
-void sgj_pr_twin_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                    const char * name, enum sgj_separator_t sep, bool value);
+void sgj_pr_hr_js_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                     const char * name, enum sgj_separator_t sep, bool value);
 
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
  * if jop is NULL) along with a value. If jsp->pr_hex is true then that
  * value is two sub-objects, one named 'i' with a 'value' as a JSON integer,
  * the other one named 'hex' with 'value' rendered as hex in a JSON string.
- * If jsp->pr_hex is false the there are no sub-objects and the 'value' is
+ * If jsp->pr_hex is false then there are no sub-objects and the 'value' is
  * rendered as JSON integer. */
-void sgj_add_name_pair_ihex(sgj_state * jsp, sgj_opaque_p jop,
-                            const char * name, uint64_t value);
+void sgj_add_nv_ihex(sgj_state * jsp, sgj_opaque_p jop,
+                     const char * name, uint64_t value);
 
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
  * if jop is NULL) along with a value. If jsp->pr_string is true then that
  * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
- * the other one named str_name with val_s rendered as a JSON string.
- * If jsp->pr_string is false the there are no sub-objects and the 'val_i' is
- * rendered as JSON integer. */
-void sgj_add_name_pair_istr(sgj_state * jsp, sgj_opaque_p jop,
-                            const char * name, int64_t val_i,
-                            const char * str_name, const char * val_s);
+ * the other one named str_name with val_s rendered as a JSON string. If
+ * str_name is NULL then "meaning" will be used. If jsp->pr_string is false
+ * then there are no sub-objects and the 'val_i' is rendered as a JSON
+ * integer. */
+void sgj_add_nv_istr(sgj_state * jsp, sgj_opaque_p jop,
+                     const char * name, int64_t val_i,
+                     const char * str_name, const char * val_s);
+
+void sgj_add_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop,
+                        const char * name, int64_t val_i,
+                        const char * str_name, const char * val_s);
+
+/* This function only produces JSON output if jsp is non-NULL and
+ * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
+ * if jop is NULL) along with a value. If jsp->pr_ane is true then that
+ * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
+ * the other one named "abbreviated_name_expansion" with value ane_s rendered
+ * as a JSON string. If jsp->pr_hex and 'want_hex' are true, then a
+ * sub-object named 'hex' with a value rendered as a hex string equal to
+ * val_i. If jsp->pr_ane is false and either jsp->pr_hex or want_hex are
+ * false then there are no sub-objects and the 'val_i' is rendered as a JSON
+ * integer. */
+void sgj_add_nv_ihex_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                         int64_t val_i, bool want_hex, const char * ane_s);
+
+void sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop,
+                            const char * name, int64_t val_i, bool want_hex,
+                            const char * str_name, const char * val_s,
+                            const char * ane_s);
+
+/* This function only produces JSON output if jsp is non-NULL and
+ * jsp->pr_as_json is true. 'sbp' is assumed to point to sense data as
+ * defined by T10 with a length of 'sb_len' bytes. Returns false if an
+ * issue is detetected, else it returns true. */
+bool sgj_get_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
+                   int sb_len);
+
+bool sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
+                                    const uint8_t * ddp, int dd_len);
 
 /* Nothing in the in-core JSON tree is actually printed to 'fp' (typically
  * stdout) until this call is made. If jsp is NULL, jsp->pr_as_json is false

@@ -1558,6 +1558,6 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
             return 0;
         }
     } else
-        pr2serr("Vendor VPD page=0x%x  failed to fetch", op->vpd_pn);
+        pr2serr("Vendor VPD page=0x%x  failed to fetch\n", op->vpd_pn);
     return res;
 }

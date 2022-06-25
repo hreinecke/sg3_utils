@@ -68,7 +68,8 @@ main(int argc, char * argv[])
         printf("jv2p->type=%d\n", jv2p->type);
     else
         printf("jv2p is NULL\n");
-    ja2p = json_array_push(ja1p, json_string_new("hello world 99"));
+    ja2p = json_array_push(ja1p, json_string_new(
+                "test double quote, etc: \" world \\ 99\t\ttwo tabs"));
     if (ja2p)
         printf("ja2p->type=%d\n", ja2p->type);
     else

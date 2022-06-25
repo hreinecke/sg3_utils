@@ -325,7 +325,8 @@ sg_get_sense_key_str(int sense_key, int buff_len, char * buff)
 
 /* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
 char *
-sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
+sg_get_additional_sense_str(int asc, int ascq, bool add_sense_leadin,
+                            int buff_len, char * buff)
 {
     int k, num, rlen;
     bool found = false;
@@ -341,7 +342,10 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
             (ascq >= ei2p->ascq_min)  &&
             (ascq <= ei2p->ascq_max)) {
             found = true;
-            num = sg_scnpr(buff, buff_len, "Additional sense: ");
+            if (add_sense_leadin)
+                num = sg_scnpr(buff, buff_len, "Additional sense: ");
+            else
+                num = 0;
             rlen = buff_len - num;
             sg_scnpr(buff + num, ((rlen > 0) ? rlen : 0), ei2p->text, ascq);
         }
@@ -355,7 +359,10 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
         if (eip->asc == asc &&
             eip->ascq == ascq) {
             found = true;
-            sg_scnpr(buff, buff_len, "Additional sense: %s", eip->text);
+            if (add_sense_leadin)
+                sg_scnpr(buff, buff_len, "Additional sense: %s", eip->text);
+            else
+                sg_scnpr(buff, buff_len, "%s", eip->text);
         }
     }
     if (! found) {
@@ -369,6 +376,13 @@ sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
             sg_scnpr(buff, buff_len, "ASC=%02x, ASCQ=%02x (hex)", asc, ascq);
     }
     return buff;
+}
+
+/* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
+char *
+sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff)
+{
+    return sg_get_additional_sense_str(asc, ascq, true, buff_len, buff);
 }
 
 /* Attempt to find the first SCSI sense data descriptor that matches the
@@ -829,7 +843,7 @@ sg_get_desig_assoc_str(int val)
 
 static const char * desig_type_str_arr[] =
 {
-    "vendor specific [0x0]",
+    "Vendor specific [0x0]",
     "T10 vendor identification",
     "EUI-64 based",
     "NAA",
@@ -979,7 +993,6 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
     if (piv && ((1 == assoc) || (2 == assoc)))
         n += sg_scnpr(b + n, blen - n, "%s     transport: %s\n", lip,
                       sg_get_trans_proto_str(p_id, sizeof(e), e));
-    /* printf("    associated with the %s\n", sdparm_assoc_arr[assoc]); */
     switch (desig_type) {
     case 0: /* vendor specific */
         k = 0;
@@ -1049,7 +1062,7 @@ sg_get_designation_descriptor_str(const char * lip, const uint8_t * ddp,
         }
         ccc_id = sg_get_unaligned_be64(ip + ci_off);
         n += sg_scnpr(b + n, blen - n, "%s      IEEE identifier: 0x%"
-                      PRIx64 "x\n", lip, ccc_id);
+                      PRIx64 "\n", lip, ccc_id);
         if (12 == dlen) {
             d_id = sg_get_unaligned_be32(ip + 8);
             n += sg_scnpr(b + n, blen - n, "%s      Directory ID: 0x%x\n",
@@ -1405,10 +1418,10 @@ uds_referral_descriptor_str(char * b, int blen, const uint8_t * dp,
                   !!(dp[2] & 0x1));
     dp += 4;
     for (k = 0, f = 1; (k + 4) < dlen; k += g, dp += g, ++f) {
-        int tpgd = dp[3];
+        int ntpgd = dp[3];
         uint64_t ull;
 
-        g = (tpgd * 4) + 20;
+        g = (ntpgd * 4) + 20;
         n += sg_scnpr(b + n, blen - n, "%s    Descriptor %d\n", lip, f);
         if ((k + g) > dlen) {
             n += sg_scnpr(b + n, blen - n, "%s      truncated descriptor, "
@@ -1421,7 +1434,7 @@ uds_referral_descriptor_str(char * b, int blen, const uint8_t * dp,
         ull = sg_get_unaligned_be64(dp + 12);
         n += sg_scnpr(b + n, blen - n, "%s      last uds LBA:  0x%" PRIx64
                       "\n", lip, ull);
-        for (j = 0; j < tpgd; ++j) {
+        for (j = 0; j < ntpgd; ++j) {
             tp = dp + 20 + (j * 4);
             decode_tpgs_state(tp[0] & 0xf, c, sizeof(c));
             n += sg_scnpr(b + n, blen - n, "%s        tpg: %d  state: %s\n",
@@ -1453,10 +1466,10 @@ sg_get_sense_descriptors_str(const char * lip, const uint8_t * sbp,
     uint16_t sct_sc;
     bool processed;
     const uint8_t * descp;
-    const char * dtsp = "   >> descriptor too short";
-    const char * eccp = "Extended copy command";
-    const char * ddp = "destination device";
     char z[64];
+    static const char * dtsp = "   >> descriptor too short";
+    static const char * eccp = "Extended copy command";
+    static const char * ddp = "destination device";
 
     if ((NULL == b) || (blen <= 0))
         return 0;
@@ -1821,8 +1834,8 @@ sg_get_sense_str(const char * lip, const uint8_t * sbp, int sb_len,
     if (NULL == lip)
         lip = "";
     if ((NULL == sbp) || (sb_len < 1)) {
-            n += sg_scnpr(cbp, cblen, "%s >>> sense buffer empty\n", lip);
-            return n;
+        n += sg_scnpr(cbp, cblen, "%s >>> sense buffer empty\n", lip);
+        return n;
     }
     resp_code = 0x7f & sbp[0];
     valid_info_fld = !!(sbp[0] & 0x80);
@@ -2811,17 +2824,14 @@ safe_strerror(int errnum)
     return errstr;
 }
 
-static void
+static int
 trimTrailingSpaces(char * b)
 {
-    int k;
+    int n = strlen(b);
 
-    for (k = ((int)strlen(b) - 1); k >= 0; --k) {
-        if (' ' != b[k])
-            break;
-    }
-    if ('\0' != b[k + 1])
-        b[k + 1] = '\0';
+    while ((n > 0) && (' ' == b[n - 1]))
+        b[--n] = '\0';
+    return n;
 }
 
 /* Read binary starting at 'str' for 'len' bytes and output as ASCII
@@ -2932,22 +2942,23 @@ dStrHexErr(const char* str, int len, int no_ascii)
 #define DSHS_LINE_BLEN 160      /* maximum characters per line */
 #define DSHS_BPL 16             /* bytes per line */
 
-/* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
- * separated) to 'b' not to exceed 'b_len' characters. Each line
- * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
- * per line with an extra space between the 8th and 9th bytes. 'format'
- * is 0 for repeat in printable ASCII ('.' for non printable chars) to
- * right of each line; 1 don't (so just output ASCII hex). Note that
- * an address is not printed on each line preceding the hex data. Returns
- * number of bytes written to 'b' excluding the trailing '\0'.
- * The only difference between dStrHexStr() and hex2str() is the type of
- * the first argument. */
+/* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space separated)
+ * to 'b' not to exceed 'b_len' characters. Each line starts with 'leadin'
+ * (NULL for no leadin) and there are 16 bytes per line with an extra space
+ * between the 8th and 9th bytes. 'oformat' is 0 for repeat in printable ASCII
+ * ('.' for non printable chars) to right of each line; 1 don't (so just
+ * output ASCII hex). If 'oformat' is 2 output same as 1 but any LFs are
+ * replaced by space (and trailing spaces are trimmed). Note that an address
+ * is not printed on each line preceding the hex data. Returns number of bytes
+ * written to 'b' excluding the trailing '\0'. The only difference between
+ * dStrHexStr() and hex2str() is the type of the first argument. */
 int
-dStrHexStr(const char * str, int len, const char * leadin, int format,
+dStrHexStr(const char * str, int len, const char * leadin, int oformat,
            int b_len, char * b)
 {
+    bool want_ascii = (0 == oformat);
+    char lf_or = (oformat > 1) ? ' ' : '\n';
     int bpstart, bpos, k, n, prior_ascii_len;
-    bool want_ascii;
     char buff[DSHS_LINE_BLEN + 2];      /* allow for trailing null */
     char a[DSHS_BPL + 1];               /* printable ASCII bytes or '.' */
     const char * p = str;
@@ -2959,7 +2970,6 @@ dStrHexStr(const char * str, int len, const char * leadin, int format,
     }
     if (b_len <= 0)
         return 0;
-    want_ascii = !format;
     if (want_ascii) {
         memset(a, ' ', DSHS_BPL);
         a[DSHS_BPL] = '\0';
@@ -2995,9 +3005,9 @@ dStrHexStr(const char * str, int len, const char * leadin, int format,
                               prior_ascii_len, buff, a);
                 memset(a, ' ', DSHS_BPL);
             } else
-                n += sg_scnpr(b + n, b_len - n, "%s\n", buff);
+                n += sg_scnpr(b + n, b_len - n, "%s%c", buff, lf_or);
             if (n >= (b_len - 1))
-                return n;
+                goto fini;
             memset(buff, ' ', DSHS_LINE_BLEN);
             bpos = bpstart;
             if (bpstart > 0)
@@ -3011,8 +3021,11 @@ dStrHexStr(const char * str, int len, const char * leadin, int format,
             n += sg_scnpr(b + n, b_len - n, "%-*s   %s\n", prior_ascii_len,
                           buff, a);
         else
-            n += sg_scnpr(b + n, b_len - n, "%s\n", buff);
+            n += sg_scnpr(b + n, b_len - n, "%s%c", buff, lf_or);
     }
+fini:
+    if (oformat > 1)
+        n = trimTrailingSpaces(b);
     return n;
 }
 
@@ -3029,14 +3042,14 @@ hex2stderr(const uint8_t * b_str, int len, int no_ascii)
 }
 
 int
-hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
+hex2str(const uint8_t * b_str, int len, const char * leadin, int oformat,
         int b_len, char * b)
 {
-    return dStrHexStr((const char *)b_str, len, leadin, format, b_len, b);
+    return dStrHexStr((const char *)b_str, len, leadin, oformat, b_len, b);
 }
 
 void
-hex2fp(const uint8_t * b_str, int len, const char * leadin, int format,
+hex2fp(const uint8_t * b_str, int len, const char * leadin, int oformat,
        FILE * fp)
 {
     int k, num;
@@ -3048,7 +3061,7 @@ hex2fp(const uint8_t * b_str, int len, const char * leadin, int format,
     }
     for (k = 0; k < len; k += num) {
         num = ((k + 64) < len) ? 64 : (len - k);
-        hex2str(b_str + k, num, leadin, format, sizeof(b), b);
+        hex2str(b_str + k, num, leadin, oformat, sizeof(b), b);
         fprintf(fp, "%s", b);
     }
 }
@@ -3393,7 +3406,7 @@ sg_get_llnum(const char * buf)
         buf += n;
         len -= n;
     }
-    /* following hack to keep C++ happy */
+    /* following cast hack to keep C++ happy */
     cp = strpbrk((char *)buf, " \t,#-");
     if (cp) {
         len = cp - buf;
@@ -3542,11 +3555,12 @@ sg_get_llnum_nomult(const char * buf)
 
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as
  * stdin). If reading ASCII hex then there should be either one entry per
- * line or a comma, space or tab separated list of bytes. If no_space is
- * set then a string of ACSII hex digits is expected, 2 per byte. Everything
- * from and including a '#' on a line is ignored. Returns 0 if ok, or an
- * error code. If the error code is SG_LIB_LBA_OUT_OF_RANGE then mp_arr
- * would be exceeded and both mp_arr and mp_arr_len are written to. */
+ * line or a comma, space, hyphen or tab separated list of bytes. If
+ * no_space is * set then a string of ACSII hex digits is expected, 2 per
+ * byte. Everything from and including a '#' on a line is ignored. Returns
+ * 0 if ok, or an error code. If the error code is
+ * SG_LIB_LBA_OUT_OF_RANGE then mp_arr would be exceeded and both mp_arr
+ * and mp_arr_len are written to. */
 int
 sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
              uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
@@ -3682,7 +3696,7 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
         in_len -= m;
         if ('#' == *lcp)
             continue;
-        k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
+        k = strspn(lcp, "0123456789aAbBcCdDeEfF ,-\t");
         if ((k < in_len) && ('#' != lcp[k]) && ('\r' != lcp[k])) {
             pr2ws("%s: syntax error at line %d, pos %d\n", __func__,
                     j + 1, m + k + 1);
@@ -3730,10 +3744,10 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                         goto fini;
                     } else
                         mp_arr[off + k] = h;
-                    lcp = strpbrk(lcp, " ,\t");
+                    lcp = strpbrk(lcp, " ,-\t");
                     if (NULL == lcp)
                         break;
-                    lcp += strspn(lcp, " ,\t");
+                    lcp += strspn(lcp, " ,-\t");
                     if ('\0' == *lcp)
                         break;
                 } else {
@@ -3829,6 +3843,41 @@ sg_get_page_size(void)
 #else
     return 4096;     /* give up, pick likely figure */
 #endif
+}
+
+#if defined(SG_LIB_WIN32)
+#if defined(MSC_VER) || defined(__MINGW32__)
+/* windows.h already included above */
+#define sg_sleep_for(seconds)    Sleep( (seconds) * 1000)
+#else
+#define sg_sleep_for(seconds)    sleep(seconds)
+#endif
+#else
+#define sg_sleep_for(seconds)    sleep(seconds)
+#endif
+
+void
+sg_sleep_secs(int num_secs)
+{
+    sg_sleep_for(num_secs);
+}
+
+void
+sg_warn_and_wait(const char * cmd_name, const char * dev_name,
+                 bool stress_all)
+{
+    int k;
+    const char * stressp = stress_all ? "ALL d" : "D";
+    const char * will_mayp = stress_all ? "will" : "may";
+
+    for (k = 0; k < 3; ++k) {
+        printf("\nA %s command will commence in 15 seconds\n", cmd_name);
+        printf("    %sata on %s %s be DESTROYED%s\n", stressp, dev_name,
+               will_mayp, (stress_all ? "" : " or modified"));
+        printf("        Press control-C to abort\n");
+        sg_sleep_secs(5);
+    }
+    sg_sleep_secs(1);
 }
 
 /* Returns pointer to heap (or NULL) that is aligned to a align_to byte

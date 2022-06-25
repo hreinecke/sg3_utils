@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.19 20220118";
+static const char * version_str = "2.20 20220616";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -1893,7 +1893,7 @@ normal_in_rd(Rq_elem * rep, int blocks)
 
         if (clp->in_flags.zero && clp->in_flags.ff && (rep->bs >= 4)) {
             uint32_t pos = (uint32_t)rep->iblk;
-            uint off;
+            uint32_t off;
 
             for (k = 0, off = 0; k < blocks; ++k, off += rep->bs, ++pos) {
                 for (j = 0; j < (rep->bs - 3); j += 4)

@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.66 20220211";
+static const char * version_str = "1.67 20220607";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -57,17 +57,6 @@ static const char * version_str = "1.66 20220211";
 #define DEF_POLL_TYPE_RS false     /* false -> test unit ready;
                                       true -> request sense */
 #define MAX_BUFF_SZ     252
-
-#if defined(MSC_VER) || defined(__MINGW32__)
-#define HAVE_MS_SLEEP
-#endif
-
-#ifdef HAVE_MS_SLEEP
-#include <windows.h>
-#define sleep_for(seconds)    Sleep( (seconds) * 1000)
-#else
-#define sleep_for(seconds)    sleep(seconds)
-#endif
 
 /* FORMAT UNIT (SBC) and FORMAT MEDIUM (SSC) share the same opcode */
 #define SG_FORMAT_MEDIUM_CMD 0x4
@@ -508,7 +497,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                                     POLL_DURATION_SECS;
         if (! op->poll_type) {
                 for(first = true; ; first = false) {
-                        sleep_for(poll_wait_secs);
+                        sg_sleep_secs(poll_wait_secs);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
                                              true, (vb > 1) ? (vb - 1) : 0);
@@ -537,7 +526,7 @@ scsi_format_unit(int fd, const struct opts_t * op)
                         return sg_convert_errno(ENOMEM);
                 }
                 for(first = true; ; first = false) {
-                        sleep_for(poll_wait_secs);
+                        sg_sleep_secs(poll_wait_secs);
                         memset(reqSense, 0x0, MAX_BUFF_SZ);
                         res = sg_ll_request_sense(fd, false, reqSense,
                                                   MAX_BUFF_SZ, false,
@@ -629,7 +618,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
         }
         if (! op->poll_type) {
                 for(first = true; ; first = false) {
-                        sleep_for(POLL_DURATION_SECS);
+                        sg_sleep_secs(POLL_DURATION_SECS);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
                                              true, (vb > 1) ? (vb - 1) : 0);
@@ -658,7 +647,7 @@ scsi_format_medium(int fd, const struct opts_t * op)
                         return sg_convert_errno(ENOMEM);
                 }
                 for(first = true; ; first = false) {
-                        sleep_for(POLL_DURATION_SECS);
+                        sg_sleep_secs(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, MAX_BUFF_SZ);
                         res = sg_ll_request_sense(fd, false, reqSense,
                                                   MAX_BUFF_SZ, false,
@@ -748,7 +737,7 @@ scsi_format_with_preset(int fd, const struct opts_t * op)
         }
         if (! op->poll_type) {
                 for(first = true; ; first = false) {
-                        sleep_for(POLL_DURATION_SECS);
+                        sg_sleep_secs(POLL_DURATION_SECS);
                         progress = -1;
                         res = sg_ll_test_unit_ready_progress(fd, 0, &progress,
                                              true, (vb > 1) ? (vb - 1) : 0);
@@ -777,7 +766,7 @@ scsi_format_with_preset(int fd, const struct opts_t * op)
                         return sg_convert_errno(ENOMEM);
                 }
                 for(first = true; ; first = false) {
-                        sleep_for(POLL_DURATION_SECS);
+                        sg_sleep_secs(POLL_DURATION_SECS);
                         memset(reqSense, 0x0, MAX_BUFF_SZ);
                         res = sg_ll_request_sense(fd, false, reqSense,
                                                   MAX_BUFF_SZ, false,
@@ -1680,24 +1669,8 @@ again_sp_false:
 
         if (op->format) {
 format_only:
-                if (op->quick)
-                        goto skip_f_unit_reconsider;
-                printf("\nA FORMAT UNIT will commence in 15 seconds\n");
-                printf("    ALL data on %s will be DESTROYED\n",
-                       op->device_name);
-                printf("        Press control-C to abort\n");
-                sleep_for(5);
-                printf("\nA FORMAT UNIT will commence in 10 seconds\n");
-                printf("    ALL data on %s will be DESTROYED\n",
-                       op->device_name);
-                printf("        Press control-C to abort\n");
-                sleep_for(5);
-                printf("\nA FORMAT UNIT will commence in 5 seconds\n");
-                printf("    ALL data on %s will be DESTROYED\n",
-                       op->device_name);
-                printf("        Press control-C to abort\n");
-                sleep_for(5);
-skip_f_unit_reconsider:
+                if (! op->quick)
+                    sg_warn_and_wait("FORMAT UNIT", op->device_name, true);
                 res = scsi_format_unit(fd, op);
                 ret = res;
                 if (res) {
@@ -1712,24 +1685,8 @@ skip_f_unit_reconsider:
 format_med:
         if (! op->poll_type_given) /* SSC-5 specifies REQUEST SENSE polling */
                 op->poll_type = true;
-        if (op->quick)
-                goto skip_f_med_reconsider;
-        printf("\nA FORMAT MEDIUM will commence in 15 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n",
-               op->device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-        printf("\nA FORMAT MEDIUM will commence in 10 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n",
-               op->device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-        printf("\nA FORMAT MEDIUM will commence in 5 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n",
-               op->device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-skip_f_med_reconsider:
+        if (! op->quick)
+            sg_warn_and_wait("FORMAT MEDIUM", op->device_name, true);
         res = scsi_format_medium(fd, op);
         ret = res;
         if (res) {
@@ -1740,24 +1697,8 @@ skip_f_med_reconsider:
         goto out;
 
 format_with_pre:
-        if (op->quick)
-                goto skip_f_with_pre_reconsider;
-        printf("\nA FORMAT WITH PRESET will commence in 15 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n",
-               op->device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-        printf("\nA FORMAT WITH PRESET will commence in 10 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n",
-               op->device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-        printf("\nA FORMAT WITH PRESET will commence in 5 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n",
-               op->device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-skip_f_with_pre_reconsider:
+        if (! op->quick)
+            sg_warn_and_wait("FORMAT WITH PRESET", op->device_name, true);
         res = scsi_format_with_preset(fd, op);
         ret = res;
         if (res) {

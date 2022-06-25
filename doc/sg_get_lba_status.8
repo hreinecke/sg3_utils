@@ -1,10 +1,11 @@
-.TH SG_GET_LBA_STATUS "8" "August 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_GET_LBA_STATUS "8" "June 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_get_lba_status \- send SCSI GET LBA STATUS(16 or 32) command
 .SH SYNOPSIS
 .B sg_get_lba_status
-[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-brief\fR] [\fI\-\-element-id=EI\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR]  [\fI\-\-inhex=FN\fR] [\fI\-\-lba=LBA\fR]
+[\fI\-\-16\fR] [\fI\-\-32\fR] [\fI\-\-blockhex\fR] [\fI\-\-brief\fR]
+[\fI\-\-element-id=EI\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
+[\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO\fR]] [\fI\-\-lba=LBA\fR]
 [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
 [\fI\-\-report\-type=RT\fR] [\fI\-\-scan-len=SL\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] \fIDEVICE\fR
@@ -56,6 +57,13 @@ option is not given) is output to stdout. A check is made that the given
 it should according to SBC\-3 revision 20) and warnings are sent to stderr
 if it doesn't.
 .TP
+\fB\-B\fR, \fB\-\-blockhex\fR
+the number of blocks in each LBA status descriptor is usually displayed in
+decimal. An exception is when the \fI\-\-brief\fR option is given in which
+case it is shown in hexadecimal. When the option is given once, both cases
+are output in hexadecimal. When the option is given twice, both cases are
+output in decimal.
+.TP
 \fB\-e\fR, \fB\-\-element\-id\fR=\fIEI\fR
 where \fIEI\fR is the element identifier of the physical element for which
 the LBAs shall be reported based on the value in the report type field (i.e.
@@ -77,6 +85,10 @@ hexadecimal bytes. See the "FORMAT OF FILES CONTAINING ASCII HEX" section
 in the sg3_utils manpage for more information. If \fIDEVICE\fR is also
 given then it is ignored. If the \fI\-\-raw\fR option is also given then
 the contents of \fIFN\fR are treated as binary.
+.TP
+\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. This is an
+EXPERIMENTAL feature; more information to follow.
 .TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
 where \fILBA\fR is the starting Logical Block Address (LBA) to check the
@@ -141,7 +153,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2019 Douglas Gilbert
+Copyright \(co 2009\-2022 Douglas Gilbert
 .br
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

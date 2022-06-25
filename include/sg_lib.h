@@ -230,8 +230,15 @@ int sg_get_sense_key(const uint8_t * sensep, int sense_len);
 /* Yield string associated with sense_key value. Returns 'buff'. */
 char * sg_get_sense_key_str(int sense_key, int buff_len, char * buff);
 
-/* Yield string associated with ASC/ASCQ values. Returns 'buff'. */
+/* Yield string associated with ASC/ASCQ values. Returns 'buff'. Prefixes
+ * any valid additional sense found with "Additional sense: ". */
 char * sg_get_asc_ascq_str(int asc, int ascq, int buff_len, char * buff);
+
+/* Same as sg_get_asc_ascq_str() when add_sense_leadin is true. When it is
+ * false this function does _not_ prefix any valid additional sense found
+ * with "Additional sense: ". */
+char * sg_get_additional_sense_str(int asc, int ascq, bool add_sense_leadin,
+                                   int buff_len, char * buff);
 
 /* Returns true if valid bit set, false if valid bit clear. Irrespective the
  * information field is written out via 'info_outp' (except when it is
@@ -584,6 +591,25 @@ int sg_vpd_dev_id_iter(const uint8_t * initial_desig_desc, int page_len,
  * If errnum is negative, flip its sign. */
 char * safe_strerror(int errnum);
 
+/* Not all platforms support the Unix sleep(seconds) function. */
+void sg_sleep_secs(int num_secs);
+
+/* There are several SCSI commands that are very destructive for the user
+ * data stored on a device. The FORMAT UNIT command is the prime example
+ * but there are an increasing number of newer SCSI commands that remove or
+ * destroy some or all of the user's data. This function takes 15 seconds,
+ * divided into three parts, saying that 'cmd_name' will be executed on
+ * 'dev_name' and then waits for 5 seconds inviting the user to press
+ * control-C to abort the operation. After three such prompts the function
+ * returns and the utility start to execute the "dangerous" SCSI command,
+ * Utilities that use this function usually have a --quick option to bypass
+ * this call. That may be appropriate if the utility in question is called
+ * from a script or in background processing. If 'stress_all' is true then
+ * state "ALL data" will be lost, if false drop the "ALL". */
+void
+sg_warn_and_wait(const char * cmd_name, const char * dev_name,
+                 bool stress_all);
+
 
 /* Print (to stdout) 'str' of bytes in hex, 16 bytes per line optionally
  * followed at the right hand side of the line with an ASCII interpretation.
@@ -607,24 +633,24 @@ void dStrHexErr(const char * str, int len, int no_ascii);
  * 'no_ascii' selects one of 3 output format types as shown in dStrHex() . */
 void dStrHexFp(const char* str, int len, int no_ascii, FILE * fp);
 
-/* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space
- * separated) to 'b' not to exceed 'b_len' characters. Each line
- * starts with 'leadin' (NULL for no leadin) and there are 16 bytes
- * per line with an extra space between the 8th and 9th bytes. 'format'
- * is 0 for repeat in printable ASCII ('.' for non printable chars) to
- * right of each line; 1 don't (so just output ASCII hex). Note that
- * an address is not printed on each line preceding the hex data. Returns
- * number of bytes written to 'b' excluding the trailing '\0'.
- * The only difference between dStrHexStr() and hex2str() is the type of
- * the first argument. */
-int dStrHexStr(const char * str, int len, const char * leadin, int format,
+/* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space separated)
+ * to 'b' not to exceed 'b_len' characters. Each line starts with 'leadin'
+ * (NULL for no leadin) and there are 16 bytes per line with an extra space
+ * between the 8th and 9th bytes. 'oformat' is 0 for repeat in printable ASCII
+ * ('.' for non printable chars) to right of each line; 1 don't (so just
+ * output ASCII hex). If 'oformat' is 2 output same as 1 but any LFs are
+ * replaced by space (and trailing spaces are trimmed). Note that an address
+ * is not printed on each line preceding the hex data. Returns number of bytes
+ * written to 'b' excluding the trailing '\0'. The only difference between
+ * dStrHexStr() and hex2str() is the type of the first argument. */
+int dStrHexStr(const char * str, int len, const char * leadin, int oformat,
                int cb_len, char * cbp);
-int hex2str(const uint8_t * b_str, int len, const char * leadin, int format,
+int hex2str(const uint8_t * b_str, int len, const char * leadin, int oformat,
             int cb_len, char * cbp);
 
 /* Similar to hex2str() but outputs to file pointed to be fp */
-void hex2fp(const uint8_t * b_str, int len, const char * leadin, int format,
-	    FILE * fp);
+void hex2fp(const uint8_t * b_str, int len, const char * leadin, int oformat,
+            FILE * fp);
 
 /* The following 2 functions are equivalent to dStrHex() and dStrHexErr()
  * respectively. The difference is only the type of the first of argument:
@@ -635,11 +661,12 @@ void hex2stderr(const uint8_t * b_str, int len, int no_ascii);
 
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as
  * stdin). If reading ASCII hex then there should be either one entry per
- * line or a comma, space or tab separated list of bytes. If no_space is
- * set then a string of ACSII hex digits is expected, 2 per byte. Everything
- * from and including a '#' on a line is ignored. Returns 0 if ok, or an
- * error code. If the error code is SG_LIB_LBA_OUT_OF_RANGE then mp_arr
- * would be exceeded and both mp_arr and mp_arr_len are written to. */
+ * line or a comma, space, hyphen or tab separated list of bytes. If
+ * no_space is * set then a string of ACSII hex digits is expected, 2 per
+ * byte. Everything from and including a '#' on a line is ignored. Returns
+ * 0 if ok, or an error code. If the error code is
+ * SG_LIB_LBA_OUT_OF_RANGE then mp_arr would be exceeded and both mp_arr
+ * and mp_arr_len are written to. */
 int sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                  uint8_t * mp_arr, int * mp_arr_len, int max_arr_len);
 

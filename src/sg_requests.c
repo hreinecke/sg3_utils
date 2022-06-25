@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2021 Douglas Gilbert.
+ * Copyright (c) 2004-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.39 20211114";
+static const char * version_str = "1.40 20220607";
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -44,17 +44,6 @@ static const char * version_str = "1.39 20211114";
 
 #define REQUEST_SENSE_CMD 0x3
 #define REQUEST_SENSE_CMDLEN 6
-
-/* Not all environments support the Unix sleep() */
-#if defined(MSC_VER) || defined(__MINGW32__)
-#define HAVE_MS_SLEEP
-#endif
-#ifdef HAVE_MS_SLEEP
-#include <windows.h>
-#define sleep_for(seconds)    Sleep( (seconds) * 1000)
-#else
-#define sleep_for(seconds)    sleep(seconds)
-#endif
 
 #define ME "sg_requests: "
 
@@ -309,7 +298,7 @@ main(int argc, char * argv[])
         for (k = 0; k < num_rs; ++k) {
             act_din_len = 0;
             if (k > 0)
-                sleep_for(30);
+                sg_sleep_secs(30);
             set_scsi_pt_cdb(ptvp, rs_cdb, sizeof(rs_cdb));
             set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
             memset(rsBuff, 0x0, sizeof(rsBuff));

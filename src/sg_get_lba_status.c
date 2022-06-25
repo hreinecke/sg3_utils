@@ -35,14 +35,16 @@
  * device.
  */
 
-static const char * version_str = "1.25 20220520";      /* sbc4r15 */
+static const char * version_str = "1.27 20220616";      /* sbc5r01 */
+
+#define MY_NAME "sg_get_lba_status"
 
 #ifndef UINT32_MAX
 #define UINT32_MAX ((uint32_t)-1)
 #endif
 
 #define MAX_GLBAS_BUFF_LEN (1024 * 1024)
-#define DEF_GLBAS_BUFF_LEN 24
+#define DEF_GLBAS_BUFF_LEN 1024
 #define MIN_MAXLEN 16
 
 static uint8_t glbasFixedBuff[DEF_GLBAS_BUFF_LEN];
@@ -52,12 +54,14 @@ static struct option long_options[] = {
         {"16", no_argument, 0, 'S'},
         {"32", no_argument, 0, 'T'},
         {"brief", no_argument, 0, 'b'},
+        {"blockhex", no_argument, 0, 'B'},
         {"element-id", required_argument, 0, 'e'},
         {"element_id", required_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
         {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
         {"inhex", required_argument, 0, 'i'},
+        {"json", optional_argument, 0, 'j'},
         {"lba", required_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"raw", no_argument, 0, 'r'},
@@ -74,17 +78,20 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    pr2serr("Usage: sg_get_lba_status  [--16] [--32][--brief] "
-            "[--element-id=EI]\n"
-            "                          [--help] [--hex] [--inhex=FN] "
-            "[--lba=LBA]\n"
-            "                          [--maxlen=LEN] [--raw] [--readonly]\n"
+    pr2serr("Usage: sg_get_lba_status  [--16] [--32] [--blockhex] "
+            "[--brief]\n"
+            "                          [--element-id=EI] [--help] [--hex] "
+            "[--inhex=FN]\n"
+            "                          [--lba=LBA] [--maxlen=LEN] [--raw] "
+            "[--readonly]\n"
             "                          [--report-type=RT] [--scan-len=SL] "
             "[--verbose]\n"
             "                          [--version] DEVICE\n"
             "  where:\n"
             "    --16|-S           use GET LBA STATUS(16) cdb (def)\n"
             "    --32|-T           use GET LBA STATUS(32) cdb\n"
+            "    --blockhex|-B     outputs the (number of) blocks field "
+            " in hex\n"
             "    --brief|-b        a descriptor per line:\n"
             "                          <lba_hex blocks_hex p_status "
             "add_status>\n"
@@ -98,6 +105,8 @@ usage()
             "DEVICE,\n"
             "                        assumed to be ASCII hex or, if --raw, "
             "in binary\n"
+            "    --json[=JO]|-j[JO]    output in JSON instead of human "
+            "readable text\n"
             "    --lba=LBA|-l LBA    starting LBA (logical block address) "
             "(def: 0)\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
@@ -122,8 +131,10 @@ usage()
             "    --verbose|-v      increase verbosity\n"
             "    --version|-V      print version string and exit\n\n"
             "Performs a SCSI GET LBA STATUS(16) or GET LBA STATUS(32) "
-            "command (SBC-3 and\nSBC-4). If --inhex=FN is given then "
-            "contents of FN is assumed to be a response\nto this command.\n"
+            "command (SBC-3 and\nSBC-4). The --element-id=EI and the "
+            "--scan-len=SL fields are only active\non the 32 byte cdb "
+            "variant. If --inhex=FN is given then contents of FN is\n"
+            "assumed to be a response to this command.\n"
             );
 }
 
@@ -159,6 +170,49 @@ decode_lba_status_desc(const uint8_t * bp, uint64_t * slbap,
     return bp[12] & 0xf;
 }
 
+static char *
+get_prov_status_str(int ps, char * b, int blen)
+{
+    switch (ps) {
+    case 0:
+        sg_scnpr(b, blen, "mapped (or unknown)");
+        break;
+    case 1:
+        sg_scnpr(b, blen, "deallocated");
+        break;
+    case 2:
+        sg_scnpr(b, blen, "anchored");
+        break;
+    case 3:
+        sg_scnpr(b, blen, "mapped");         /* sbc4r12 */
+        break;
+    case 4:
+        sg_scnpr(b, blen, "unknown");        /* sbc4r12 */
+        break;
+    default:
+        sg_scnpr(b, blen, "unknown provisioning status: %d", ps);
+        break;
+    }
+    return b;
+}
+
+static char *
+get_add_status_str(int as, char * b, int blen)
+{
+    switch (as) {
+    case 0:
+        sg_scnpr(b, blen, "%s", "");
+        break;
+    case 1:
+        sg_scnpr(b, blen, "may contain unrecovered errors");
+        break;
+    default:
+        sg_scnpr(b, blen, "unknown additional status: %d", as);
+        break;
+    }
+    return b;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -170,8 +224,9 @@ main(int argc, char * argv[])
     bool o_readonly = false;
     bool verbose_given = false;
     bool version_given = false;
-    int k, j, res, c, rlen, num_descs, completion_cond, in_len;
+    int k, j, res, c, n, rlen, num_descs, completion_cond, in_len;
     int sg_fd = -1;
+    int blockhex = 0;
     int do_brief = 0;
     int do_hex = 0;
     int ret = 0;
@@ -190,18 +245,31 @@ main(int argc, char * argv[])
     const uint8_t * bp;
     uint8_t * glbasBuffp = glbasFixedBuff;
     uint8_t * free_glbasBuffp = NULL;
+    sgj_opaque_p jop = NULL;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    sgj_state json_st = {0};
+    sgj_state * jsp = &json_st;
+    char b[144];
+    static const size_t blen = sizeof(b);
+    static const char * prov_stat_s = "Provisoning status";
+    static const char * add_stat_s = "Additional status";
+    static const char * compl_cond_s = "Completion condition";
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "be:hi:Hl:m:rRs:St:TvV", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "bBe:hi:j::Hl:m:rRs:St:TvV",
+                        long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'b':
             ++do_brief;
+            break;
+        case 'B':
+            ++blockhex;
             break;
         case 'e':
             ll = sg_get_llnum(optarg);
@@ -220,6 +288,13 @@ main(int argc, char * argv[])
             break;
         case 'i':
             in_fn = optarg;
+            break;
+        case 'j':
+            if (! sgj_init_state(&json_st, optarg)) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n", json_st.first_bad_char);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'l':
             ll = sg_get_llnum(optarg);
@@ -318,6 +393,8 @@ main(int argc, char * argv[])
         pr2serr("version: %s\n", version_str);
         return 0;
     }
+    if (jsp->pr_as_json)
+        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
 
     if (maxlen > DEF_GLBAS_BUFF_LEN) {
         glbasBuffp = (uint8_t *)sg_memalign(maxlen, 0, &free_glbasBuffp,
@@ -416,10 +493,10 @@ start_response:
         goto fini;
     }
     if (do_hex) {
-	if (do_hex > 2)
-	    hex2stdout(glbasBuffp, k, -1);
-	else
-	    hex2stdout(glbasBuffp, k, (2 == do_hex) ? 0 : 1);
+        if (do_hex > 2)
+            hex2stdout(glbasBuffp, k, -1);
+        else
+            hex2stdout(glbasBuffp, k, (2 == do_hex) ? 0 : 1);
         goto fini;
     }
     if (maxlen < 4) {
@@ -438,9 +515,9 @@ start_response:
         rlen = maxlen;
 
     if (do_brief > 1) {
-        if (rlen < 24) {
-            pr2serr("Need maxlen and response length to be at least 24, "
-                    "have %d bytes\n", rlen);
+        if (rlen > DEF_GLBAS_BUFF_LEN) {
+            pr2serr("Need maxlen and response length to be at least %d, "
+                    "have %d bytes\n", DEF_GLBAS_BUFF_LEN, rlen);
             ret = SG_LIB_CAT_OTHER;
             goto fini;
         }
@@ -462,92 +539,111 @@ start_response:
             ret = SG_LIB_CAT_OTHER;
             goto fini;
         }
-        printf("%d\n", res);
+        sgj_pr_hr(jsp,"p_status: %d  add_status: 0x%x\n", res,
+                  (unsigned int)add_status);
+        if (jsp->pr_as_json) {
+            sgj_add_nv_i(jsp, jop, prov_stat_s, res);
+            sgj_add_nv_i(jsp, jop, add_stat_s, add_status);
+        }
         goto fini;
     }
 
     if (rlen < 24) {
-        printf("No complete LBA status descriptors available\n");
+        sgj_pr_hr(jsp, "No complete LBA status descriptors available\n");
         goto fini;
     }
     num_descs = (rlen - 8) / 16;
     completion_cond = (*(glbasBuffp + 7) >> 1) & 7; /* added sbc4r14 */
     if (do_brief)
-        printf("Completion condition=%d\n", completion_cond);
+        sgj_pr_hr_js_vi(jsp, jop, 0, compl_cond_s,
+                        SGJ_SEP_EQUAL_NO_SPACE, completion_cond);
     else {
         switch (completion_cond) {
         case 0:
-            printf("No indication of the completion condition\n");
+            snprintf(b, blen, "No indication of the completion condition");
             break;
         case 1:
-            printf("Command completed due to meeting allocation length "
-                   "(--maxlen=LEN (def 24))\n");
+            snprintf(b, blen, "Command completed due to meeting allocation "
+                     "length");
             break;
         case 2:
-            printf("Command completed due to meeting scan length "
-                   "(--scan-len=SL)\n");
+            snprintf(b, blen, "Command completed due to meeting scan length");
             break;
         case 3:
-            printf("Command completed due to meeting capacity of "
-                   "medium\n");
+            snprintf(b, blen, "Command completed due to meeting capacity of "
+                   "medium");
             break;
         default:
-            printf("Command completion is reserved [%d]\n",
+            snprintf(b, blen, "Command completion is reserved [%d]",
                    completion_cond);
             break;
         }
+        sgj_pr_hr(jsp, "%s\n", b);
+        sgj_add_nv_istr(jsp, jop, compl_cond_s, completion_cond,
+                        NULL /* "meaning" */, b);
     }
-    printf("RTP=%d\n", *(glbasBuffp + 7) & 0x1);    /* added sbc4r12 */
+    sgj_pr_hr_js_vi(jsp, jop, 0, "RTP", SGJ_SEP_EQUAL_NO_SPACE,
+                    *(glbasBuffp + 7) & 0x1);    /* added sbc4r12 */
     if (verbose)
         pr2serr("%d complete LBA status descriptors found\n", num_descs);
+    if (jsp->pr_as_json)
+        jap = sgj_new_named_array(jsp, jop, "lba_status_descriptor");
+
     for (bp = glbasBuffp + 8, k = 0; k < num_descs; bp += 16, ++k) {
         res = decode_lba_status_desc(bp, &d_lba, &d_blocks, &add_status);
         if ((res < 0) || (res > 15))
             pr2serr("descriptor %d: bad LBA status descriptor returned "
                     "%d\n", k + 1, res);
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object(jsp);
         if (do_brief) {
-            printf("0x");
+            n = 0;
+            n += sg_scnpr(b + n, blen - n, "0x");
             for (j = 0; j < 8; ++j)
-                printf("%02x", bp[j]);
-            printf("  0x%x  %d  %d\n", (unsigned int)d_blocks, res,
-                   add_status);
+                n += sg_scnpr(b + n, blen - n, "%02x", bp[j]);
+            if ((0 == blockhex) || (1 == (blockhex % 2)))
+                n += sg_scnpr(b + n, blen - n, "  0x%x  %d  %d",
+                              (unsigned int)d_blocks, res, add_status);
+            else
+                n += sg_scnpr(b + n, blen - n, "  %u  %d  %d",
+                              (unsigned int)d_blocks, res, add_status);
+            sgj_pr_hr(jsp, "%s\n", b);
+            sgj_add_nv_ihex(jsp, jo2p, "lba", d_lba);
+            sgj_add_nv_ihex(jsp, jo2p, "blocks", d_blocks);
+            sgj_add_nv_i(jsp, jo2p, prov_stat_s, res);
+            sgj_add_nv_i(jsp, jo2p, add_stat_s, add_status);
         } else {
-            printf("[%d] LBA: 0x", k + 1);
-            for (j = 0; j < 8; ++j)
-                printf("%02x", bp[j]);
-            printf("  blocks: %10u", (unsigned int)d_blocks);
-            switch (res) {
-            case 0:
-                printf("  mapped (or unknown)");
-                break;
-            case 1:
-                printf("  deallocated");
-                break;
-            case 2:
-                printf("  anchored");
-                break;
-            case 3:
-                printf("  mapped");         /* sbc4r12 */
-                break;
-            case 4:
-                printf("  unknown");        /* sbc4r12 */
-                break;
-            default:
-                printf("  Provisioning status: %d", res);
-                break;
-            }
-            switch (add_status) {
-            case 0:
-                printf("\n");
-                break;
-            case 1:
-                printf(" [may return unrecovered errors]\n");
-                break;
-            default:
-                printf(" [add_status: 0x%x]\n", (unsigned int)add_status);
-                break;
+            if (jsp->pr_as_json) {
+                sgj_add_nv_ihex(jsp, jo2p, "lba", d_lba);
+                sgj_add_nv_ihex(jsp, jo2p, "blocks", d_blocks);
+                sgj_add_nv_istr(jsp, jo2p, prov_stat_s, res, NULL,
+                                get_prov_status_str(res, b, blen));
+                sgj_add_nv_istr(jsp, jo2p, add_stat_s, add_status, NULL,
+                                get_add_status_str(add_status, b, blen));
+            } else {
+                char c[64];
+
+                n = 0;
+                n += sg_scnpr(b + n, blen - n, "[%d] LBA: 0x", k + 1);
+                for (j = 0; j < 8; ++j)
+                    n += sg_scnpr(b + n, blen - n, "%02x", bp[j]);
+                if (1 == (blockhex % 2)) {
+
+                    snprintf(c, sizeof(c), "0x%x", d_blocks);
+                    n += sg_scnpr(b + n, blen - n, "  blocks: %10s", c);
+                } else
+                    n += sg_scnpr(b + n, blen - n, "  blocks: %10u",
+                                  (unsigned int)d_blocks);
+                get_prov_status_str(res, c, sizeof(c));
+                n += sg_scnpr(b + n, blen - n, "  %s", c);
+                get_add_status_str(add_status, c, sizeof(c));
+                if (strlen(c) > 0)
+                    n += sg_scnpr(b + n, blen - n, "  [%s]", c);
+                sgj_pr_hr(jsp, "%s\n", b);
             }
         }
+        if (jsp->pr_as_json)
+            sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     if ((num_descs * 16) + 8 < rlen)
         pr2serr("incomplete trailing LBA status descriptors found\n");
@@ -581,5 +677,11 @@ fini:
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
     }
-    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    if (jsp->pr_as_json) {
+        if (0 == do_hex)
+            sgj_pr2file(jsp, NULL, ret, stdout);
+        sgj_finish(jsp);
+    }
+    return ret;
 }

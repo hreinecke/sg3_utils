@@ -33,19 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.18 20220127";
-
-/* Not all environments support the Unix sleep() */
-#if defined(MSC_VER) || defined(__MINGW32__)
-#define HAVE_MS_SLEEP
-#endif
-#ifdef HAVE_MS_SLEEP
-#include <windows.h>
-#define sleep_for(seconds)    Sleep( (seconds) * 1000)
-#else
-#define sleep_for(seconds)    sleep(seconds)
-#endif
-
+static const char * version_str = "1.19 20220608";
 
 #define ME "sg_sanitize: "
 
@@ -720,20 +708,8 @@ main(int argc, char * argv[])
         sg_put_unaligned_be16((uint16_t)op->ipl, wBuff + 2);
     }
 
-    if ((! op->quick) && (! op->fail)) {
-        printf("\nA SANITIZE will commence in 15 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n", device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-        printf("\nA SANITIZE will commence in 10 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n", device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-        printf("\nA SANITIZE will commence in 5 seconds\n");
-        printf("    ALL data on %s will be DESTROYED\n", device_name);
-        printf("        Press control-C to abort\n");
-        sleep_for(5);
-    }
+    if ((! op->quick) && (! op->fail))
+        sg_warn_and_wait("SANITIZE", device_name, true);
 
     ret = do_sanitize(sg_fd, op, wBuff, param_lst_len);
     if (ret) {
@@ -747,7 +723,7 @@ main(int argc, char * argv[])
                 pr2serr("Due to --dry-run option, leave poll loop\n");
                 break;
             }
-            sleep_for(POLL_DURATION_SECS);
+            sg_sleep_secs(POLL_DURATION_SECS);
             memset(rsBuff, 0x0, sizeof(rsBuff));
             res = sg_ll_request_sense(sg_fd, op->desc, rsBuff, sizeof(rsBuff),
                                       1, vb);

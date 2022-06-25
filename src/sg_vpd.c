@@ -40,7 +40,7 @@
 
 */
 
-static const char * version_str = "1.70 20220218";  /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.71 20220608";  /* spc6r06 + sbc5r01 */
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
