@@ -153,6 +153,9 @@ sgj_opaque_p sgj_new_named_array(sgj_state * jsp, sgj_opaque_p jop,
  * a pointer newly formed JSON string. */
 sgj_opaque_p sgj_add_nv_s(sgj_state * jsp, sgj_opaque_p jop,
                           const char * name, const char * value);
+sgj_opaque_p sgj_add_nv_s_len(sgj_state * jsp, sgj_opaque_p jop,
+                              const char * name,
+                              const char * value, int slen);
 
 /* If either jsp is NULL or jsp->pr_as_json is false then nothing happens and
  * NULL is returned. The insertion point is at jop but if it is NULL
@@ -256,6 +259,12 @@ void sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop,
                             const char * str_name, const char * val_s,
                             const char * ane_s);
 
+/* Breaks up the string pointed to by 'sp' into lines and adds them to the
+ * jsp->outputp array. Treat '\n' in sp as line breaks. Consumes characters
+ * from sp until either a '\0' is found or slen is exhausted. Add each line
+ * to jsp->outputp JSON array (if conditions met). */
+void sgj_pr_str_output(sgj_state * jsp, const char * sp, int slen);
+
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. 'sbp' is assumed to point to sense data as
  * defined by T10 with a length of 'sb_len' bytes. Returns false if an
@@ -286,6 +295,8 @@ void sgj_free_unattached(sgj_opaque_p jop);
  * found at jsp->basep . After this call jsp->basep, jsp->outputp and
  * jsp->userp will all be set to NULL.  */
 void sgj_finish(sgj_state * jsp);
+
+char * sg_json_usage(int char_if_not_j, char * b, int blen);
 
 
 #ifdef __cplusplus

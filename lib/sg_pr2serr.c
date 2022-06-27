@@ -63,21 +63,6 @@ pr2serr(const char * fmt, ...)
     return n;
 }
 
-/* local copy of snprntf() variant */
-static int
-scnpr(char * cp, int cp_max_len, const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    if (cp_max_len < 2)
-        return 0;
-    va_start(args, fmt);
-    n = vsnprintf(cp, cp_max_len, fmt, args);
-    va_end(args);
-    return (n < cp_max_len) ? n : (cp_max_len - 1);
-}
-
 static bool
 sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
 {
@@ -149,6 +134,10 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
         case 'y':
             jsp->pr_format = 'g';
             break;
+        case '?':
+            bad_arg = true;
+            jsp->first_bad_char = '\0';
+            break;
         default:
             bad_arg = true;
             if (0 == jsp->first_bad_char)
@@ -158,6 +147,77 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
         prev_negate = negate ? ! prev_negate : false;
     }
     return ! bad_arg;
+}
+
+char *
+sg_json_usage(int char_if_not_j, char * b, int blen)
+{
+    int n = 0;
+    char short_opt = char_if_not_j ? char_if_not_j : 'j';
+
+    if ((NULL == b) || (blen < 1))
+        goto fini;
+    n +=  sg_scnpr(b + n, blen - n, "JSON option usage:\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "     --json[-JO] | -%c[JO]\n\n", short_opt);
+    n +=  sg_scnpr(b + n, blen - n, "  where JO is a string of one or more "
+                   "of:\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      0 | 2    tab pretty output to 2 spaces\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      4    tab pretty output to 4 spaces\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      8    tab pretty output to 8 spaces\n");
+    if (n >= (blen - 1))
+        goto fini;
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      a    show 'abbreviated_name_expansion' "
+                   "fields\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      e    show 'exit_status' field\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      h    show 'hex' fields\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      l    show lead-in fields (invocation "
+                   "information)\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      o    non-JSON output placed in 'output' array in "
+                   "lead-in\n");
+    if (n >= (blen - 1))
+        goto fini;
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      p    pretty print the JSON output\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      s    show string output (usually fields named "
+                   "'meaning')\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      v    make JSON output more verbose\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      =    ignored if first character, else it's an "
+                   "error\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      - | ~ | !    toggle next letter setting\n");
+
+    n +=  sg_scnpr(b + n, blen - n, "\nIn the absence of the optional JO "
+                   "argument, the following are set\non: 'elps' while the "
+                   "others are set off, and tabs are set to 4.\nBefore "
+                   "command line JO options are applied, the environment\n"
+                   "variable: %s is applied (if present). Note that\nno "
+                   "space is permitted between the short option ('-%c') "
+                   "and its\nargument ('JO').\n", sgj_opts_ev, short_opt);
+fini:
+    return b;
+}
+
+char *
+sg_json_settings(sgj_state * jsp, char * b, int blen)
+{
+    snprintf(b, blen, "%d%sa%se%sh%sl%so%sp%ss%sv", jsp->pr_indent_size,
+             jsp->pr_ane ? "" : "-", jsp->pr_exit_status ? "" : "-",
+             jsp->pr_hex ? "" : "-", jsp->pr_leadin ? "" : "-",
+             jsp->pr_output ? "" : "-", jsp->pr_pretty ? "" : "-",
+             jsp->pr_string ? "" : "-", jsp->verbose ? "" : "-");
+    return b;
 }
 
 static void
@@ -207,7 +267,6 @@ sgj_start(const char * util_name, const char * ver_str, int argc,
     json_value * jv2p = NULL;
     json_value * jap = NULL;
 
-
     if (NULL == jvp)
         return NULL;
     if (NULL == jsp)
@@ -241,6 +300,18 @@ sgj_start(const char * util_name, const char * ver_str, int argc,
                                  json_string_new("0.0"));
             json_object_push((json_value *)jv2p, "argv", jap);
         }
+        if (jsp->verbose) {
+            const char * cp = getenv(sgj_opts_ev);
+            char b[32];
+
+            json_object_push((json_value *)jv2p, "environment_variable_name",
+                             json_string_new(sgj_opts_ev));
+            json_object_push((json_value *)jv2p, "environment_variable_value",
+                             json_string_new(cp ? cp : "no available"));
+            sg_json_settings(jsp, b, sizeof(b));
+            json_object_push((json_value *)jv2p, "json_options",
+                             json_string_new(b));
+        }
     } else {
         if (jsp->pr_output && util_name)
             jv2p = json_object_push((json_value *)jvp, "utility_invoked",
@@ -264,9 +335,16 @@ sgj_pr2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
         fprintf(fp, "%s: all NULL pointers ??\n", __func__);
         return;
     }
-    if ((NULL == jop) && jsp->pr_exit_status)
-         json_object_push(jvp, "exit_status", json_integer_new(exit_status));
+    if ((NULL == jop) && jsp->pr_exit_status) {
+        char d[80];
 
+        if (sg_exit2str(exit_status, jsp->verbose, sizeof(d), d)) {
+            if (0 == strlen(d))
+                strncpy(d, "no errors", sizeof(d) - 1);
+        } else
+            strncpy(d, "not available", sizeof(d) - 1);
+        sgj_add_nv_istr(jsp, jop, "exit_status", exit_status, NULL, d);
+    }
     memcpy(&out_settings, &def_out_settings, sizeof(out_settings));
     if (jsp->pr_indent_size != def_out_settings.indent_size)
         out_settings.indent_size = jsp->pr_indent_size;
@@ -394,6 +472,22 @@ sgj_add_nv_s(sgj_state * jsp, sgj_opaque_p jop, const char * name,
         else
             return json_array_push((json_value *)(jop ? jop : jsp->basep),
                                    json_string_new(value));
+    } else
+        return NULL;
+}
+
+sgj_opaque_p
+sgj_add_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                 const char * value, int slen)
+{
+    if (jsp && jsp->pr_as_json && value && (slen >= 0)) {
+        if (name)
+            return json_object_push((json_value *)(jop ? jop : jsp->basep),
+                                    name, json_string_new_length(slen,
+                                                                 value));
+        else
+            return json_array_push((json_value *)(jop ? jop : jsp->basep),
+                                   json_string_new_length(slen, value));
     } else
         return NULL;
 }
@@ -549,6 +643,7 @@ sgj_add_nv_ihex_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     }
 }
 
+/* Add hex byte strings irrespective of jsp->pr_hex setting. */
 void
 sgj_add_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                      const uint8_t * byte_arr, int num_bytes)
@@ -556,7 +651,7 @@ sgj_add_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     int blen = num_bytes * 4;
     char * bp;
 
-    if ((NULL == jsp) || (! jsp->pr_as_json) || (! jsp->pr_hex))
+    if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
     bp = (char *)calloc(blen + 4, 1);
     if (bp) {
@@ -604,6 +699,37 @@ sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                 sgj_add_nv_s(jsp, jo2p, sname, val_s);
         } else if (as_str)
             sgj_add_nv_s(jsp, jo2p, sname, val_s);
+    }
+}
+
+/* Treat '\n' in sp as line breaks. Consumes characters from sp until either
+ * a '\0' is found or slen is exhausted. Add each line to jsp->outputp JSON
+ * array (if conditions met). */
+void
+sgj_pr_str_output(sgj_state * jsp, const char * sp, int slen)
+{
+    char c;
+    int k, n;
+    const char * prev_sp = sp;
+    const char * cur_sp = sp;
+
+    if ((NULL == jsp) || (NULL == jsp->outputp) || (! jsp->pr_as_json) ||
+        (! jsp->pr_output))
+        return;
+    for (k = 0; k < slen; ++k, ++cur_sp) {
+        c = *cur_sp;
+        if ('\0' == c)
+            break;
+        else if ('\n' == c) {
+            n = cur_sp - prev_sp;
+            /* when name is NULL, add to array (jsp->outputp) */
+            sgj_add_nv_s_len(jsp, jsp->outputp, NULL, prev_sp, n);
+            prev_sp = cur_sp + 1;
+        }
+    }
+    if (prev_sp < cur_sp) {
+        n = cur_sp - prev_sp;
+        sgj_add_nv_s_len(jsp, jsp->outputp, NULL, prev_sp, n);
     }
 }
 
@@ -667,14 +793,14 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         if ((! as_json) || (jsp && jsp->pr_output)) {
             switch (jtype) {
             case json_string:
-                scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
+                sg_scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
                 break;
             case json_integer:
-                scnpr(b + n, blen - n, "%" PRIi64, jvp->u.integer);
+                sg_scnpr(b + n, blen - n, "%" PRIi64, jvp->u.integer);
                 break;
             case json_boolean:
-                scnpr(b + n, blen - n, "%s",
-                      jvp->u.boolean ? "true" : "false");
+                sg_scnpr(b + n, blen - n, "%s",
+                         jvp->u.boolean ? "true" : "false");
                 break;
             case json_none:
             default:
@@ -699,7 +825,7 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
             json_builder_free((json_value *)jvp);
         return;
     }
-    n += scnpr(b + n, blen - n, "%s", name);
+    n += sg_scnpr(b + n, blen - n, "%s", name);
     if (as_json) {
         int k;
 
@@ -717,41 +843,41 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         case SGJ_SEP_NONE:
             break;
         case SGJ_SEP_SPACE_1:
-            n += scnpr(b + n, blen - n, " ");
+            n += sg_scnpr(b + n, blen - n, " ");
             break;
         case SGJ_SEP_SPACE_2:
-            n += scnpr(b + n, blen - n, "  ");
+            n += sg_scnpr(b + n, blen - n, "  ");
             break;
         case SGJ_SEP_SPACE_3:
-            n += scnpr(b + n, blen - n, "   ");
+            n += sg_scnpr(b + n, blen - n, "   ");
             break;
         case SGJ_SEP_SPACE_4:
-            n += scnpr(b + n, blen - n, "    ");
+            n += sg_scnpr(b + n, blen - n, "    ");
             break;
         case SGJ_SEP_EQUAL_NO_SPACE:
-            n += scnpr(b + n, blen - n, "=");
+            n += sg_scnpr(b + n, blen - n, "=");
             break;
         case SGJ_SEP_EQUAL_1_SPACE:
-            n += scnpr(b + n, blen - n, "= ");
+            n += sg_scnpr(b + n, blen - n, "= ");
             break;
         case SGJ_SEP_COLON_NO_SPACE:
-            n += scnpr(b + n, blen - n, ":");
+            n += sg_scnpr(b + n, blen - n, ":");
             break;
         case SGJ_SEP_COLON_1_SPACE:
-            n += scnpr(b + n, blen - n, ": ");
+            n += sg_scnpr(b + n, blen - n, ": ");
             break;
         default:
             break;
         }
         switch (jtype) {
         case json_string:
-            scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
+            sg_scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
             break;
         case json_integer:
-            scnpr(b + n, blen - n, "%" PRIi64, jvp->u.integer);
+            sg_scnpr(b + n, blen - n, "%" PRIi64, jvp->u.integer);
             break;
         case json_boolean:
-            scnpr(b + n, blen - n, "%s", jvp->u.boolean ? "true" : "false");
+            sg_scnpr(b + n, blen - n, "%s", jvp->u.boolean ? "true" : "false");
             break;
         case json_none:
         default:
@@ -818,6 +944,7 @@ sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
     char b[256];
     const char * cp;
     const char * naa_sp;
+    sgj_opaque_p jo2p;
     static const int blen = sizeof(b);
     static const int elen = sizeof(e);
 
@@ -858,7 +985,7 @@ sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
     sgj_add_nv_ihexstr(jsp, jop, "protocol_identifier", p_id, NULL, e);
     switch (desig_type) {
     case 0: /* vendor specific */
-        sgj_add_nv_hex_bytes(jsp, jop, "vendor_specific_hex", ip, dlen);
+        sgj_add_nv_hex_bytes(jsp, jop, "vendor_specific_hexbytes", ip, dlen);
         break;
     case 1: /* T10 vendor identification */
         n = (dlen < 8) ? dlen : 8;
@@ -892,7 +1019,8 @@ sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
         }
         break;
     case 3: /* NAA <n> */
-        sgj_add_nv_hex_bytes(jsp, jop, "full_naa_in_hex", ip, dlen);
+        if (jsp->pr_hex)
+            sgj_add_nv_hex_bytes(jsp, jop, "full_naa_hexbytes", ip, dlen);
         naa = (ip[0] >> 4) & 0xff;
         switch (naa) {
         case 2:
@@ -938,112 +1066,74 @@ sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
             snprintf(b, blen, "unknown NAA value=0x%x", naa);
             sgj_add_nv_ihexstr_ane(jsp, jop, "naa", naa, true, NULL, b,
                                    naa_exp);
+            sgj_add_nv_hex_bytes(jsp, jop, "full_naa_hexbytes", ip, dlen);
             break;
         }
         break;
-#if 0
     case 4: /* Relative target port */
-        if ((1 != c_set) || (1 != assoc) || (4 != dlen)) {
-            n += sg_scnpr(b + n, blen - n, "%s      << expected binary "
-                          "code_set, target port association, length 4 >>\n",
-                          lip);
-            n += hex2str(ip, dlen, "", 1, blen - n, b + n);
-            break;
-        }
-        d_id = sg_get_unaligned_be16(ip + 2);
-        n += sg_scnpr(b + n, blen - n, "%s      Relative target port: 0x%x\n",
-                      lip, d_id);
+        if (jsp->pr_hex)
+            sgj_add_nv_hex_bytes(jsp, jop, "relative_target_port_hexbytes",
+                                 ip, dlen);
+        sgj_add_nv_ihex(jsp, jop, "relative_target_port_identifier",
+                        sg_get_unaligned_be16(ip + 2));
         break;
     case 5: /* (primary) Target port group */
-        if ((1 != c_set) || (1 != assoc) || (4 != dlen)) {
-            n += sg_scnpr(b + n, blen - n, "%s      << expected binary "
-                          "code_set, target port association, length 4 >>\n",
-                          lip);
-            n += hex2str(ip, dlen, lip, 1, blen - n, b + n);
-            break;
-        }
-        d_id = sg_get_unaligned_be16(ip + 2);
-        n += sg_scnpr(b + n, blen - n, "%s      Target port group: 0x%x\n",
-                      lip, d_id);
+        if (jsp->pr_hex)
+            sgj_add_nv_hex_bytes(jsp, jop, "target_port_group_hexbytes",
+                                 ip, dlen);
+        sgj_add_nv_ihex(jsp, jop, "target_port_group",
+                        sg_get_unaligned_be16(ip + 2));
         break;
     case 6: /* Logical unit group */
-        if ((1 != c_set) || (0 != assoc) || (4 != dlen)) {
-            n += sg_scnpr(b + n, blen - n, "%s      << expected binary "
-                          "code_set, logical unit association, length 4 >>\n",
-                          lip);
-            n += hex2str(ip, dlen, lip, 1, blen - n, b + n);
-            break;
-        }
-        d_id = sg_get_unaligned_be16(ip + 2);
-        n += sg_scnpr(b + n, blen - n, "%s      Logical unit group: 0x%x\n",
-                      lip, d_id);
+        if (jsp->pr_hex)
+            sgj_add_nv_hex_bytes(jsp, jop, "logical_unit_group_hexbytes",
+                                 ip, dlen);
+        sgj_add_nv_ihex(jsp, jop, "logical_unit_group",
+                        sg_get_unaligned_be16(ip + 2));
         break;
     case 7: /* MD5 logical unit identifier */
-        if ((1 != c_set) || (0 != assoc)) {
-            n += sg_scnpr(b + n, blen - n, "%s      << expected binary "
-                          "code_set, logical unit association >>\n", lip);
-            n += hex2str(ip, dlen, "", 1, blen - n, b + n);
-            break;
-        }
-        n += sg_scnpr(b + n, blen - n, "%s      MD5 logical unit "
-                      "identifier:\n", lip);
-        n += hex2str(ip, dlen, lip, 1, blen - n, b + n);
+        sgj_add_nv_hex_bytes(jsp, jop, "md5_logical_unit_hexbytes",
+                                 ip, dlen);
         break;
     case 8: /* SCSI name string */
-        if (3 != c_set) {       /* accept ASCII as subset of UTF-8 */
-            if (2 == c_set) {
-                if (do_long)
-                    n += sg_scnpr(b + n, blen - n, "%s      << expected "
-                                  "UTF-8, use ASCII >>\n", lip);
-            } else {
-                n += sg_scnpr(b + n, blen - n, "%s      << expected UTF-8 "
-                              "code_set >>\n", lip);
-                n += hex2str(ip, dlen, lip, 0, blen - n, b + n);
-                break;
-            }
-        }
-        n += sg_scnpr(b + n, blen - n, "%s      SCSI name string:\n", lip);
-        /* does %s print out UTF-8 ok??
-         * Seems to depend on the locale. Looks ok here with my
-         * locale setting: en_AU.UTF-8
-         */
-        n += sg_scnpr(b + n, blen - n, "%s      %.*s\n", lip, dlen,
-                      (const char *)ip);
+        if (jsp->pr_hex)
+            sgj_add_nv_hex_bytes(jsp, jop, "scsi_name_string_hexbytes",
+                                 ip, dlen);
+        snprintf(b, blen, "%s", ip);
+        sgj_add_nv_s(jsp, jop, "scsi_name_string", b);
         break;
     case 9: /* Protocol specific port identifier */
-        /* added in spc4r36, PIV must be set, proto_id indicates */
-        /* whether UAS (USB) or SOP (PCIe) or ... */
-        if (! piv)
-            n += sg_scnpr(b + n, blen - n, " %s      >>>> Protocol specific "
-                          "port identifier expects protocol\n%s          "
-                          "identifier to be valid and it is not\n", lip, lip);
+        if (jsp->pr_hex)
+            sgj_add_nv_hex_bytes(jsp, jop,
+                                 "protocol_specific_port_identifier_hexbytes",
+                                 ip, dlen);
         if (TPROTO_UAS == p_id) {
-            n += sg_scnpr(b + n, blen - n, "%s      USB device address: "
-                          "0x%x\n", lip, 0x7f & ip[0]);
-            n += sg_scnpr(b + n, blen - n, "%s      USB interface number: "
-                          "0x%x\n", lip, ip[2]);
+            jo2p = sgj_new_named_object(jsp, jop,
+                                        "usb_target_port_identifier");
+            sgj_add_nv_ihex(jsp, jo2p, "device_address", 0x7f & ip[0]);
+            sgj_add_nv_ihex(jsp, jo2p, "interface_number", ip[2]);
         } else if (TPROTO_SOP == p_id) {
-            n += sg_scnpr(b + n, blen - n, "%s      PCIe routing ID, bus "
-                          "number: 0x%x\n", lip, ip[0]);
-            n += sg_scnpr(b + n, blen - n, "%s          function number: "
-                          "0x%x\n", lip, ip[1]);
-            n += sg_scnpr(b + n, blen - n, "%s          [or device number: "
-                          "0x%x, function number: 0x%x]\n", lip,
-                          (0x1f & (ip[1] >> 3)), 0x7 & ip[1]);
+            jo2p = sgj_new_named_object(jsp, jop, "pci_express_routing_id");
+            sgj_add_nv_ihex(jsp, jo2p, "routing_id",
+                            sg_get_unaligned_be16(ip + 0));
         } else
-            n += sg_scnpr(b + n, blen - n, "%s      >>>> unexpected protocol "
-                          "identifier: %s\n%s           with Protocol "
-                          "specific port identifier\n", lip,
-                          sg_get_trans_proto_str(p_id, elen, e), lip);
+            sgj_add_nv_s(jsp, jop, "protocol_specific_port_identifier",
+                         "decoding failure");
+
         break;
     case 0xa: /* UUID identifier */
-        n += sg_t10_uuid_desig2str(ip, dlen, c_set, do_long, false, lip,
-                                   blen - n, b + n);
+        if (jsp->pr_hex)
+            sgj_add_nv_hex_bytes(jsp, jop, "uuid_hexbytes",
+                                 ip, dlen);
+        sg_t10_uuid_desig2str(ip, dlen, c_set, false, true, NULL, blen, b);
+        n = strlen(b);
+        if ((n > 0) && ('\n' == b[n - 1]))
+            b[n - 1] = '\0';
+        sgj_add_nv_s(jsp, jop, "uuid", b);
         break;
-#endif
     default: /* reserved */
-        hex2str(ip, dlen, NULL, 1, blen, b);
-        sgj_add_nv_s(jsp, jop, "reserved_designator_hex", b);
+        sgj_add_nv_hex_bytes(jsp, jop, "reserved_designator_hexbytes",
+                             ip, dlen);
         break;
     }
     return true;
@@ -1226,6 +1316,15 @@ sgj_uds_referral_descriptor(sgj_state * jsp, sgj_opaque_p jop,
     return true;
 }
 
+/* Copy of static array in sg_lib.c */
+static const char * dd_usage_reason_str_arr[] = {
+    "Unknown",
+    "resend this and further commands to:",
+    "resend this command to:",
+    "new subsidiary lu added to this administrative lu:",
+    "administrative lu associated with a preferred binding:",
+   };
+
 static bool
 sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                           const struct sg_scsi_sense_hdr * sshp,
@@ -1233,11 +1332,10 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
 {
     bool processed = true;
     int add_sb_len, desc_len, k, dt, sense_key, n, sds;
-#if 0
     uint16_t sct_sc;
-#endif
     uint64_t ull;
     const uint8_t * descp;
+    const char * cp;
     sgj_opaque_p jap, jo2p, jo3p;
     char b[80];
     static const int blen = sizeof(b);
@@ -1409,7 +1507,7 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                 break;
             }
             sgj_add_nv_ihex_ane(jsp, jo2p, "fsdt", !! (0x80 & descp[2]),
-                               NULL, "Forwarded Sense Data Truncated");
+                                false, "Forwarded Sense Data Truncated");
             sds = (0x7 & descp[2]);
             if (sds < 1)
                 snprintf(b, blen, "%s [%d]", "Unknown", sds);
@@ -1429,7 +1527,7 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
             break;
         case 0xd:       /* Added in SBC-3 rev 36d */
             /* this descriptor combines descriptors 0, 1, 2 and 3 */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", 0xc, NULL,
+            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
                                "Direct-access block device");
             if (add_d_len < 28) {
                 sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
@@ -1438,7 +1536,7 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
             }
             sgj_add_nv_i(jsp, jo2p, "valid", (0x80 & descp[2]));
             sgj_add_nv_ihex_ane(jsp, jo2p, "ili", !! (0x20 & descp[2]),
-                               NULL, "Incorrect Length Indicator");
+                                false, "Incorrect Length Indicator");
             processed = sgj_decode_sks(jsp, jo2p, descp + 4, desc_len - 4,
                                        sense_key);
             sgj_add_nv_ihex(jsp, jo2p, "field_replaceable_unit_code",
@@ -1448,77 +1546,59 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
             sgj_add_nv_ihex(jsp, jo2p, "command_specific_information",
                             sg_get_unaligned_be64(descp + 16));
             break;
-#if 0
         case 0xe:       /* Added in SPC-5 rev 6 (for Bind/Unbind) */
-            n += sg_scnpr(b + n, blen - n, "Device designation\n");
-            j = (int)SG_ARRAY_SIZE(dd_usage_reason_str_arr);
-            if (descp[3] < j)
-                n += sg_scnpr(b + n, blen - n, "%s    Usage reason: %s\n",
-                              lip, dd_usage_reason_str_arr[descp[3]]);
-            else
-                n += sg_scnpr(b + n, blen - n, "%s    Usage reason: "
-                              "reserved[%d]\n", lip, descp[3]);
-            n += sg_get_designation_descriptor_str(z, descp + 4, descp[1] - 2,
-                                                   true, false, blen - n,
-                                                   b + n);
+            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                               "Device designation");
+            n = descp[3];
+            cp = (n < (int)SG_ARRAY_SIZE(dd_usage_reason_str_arr)) ?
+                  dd_usage_reason_str_arr[n] : "Unknown (reserved)";
+            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_usage_reason",
+                               n, NULL, cp);
+            jo3p = sgj_new_named_object(jsp, jo2p,
+                                        "device_designation_descriptor");
+            sgj_get_designation_descriptor(jsp, jo3p, descp + 4,
+                                           desc_len - 4);
             break;
         case 0xf:       /* Added in SPC-5 rev 10 (for Write buffer) */
-            n += sg_scnpr(b + n, blen - n, "Microcode activation ");
+            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                               "Microcode activation");
             if (add_d_len < 6) {
                 sgj_add_nv_s(jsp, jop, parsing, dtsp);
                 processed = false;
                 break;
             }
-            progress = sg_get_unaligned_be16(descp + 6);
-            n += sg_scnpr(b + n, blen - n, "time: ");
-            if (0 == progress)
-                n += sg_scnpr(b + n, blen - n, "unknown\n");
-            else
-                n += sg_scnpr(b + n, blen - n, "%d seconds\n", progress);
+            sgj_add_nv_ihex(jsp, jo2p, "microcode_activation_time",
+                            sg_get_unaligned_be16(descp + 6));
             break;
         case 0xde:       /* NVME Status Field; vendor (sg3_utils) specific */
-            n += sg_scnpr(b + n, blen - n, "NVMe Status: ");
+            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                               "NVME status (sg3_utils)");
             if (add_d_len < 6) {
                 sgj_add_nv_s(jsp, jop, parsing, dtsp);
                 processed = false;
                 break;
             }
-            n += sg_scnpr(b + n, blen - n, "DNR=%d, M=%d, ",
-                          (int)!!(0x80 & descp[5]), (int)!!(0x40 & descp[5]));
+            sgj_add_nv_ihex_ane(jsp, jo2p, "dnr", !! (0x80 & descp[5]),
+                                false, "Do not retry");
+            sgj_add_nv_ihex_ane(jsp, jo2p, "m", !! (0x40 & descp[5]),
+                                false, "More");
             sct_sc = sg_get_unaligned_be16(descp + 6);
-            n += sg_scnpr(b + n, blen - n, "SCT_SC=0x%x\n", sct_sc);
-            if (sct_sc > 0) {
-                char d[80];
-
-                n += sg_scnpr(b + n, blen - n, "    %s\n",
-                        sg_get_nvme_cmd_status_str(sct_sc, sizeof(d), d));
-            }
+            sgj_add_nv_ihexstr_ane
+                (jsp, jo2p, "sct_sc", sct_sc, true, NULL,
+                 sg_get_nvme_cmd_status_str(sct_sc, blen, b),
+                 "Status Code Type (upper 8 bits) and Status Code");
             break;
-#endif
         default:
             if (dt >= 0x80)
                 sgj_add_nv_ihex(jsp, jo2p, "vendor_specific_descriptor_type",
                                 dt);
             else
                 sgj_add_nv_ihex(jsp, jo2p, "unknown_descriptor_type", dt);
+            sgj_add_nv_hex_bytes(jsp, jo2p, "descriptor_hexbytes",
+                                 descp, desc_len);
             processed = false;
             break;
         }
-#if 0
-        if (! processed) {
-            if (add_d_len > 0) {
-                n += sg_scnpr(b + n, blen - n, "%s    ", lip);
-                for (j = 0; j < add_d_len; ++j) {
-                    if ((j > 0) && (0 == (j % 24)))
-                        n += sg_scnpr(b + n, blen - n, "\n%s    ", lip);
-                    n += sg_scnpr(b + n, blen - n, "%02x ", descp[j + 2]);
-                }
-                n += sg_scnpr(b + n, blen - n, "\n");
-            }
-        }
-        if (add_d_len < 0)
-            n += sg_scnpr(b + n, blen - n, "%s    short descriptor\n", lip);
-#endif
         sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     return processed;

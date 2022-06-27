@@ -28,6 +28,8 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
+#include "sg_vpd.h"
+
 /* This is a companion file to sg_vpd.c . It contains logic to output and
    decode vendor specific VPD pages
 
@@ -98,46 +100,6 @@
 #define DEF_ALLOC_LEN 252
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 
-/* These two structures are duplicates of those of the same name in
- * sg_vpd.c . <<< Take care that both are the same. >>> */
-struct opts_t {
-    bool do_all;
-    bool do_enum;
-    bool do_force;
-    bool do_long;
-    bool do_quiet;
-    bool verbose_given;
-    bool version_given;
-    int do_hex;
-    int do_ident;
-    int do_raw;
-    int examine;
-    int maxlen;
-    int vend_prod_num;
-    int verbose;
-    int vpd_pn;
-    const char * device_name;
-    const char * page_str;
-    const char * inhex_fn;
-    const char * vend_prod;
-};
-
-struct svpd_values_name_t {
-    int value;       /* VPD page number */
-    int subvalue;    /* to differentiate if value+pdt are not unique */
-    int pdt;         /* peripheral device type id, -1 is the default */
-                     /* (all or not applicable) value */
-    const char * acron;
-    const char * name;
-};
-
-int vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen,
-                   bool qt, int vb, int * rlenp);
-
-/* sharing large global buffer, defined in sg_vpd.c */
-extern uint8_t * rsp_buff;
-
-/* end of section copied from sg_vpd.c . Maybe sg_vpd.h is needed */
 
 struct svpd_vp_name_t {
     int vend_prod_num;       /* vendor/product identifier */

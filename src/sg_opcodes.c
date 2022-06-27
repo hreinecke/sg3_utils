@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.83 20220616";    /* spc6r06 */
+static const char * version_str = "0.84 20220626";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -137,8 +137,7 @@ usage()
             "                        instead of DEVICE which is ignored\n"
             "    --json[=JO]|-jJO    output in JSON instead of human "
             "readable\n"
-            "                        text. Optional argument JO see manpage "
-            "sg3_utils\n"
+            "                        test. Use --json=? for JSON help\n"
             "    --mask|-m       show cdb usage data (a mask) when "
             "all listed\n"
             "    --mlu|-M        show MLU bit when all listed\n"
@@ -368,8 +367,15 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'j':
             if (! sgj_init_state(&op->json_st, optarg)) {
-                pr2serr("bad argument to --json= option, unrecognized "
-                        "character '%c'\n", op->json_st.first_bad_char);
+                int bad_char = op->json_st.first_bad_char;
+                char e[1500];
+
+                if (bad_char) {
+                    pr2serr("bad argument to --json= option, unrecognized "
+                            "character '%c'\n\n", bad_char);
+                }
+                sg_json_usage(0, e, sizeof(e));
+                pr2serr("%s", e);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -1135,10 +1141,10 @@ main(int argc, char * argv[])
             usage_old();
         return 0;
     }
-    as_json = op->json_st.pr_as_json;
     jsp = &op->json_st;
+    as_json = jsp->pr_as_json;
     if (as_json) {
-        jop = sgj_start(MY_NAME, version_str, argc, argv, &op->json_st);
+        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
     }
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
@@ -1487,7 +1493,7 @@ err_out:
     res = (res >= 0) ? res : SG_LIB_CAT_OTHER;
     if (as_json) {
         if (0 == op->do_hex)
-            sgj_pr2file(&op->json_st, NULL, res, stdout);
+            sgj_pr2file(jsp, NULL, res, stdout);
         sgj_finish(jsp);
     }
     return res;

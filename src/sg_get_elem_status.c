@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.11 20220616";      /* sbc5r01 */
+static const char * version_str = "1.12 20220626";      /* sbc5r01 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -111,6 +111,7 @@ usage()
             "in binary\n"
             "    --json[=JO]|-j[JO]     output in JSON instead of human "
             "readable text\n"
+            "                           use --json=? for JSON help\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
@@ -337,8 +338,15 @@ main(int argc, char * argv[])
             break;
         case 'j':
             if (! sgj_init_state(&json_st, optarg)) {
-                pr2serr("bad argument to --json= option, unrecognized "
-                        "character '%c'\n", json_st.first_bad_char);
+                int bad_char = json_st.first_bad_char;
+                char e[1500];
+
+                if (bad_char) {
+                    pr2serr("bad argument to --json= option, unrecognized "
+                            "character '%c'\n\n", bad_char);
+                }
+                sg_json_usage(0, e, sizeof(e));
+                pr2serr("%s", e);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;

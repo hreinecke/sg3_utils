@@ -31,6 +31,8 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
+#include "sg_vpd.h"
+
 /* This utility program was originally written for the Linux OS SCSI subsystem.
 
    This program fetches Vital Product Data (VPD) pages from the given
@@ -40,7 +42,9 @@
 
 */
 
-static const char * version_str = "1.71 20220608";  /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.72 20220627";  /* spc6r06 + sbc5r01 */
+
+#define MY_NAME "sg_decode_sense"
 
 /* standard VPD pages, in ascending page number order */
 #define VPD_SUPPORTED_VPDS 0x0
@@ -105,64 +109,20 @@ static const char * version_str = "1.71 20220608";  /* spc6r06 + sbc5r01 */
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
 
-/* These two structures are duplicates of those of the same name in
- * sg_vpd_vendor.c . <<< Take care that both are the same. >>> */
-struct opts_t {
-    bool do_all;
-    bool do_enum;
-    bool do_force;
-    bool do_long;
-    bool do_quiet;
-    bool verbose_given;
-    bool version_given;
-    int do_hex;
-    int do_ident;
-    int do_raw;
-    int examine;
-    int maxlen;
-    int vend_prod_num;
-    int verbose;
-    int vpd_pn;
-    const char * device_name;
-    const char * page_str;
-    const char * inhex_fn;
-    const char * vend_prod;
-};
+uint8_t * rsp_buff;
 
-struct svpd_values_name_t {
-    int value;       /* VPD page number */
-    int subvalue;    /* to differentiate if value+pdt are not unique */
-    int pdt;         /* peripheral device type id, -1 is the default */
-                     /* (all or not applicable) value */
-    const char * acron;
-    const char * name;
-};
-
-
-/* Following functions also used by sg_vpd_vendor.c hence extern */
-void svpd_enumerate_vendor(int vend_prod_num);
-int svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num);
-int svpd_decode_vendor(int sg_fd, struct opts_t * op, int off);
-const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
-int svpd_find_vp_num_by_acron(const char * vp_ap);
-const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
-                                                          int vend_prod_num);
-int vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen,
-                   bool qt, int vb, int * rlenp);
-void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
-
-static int svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue,
-                           int off, const char * prefix);
+static int svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
+                           int subvalue, int off, const char * prefix);
 static int svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue,
                                  int off);
 
 static int decode_dev_ids(const char * print_if_found, int num_leading,
                           uint8_t * buff, int len, int m_assoc,
                           int m_desig_type, int m_code_set,
-                          const struct opts_t * op);
+                          struct opts_t * op, sgj_opaque_p jop);
 
-uint8_t * rsp_buff;
-const int rsp_buff_sz = MX_ALLOC_LEN + 2;
+static const int rsp_buff_sz = MX_ALLOC_LEN + 2;
+
 static uint8_t * free_rsp_buff;
 
 static struct option long_options[] = {
@@ -174,6 +134,7 @@ static struct option long_options[] = {
         {"hex", no_argument, 0, 'H'},
         {"ident", no_argument, 0, 'i'},
         {"inhex", required_argument, 0, 'I'},
+        {"json", optional_argument, 0, 'j'},
         {"long", no_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"page", required_argument, 0, 'p'},
@@ -280,6 +241,9 @@ usage()
             "DEVICE;\n"
             "                        if used with --raw then read binary "
             "from FN\n"
+            "    --json[=JO]|-j[JO]    output in JSON instead of human "
+            "readable text.\n"
+            "                          Use --json=? for JSON help\n"
             "    --long|-l       perform extra decoding\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
@@ -539,8 +503,8 @@ std_inq_decode(uint8_t * b, int len, int verbose)
 }
 
 static void
-decode_id_vpd(uint8_t * buff, int len, int subvalue,
-              const struct opts_t * op)
+decode_id_vpd(uint8_t * buff, int len, int subvalue, struct opts_t * op,
+              sgj_opaque_p jop)
 {
     int m_a, m_d, m_cs, blen;
     uint8_t * b;
@@ -556,23 +520,23 @@ decode_id_vpd(uint8_t * buff, int len, int subvalue,
     m_cs = -1;
     if (0 == subvalue) {
         decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), 0, b, blen,
-                       VPD_ASSOC_LU, m_d, m_cs, op);
+                       VPD_ASSOC_LU, m_d, m_cs, op, jop);
         decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), 0, b, blen,
-                       VPD_ASSOC_TPORT, m_d, m_cs, op);
+                       VPD_ASSOC_TPORT, m_d, m_cs, op, jop);
         decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0, b, blen,
-                       VPD_ASSOC_TDEVICE, m_d, m_cs, op);
+                       VPD_ASSOC_TDEVICE, m_d, m_cs, op, jop);
     } else if (VPD_DI_SEL_AS_IS == subvalue)
-        decode_dev_ids(NULL, 0, b, blen, m_a, m_d, m_cs, op);
+        decode_dev_ids(NULL, 0, b, blen, m_a, m_d, m_cs, op, jop);
     else {
         if (VPD_DI_SEL_LU & subvalue)
             decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), 0, b, blen,
-                           VPD_ASSOC_LU, m_d, m_cs, op);
+                           VPD_ASSOC_LU, m_d, m_cs, op, jop);
         if (VPD_DI_SEL_TPORT & subvalue)
             decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), 0, b,
-                           blen, VPD_ASSOC_TPORT, m_d, m_cs, op);
+                           blen, VPD_ASSOC_TPORT, m_d, m_cs, op, jop);
         if (VPD_DI_SEL_TARGET & subvalue)
             decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0,
-                           b, blen, VPD_ASSOC_TDEVICE, m_d, m_cs, op);
+                           b, blen, VPD_ASSOC_TDEVICE, m_d, m_cs, op, jop);
     }
 }
 
@@ -685,7 +649,8 @@ decode_mode_policy_vpd(uint8_t * buff, int len, int do_hex)
 
 /* VPD_SCSI_PORTS */
 static void
-decode_scsi_ports_vpd(uint8_t * buff, int len, const struct opts_t * op)
+decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
+                      sgj_opaque_p jop)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
     uint8_t * bp;
@@ -735,7 +700,7 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, const struct opts_t * op)
                 if ((0 == op->do_quiet) || (ip_tid_len > 0))
                     printf("    Target port descriptor(s):\n");
                 decode_dev_ids("", 2 /* leading spaces */, bp + bump + 4,
-                               tpd_len, VPD_ASSOC_TPORT, -1, -1, op);
+                               tpd_len, VPD_ASSOC_TPORT, -1, -1, op, jop);
             }
         }
         bump += tpd_len + 4;
@@ -944,15 +909,17 @@ decode_dev_ids_quiet(uint8_t * buff, int len, int m_assoc,
 static int
 decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
                int len, int m_assoc, int m_desig_type, int m_code_set,
-               const struct opts_t * op)
+               struct opts_t * op, sgj_opaque_p jop)
 {
+    bool printed, sgj_output;
     int assoc, off, u, i_len;
-    bool printed;
     const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
     char b[1024];
     char sp[82];
+    static const int blen = sizeof(b);
 
-    if (op->do_quiet)
+    if (op->do_quiet && (! jsp->pr_as_json))
         return decode_dev_ids_quiet(buff, len, m_assoc, m_desig_type,
                                     m_code_set);
     if (num_leading > (int)(sizeof(sp) - 2))
@@ -979,17 +946,41 @@ decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
                     "     remaining response length=%d\n", (len - off));
             return SG_LIB_CAT_MALFORMED;
         }
+        sgj_output = false;
+        if (op->json_st.pr_as_json) {
+            sgj_opaque_p jo2p =
+                sgj_new_named_object(jsp, jop, "designation_descriptor");
+
+            sgj_get_designation_descriptor(jsp, jo2p, bp, i_len + 4);
+            if (jsp->pr_output)
+                sgj_output = true;
+            else
+                continue;
+        }
         assoc = ((bp[1] >> 4) & 0x3);
         if (print_if_found && (! printed)) {
             printed = true;
-            if (strlen(print_if_found) > 0)
-                printf("  %s:\n", print_if_found);
+            if (strlen(print_if_found) > 0) {
+                snprintf(b, blen, "  %s:", print_if_found);
+                if (sgj_output)
+                    sgj_pr_str_output(jsp, b, strlen(b));
+                else
+                    printf("%s\n", b);
+            }
         }
-        if (NULL == print_if_found)
-            printf("  %s%s:\n", sp, sg_get_desig_assoc_str(assoc));
+        if (NULL == print_if_found) {
+            snprintf(b, blen, "  %s%s:", sp, sg_get_desig_assoc_str(assoc));
+            if (sgj_output)
+                sgj_pr_str_output(jsp, b, strlen(b));
+            else
+                printf("%s\n", b);
+        }
         sg_get_designation_descriptor_str(sp, bp, i_len + 4, false,
-                                          op->do_long, sizeof(b), b);
-        printf("%s", b);
+                                          op->do_long, blen, b);
+        if (sgj_output)
+            sgj_pr_str_output(jsp, b, strlen(b));
+        else
+            printf("%s", b);
     }
     if (-2 == u) {
         pr2serr("VPD page error: short designator around offset %d\n", off);
@@ -1150,7 +1141,7 @@ decode_softw_inf_id(uint8_t * buff, int len, int do_hex)
     len -= 4;
     buff += 4;
     for ( ; len > 5; len -= 6, buff += 6)
-	printf("    IEEE identifier: 0x%" PRIx64 "\n",
+        printf("    IEEE identifier: 0x%" PRIx64 "\n",
                sg_get_unaligned_be48(buff + 0));
 }
 
@@ -1266,7 +1257,8 @@ static const char * constituent_type_arr[] = {
 
 /* VPD_DEVICE_CONSTITUENTS 0x8b */
 static void
-decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op)
+decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                       sgj_opaque_p jop)
 {
     int k, j, res, bump, csd_len;
     uint16_t constit_type;
@@ -1335,7 +1327,7 @@ decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op)
                     printf("      Constituent VPD page %d:\n", q + 1);
                     /* SPC-5 says these shall _not_ themselves be Device
                      *  Constituent VPD pages. So no infinite recursion. */
-                    res = svpd_decode_t10(-1, op, 0, off, NULL);
+                    res = svpd_decode_t10(-1, op, jop, 0, off, NULL);
                     if (SG_LIB_CAT_OTHER == res) {
                         res = svpd_decode_vendor(-1, op, off);
                         if (SG_LIB_CAT_OTHER == res)
@@ -2819,8 +2811,8 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
 /* Returns 0 if successful. If don't know how to decode, returns
  * SG_LIB_CAT_OTHER else see sg_ll_inquiry(). */
 static int
-svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
-                const char * prefix)
+svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
+                int subvalue, int off, const char * prefix)
 {
     bool allow_name, allow_if_found, long_notquiet, qt;
     bool vpd_supported = false;
@@ -2997,7 +2989,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_id_vpd(rp, len, subvalue, op);
+                decode_id_vpd(rp, len, subvalue, op, jop);
             }
             return 0;
         }
@@ -3108,7 +3100,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
                            (rp[0] & 0xe0) >> 5,
                            sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_scsi_ports_vpd(rp, len, op);
+                decode_scsi_ports_vpd(rp, len, op, jop);
             }
             return 0;
         }
@@ -3175,7 +3167,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else
-                decode_dev_constit_vpd(rp, len, op);
+                decode_dev_constit_vpd(rp, len, op, jop);
             return 0;
         }
         break;
@@ -3626,7 +3618,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, int subvalue, int off,
 }
 
 static int
-svpd_decode_all(int sg_fd, struct opts_t * op)
+svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
 {
     int k, res, rlen, n, pn;
     int max_pn = 255;
@@ -3670,7 +3662,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
             if (op->do_long)
                 printf("[0x%x] ", pn);
 
-            res = svpd_decode_t10(sg_fd, op, 0, 0, NULL);
+            res = svpd_decode_t10(sg_fd, op, jop, 0, 0, NULL);
             if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(sg_fd, op, 0);
                 if (SG_LIB_CAT_OTHER == res)
@@ -3721,7 +3713,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
             if (op->do_long)
                 printf("[0x%x] ", pn);
 
-            res = svpd_decode_t10(-1, op, 0, off, NULL);
+            res = svpd_decode_t10(-1, op, jop, 0, off, NULL);
             if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(-1, op, off);
                 if (SG_LIB_CAT_OTHER == res)
@@ -3733,7 +3725,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op)
 }
 
 static int
-svpd_examine_all(int sg_fd, struct opts_t * op)
+svpd_examine_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
 {
     bool first = true;
     bool got_one = false;
@@ -3756,7 +3748,7 @@ svpd_examine_all(int sg_fd, struct opts_t * op)
             snprintf(b, sizeof(b), "[0x%x] ", k);
         else
             b[0] = '\0';
-        res = svpd_decode_t10(sg_fd, op, 0, 0, b);
+        res = svpd_decode_t10(sg_fd, op, jop, 0, 0, b);
         if (SG_LIB_CAT_OTHER == res) {
             res = svpd_decode_vendor(sg_fd, op, 0);
             if (SG_LIB_CAT_OTHER == res)
@@ -3783,24 +3775,25 @@ svpd_examine_all(int sg_fd, struct opts_t * op)
 int
 main(int argc, char * argv[])
 {
+    bool as_json;
     int c, res, matches;
     int sg_fd = -1;
     int inhex_len = 0;
     int ret = 0;
     int subvalue = 0;
     const char * cp;
-    struct opts_t * op;
+    sgj_state * jsp;
+    sgj_opaque_p jop = NULL;
     const struct svpd_values_name_t * vnp;
-    struct opts_t opts;
+    struct opts_t opts = {0};
+    struct opts_t * op = &opts;
 
-    op = &opts;
-    memset(&opts, 0, sizeof(opts));
     dup_sanity_chk((int)sizeof(opts), (int)sizeof(*vnp));
     op->vend_prod_num = -1;
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aeEfhHiI:lm:M:p:qrvV", long_options,
+        c = getopt_long(argc, argv, "aeEfhHiI:j::lm:M:p:qrvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -3835,6 +3828,20 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             } else
                 op->inhex_fn = optarg;
+            break;
+        case 'j':
+            if (! sgj_init_state(&op->json_st, optarg)) {
+                int bad_char = op->json_st.first_bad_char;
+                char e[1500];
+
+                if (bad_char) {
+                    pr2serr("bad argument to --json= option, unrecognized "
+                            "character '%c'\n\n", bad_char);
+                }
+                sg_json_usage(0, e, sizeof(e));
+                pr2serr("%s", e);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'l':
             op->do_long = true;
@@ -3972,6 +3979,12 @@ main(int argc, char * argv[])
         }
         return 0;
     }
+
+    as_json = op->json_st.pr_as_json;
+    jsp = &op->json_st;
+    if (as_json)
+        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
+
     if (op->page_str) {
         if ((0 == strcmp("-1", op->page_str)) ||
             (0 == strcmp("-2", op->page_str)))
@@ -3984,7 +3997,8 @@ main(int argc, char * argv[])
                     pr2serr("abbreviation doesn't match a VPD page\n");
                     printf("Available standard VPD pages:\n");
                     enumerate_vpds(1, 1);
-                    return SG_LIB_SYNTAX_ERROR;
+                    ret = SG_LIB_SYNTAX_ERROR;
+                    goto fini;
                 }
             }
             op->vpd_pn = vnp->value;
@@ -3995,14 +4009,16 @@ main(int argc, char * argv[])
             if (cp && op->vend_prod) {
                 pr2serr("the --page=pg,vp and the --vendor=vp forms overlap, "
                         "choose one or the other\n");
-                return SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_SYNTAX_ERROR;
+                goto fini;
             }
             op->vpd_pn = sg_get_num_nomult(op->page_str);
             if ((op->vpd_pn < 0) || (op->vpd_pn > 255)) {
                 pr2serr("Bad page code value after '-p' option\n");
                 printf("Available standard VPD pages:\n");
                 enumerate_vpds(1, 1);
-                return SG_LIB_SYNTAX_ERROR;
+                ret = SG_LIB_SYNTAX_ERROR;
+                goto fini;
             }
             if (cp) {
                 if (isdigit((uint8_t)*(cp + 1)))
@@ -4014,7 +4030,8 @@ main(int argc, char * argv[])
                             "option\n");
                     if (op->vend_prod_num < 0)
                         svpd_enumerate_vendor(-1);
-                    return SG_LIB_SYNTAX_ERROR;
+                    ret = SG_LIB_SYNTAX_ERROR;
+                    goto fini;
                 }
                 subvalue = op->vend_prod_num;
             } else if (op->vend_prod) {
@@ -4027,7 +4044,8 @@ main(int argc, char * argv[])
                     pr2serr("Bad vendor/product acronym after '--vendor=' "
                             "option\n");
                     svpd_enumerate_vendor(-1);
-                    return SG_LIB_SYNTAX_ERROR;
+                    ret = SG_LIB_SYNTAX_ERROR;
+                    goto fini;
                 }
                 subvalue = op->vend_prod_num;
             }
@@ -4041,7 +4059,8 @@ main(int argc, char * argv[])
             pr2serr("Bad vendor/product acronym after '--vendor=' "
                     "option\n");
             svpd_enumerate_vendor(-1);
-            return SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto fini;
         }
         subvalue = op->vend_prod_num;
     }
@@ -4050,7 +4069,8 @@ main(int argc, char * argv[])
                            false);
     if (NULL == rsp_buff) {
         pr2serr("Unable to allocate %d bytes on heap\n", rsp_buff_sz);
-        return sg_convert_errno(ENOMEM);
+        ret = sg_convert_errno(ENOMEM);
+        goto fini;
     }
     if (op->inhex_fn) {
         if (op->device_name) {
@@ -4126,9 +4146,9 @@ main(int argc, char * argv[])
         if ((0 == op->maxlen) || (inhex_len < op->maxlen))
             op->maxlen = inhex_len;
         if (op->do_all)
-            res = svpd_decode_all(-1, op);
+            res = svpd_decode_all(-1, op, jop);
         else {
-            res = svpd_decode_t10(-1, op, subvalue, 0, NULL);
+            res = svpd_decode_t10(-1, op, jop, subvalue, 0, NULL);
             if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(-1, op, 0);
                 if (SG_LIB_CAT_OTHER == res)
@@ -4151,13 +4171,13 @@ main(int argc, char * argv[])
     }
 
     if (op->examine > 0) {
-        ret = svpd_examine_all(sg_fd, op);
+        ret = svpd_examine_all(sg_fd, op, jop);
     } else if (op->do_all)
-        ret = svpd_decode_all(sg_fd, op);
+        ret = svpd_decode_all(sg_fd, op, jop);
     else {
         memset(rsp_buff, 0, rsp_buff_sz);
 
-        res = svpd_decode_t10(sg_fd, op, subvalue, 0, NULL);
+        res = svpd_decode_t10(sg_fd, op, jop, subvalue, 0, NULL);
         if (SG_LIB_CAT_OTHER == res) {
             res = svpd_decode_vendor(sg_fd, op, 0);
             if (SG_LIB_CAT_OTHER == res)
@@ -4183,12 +4203,19 @@ err_out:
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
     }
+fini:
     res = (sg_fd >= 0) ? sg_cmds_close_device(sg_fd) : 0;
 
     if (res < 0) {
         pr2serr("close error: %s\n", safe_strerror(-res));
         if (0 == ret)
-            return sg_convert_errno(-res);
+            ret = sg_convert_errno(-res);
     }
-    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    if (as_json) {
+        if (0 == op->do_hex)
+            sgj_pr2file(jsp, NULL, ret, stdout);
+        sgj_finish(jsp);
+    }
+    return ret;
 }

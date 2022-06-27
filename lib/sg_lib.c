@@ -2957,11 +2957,11 @@ dStrHexStr(const char * str, int len, const char * leadin, int oformat,
            int b_len, char * b)
 {
     bool want_ascii = (0 == oformat);
-    char lf_or = (oformat > 1) ? ' ' : '\n';
     int bpstart, bpos, k, n, prior_ascii_len;
     char buff[DSHS_LINE_BLEN + 2];      /* allow for trailing null */
     char a[DSHS_BPL + 1];               /* printable ASCII bytes or '.' */
     const char * p = str;
+    const char * lf_or = (oformat > 1) ? "  " : "\n";
 
     if (len <= 0) {
         if (b_len > 0)
@@ -2974,16 +2974,20 @@ dStrHexStr(const char * str, int len, const char * leadin, int oformat,
         memset(a, ' ', DSHS_BPL);
         a[DSHS_BPL] = '\0';
     }
+    n = 0;
+    bpstart = 0;
     if (leadin) {
-        bpstart = strlen(leadin);
-        /* Cap leadin at (DSHS_LINE_BLEN - 70) characters */
-        if (bpstart > (DSHS_LINE_BLEN - 70))
-            bpstart = DSHS_LINE_BLEN - 70;
-    } else
-        bpstart = 0;
+        if (oformat > 1)
+            n += sg_scnpr(b + n, b_len - n, "%s", leadin);
+        else {
+            bpstart = strlen(leadin);
+            /* Cap leadin at (DSHS_LINE_BLEN - 70) characters */
+            if (bpstart > (DSHS_LINE_BLEN - 70))
+                bpstart = DSHS_LINE_BLEN - 70;
+        }
+    }
     bpos = bpstart;
     prior_ascii_len = bpstart + (DSHS_BPL * 3) + 1;
-    n = 0;
     memset(buff, ' ', DSHS_LINE_BLEN);
     buff[DSHS_LINE_BLEN] = '\0';
     if (bpstart > 0)
@@ -3005,7 +3009,7 @@ dStrHexStr(const char * str, int len, const char * leadin, int oformat,
                               prior_ascii_len, buff, a);
                 memset(a, ' ', DSHS_BPL);
             } else
-                n += sg_scnpr(b + n, b_len - n, "%s%c", buff, lf_or);
+                n += sg_scnpr(b + n, b_len - n, "%s%s", buff, lf_or);
             if (n >= (b_len - 1))
                 goto fini;
             memset(buff, ' ', DSHS_LINE_BLEN);
@@ -3021,7 +3025,7 @@ dStrHexStr(const char * str, int len, const char * leadin, int oformat,
             n += sg_scnpr(b + n, b_len - n, "%-*s   %s\n", prior_ascii_len,
                           buff, a);
         else
-            n += sg_scnpr(b + n, b_len - n, "%s%c", buff, lf_or);
+            n += sg_scnpr(b + n, b_len - n, "%s%s", buff, lf_or);
     }
 fini:
     if (oformat > 1)

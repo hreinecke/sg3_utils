@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.27 20220624";
+static const char * version_str = "1.28 20220626";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -118,8 +118,7 @@ usage()
           "    --inhex=HFN|-i HFN    same as action as --file=HFN\n"
           "    --json[=JO]|-j[JO]    output in JSON instead of human "
           "readable text.\n"
-          "                          Optional argument JO see sg3_utils "
-          "manpage\n"
+	  "                          Use --json=? for JSON help\n"
           "    --nodecode|-N         do not decode, may be neither sense "
           "nor cdb\n"
           "    --nospace|-n          no spaces or other separators between "
@@ -204,8 +203,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
        case 'j':
             if (! sgj_init_state(&op->json_st, optarg)) {
-                pr2serr("bad argument to --json= option, unrecognized "
-                        "character '%c'\n", op->json_st.first_bad_char);
+                int bad_char = op->json_st.first_bad_char;
+                char e[1500];
+
+                if (bad_char) {
+                    pr2serr("bad argument to --json= option, unrecognized "
+                            "character '%c'\n\n", bad_char);
+                }
+                sg_json_usage(0, e, sizeof(e));
+                pr2serr("%s", e);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -327,7 +333,6 @@ main(int argc, char *argv[])
     const char * cp;
     sgj_state * jsp;
     sgj_opaque_p jop = NULL;
-    sgj_opaque_p jo2p;
     char b[2048];
     struct opts_t opts;
 
@@ -498,12 +503,18 @@ main(int argc, char *argv[])
             sg_get_opcode_sa_name(opcode, sa, 0, blen, b);
             printf("%s\n", b);
         } else {
-            if (as_json)
+            if (as_json) {
                 sgj_get_sense(jsp, jop, op->sense, op->sense_len);
-            else
+                if (jsp->pr_output) {
+                    sg_get_sense_str(NULL, op->sense, op->sense_len,
+                                     op->verbose, blen, b);
+                     sgj_pr_str_output(jsp, b, strlen(b));
+                }
+            } else {
                 sg_get_sense_str(NULL, op->sense, op->sense_len,
                                  op->verbose, blen, b);
-            printf("%s\n", b);
+                printf("%s\n", b);
+            }
         }
     }
 fini:
@@ -511,10 +522,13 @@ fini:
 
 #if 0
 // <<<<   testing
+{
+    sgj_opaque_p jo2p;
+
 // uint8_t dd[] = {0x1, 0x0, 0x0, 0x6, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
 
-uint8_t dd[] = {0x01, 0x00, 0x00, 0x16, 0x11, 0x22, 0x33, 0x44 , 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
-                0xdd, 0xee, 0xff, 0xed, 0xcb, 0xa9, 0x87, 0x65 , 0x43, 0x21};
+// uint8_t dd[] = {0x01, 0x00, 0x00, 0x16, 0x11, 0x22, 0x33, 0x44 , 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
+//                 0xdd, 0xee, 0xff, 0xed, 0xcb, 0xa9, 0x87, 0x65 , 0x43, 0x21};
 
 // uint8_t dd[] = {0x2, 0x1, 0x0, 0x14,
 //              0x41, 0x42, 0x43, 0x20, 0x20, 0x20, 0x20, 0x20,
@@ -523,8 +537,11 @@ uint8_t dd[] = {0x01, 0x00, 0x00, 0x16, 0x11, 0x22, 0x33, 0x44 , 0x55, 0x66, 0x7
 // uint8_t dd[] = {0x01, 0x03, 0x00, 0x08, 0x51, 0x22, 0x33, 0x44,  0x55, 0x66, 0x77, 0x88};
 // uint8_t dd[] = {0x01, 0x03, 0x00, 0x10, 0x61, 0x22, 0x33, 0x44,  0x55, 0x66, 0x77, 0x88, 0xaa, 0xbb, 0xcc, 0xdd,  0xee, 0xff, 0xee, 0xdd};
 
+uint8_t dd[] = {0x01, 0x14, 0x00, 0x04, 0x0, 0x0, 0x0, 0x2,  };
+
 jo2p = sgj_new_named_object(jsp, jop, "designation_descriptor");
 sgj_get_designation_descriptor(jsp, jo2p, dd, sizeof(dd));
+}
 // <<<< end of testing
 #endif
 

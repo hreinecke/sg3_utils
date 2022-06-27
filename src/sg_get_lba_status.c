@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.27 20220616";      /* sbc5r01 */
+static const char * version_str = "1.28 20220626";      /* sbc5r01 */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -106,7 +106,8 @@ usage()
             "                        assumed to be ASCII hex or, if --raw, "
             "in binary\n"
             "    --json[=JO]|-j[JO]    output in JSON instead of human "
-            "readable text\n"
+            "readable text.\n"
+            "                          Use --json=? for JSON help\n"
             "    --lba=LBA|-l LBA    starting LBA (logical block address) "
             "(def: 0)\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
@@ -291,8 +292,15 @@ main(int argc, char * argv[])
             break;
         case 'j':
             if (! sgj_init_state(&json_st, optarg)) {
-                pr2serr("bad argument to --json= option, unrecognized "
-                        "character '%c'\n", json_st.first_bad_char);
+                int bad_char = json_st.first_bad_char;
+                char e[1500];
+
+                if (bad_char) {
+                    pr2serr("bad argument to --json= option, unrecognized "
+                            "character '%c'\n\n", bad_char);
+                }
+                sg_json_usage(0, e, sizeof(e));
+                pr2serr("%s", e);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;

@@ -87,7 +87,7 @@ sg_chk_asc: sg_chk_asc.o ../lib/sg_lib.o ../lib/sg_lib_data.o
 sg_tst_nvme: sg_tst_nvme.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^
 
-tst_sg_lib: tst_sg_lib.o ../lib/sg_lib.o ../lib/sg_lib_data.o
+tst_sg_lib: tst_sg_lib.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sgs_dd: sgs_dd.o $(LIBFILESOLD)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 Douglas Gilbert.
+ * Copyright (c) 2013-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -44,8 +44,10 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.14 20200901";
+static const char * version_str = "1.15 20220625";
 
+
+#define MY_NAME "tst_sg_lib"
 
 #define MAX_LINE_LEN 1024
 
@@ -55,6 +57,7 @@ static struct option long_options[] = {
         {"exit", no_argument, 0, 'e'},
         {"help", no_argument, 0, 'h'},
         {"hex2",  no_argument, 0, 'H'},
+        {"json", optional_argument, 0, 'j'},
         {"leadin",  required_argument, 0, 'l'},
         {"num",  required_argument, 0, 'n'},
         {"printf", no_argument, 0, 'p'},
@@ -136,7 +139,7 @@ static const uint8_t desc_sense_data5[] = {
     };
 
 static const uint8_t desc_sense_data6[] = {
-   /* UA, req, subsidiary bindinganged */
+   /* UA, req, subsidiary binding */
     0x72, 0x6, 0x3f, 0x1a, 0x0, 0x0, 0x0, 26+12+12,
     /* 0xe: designator, reason: preferred admin lu, uuid */
     0xe, 0x18, 0x0, 0x4, 0x1, 0xa, 0x0, 0x12,
@@ -215,6 +218,7 @@ static uint8_t arr[64];
 int
 main(int argc, char * argv[])
 {
+    bool as_json = false;
     bool do_exit_status = false;
     bool ok;
     int k, c, n, len;
@@ -227,6 +231,10 @@ main(int argc, char * argv[])
     int did_something = 0;
     int vb = 0;
     int ret = 0;
+    sgj_opaque_p jop = NULL;
+    sgj_opaque_p jo2p;
+    sgj_state json_st = {0};
+    sgj_state * jsp = &json_st;
     char b[2048];
     char bb[256];
     const int b_len = sizeof(b);
@@ -234,7 +242,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "b:ehHl:n:psuvV", long_options,
+        c = getopt_long(argc, argv, "b:ehHj::l:n:psuvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -258,6 +266,14 @@ main(int argc, char * argv[])
         case 'H':
             ++do_hex2;
             break;
+        case 'j':
+            if (! sgj_init_state(&json_st, optarg)) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n", json_st.first_bad_char);
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            break;
+
         case 'l':
             leadin = optarg;
             break;
@@ -299,6 +315,10 @@ main(int argc, char * argv[])
         }
     }
 
+    as_json = json_st.pr_as_json;
+    if (as_json)
+        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
+
     if (do_exit_status) {
         ++did_something;
 
@@ -335,39 +355,87 @@ main(int argc, char * argv[])
 
     if (do_sense ) {
         ++did_something;
-        printf("desc_sense_data test1:\n");
-        sg_print_sense(leadin, desc_sense_data1,
-                       (int)sizeof(desc_sense_data1), vb);
-        printf("\n");
+        if (as_json) {
+            jo2p = sgj_new_named_object(jsp, jop, "desc_sense_data__test1");
+            sgj_get_sense(jsp, jo2p,  desc_sense_data1,
+                          (int)sizeof(desc_sense_data1));
+        } else {
+            printf("desc_sense_data test1:\n");
+            sg_print_sense(leadin, desc_sense_data1,
+                           (int)sizeof(desc_sense_data1), vb);
+            printf("\n");
+        }
 #if 1
-        printf("sg_get_sense_str(ds_data1):\n");
-        sg_get_sense_str(leadin, desc_sense_data1,
-                         sizeof(desc_sense_data1), vb, b_len, b);
-        printf("sg_get_sense_str: strlen(b)->%u\n", (uint32_t)strlen(b));
-        printf("%s", b);
-        printf("\n");
+        if (as_json) {
+            sgj_pr_str_output(jsp, "sg_get_sense_str(ds_data1)", 999);
+            sg_get_sense_str(leadin, desc_sense_data1,
+                             sizeof(desc_sense_data1), vb, b_len, b);
+            sgj_pr_str_output(jsp, b, strlen(b));
+
+        } else {
+            printf("sg_get_sense_str(ds_data1):\n");
+            sg_get_sense_str(leadin, desc_sense_data1,
+                             sizeof(desc_sense_data1), vb, b_len, b);
+            printf("sg_get_sense_str: strlen(b)->%u\n", (uint32_t)strlen(b));
+            printf("%s", b);
+            printf("\n");
+        }
 #endif
-        printf("desc_sense_data test2\n");
-        sg_print_sense(leadin, desc_sense_data2,
-                       (int)sizeof(desc_sense_data2), vb);
-        printf("\n");
-        printf("desc_sense block dev combo plus designator test3\n");
-        sg_print_sense(leadin, desc_sense_data3,
-                       (int)sizeof(desc_sense_data3), vb);
-        printf("\n");
-        printf("desc_sense forwarded sense test4\n");
-        sg_print_sense(leadin, desc_sense_data4,
-                       (int)sizeof(desc_sense_data4), vb);
-        printf("\n");
-        printf("desc_sense ATA Info test5\n");
-        sg_print_sense(leadin, desc_sense_data5,
-                       (int)sizeof(desc_sense_data5), vb);
-        printf("\n");
-        printf("desc_sense UA subsidiary binding changed test6\n");
-        sg_print_sense(leadin, desc_sense_data6,
-                       (int)sizeof(desc_sense_data6), vb);
-        printf("\n");
-        printf("\n");
+        if (as_json) {
+            jo2p = sgj_new_named_object(jsp, jop, "desc_sense_data__test2");
+            sgj_get_sense(jsp, jo2p,  desc_sense_data2,
+                          (int)sizeof(desc_sense_data2));
+        } else {
+            printf("desc_sense_data test2\n");
+            sg_print_sense(leadin, desc_sense_data2,
+                           (int)sizeof(desc_sense_data2), vb);
+            printf("\n");
+        }
+        if (as_json) {
+            jo2p = sgj_new_named_object(jsp, jop,
+                                        "desc_sense_block_combo_test3");
+            sgj_get_sense(jsp, jo2p,  desc_sense_data3,
+                          (int)sizeof(desc_sense_data3));
+        } else {
+            printf("desc_sense block dev combo plus designator test3\n");
+            sg_print_sense(leadin, desc_sense_data3,
+                           (int)sizeof(desc_sense_data3), vb);
+            printf("\n");
+        }
+        if (as_json) {
+            jo2p = sgj_new_named_object(jsp, jop,
+                                        "desc_sense_forwarded_sense_test4");
+            sgj_get_sense(jsp, jo2p,  desc_sense_data4,
+                          (int)sizeof(desc_sense_data4));
+        } else {
+            printf("desc_sense forwarded sense test4\n");
+            sg_print_sense(leadin, desc_sense_data4,
+                           (int)sizeof(desc_sense_data4), vb);
+            printf("\n");
+        }
+        if (as_json) {
+            jo2p = sgj_new_named_object(jsp, jop,
+                                        "desc_sense_ata_info_test5");
+            sgj_get_sense(jsp, jo2p,  desc_sense_data5,
+                          (int)sizeof(desc_sense_data5));
+        } else {
+            printf("desc_sense ATA Info test5\n");
+            sg_print_sense(leadin, desc_sense_data5,
+                           (int)sizeof(desc_sense_data5), vb);
+            printf("\n");
+        }
+        if (as_json) {
+            jo2p = sgj_new_named_object(jsp, jop,
+                                        "desc_sense_ua_binding_test6");
+            sgj_get_sense(jsp, jo2p,  desc_sense_data6,
+                          (int)sizeof(desc_sense_data6));
+        } else {
+            printf("desc_sense UA subsidiary binding changed test6\n");
+            sg_print_sense(leadin, desc_sense_data6,
+                           (int)sizeof(desc_sense_data6), vb);
+            printf("\n");
+            printf("\n");
+        }
     }
 
     if (do_printf) {
@@ -459,7 +527,7 @@ main(int argc, char * argv[])
                        0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58};
 
         ++did_something;
-        for (k = 0; k < 18; ++k) {
+        for (k = 0; k < 19; ++k) {
             printf("k=%d:\n", k);
             hex2stdout(b, k, 0);
             hex2str(b, k, "h2str0: ", 0, sizeof(bb), bb);
@@ -467,6 +535,8 @@ main(int argc, char * argv[])
             hex2stdout(b, k, 1);
             hex2str(b, k, "h2str1: ", 1, sizeof(bb), bb);
             printf("%s", bb);
+            hex2str(b, k, "h2str2: ", 2, sizeof(bb), bb);
+            printf("%s\n", bb);
             hex2stdout(b, k, -1);
             printf("\n");
         }
@@ -654,5 +724,11 @@ main(int argc, char * argv[])
 
     if (0 == did_something)
         printf("Looks like no tests done, check usage with '-h'\n");
+    ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    if (as_json) {
+        if (0 == do_hex2)
+            sgj_pr2file(jsp, NULL, ret, stdout);
+        sgj_finish(jsp);
+    }
     return ret;
 }

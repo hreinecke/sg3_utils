@@ -1,0 +1,30 @@
+# Test descriptor format sense data. Values are in hex.
+# Invocation: 'sg_decode_sense -f descriptor_sense.hex'   [dpg 20220626]
+
+
+# unrec_err, excessive_writes, sdat_ovfl, additional_len=? 
+72 01 03 02 80 00 00 4c
+
+# Information: 0x11223344556677bb
+00 0a 80 00 11 22 33 44 55 66 77 bb
+
+# command specific: 0x3344556677bbccff
+01 0a 00 00 33 44 55 66 77 bb cc ff
+
+# sense key specific: SKSV=1, actual_count=257 (hex: 0x101)
+02 06 00 00 80 01 01 00
+
+# field replaceable code=0x45
+03 02 00 45
+
+# another progress report indicator
+0a 06 02 01 02 00 32 01
+
+# incorrect length indicator (ILI)
+05 02 00 20
+
+# user data segment referral
+0b 1a 01 00
+00 00 00 01 01 02 03 04 05 06 07 08
+01 02 03 04 55 06 07 08
+02 00 12 34

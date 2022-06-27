@@ -40,7 +40,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.39 20220616";
+static const char * version_str = "1.40 20220625";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -188,8 +188,7 @@ usage(int h)
             "    --inhex=FN|-i FN    decode contents of FN, ignore DEVICE\n"
             "    --json[=JO]|-j[JO]    output in JSON instead of human "
             "readable text.\n"
-            "                          Optional argument JO see sg3_utils "
-            "manpage\n"
+            "                          Use --json=? for JSON help\n"
             "    --locator=LBA|-l LBA    similar to --start= option\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
@@ -1216,8 +1215,15 @@ main(int argc, char * argv[])
             break;
        case 'j':
             if (! sgj_init_state(&op->json_st, optarg)) {
-                pr2serr("bad argument to --json= option, unrecognized "
-                        "character '%c'\n", op->json_st.first_bad_char);
+                int bad_char = op->json_st.first_bad_char;
+                char e[1500];
+
+                if (bad_char) {
+                    pr2serr("bad argument to --json= option, unrecognized "
+                            "character '%c'\n\n", bad_char);
+                }
+                sg_json_usage(0, e, sizeof(e));
+                pr2serr("%s", e);
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
@@ -1512,7 +1518,7 @@ the_end:
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
     if (as_json) {
         if (0 == op->do_hex)
-            sgj_pr2file(&op->json_st, NULL, ret, stdout);
+            sgj_pr2file(jsp, NULL, ret, stdout);
         sgj_finish(jsp);
     }
     return ret;
