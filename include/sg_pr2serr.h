@@ -90,7 +90,7 @@ typedef struct sgj_state_t {
  * unless jsp->pr_output is true. Otherwise this function prints to stdout
  * like printf(fmt, ...); note that no LF is added. In the jsp->pr_output
  * is true case, nothing is printed to stdout but instead is placed into the
- * JSON 'output" array (jsp->outputp) after some preprocessing. That
+ * JSON 'output' array (jsp->outputp) after some preprocessing. That
  * preprocessing involves removing a leading LF from 'fmt' (if present) and
  * up to two trailing LF characters. */
 void sgj_pr_hr(sgj_state * jsp, const char * fmt, ...) __printf(2, 3);

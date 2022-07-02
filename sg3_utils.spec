@@ -5,7 +5,7 @@ Version: 1.48
 Release: 1
 License: GPL
 Group: Utilities/System
-Source: https://sg.danny.cz/sg/p/sg3_utils-%{version}.tgz
+Source: https://sg.danny.cz/sg/p/sg3_utils-%{version}.tar.gz
 Url: https://sg.danny.cz/sg/sg3_utils.html
 Provides: sg_utils
 # BuildRequires: libtool
@@ -81,10 +81,9 @@ fi
 %{_includedir}/scsi/*.h
 %{_libdir}/*.so
 %{_libdir}/*.a
-%{_libdir}/*.la
 
 %changelog
-* Wed Mar 09 2022 - dgilbert at interlog dot com
+* Fri Jul 01 2022 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.48
 

@@ -317,9 +317,19 @@ sgj_start(const char * util_name, const char * ver_str, int argc,
             jv2p = json_object_push((json_value *)jvp, "utility_invoked",
                                     json_object_new(0));
     }
-    if (jsp->pr_output && jv2p)
+    if (jsp->pr_output && jv2p) {
         jsp->outputp = json_object_push((json_value *)jv2p, "output",
                                         json_array_new(0));
+        if (jsp->pr_leadin && (jsp->verbose > 3)) {
+            char * bp = (char *)calloc(4096, 1);
+
+            if (bp) {
+                sg_json_usage(0, bp, 4096);
+                sgj_pr_str_output(jsp, bp, strlen(bp));
+                free(bp);
+            }
+        }
+    }
     return jvp;
 }
 
@@ -1014,7 +1024,7 @@ sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
                             sg_get_unaligned_be64(ip + 8));
             break;
         default:
-            sgj_add_nv_s(jsp, jop, "eui_64", "decoding falied");
+            sgj_add_nv_s(jsp, jop, "eui_64", "decoding failed");
             break;
         }
         break;

@@ -1,13 +1,13 @@
-.TH SG_VPD "8" "January 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_VPD "8" "July 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
 .B sg_vpd
 [\fI\-\-all\fR] [\fI\-\-enumerate\fR] [\fI\-\-examine\fR] [\fI\-\-force\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-ident\fR] [\fI\-\-inhex=FN\fR]
-[\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR]
-[\fI\-\-raw\fR] [\fI\-\-vendor=VP\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fIDEVICE\fR]
+[\fI\-\-json[=JO]\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-vendor=VP\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -117,6 +117,10 @@ with. The hexadecimal should be arranged as 1 or 2 digits representing a
 byte each of which is whitespace or comma separated. Anything from and
 including a hash mark to the end of line is ignored. If the \fI\-\-raw\fR
 option is also given then \fIFN\fR is treated as binary.
+.TP
+\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. This is an
+EXPERIMENTAL feature; see sg3_utils_json manpage.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 when decoding some VPD pages, give a little more output. For example the ATA

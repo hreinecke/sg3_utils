@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.72 20220627";  /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.73 20220701";  /* spc6r06 + sbc5r01 */
 
 #define MY_NAME "sg_decode_sense"
 
@@ -503,8 +503,8 @@ std_inq_decode(uint8_t * b, int len, int verbose)
 }
 
 static void
-decode_id_vpd(uint8_t * buff, int len, int subvalue, struct opts_t * op,
-              sgj_opaque_p jop)
+decode_id_vpd_variants(uint8_t * buff, int len, int subvalue,
+                       struct opts_t * op, sgj_opaque_p jop)
 {
     int m_a, m_d, m_cs, blen;
     uint8_t * b;
@@ -947,7 +947,7 @@ decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
             return SG_LIB_CAT_MALFORMED;
         }
         sgj_output = false;
-        if (op->json_st.pr_as_json) {
+        if (jsp->pr_as_json) {
             sgj_opaque_p jo2p =
                 sgj_new_named_object(jsp, jop, "designation_descriptor");
 
@@ -2820,6 +2820,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     int len, pdt, num, k, resid, alloc_len, pn, vb;
     int res = 0;
     const struct svpd_values_name_t * vnp;
+    sgj_state * jsp = &op->json_st;
     uint8_t * rp;
     const char * np;
     const char * pre = (prefix ? prefix : "");;
@@ -2974,11 +2975,11 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case VPD_DEVICE_ID:         /* 0x83 */
         np = "Device Identification VPD page:";
         if (allow_name)
-            printf("%s%s\n", pre, np);
+            sgj_pr_hr(jsp, "%s%s\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
             else if (op->do_hex)
@@ -2986,10 +2987,10 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else {
                 pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_id_vpd(rp, len, subvalue, op, jop);
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", (rp[0] & 0xe0) >> 5,
+                              sg_get_pdt_str(pdt, sizeof(b), b));
+                decode_id_vpd_variants(rp, len, subvalue, op, jop);
             }
             return 0;
         }

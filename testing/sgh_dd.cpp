@@ -71,7 +71,8 @@ static const char * version_str = "2.20 20220616";
 
 #include <vector>
 #include <array>
-#include <atomic>       // C++ header replacing <stdatomic.h>
+#include <atomic>       // C++ header replacing <stdatomic.h> also link
+                        // needed '-l atomic' . Not anymore??
 #include <random>
 #include <thread>       // needed for std::this_thread::yield()
 #include <mutex>

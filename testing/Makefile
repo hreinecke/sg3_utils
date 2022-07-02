@@ -111,14 +111,15 @@ sg_tst_context: sg_tst_context.o $(LIBFILESNEW)
 sg_tst_async: sg_tst_async.o $(LIBFILESNEW)
 	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
 
+# Next three used to require '-latomic', may not anymore
 sgh_dd: sgh_dd.o $(LIBFILESNEW)
-	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
 
 sg_mrq_dd: sg_mrq_dd.o sg_scat_gath.o $(LIBFILESNEW)
-	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
 
 sg_iovec_tst: sg_iovec_tst.o sg_scat_gath.o $(LIBFILESNEW)
-	$(CXXLD) -o $@ $(LDFLAGS) -pthread -latomic $^
+	$(CXXLD) -o $@ $(LDFLAGS) -pthread $^
 
 sg_take_snap: sg_take_snap.o $(LIBFILESNEW)
 	$(LD) -o $@ $(LDFLAGS) $^

@@ -1,9 +1,9 @@
-.TH SG3_UTILS "8" "June 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG3_UTILS "8" "July 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg3_utils \- JSON output for some utilities
 .SH SYNOPSIS
 .B sg_*
-\fI\-\-json[=JO]\fR [\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
+\fI\-\-json[=JO]\fR [\fIOTHER_OPTIONS\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -47,61 +47,144 @@ have an optional argument. In its shorter form it may either be \fI\-j\fR or
 also take an argument but there must not be a space (or whitespace) between
 \fI\-j\fR and that argument.  
 .SH ENVIRONMENT VARIABLES
-The SG3_UTILS_JSON_OPTS environment variable
-yyyyyyyy
- is explained in the previous
-section. It is only for backward compatibility of the command line options
-for older utilities.
-.PP
-The SG3_UTILS_DSENSE environment variable may be set to a number. It is
-only used by the embedded SNTL within the library used by the utilities in
-this library. SNTL is a SCSI to NVMe Translation Layer. This environment
-variable defaults to 0 which will lead to any utility that issues a SCSI
-command that is translated to a NVMe command (by the embedded SNTL) that
-fails at the NVMe dvice, to return SCSI sense in 'fixed' format. If this
-variable is non\-zero then then the returned SCSI sense will be in 'descriptor'
-format.
-.PP
-Several utilities have their own environment variable setting (e.g.
-sg_persist has SG_PERSIST_IN_RDONLY). See individual utility man pages
-for more information.
-.PP
-There is a Linux specific environment variable called SG3_UTILS_LINUX_NANO
-that if defined and the sg driver in the system is 4.0.30 or later, will
-show command durations in nanoseconds rather than the default milliseconds.
-Command durations are typically only shown if \-\-verbose is used 3 or more
-times. Due to an interface problem (a 32 bit integer that should be 64 bits
-with the benefit of hindsight) the maximum duration that can be represented
-in nanoseconds is about 4.2 seconds. If longer durations may occur then
-don't define this environment variable (or undefine it).
+The SG3_UTILS_JSON_OPTS environment variable allows the user to override the
+default values of the \fIJO\fR settings. Those settings can again be overridden
+by the command line \fI\-\-json[=JO]\fR option. If the string associated with
+SG3_UTILS_JSON_OPTS cannot be parsed this error message is sent to
+stderr: "error parsing SG3_UTILS_JSON_OPTS environment variable, ignore".
 .SH OPTIONS
 Since the argument to \fI\-\-json[=JO]\fR is optional, in the shorter form
 there can be no space(s) between the option and its argument.
 .TP
 \fB\-j[JO]\fR, \fB\-\-json\fR\fI[=JO]\fR
-yyyyyyyyy
-utilities that can cause lots of user data to be lost or overwritten
-sometimes have a \fI\-\-dry\-run\fR option. Device modifying actions are
-typically bypassed (or skipped) to implement a policy of "do no harm".
-This allows complex command line invocations to be tested before the
-action required (e.g. format a disk) is performed. The \fI\-\-dry\-run\fR
-option has become a common feature of many command line utilities (e.g.
-the Unix 'patch' command), not just those from this package.
+\fIJO\fR is a string of 0 or more characters whose order is not significant
+apart from the negation characters ('\-' is preferred). The negation character
+must appear immediately before the (boolean) feature it is toggling.
 .br
-Note that most hyphenated option names in this package also can be given
-with an underscore rather than a hyphen (e.g.  \fI\-\-dry_run\fR).
-.SH WEB SITE
-There is a web page discussing this package at
-https://sg.danny.cz/sg/sg3_utils.html . The device naming used by this
-package on various operating systems is discussed at:
-https://sg.danny.cz/sg/device_name.html . There is a git code mirror at
-https://github.com/hreinecke/sg3_utils . The principle code repository
-uses subversion and is on the author's equipment. The author keeps track
-of this via the subversion revision number which is an ascending integer
-(currently at 922 for this package). The github mirror gets updated
-periodically from the author's repository. Depending on the time of
-update, the above Downloads section at sg.danny.cz may be more up to
-date than the github mirror.
+In the short form the option letter may be other than \fI\-j\fR if that letter
+has already been used (\fI\-J\fR is preferred next). For example the sg_ses
+utility uses \fI\-j\fR for its "join" operation. Also since the argument to
+the short form option is itself optional, there can be no space between the
+short form option and \fIJO\fR, if it is given. To make this read a little
+better on the command line, "=" may be first character of \fIJO\fR, so for
+example, this is valid '\-j=av'.
+.SH JSON CONTROL CHARACTERS
+Each \fIJO\fR string is made up of zero or more of the following JSON control
+characters.
+.TP
+\fB0\fR
+If pretty printing JSON output, tab to 2 spaces.
+.TP
+\fB2\fR
+If pretty printing JSON output, tab to 2 spaces.
+.TP
+\fB4\fR
+If pretty printing JSON output, tab to 4 spaces.
+.br
+This is the default tab setting for pretty printing JSON.
+.TP
+\fB8\fR
+If pretty printing JSON output, tab to 8 spaces.
+.TP
+\fB=\fR
+does nothing. May appear as first character of \fIJO\fR. This character is
+defined to make the short option form look better (e.g. '\-j=av').
+.TP
+\fB\-\fR
+negation character. Toggles the (boolean) sense of the following control
+character.
+.TP
+\fBa\fR
+this is a boolean control character for "abbreviated name expansion". T10
+names fields often depending on the amount of space available in the
+CDB (command descriptor block) table in the relevant specification. This
+leads to some clear names (e.g. "number of blocks) and some not so clear
+names (e.g. "SKSV"). When this character is on (true), then fields that have
+abbreviated names (subjective decision by author) will use the T10 field
+name with a sub\-object containing at least a "i" field with the integer
+value and a "abbreviated_name_expansion" field with a string value that
+should make the T10 name clearer (e.g. "Sense Key Specific Valid").
+.br
+This boolean control character is default off (false).
+.TP
+\fBe\fR
+this is a boolean control character for "exit status". If active an "exit
+status" field is placed at the end of the JSON output. The integer value
+of this field is the Unix exit status value that is return to the operating
+system when this utility exits. The value of 0 is a good exit (i.e. no
+errors detected).
+.br
+This boolean control character is default on (true).
+.TP
+\fBh\fR
+this is a boolean control character for "hexadecimal". Many values associated
+with SCSI are best (or at least historically) viewed in hexadecimal while
+JSON output prefers decimal integers (assumed to have a maximum size of 64
+bits, signed). The maximum size of most SCSI fields is 64 bit _unsigned_ .
+Also some SCSI fields are masks which are best viewed in hex. When this
+control character is active most (non\-trivial) fields that have an integer
+value instead receive a a sub\-object containing at least a "i" field with
+the integer value and a "hex" field with the corresponding hex value in a
+JSON string. That hex string has no hex decorations (i.e. no leading '0x'
+nor traing 'h').
+.br
+This boolean control character is default off (false).
+.TP
+\fBl\fR
+this is a boolean control character to control whether lead\-in fields are
+output. Lead\-in fields are at the start of the JSON output and include
+json_format_version and utility_invoked sub\-objects. The utility_invoked
+sub\-object includes name, version_date string fields and an JSON array
+named argv with an entry for each command line argument. If the \fIo\fR
+control character is also active, then if available, the non_JSON output
+is placed in and array called output with one element per line
+of 'normal' output.
+.br
+This boolean control character is default on (true).
+.TP
+\fBo\fR
+this is a boolean control character to control whether normal (i.e.
+non\-JSON) lines of output are placed in a JSON array (one element per
+line of normal output) within the utility_invoked subject (see control
+character \fIl\fR). This control character is only active when the
+\fIl\fR control character is also active).
+.br
+This boolean control character is default off (false).
+.TP
+\fBp\fR
+this boolean control character controls whether the JSON output
+is "pretty printed" or sent in a relatively compact stream suitable
+for more efficient transmission over a communications channel.
+.br
+The pretty printed form of output has one JSON name with its associated
+integer, string or boolean value per line; and one array element per line.
+JSON objects and arrays that have an associated JSON object as their value,
+have their name on a separate line. These lines are indented with the
+current tab setting to indicate the level of nesting. Basically the pretty
+printed form is for human consumption.
+.br
+This boolean control character is default on (true).
+.TP
+\fBs\fR
+this boolean control character controls whether T10 field values that have
+a defined meaning are broken out with an added JSON sub\-object usually
+named "meaning". When active the field name has a sub\-object that contains
+at least an "i" field with the integer value of the field and a JSON string
+object, usually named "meaning", with a string that corresponds to the T10
+defined meaning of the value in the "i" field.
+.br
+This boolean control character is default on (true).
+.TP
+\fBv\fR
+this is an integer control character that controls the amount of debug output.
+It can be given multiple times to increase the level of JSON debug
+verbosity in the output.
+.br
+Note that this verbose control character is JSON specific while the
+\fI\-\-verbose\fR option (short form: fI\-v\fR often repeated: fI\-vvv\fR) that
+most utilities support is more general.
+.br
+This integer control character is set to 0 by default.
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).

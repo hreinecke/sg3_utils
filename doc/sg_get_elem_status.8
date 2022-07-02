@@ -1,4 +1,4 @@
-.TH SG_GET_ELEM_STATUS "8" "May 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_GET_ELEM_STATUS "8" "July 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_get_elem_status \- send SCSI GET PHYSICAL ELEMENT STATUS command
 .SH SYNOPSIS
@@ -73,7 +73,7 @@ also given then the contents of \fIFN\fR are treated as binary.
 .TP
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
 output is in JSON format instead of human readable form. This is an
-EXPERIMENTAL feature; more information to follow.
+EXPERIMENTAL feature; see the sg3_utils_json manpage.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in
@@ -134,4 +134,4 @@ Copyright \(co 2019\-2022 Douglas Gilbert
 This software is distributed under a FreeBSD license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_get_lba_status(8), sg3_utils(8)
+.B sg_get_lba_status,sg3_utils,sg3_utils_json(sg3_utils)

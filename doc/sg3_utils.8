@@ -1,12 +1,13 @@
-.TH SG3_UTILS "8" "June 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG3_UTILS "8" "July 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
 .B sg_*
 [\fI\-\-dry\-run\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-in=FN\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
-[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fIOTHER_OPTIONS\fR] \fIDEVICE\fR
+[\fI\-\-in=FN\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-timeout=SECS\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fIOTHER_OPTIONS\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -616,6 +617,17 @@ expected in the contents of file: \fIFN\fR. Alternatively the short form
 option may be \fI\-I\fR or \fI\-X\fR. See the "FORMAT OF FILES CONTAINING
 ASCII HEX" section below for more information.
 .TP
+\fB\-\-json\fR[=\fIJO\fR]
+The default output of most utilities that decode information returned from
+SCSI devices is designed for human readability. Sometimes a more parseable
+form of output is required and JSON is a popular way to do this. Only
+utilities that decode a significant amount of SCSI data support this option.
+.br
+The corresponding short option is usually \fI\-j[JO]\fR but maybe
+\fI\-J[JO]\fR if \fI\-j\fR is already in use. Note that in all cases \fIJO\fR
+argument is itself optional. See the sg3_utils_json manpage for more
+information.
+.TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
 lengths that vary depending on many factors, only some of which these
@@ -848,8 +860,8 @@ code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
 under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
 or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_decode_sense(sg3_utils), sdparm(sdparm), ddpt(ddpt), lsscsi(lsscsi),
-.B dmesg(1), mt(1)
+.B sg3_utils_json,sg_decode_sense(sg3_utils), sdparm(sdparm), ddpt(ddpt),
+.B lsscsi(lsscsi), dmesg(1), mt(1)
 .br
 The format of this section is: <utility_name>(<package_containing_utility>)
 or <utility_name>(<manpage_section_number_containing_utility>) .
