@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * This program outputs information provided by a SCSI INQUIRY command.
- * It is mainly based on the SCSI SPC-5 document at https://www.t10.org .
+ * It is mainly based on the SCSI SPC-6 document at https://www.t10.org .
  *
  * Acknowledgment:
  *    - Martin Schwenke <martin at meltin dot net> added the raw switch and

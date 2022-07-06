@@ -505,10 +505,10 @@ main(int argc, char *argv[])
         } else {
             if (as_json) {
                 sgj_get_sense(jsp, jop, op->sense, op->sense_len);
-                if (jsp->pr_output) {
+                if (jsp->pr_out_hr) {
                     sg_get_sense_str(NULL, op->sense, op->sense_len,
                                      op->verbose, blen, b);
-                     sgj_pr_str_output(jsp, b, strlen(b));
+                     sgj_pr_str_out_hr(jsp, b, strlen(b));
                 }
             } else {
                 sg_get_sense_str(NULL, op->sense, op->sense_len,

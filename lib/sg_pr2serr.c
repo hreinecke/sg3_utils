@@ -49,6 +49,8 @@ static const json_serialize_opts def_out_settings = {
     4                                   /* indent size */
 };
 
+static int sgj_name_to_snake(const char * in, char * out, int maxlen_out);
+
 
 /* Users of the sg_pr2serr.h header need this function definition */
 int
@@ -116,11 +118,14 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
         case 'h':
             jsp->pr_hex = ! prev_negate;
             break;
+        case 'k':
+            jsp->pr_packed = ! prev_negate;
+            break;
         case 'l':
             jsp->pr_leadin = ! prev_negate;
             break;
         case 'o':
-            jsp->pr_output = ! prev_negate;
+            jsp->pr_out_hr = ! prev_negate;
             break;
         case 'p':
             jsp->pr_pretty = ! prev_negate;
@@ -178,6 +183,8 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
     n +=  sg_scnpr(b + n, blen - n,
                    "      h    show 'hex' fields\n");
     n +=  sg_scnpr(b + n, blen - n,
+                   "      k    packed, only non-pretty printed output\n");
+    n +=  sg_scnpr(b + n, blen - n,
                    "      l    show lead-in fields (invocation "
                    "information)\n");
     n +=  sg_scnpr(b + n, blen - n,
@@ -212,11 +219,12 @@ fini:
 char *
 sg_json_settings(sgj_state * jsp, char * b, int blen)
 {
-    snprintf(b, blen, "%d%sa%se%sh%sl%so%sp%ss%sv", jsp->pr_indent_size,
+    snprintf(b, blen, "%d%sa%se%sh%sk%sl%so%sp%ss%sv", jsp->pr_indent_size,
              jsp->pr_ane ? "" : "-", jsp->pr_exit_status ? "" : "-",
-             jsp->pr_hex ? "" : "-", jsp->pr_leadin ? "" : "-",
-             jsp->pr_output ? "" : "-", jsp->pr_pretty ? "" : "-",
-             jsp->pr_string ? "" : "-", jsp->verbose ? "" : "-");
+             jsp->pr_hex ? "" : "-", jsp->pr_packed ? "" : "-",
+             jsp->pr_leadin ? "" : "-", jsp->pr_out_hr ? "" : "-",
+             jsp->pr_pretty ? "" : "-", jsp->pr_string ? "" : "-",
+             jsp->verbose ? "" : "-");
     return b;
 }
 
@@ -228,7 +236,8 @@ sgj_def_opts(sgj_state * jsp)
     jsp->pr_exit_status = true;
     jsp->pr_hex = false;
     jsp->pr_leadin = true;
-    jsp->pr_output = false;
+    jsp->pr_out_hr = false;
+    jsp->pr_packed = false;     /* 'k' control character, needs '-p' */
     jsp->pr_pretty = true;
     jsp->pr_string = true;
     jsp->pr_format = 0;
@@ -244,7 +253,7 @@ sgj_init_state(sgj_state * jsp, const char * j_optarg)
 
     sgj_def_opts(jsp);
     jsp->basep = NULL;
-    jsp->outputp = NULL;
+    jsp->out_hrp = NULL;
     jsp->userp = NULL;
 
     cp = getenv(sgj_opts_ev);
@@ -286,8 +295,11 @@ sgj_start(const char * util_name, const char * ver_str, int argc,
                          (json_value *)jap);
         if (util_name) {
             jap = json_array_new(0);
-            for (k = 0; k < argc; ++k)
-                json_array_push((json_value *)jap, json_string_new(argv[k]));
+            if (argv) {
+                for (k = 0; k < argc; ++k)
+                    json_array_push((json_value *)jap,
+                                    json_string_new(argv[k]));
+            }
             jv2p = json_object_push((json_value *)jvp, "utility_invoked",
                                     json_object_new(0));
             json_object_push((json_value *)jv2p, "name",
@@ -313,19 +325,19 @@ sgj_start(const char * util_name, const char * ver_str, int argc,
                              json_string_new(b));
         }
     } else {
-        if (jsp->pr_output && util_name)
+        if (jsp->pr_out_hr && util_name)
             jv2p = json_object_push((json_value *)jvp, "utility_invoked",
                                     json_object_new(0));
     }
-    if (jsp->pr_output && jv2p) {
-        jsp->outputp = json_object_push((json_value *)jv2p, "output",
+    if (jsp->pr_out_hr && jv2p) {
+        jsp->out_hrp = json_object_push((json_value *)jv2p, "output",
                                         json_array_new(0));
         if (jsp->pr_leadin && (jsp->verbose > 3)) {
             char * bp = (char *)calloc(4096, 1);
 
             if (bp) {
                 sg_json_usage(0, bp, 4096);
-                sgj_pr_str_output(jsp, bp, strlen(bp));
+                sgj_pr_str_out_hr(jsp, bp, strlen(bp));
                 free(bp);
             }
         }
@@ -359,7 +371,8 @@ sgj_pr2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
     if (jsp->pr_indent_size != def_out_settings.indent_size)
         out_settings.indent_size = jsp->pr_indent_size;
     if (! jsp->pr_pretty)
-        out_settings.mode = json_serialize_mode_single_line;
+        out_settings.mode = jsp->pr_packed ? json_serialize_mode_packed :
+                                json_serialize_mode_single_line;
 
     len = json_measure_ex(jvp, out_settings);
     if (len < 1)
@@ -372,6 +385,7 @@ sgj_pr2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
             pr2serr("%s: unable to get %zu bytes on heap\n", __func__, len);
         return;
     }
+
     json_serialize_ex(b, jvp, out_settings);
     if (jsp->verbose > 3)
         fprintf(fp, "json serialized:\n");
@@ -384,7 +398,7 @@ sgj_finish(sgj_state * jsp)
     if (jsp && jsp->basep) {
         json_builder_free((json_value *)jsp->basep);
         jsp->basep = NULL;
-        jsp->outputp = NULL;
+        jsp->out_hrp = NULL;
         jsp->userp = NULL;
     }
 }
@@ -401,7 +415,7 @@ sgj_pr_hr(sgj_state * jsp, const char * fmt, ...)
 {
     va_list args;
 
-    if (jsp->pr_as_json && jsp->pr_output) {
+    if (jsp->pr_as_json && jsp->pr_out_hr) {
         size_t len;
         char b[256];
 
@@ -420,7 +434,7 @@ sgj_pr_hr(sgj_state * jsp, const char * fmt, ...)
             /* remove leading linefeed, if present */
             if ((len > 0) && ('\n' == b[0]))
                 ++cp;
-            json_array_push((json_value *)jsp->outputp, json_string_new(cp));
+            json_array_push((json_value *)jsp->out_hrp, json_string_new(cp));
         }
         va_end(args);
     } else if (jsp->pr_as_json) {
@@ -445,6 +459,22 @@ sgj_new_named_object(sgj_state * jsp, sgj_opaque_p jop, const char * name)
     return resp;
 }
 
+sgj_opaque_p
+sgj_new_snake_named_object(sgj_state * jsp, sgj_opaque_p jop,
+                           const char * conv2sname)
+{
+    if (jsp && jsp->pr_as_json && conv2sname) {
+        int olen = strlen(conv2sname);
+        char * sname = malloc(olen + 8);
+        int nlen = sgj_name_to_snake(conv2sname, sname, olen + 8);
+
+        if (nlen > 0)
+            return json_object_push((json_value *)(jop ? jop : jsp->basep),
+                                    sname, json_object_new(0));
+    }
+    return NULL;
+}
+
 /* jop will 'own' returned value (if non-NULL) */
 sgj_opaque_p
 sgj_new_named_array(sgj_state * jsp, sgj_opaque_p jop, const char * name)
@@ -455,6 +485,22 @@ sgj_new_named_array(sgj_state * jsp, sgj_opaque_p jop, const char * name)
         resp = json_object_push((json_value *)(jop ? jop : jsp->basep), name,
                                 json_array_new(0));
     return resp;
+}
+
+sgj_opaque_p
+sgj_new_snake_named_array(sgj_state * jsp, sgj_opaque_p jop,
+                          const char * conv2sname)
+{
+    if (jsp && jsp->pr_as_json && conv2sname) {
+        int olen = strlen(conv2sname);
+        char * sname = malloc(olen + 8);
+        int nlen = sgj_name_to_snake(conv2sname, sname, olen + 8);
+
+        if (nlen > 0)
+            return json_object_push((json_value *)(jop ? jop : jsp->basep),
+                                    sname, json_array_new(0));
+    }
+    return NULL;
 }
 
 /* Newly created object is un-attached to jsp->basep tree */
@@ -490,14 +536,19 @@ sgj_opaque_p
 sgj_add_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                  const char * value, int slen)
 {
+    int k;
+
     if (jsp && jsp->pr_as_json && value && (slen >= 0)) {
+        for (k = 0; k < slen; ++k) {    /* don't want '\0' in value string */
+            if (0 == value[k])
+                break;
+        }
         if (name)
             return json_object_push((json_value *)(jop ? jop : jsp->basep),
-                                    name, json_string_new_length(slen,
-                                                                 value));
+                                    name, json_string_new_length(k, value));
         else
             return json_array_push((json_value *)(jop ? jop : jsp->basep),
-                                   json_string_new_length(slen, value));
+                                   json_string_new_length(k, value));
     } else
         return NULL;
 }
@@ -555,8 +606,7 @@ sgj_add_nv_ihex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     if ((NULL == jsp) || (NULL == name) || (! jsp->pr_as_json))
         return;
     else if (jsp->pr_hex)  {
-        sgj_opaque_p jo2p =
-                 sgj_new_named_object(jsp, jop, name);
+        sgj_opaque_p jo2p = sgj_new_named_object(jsp, jop, name);
         char b[64];
 
         if (NULL == jo2p)
@@ -577,8 +627,8 @@ sgj_add_nv_istr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
     else if (jsp->pr_string) {
-        sgj_opaque_p jo2p =
-                 sgj_new_named_object(jsp, jop, name);
+        sgj_opaque_p jo2p = sgj_new_named_object(jsp, jop, name);
+
         if (NULL == jo2p)
             return;
         sgj_add_nv_i(jsp, jo2p, "i", (int64_t)val_i);
@@ -598,8 +648,7 @@ sgj_add_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
         sgj_add_nv_i(jsp, jop, name, val_i);
     else {
         char b[64];
-        sgj_opaque_p jo2p =
-                 sgj_new_named_object(jsp, jop, name);
+        sgj_opaque_p jo2p = sgj_new_named_object(jsp, jop, name);
 
         if (NULL == jo2p)
             return;
@@ -713,18 +762,18 @@ sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 }
 
 /* Treat '\n' in sp as line breaks. Consumes characters from sp until either
- * a '\0' is found or slen is exhausted. Add each line to jsp->outputp JSON
+ * a '\0' is found or slen is exhausted. Add each line to jsp->out_hrp JSON
  * array (if conditions met). */
 void
-sgj_pr_str_output(sgj_state * jsp, const char * sp, int slen)
+sgj_pr_str_out_hr(sgj_state * jsp, const char * sp, int slen)
 {
     char c;
     int k, n;
     const char * prev_sp = sp;
     const char * cur_sp = sp;
 
-    if ((NULL == jsp) || (NULL == jsp->outputp) || (! jsp->pr_as_json) ||
-        (! jsp->pr_output))
+    if ((NULL == jsp) || (NULL == jsp->out_hrp) || (! jsp->pr_as_json) ||
+        (! jsp->pr_out_hr))
         return;
     for (k = 0; k < slen; ++k, ++cur_sp) {
         c = *cur_sp;
@@ -732,20 +781,25 @@ sgj_pr_str_output(sgj_state * jsp, const char * sp, int slen)
             break;
         else if ('\n' == c) {
             n = cur_sp - prev_sp;
-            /* when name is NULL, add to array (jsp->outputp) */
-            sgj_add_nv_s_len(jsp, jsp->outputp, NULL, prev_sp, n);
+            /* when name is NULL, add to array (jsp->out_hrp) */
+            sgj_add_nv_s_len(jsp, jsp->out_hrp, NULL, prev_sp, n);
             prev_sp = cur_sp + 1;
         }
     }
     if (prev_sp < cur_sp) {
         n = cur_sp - prev_sp;
-        sgj_add_nv_s_len(jsp, jsp->outputp, NULL, prev_sp, n);
+        sgj_add_nv_s_len(jsp, jsp->out_hrp, NULL, prev_sp, n);
     }
 }
 
-/* Returns number of characters placed in 'out' excluding trailing NULL */
+/* This function tries to convert the 'in' C string to "snake_case"
+ * convention so the output 'out' only contains lower case ASCII letters,
+ * numerals and "_" as a separator. Any leading or trailing underscores
+ * are removed as are repeated underscores (e.g. "_Snake __ case" becomes
+ * "snake_case").  Returns number of characters placed in 'out' excluding
+ * the trailing NULL */
 static int
-sgj_jsonify_name(const char * in, char * out, int maxlen_out)
+sgj_name_to_snake(const char * in, char * out, int maxlen_out)
 {
     bool prev_underscore = false;
     int c, k, j, inlen;
@@ -800,7 +854,7 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         b[n] = ' ';
     b[n] = '\0';
     if (NULL == name) {
-        if ((! as_json) || (jsp && jsp->pr_output)) {
+        if ((! as_json) || (jsp && jsp->pr_out_hr)) {
             switch (jtype) {
             case json_string:
                 sg_scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
@@ -819,9 +873,9 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
             printf("%s\n", b);
         }
         if (NULL == jop) {
-            if (as_json && jsp->pr_output) {
+            if (as_json && jsp->pr_out_hr) {
                 eaten = true;
-                json_array_push((json_value *)jsp->outputp,
+                json_array_push((json_value *)jsp->out_hrp,
                                 jvp ? jvp : json_null_new());
             }
         } else {        /* assume jop points to named array */
@@ -841,14 +895,14 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 
         if (NULL == jop)
             jop = jsp->basep;
-        k = sgj_jsonify_name(name, jname, sizeof(jname));
+        k = sgj_name_to_snake(name, jname, sizeof(jname));
         if (k > 0) {
             eaten = true;
             json_object_push((json_value *)jop, jname,
                              jvp ? jvp : json_null_new());
         }
     }
-    if (jvp && ((as_json && jsp->pr_output) || (! as_json))) {
+    if (jvp && ((as_json && jsp->pr_out_hr) || (! as_json))) {
         switch (sep) {
         case SGJ_SEP_NONE:
             break;
@@ -894,8 +948,8 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
             break;
         }
     }
-    if (as_json && jsp->pr_output)
-        json_array_push((json_value *)jsp->outputp, json_string_new(b));
+    if (as_json && jsp->pr_out_hr)
+        json_array_push((json_value *)jsp->out_hrp, json_string_new(b));
     else if (! as_json)
         printf("%s\n", b);
     if (jvp && (! eaten))
@@ -1292,7 +1346,7 @@ sgj_uds_referral_descriptor(sgj_state * jsp, sgj_opaque_p jop,
                         "Not all referrals");
     dp += 4;
     jap = sgj_new_named_array(jsp, jop,
-                              "user_data_segment_referral_descriptor");
+                              "user_data_segment_referral_descriptor_list");
     for (k = 0, f = 1; (k + 4) < dlen; k += g, dp += g, ++f) {
         int ntpgd = dp[3];
 
@@ -1309,7 +1363,8 @@ sgj_uds_referral_descriptor(sgj_state * jsp, sgj_opaque_p jop,
         sgj_add_nv_ihex(jsp, jo2p, "first_user_date_sgment_lba", ull);
         ull = sg_get_unaligned_be64(dp + 12);
         sgj_add_nv_ihex(jsp, jo2p, "last_user_date_sgment_lba", ull);
-        ja2p = sgj_new_named_array(jsp, jo2p, "target_port_group_descriptor");
+        ja2p = sgj_new_named_array(jsp, jo2p,
+                                   "target_port_group_descriptor_list");
         for (j = 0; j < ntpgd; ++j) {
             jo3p = sgj_new_unattached_object(jsp);
             tp = dp + 20 + (j * 4);
@@ -1358,7 +1413,7 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
     add_sb_len = sshp->additional_length;
     add_sb_len = (add_sb_len < sb_len) ? add_sb_len : sb_len;
     sense_key = sshp->sense_key;
-    jap = sgj_new_named_array(jsp, jop, "sense_data_descriptor");
+    jap = sgj_new_named_array(jsp, jop, "sense_data_descriptor_list");
 
     for (descp = sbp, k = 0; (k < add_sb_len);
          k += desc_len, descp += desc_len) {

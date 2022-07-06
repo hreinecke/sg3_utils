@@ -15,14 +15,17 @@ output, rather than simple, human-readable output. The default remains
 human-readable output.
 .PP
 JSON is an open standard file format that can be used for data exchange
-between systems. See https://en.wikipedia.org/wiki/JSON . JSON comes in
-many flavours and this one uses the json-builder C implementation found
-at https://github.com/json-parser/json-builder which implements four simple
-JSON data types: string, integer, boolean and null. Its other data types
-are JSON object and JSON array. This project uses the "snake" convention
-for JSON object names: all in lower case with separate words joined with
-a single underscore (e.g. "starting_lba"). The json-builder library uses
-the SPDX-License-Identifier: BSD-2-Clause which is the same license as the
+between systems. See https://en.wikipedia.org/wiki/JSON . JSON comes in many
+flavours and this one uses the json-builder C implementation found at
+https://github.com/json-parser/json-builder which implements four simple JSON
+data types: string, integer, boolean and null. Its other data types are JSON
+object and JSON array.
+.PP
+This project uses the "snake_case" convention for JSON object names: all in
+lower case letters or numerals with individual words joined with a single
+underscore (e.g. "starting_lba"). There should be no leading or trailing
+underscore characters. The json-builder library uses the
+SPDX\-License\-Identifier: BSD\-2\-Clause which is the same license as the
 bulk of the utilities in the sg3_utils package.
 .PP
 The json-builder library is relatively lightweight (700 lines of C code) and
@@ -45,7 +48,7 @@ This manpage discusses the \fI\-\-json\fR option which may or may not itself
 have an optional argument. In its shorter form it may either be \fI\-j\fR or
 \fI\-J\fR (lower case preferred if not already in use). The shorter form may
 also take an argument but there must not be a space (or whitespace) between
-\fI\-j\fR and that argument.  
+\fI\-j\fR and that argument.
 .SH ENVIRONMENT VARIABLES
 The SG3_UTILS_JSON_OPTS environment variable allows the user to override the
 default values of the \fIJO\fR settings. Those settings can again be overridden
@@ -105,6 +108,10 @@ name with a sub\-object containing at least a "i" field with the integer
 value and a "abbreviated_name_expansion" field with a string value that
 should make the T10 name clearer (e.g. "Sense Key Specific Valid").
 .br
+The "abbreviated name expansion" control character is also used to flag
+fields that are obsolete, usually noting the standard or revision of a
+draft standard when they became obsolete.
+.br
 This boolean control character is default off (false).
 .TP
 \fBe\fR
@@ -126,7 +133,20 @@ control character is active most (non\-trivial) fields that have an integer
 value instead receive a a sub\-object containing at least a "i" field with
 the integer value and a "hex" field with the corresponding hex value in a
 JSON string. That hex string has no hex decorations (i.e. no leading '0x'
-nor traing 'h').
+nor trailing 'h').
+.br
+This boolean control character is default off (false).
+.TP
+\fBk\fR
+this is a boolean control character for finer control of non\-pretty printed
+JSON output. If the 'p' control character is set on (true) then this option
+has no effect.
+.br
+If the 'p' control character is set off (false) and this control character is
+set off (false) then the single line JSON output contains some spaces for
+readability. If the 'p' control character is set off (false) and this control
+character is set on (true) then the JSON single line JSON output is "packed"
+removing all unnecessary spaces.
 .br
 This boolean control character is default off (false).
 .TP
@@ -162,6 +182,9 @@ JSON objects and arrays that have an associated JSON object as their value,
 have their name on a separate line. These lines are indented with the
 current tab setting to indicate the level of nesting. Basically the pretty
 printed form is for human consumption.
+.br
+There are two forms of non\-pretty printed output, see the "packed" control
+character ['k'].
 .br
 This boolean control character is default on (true).
 .TP

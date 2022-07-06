@@ -1386,7 +1386,7 @@ start_response:
             sgj_add_nv_b(jsp, jop, "qaes", rsoc_buff[1] & 0x4);
             sgj_add_nv_b(jsp, jop, "qtss", rsoc_buff[1] & 0x2);
             sgj_add_nv_b(jsp, jop, "itnrs", rsoc_buff[1] & 0x1);
-            if (! jsp->pr_output)
+            if (! jsp->pr_out_hr)
                 goto fini;
         }
         sgj_pr_hr(jsp, "\nTask Management Functions supported by device:\n");

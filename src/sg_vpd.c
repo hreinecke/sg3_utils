@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.73 20220701";  /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.73 20220705";  /* spc6r06 + sbc5r01 */
 
 #define MY_NAME "sg_decode_sense"
 
@@ -116,7 +116,7 @@ static int svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
 static int svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue,
                                  int off);
 
-static int decode_dev_ids(const char * print_if_found, int num_leading,
+static int filter_dev_ids(const char * print_if_found, int num_leading,
                           uint8_t * buff, int len, int m_assoc,
                           int m_desig_type, int m_code_set,
                           struct opts_t * op, sgj_opaque_p jop);
@@ -198,7 +198,7 @@ static struct svpd_values_name_t standard_vpd_pg[] = {
      "protection types (SBC)"},
     {VPD_SCSI_FEATURE_SETS, 0, -1, "sfs", "SCSI feature sets"},
     {VPD_SOFTW_INF_ID, 0, -1, "sii", "Software interface identification"},
-    {VPD_NOPE_WANT_STD_INQ, 0, -1, "sinq", "Standard inquiry response"},
+    {VPD_NOPE_WANT_STD_INQ, 0, -1, "sinq", "Standard inquiry data format"},
     {VPD_UNIT_SERIAL_NUM, 0, -1, "sn", "Unit serial number"},
     {VPD_SCSI_PORTS, 0, -1, "sp", "SCSI ports"},
     {VPD_SECURITY_TOKEN, 0, 0x11, "st", "Security token (OSD)"},
@@ -439,7 +439,7 @@ static const char * sg_ansi_version_arr[16] =
     "SPC-2",            /* ANSI INCITS 351-2001, ISO/IEC 14776-452 */
     "SPC-3",            /* ANSI INCITS 408-2005, ISO/IEC 14776-453 */
     "SPC-4",            /* ANSI INCITS 513-2015 */
-    "SPC-5",
+    "SPC-5",            /* ANSI INCITS 502-2020 */
     "ecma=1, [8h]",
     "ecma=1, [9h]",
     "ecma=1, [Ah]",
@@ -450,61 +450,186 @@ static const char * sg_ansi_version_arr[16] =
     "reserved [Fh]",
 };
 
-static void
-std_inq_decode(uint8_t * b, int len, int verbose)
+static const char *
+pqual_str(int pqual)
 {
-    int pqual, n;
+    switch (pqual) {
+    case 0:
+        return "LU accessible";
+    case 1:
+        return "LU temporarily unavailable";
+    case 3:
+        return "LU not accessible via this port";
+    default:
+        return "value reserved by T10";
+    }
+}
 
-    if (len < 4)
+static const char *
+hot_pluggable_str(int hp)
+{
+    switch (hp) {
+    case 0:
+        return "No information";
+    case 1:
+        return "target device designed to be removed from SCSI domain";
+    case 2:
+        return "target device not designed to be removed from SCSI domain";
+    default:
+        return "value reserved by T10";
+    }
+}
+
+static const char *
+tpgs_str(int tpgs)
+{
+    switch (tpgs) {
+    case 1:
+        return "only implicit asymmetric logical unit access";
+    case 2:
+        return "only explicit asymmetric logical unit access";
+    case 3:
+        return "both explicit and implicit asymmetric logical unit access";
+    case 0:
+    default:
+        return "not supported";
+    }
+}
+
+static void
+std_inq_decode(uint8_t * b, int len, struct opts_t * op, sgj_opaque_p jop)
+{
+    uint8_t ver;
+    int pqual, pdt, hp, tpgs, j, n;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    const char * cp;
+    char c[256];
+    static const int clen = sizeof(c);
+    static const char * np = "Standard INQUIRY data format:";
+
+    if (len < 4) {
+        pr2serr("%s: len [%d] too short\n", __func__, len);
         return;
+    }
     pqual = (b[0] & 0xe0) >> 5;
-    printf("standard INQUIRY:");
+    pdt = b[0] & PDT_MASK;
+    hp = (b[1] >> 4) & 0x3;
+    ver = b[2];
+    sgj_pr_hr(jsp, "%s", np);
     if (0 == pqual)
-        printf("\n");
-    else if (1 == pqual)
-        printf(" [PQ indicates LU temporarily unavailable]\n");
-    else if (3 == pqual)
-        printf(" [PQ indicates LU not accessible via this port]\n");
-    else
-        printf(" [reserved or vendor specific qualifier [%d]]\n", pqual);
-    printf("  PQual=%d  PDT=%d  RMB=%d  LU_CONG=%d  hot_pluggable=%d  "
-           "version=0x%02x ", pqual, b[0] & PDT_MASK, !!(b[1] & 0x80),
-               !!(b[1] & 0x40), (b[1] >> 4) & 0x3, (unsigned int)b[2]);
-    printf(" [%s]\n", sg_ansi_version_arr[b[2] & 0xf]);
-    printf("  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
+        sgj_pr_hr(jsp, "\n");
+    else {
+        cp = pqual_str(pqual);
+
+        if (pqual < 3)
+            sgj_pr_hr(jsp, " [PQ indicates %s]\n", cp);
+        else
+            sgj_pr_hr(jsp, " [PQ indicates %s [0x%x] ]\n", cp, pqual);
+    }
+    sgj_pr_hr(jsp, "  PQual=%d  PDT=%d  RMB=%d  LU_CONG=%d  hot_pluggable="
+              "%d  version=0x%02x  [%s]\n", pqual, pdt, !!(b[1] & 0x80),
+              !!(b[1] & 0x40), hp, ver, sg_ansi_version_arr[ver & 0xf]);
+    sgj_pr_hr(jsp, "  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
            " Resp_data_format=%d\n",
            !!(b[3] & 0x80), !!(b[3] & 0x40), !!(b[3] & 0x20),
            !!(b[3] & 0x10), b[3] & 0x0f);
     if (len < 5)
-        return;
-    n = b[4] + 5;
-    if (verbose)
-        pr2serr(">> requested %d bytes, %d bytes available\n", len, n);
-    printf("  SCCS=%d  ACC=%d  TPGS=%d  3PC=%d  Protect=%d ",
-           !!(b[5] & 0x80), !!(b[5] & 0x40), ((b[5] & 0x30) >> 4),
-           !!(b[5] & 0x08), !!(b[5] & 0x01));
-    printf(" [BQue=%d]\n  EncServ=%d  ", !!(b[6] & 0x80), !!(b[6] & 0x40));
+        goto skip1;
+    j = b[4] + 5;
+    if (op->verbose > 2)
+        pr2serr(">> requested %d bytes, %d bytes available\n", len, j);
+    sgj_pr_hr(jsp, "  SCCS=%d  ACC=%d  TPGS=%d  3PC=%d  Protect=%d  "
+              "[BQue=%d]\n", !!(b[5] & 0x80), !!(b[5] & 0x40),
+              ((b[5] & 0x30) >> 4), !!(b[5] & 0x08), !!(b[5] & 0x01),
+              !!(b[6] & 0x80));
+    n = 0;
+    n += sg_scnpr(c + n, clen - n, "EncServ=%d  ", !!(b[6] & 0x40));
     if (b[6] & 0x10)
-        printf("MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
+        n += sg_scnpr(c + n, clen - n, "MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
     else
-        printf("MultiP=0  ");
-    printf("[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d\n  [RelAdr=%d]  ",
-           !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01),
-           !!(b[7] & 0x80));
-    printf("WBus16=%d  Sync=%d  [Linked=%d]  [TranDis=%d]  ",
-           !!(b[7] & 0x20), !!(b[7] & 0x10), !!(b[7] & 0x08),
-           !!(b[7] & 0x04));
-    printf("CmdQue=%d\n", !!(b[7] & 0x02));
+        n += sg_scnpr(c + n, clen - n, "MultiP=0  ");
+    n += sg_scnpr(c + n, clen - n, "[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d",
+                  !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01));
+    sgj_pr_hr(jsp, "  %s\n", c);
+    sgj_pr_hr(jsp, "  [RelAdr=%d]  WBus16=%d  Sync=%d  [Linked=%d]  "
+              "[TranDis=%d]  CmdQue=%d\n", !!(b[7] & 0x80), !!(b[7] & 0x20),
+              !!(b[7] & 0x10), !!(b[7] & 0x08), !!(b[7] & 0x04),
+              !!(b[7] & 0x02));
+    if (len < 36)
+        goto skip1;
+    sgj_pr_hr(jsp, "  Vendor_identification: %.8s\n", b + 8);
+    sgj_pr_hr(jsp, "  Product_identification: %.16s\n", b + 16);
+    sgj_pr_hr(jsp, "  Product_revision_level: %.4s\n", b + 32);
+skip1:
+    if (! jsp->pr_as_json || (len < 8))
+        return;
+    jo2p = sgj_new_snake_named_object(jsp, jop, np);
+    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_qualifier", pqual, NULL,
+                       pqual_str(pqual));
+    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_device_type", pdt, NULL,
+                       sg_get_pdt_str(pdt, clen, c));
+    sgj_add_nv_ihex_ane(jsp, jo2p, "rmb", !!(b[1] & 0x80), false,
+                        "Removable Medium Bit");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "lu_cong", !!(b[1] & 0x40), false,
+                        "Logical Unit Conglomerate");
+    sgj_add_nv_ihexstr(jsp, jo2p, "hot_pluggable", hp, NULL,
+                       hot_pluggable_str(hp));
+    snprintf(c, clen, "%s", (ver > 0xf) ? "old or reserved version code" :
+                                          sg_ansi_version_arr[ver]);
+    sgj_add_nv_ihexstr(jsp, jo2p, "version", ver, NULL, c);
+    sgj_add_nv_ihex_ane(jsp, jo2p, "aerc", !!(b[3] & 0x80), false,
+                        "Asynchronous Event Reporting Capability (obsolete "
+                        "SPC-3)");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "trmtsk", !!(b[3] & 0x40), false,
+                        "Terminate Task (obsolete SPC-2)");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "normaca", !!(b[3] & 0x20), false,
+                        "Normal ACA (Auto Contingent Allegiance)");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "hisup", !!(b[3] & 0x10), false,
+                        "Hierarchial Support");
+    sgj_add_nv_ihex(jsp, jo2p, "response_data_format", b[3] & 0xf);
+    sgj_add_nv_ihex_ane(jsp, jo2p, "sccs", !!(b[5] & 0x80), false,
+                        "SCC (SCSI Storage Commands) Supported");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "acc", !!(b[5] & 0x40), false,
+                        "Access Commands Coordinator (obsolete SPC-5)");
+    tpgs = (b[5] >> 4) & 0x3;
+    sgj_add_nv_ihexstr_ane(jsp, jo2p, "tpgs", tpgs, false, NULL,
+                           tpgs_str(tpgs), "Target Port Group Support");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "3pc", !!(b[5] & 0x8), false,
+                        "Third Party Copy");
+    sgj_add_nv_ihex(jsp, jo2p, "protect", !!(b[5] & 0x1));
+    /* Skip SPI specific flags which have been obsolete for a while) */
+    sgj_add_nv_ihex_ane(jsp, jo2p, "bque", !!(b[6] & 0x80), false,
+                        "Basic task management model (obsolete SPC-4)");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "encserv", !!(b[6] & 0x40), false,
+                        "Enclousure Services supported");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "multip", !!(b[6] & 0x10), false,
+                        "Multiple SCSI port");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "mchngr", !!(b[6] & 0x8), false,
+                        "Medium changer (obsolete SPC-4)");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "reladr", !!(b[7] & 0x80), false,
+                        "Relative Addressing (obsolete in SPC-4)");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "linked", !!(b[7] & 0x8), false,
+                        "Linked Commands (obsolete in SPC-4)");
+    sgj_add_nv_ihex_ane(jsp, jo2p, "cmdque", !!(b[7] & 0x2), false,
+                        "Command Management Model (command queuing)");
+    if (len < 16)
+        return;
+    snprintf(c, clen, "%.8s", b + 8);
+    sgj_add_nv_s(jsp, jo2p, "t10_vendor_identification", c);
+    if (len < 32)
+        return;
+    snprintf(c, clen, "%.16s", b + 16);
+    sgj_add_nv_s(jsp, jo2p, "product_identification", c);
     if (len < 36)
         return;
-    printf("  Vendor_identification: %.8s\n", b + 8);
-    printf("  Product_identification: %.16s\n", b + 16);
-    printf("  Product_revision_level: %.4s\n", b + 32);
+    snprintf(c, clen, "%.4s", b + 32);
+    sgj_add_nv_s(jsp, jo2p, "product_revision_level", c);
 }
 
 static void
-decode_id_vpd_variants(uint8_t * buff, int len, int subvalue,
-                       struct opts_t * op, sgj_opaque_p jop)
+device_id_vpd_variants(uint8_t * buff, int len, int subvalue,
+                       struct opts_t * op, sgj_opaque_p jap)
 {
     int m_a, m_d, m_cs, blen;
     uint8_t * b;
@@ -519,24 +644,24 @@ decode_id_vpd_variants(uint8_t * buff, int len, int subvalue,
     m_d = -1;
     m_cs = -1;
     if (0 == subvalue) {
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), 0, b, blen,
-                       VPD_ASSOC_LU, m_d, m_cs, op, jop);
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), 0, b, blen,
-                       VPD_ASSOC_TPORT, m_d, m_cs, op, jop);
-        decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0, b, blen,
-                       VPD_ASSOC_TDEVICE, m_d, m_cs, op, jop);
+        filter_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), 0, b, blen,
+                       VPD_ASSOC_LU, m_d, m_cs, op, jap);
+        filter_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), 0, b, blen,
+                       VPD_ASSOC_TPORT, m_d, m_cs, op, jap);
+        filter_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0, b, blen,
+                       VPD_ASSOC_TDEVICE, m_d, m_cs, op, jap);
     } else if (VPD_DI_SEL_AS_IS == subvalue)
-        decode_dev_ids(NULL, 0, b, blen, m_a, m_d, m_cs, op, jop);
+        filter_dev_ids(NULL, 0, b, blen, m_a, m_d, m_cs, op, jap);
     else {
         if (VPD_DI_SEL_LU & subvalue)
-            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), 0, b, blen,
-                           VPD_ASSOC_LU, m_d, m_cs, op, jop);
+            filter_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_LU), 0, b, blen,
+                           VPD_ASSOC_LU, m_d, m_cs, op, jap);
         if (VPD_DI_SEL_TPORT & subvalue)
-            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), 0, b,
-                           blen, VPD_ASSOC_TPORT, m_d, m_cs, op, jop);
+            filter_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TPORT), 0, b,
+                           blen, VPD_ASSOC_TPORT, m_d, m_cs, op, jap);
         if (VPD_DI_SEL_TARGET & subvalue)
-            decode_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0,
-                           b, blen, VPD_ASSOC_TDEVICE, m_d, m_cs, op, jop);
+            filter_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0,
+                           b, blen, VPD_ASSOC_TDEVICE, m_d, m_cs, op, jap);
     }
 }
 
@@ -561,13 +686,18 @@ static const char * network_service_type_arr[] =
 
 /* VPD_MAN_NET_ADDR */
 static void
-decode_net_man_vpd(uint8_t * buff, int len, int do_hex)
+decode_net_man_vpd(uint8_t * buff, int len, struct opts_t * op,
+                   sgj_opaque_p jap)
 {
-    int k, bump, na_len;
+    int k, bump, na_len, assoc, nst;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
     uint8_t * bp;
+    const char * assoc_str;
+    const char * nst_str;
 
-    if ((1 == do_hex) || (do_hex > 2)) {
-        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
         return;
     }
     if (len < 4) {
@@ -578,22 +708,34 @@ decode_net_man_vpd(uint8_t * buff, int len, int do_hex)
     len -= 4;
     bp = buff + 4;
     for (k = 0; k < len; k += bump, bp += bump) {
-        printf("  %s, Service type: %s\n",
-               sg_get_desig_assoc_str((bp[0] >> 5) & 0x3),
-               network_service_type_arr[bp[0] & 0x1f]);
+        assoc = (bp[0] >> 5) & 0x3;
+        assoc_str = sg_get_desig_assoc_str(assoc);
+        nst = bp[0] & 0x1f;
+        nst_str = network_service_type_arr[nst];
+        sgj_pr_hr(jsp, "  %s, Service type: %s\n", assoc_str, nst_str);
         na_len = sg_get_unaligned_be16(bp + 2);
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object(jsp);
+            sgj_add_nv_ihexstr(jsp, jo2p, "association", assoc, NULL,
+                               assoc_str);
+            sgj_add_nv_ihexstr(jsp, jo2p, "service_type", nst, NULL,
+                               nst_str);
+            sgj_add_nv_s_len(jsp, jo2p, "network_address",
+			     (const char *)(bp + 4), na_len);
+            sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+        }
+        if (na_len > 0) {
+            if (op->do_hex > 1) {
+                printf("    Network address:\n");
+                hex2stdout((bp + 4), na_len, 0);
+            } else
+                sgj_pr_hr(jsp, "    %s\n", bp + 4);
+        }
         bump = 4 + na_len;
         if ((k + bump) > len) {
             pr2serr("Management network addresses VPD page, short "
                     "descriptor length=%d, left=%d\n", bump, (len - k));
             return;
-        }
-        if (na_len > 0) {
-            if (do_hex > 1) {
-                printf("    Network address:\n");
-                hex2stdout((bp + 4), na_len, 0);
-            } else
-                printf("    %s\n", bp + 4);
         }
     }
 }
@@ -650,9 +792,12 @@ decode_mode_policy_vpd(uint8_t * buff, int len, int do_hex)
 /* VPD_SCSI_PORTS */
 static void
 decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
-                      sgj_opaque_p jop)
+                      sgj_opaque_p jap)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p ja2p = NULL;
     uint8_t * bp;
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
@@ -667,7 +812,9 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
     bp = buff + 4;
     for (k = 0; k < len; k += bump, bp += bump) {
         rel_port = sg_get_unaligned_be16(bp + 2);
-        printf("  Relative port=%d\n", rel_port);
+        sgj_pr_hr(jsp, "  Relative port=%d\n", rel_port);
+        jo2p = sgj_new_unattached_object(jsp);
+        sgj_add_nv_i(jsp, jo2p, "relative_port", rel_port);
         ip_tid_len = sg_get_unaligned_be16(bp + 6);
         bump = 8 + ip_tid_len;
         if ((k + bump) > len) {
@@ -677,13 +824,14 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
         }
         if (ip_tid_len > 0) {
             if (op->do_hex > 1) {
-                printf("    Initiator port transport id:\n");
+                sgj_pr_hr(jsp, "    Initiator port transport id:\n");
                 hex2stdout((bp + 8), ip_tid_len, 1);
             } else {
                 char b[1024];
 
-                printf("%s", sg_decode_transportid_str("    ", bp + 8,
-                                         ip_tid_len, true, sizeof(b), b));
+                sgj_pr_hr(jsp, "%s",
+                          sg_decode_transportid_str("    ", bp + 8,
+                                            ip_tid_len, true, sizeof(b), b));
             }
         }
         tpd_len = sg_get_unaligned_be16(bp + bump + 2);
@@ -694,23 +842,31 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
         }
         if (tpd_len > 0) {
             if (op->do_hex > 1) {
-                printf("    Target port descriptor(s):\n");
+                sgj_pr_hr(jsp, "    Target port descriptor(s):\n");
                 hex2stdout(bp + bump + 4, tpd_len, 1);
             } else {
                 if ((0 == op->do_quiet) || (ip_tid_len > 0))
-                    printf("    Target port descriptor(s):\n");
-                decode_dev_ids("", 2 /* leading spaces */, bp + bump + 4,
-                               tpd_len, VPD_ASSOC_TPORT, -1, -1, op, jop);
+                    sgj_pr_hr(jsp, "    Target port descriptor(s):\n");
+                if (jsp->pr_as_json) {
+                    sgj_opaque_p jo3p = sgj_new_named_object(jsp, jo2p,
+                                                             "target_port");
+
+                    ja2p = sgj_new_named_array(jsp, jo3p,
+                                               "designation_descriptor_list");
+                }
+                filter_dev_ids("", 2 /* leading spaces */, bp + bump + 4,
+                               tpd_len, VPD_ASSOC_TPORT, -1, -1, op, ja2p);
             }
         }
         bump += tpd_len + 4;
+        sgj_add_nv_o(jsp, jap, NULL, jo2p);
     }
 }
 
 /* Prints outs an abridged set of device identification designators
    selected by association, designator type and/or code set. */
 static int
-decode_dev_ids_quiet(uint8_t * buff, int len, int m_assoc,
+filter_dev_ids_quiet(uint8_t * buff, int len, int m_assoc,
                      int m_desig_type, int m_code_set)
 {
     int k, m, p_id, c_set, piv, desig_type, i_len, naa, off, u;
@@ -904,14 +1060,14 @@ decode_dev_ids_quiet(uint8_t * buff, int len, int m_assoc,
     return 0;
 }
 
-/* Prints outs designation descriptors (dd_s)selected by association,
+/* Prints outs designation descriptors (dd_s) selected by association,
    designator type and/or code set. */
 static int
-decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
+filter_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
                int len, int m_assoc, int m_desig_type, int m_code_set,
-               struct opts_t * op, sgj_opaque_p jop)
+               struct opts_t * op, sgj_opaque_p jap)
 {
-    bool printed, sgj_output;
+    bool printed, sgj_out_hr;
     int assoc, off, u, i_len;
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
@@ -920,7 +1076,7 @@ decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
     static const int blen = sizeof(b);
 
     if (op->do_quiet && (! jsp->pr_as_json))
-        return decode_dev_ids_quiet(buff, len, m_assoc, m_desig_type,
+        return filter_dev_ids_quiet(buff, len, m_assoc, m_desig_type,
                                     m_code_set);
     if (num_leading > (int)(sizeof(sp) - 2))
         num_leading = sizeof(sp) - 2;
@@ -946,14 +1102,15 @@ decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
                     "     remaining response length=%d\n", (len - off));
             return SG_LIB_CAT_MALFORMED;
         }
-        sgj_output = false;
+        sgj_out_hr = false;
         if (jsp->pr_as_json) {
-            sgj_opaque_p jo2p =
-                sgj_new_named_object(jsp, jop, "designation_descriptor");
+            sgj_opaque_p jo2p;
 
+            jo2p = sgj_new_unattached_object(jsp);
             sgj_get_designation_descriptor(jsp, jo2p, bp, i_len + 4);
-            if (jsp->pr_output)
-                sgj_output = true;
+            sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+            if (jsp->pr_out_hr)
+                sgj_out_hr = true;
             else
                 continue;
         }
@@ -962,23 +1119,23 @@ decode_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
             printed = true;
             if (strlen(print_if_found) > 0) {
                 snprintf(b, blen, "  %s:", print_if_found);
-                if (sgj_output)
-                    sgj_pr_str_output(jsp, b, strlen(b));
+                if (sgj_out_hr)
+                    sgj_pr_str_out_hr(jsp, b, strlen(b));
                 else
                     printf("%s\n", b);
             }
         }
         if (NULL == print_if_found) {
             snprintf(b, blen, "  %s%s:", sp, sg_get_desig_assoc_str(assoc));
-            if (sgj_output)
-                sgj_pr_str_output(jsp, b, strlen(b));
+            if (sgj_out_hr)
+                sgj_pr_str_out_hr(jsp, b, strlen(b));
             else
                 printf("%s\n", b);
         }
         sg_get_designation_descriptor_str(sp, bp, i_len + 4, false,
                                           op->do_long, blen, b);
-        if (sgj_output)
-            sgj_pr_str_output(jsp, b, strlen(b));
+        if (sgj_out_hr)
+            sgj_pr_str_out_hr(jsp, b, strlen(b));
         else
             printf("%s", b);
     }
@@ -1132,17 +1289,28 @@ decode_x_inq_vpd(uint8_t * b, int len, int do_hex, bool do_long,
 
 /* VPD_SOFTW_INF_ID */
 static void
-decode_softw_inf_id(uint8_t * buff, int len, int do_hex)
+decode_softw_inf_id(uint8_t * buff, int len, struct opts_t * op,
+                    sgj_opaque_p jap)
 {
-    if (do_hex) {
-        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jop;
+    uint64_t ieee_id;
+
+    if (op->do_hex) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
         return;
     }
     len -= 4;
     buff += 4;
-    for ( ; len > 5; len -= 6, buff += 6)
-        printf("    IEEE identifier: 0x%" PRIx64 "\n",
-               sg_get_unaligned_be48(buff + 0));
+    for ( ; len > 5; len -= 6, buff += 6) {
+        ieee_id = sg_get_unaligned_be48(buff + 0);
+        sgj_pr_hr(jsp, "    IEEE identifier: 0x%" PRIx64 "\n", ieee_id);
+        if (jsp->pr_as_json) {
+            jop = sgj_new_unattached_object(jsp);
+            sgj_add_nv_ihex(jsp, jop, "ieee_identifier", ieee_id);
+            sgj_add_nv_o(jsp, jap, NULL /* name */, jop);
+        }
+   }
 }
 
 /* VPD_ATA_INFO */
@@ -1263,8 +1431,8 @@ decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op,
     int k, j, res, bump, csd_len;
     uint16_t constit_type;
     const uint8_t * bp;
-    const char * dcp = "Device constituents VPD page";
     char b[64];
+    static const char * dcp = "Device constituents VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
         hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
@@ -1365,7 +1533,7 @@ decode_power_consumption_vpd(uint8_t * buff, int len, int do_hex)
     int k, bump;
     uint8_t * bp;
     unsigned int value;
-    const char * pcp = "Power consumption VPD page";
+    static const char * pcp = "Power consumption VPD page";
 
     if ((1 == do_hex) || (do_hex > 2)) {
         hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
@@ -2817,15 +2985,22 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     bool allow_name, allow_if_found, long_notquiet, qt;
     bool vpd_supported = false;
     bool inhex_active = (-1 == sg_fd);
-    int len, pdt, num, k, resid, alloc_len, pn, vb;
+    int len, pdt, pqual, num, k, resid, alloc_len, pn, vb;
     int res = 0;
     const struct svpd_values_name_t * vnp;
     sgj_state * jsp = &op->json_st;
     uint8_t * rp;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p jo2p = NULL;
     const char * np;
     const char * pre = (prefix ? prefix : "");;
+    const char * pdt_str;
+    bool as_json = jsp->pr_as_json;
+    bool not_json = ! as_json;
     char obuff[DEF_ALLOC_LEN];
-    char b[48];
+    char b[120];
+    char d[48];
+    static const int blen = sizeof(b);
 
     vb = op->verbose;
     qt = op->do_quiet;
@@ -2868,6 +3043,10 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return sg_convert_errno(EDOM);
         }
     }
+    pdt = rp[0] & PDT_MASK;
+    pdt_str = sg_get_pdt_str(pdt, sizeof(d), d);
+    pqual = (rp[0] & 0xe0) >> 5;
+
     switch(pn) {
     case VPD_NOPE_WANT_STD_INQ:    /* -2 (want standard inquiry response) */
         if (!inhex_active) {
@@ -2890,55 +3069,79 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 dStrRaw(rp, alloc_len);
             else if (op->do_hex) {
                 if (! op->do_quiet && (op->do_hex < 3))
-                    printf("Standard Inquiry response:\n");
+                    sgj_pr_hr(jsp, "Standard Inquiry data format:\n");
                 hex2stdout(rp, alloc_len, (1 == op->do_hex) ? 0 : -1);
             } else
-                std_inq_decode(rp, alloc_len, vb);
+                std_inq_decode(rp, alloc_len, op, jop);
             return 0;
         }
         break;
     case VPD_SUPPORTED_VPDS:    /* 0x0 */
         np = "Supported VPD pages VPD page:";
         if (allow_name)
-            printf("%s%s\n", pre, np);
+            sgj_pr_hr(jsp, "%s%s\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
             else if (op->do_hex)
                 hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", pqual, pdt_str);
                 num = rp[3];
                 if (num > (len - 4))
                     num = (len - 4);
+                if (as_json) {
+                    jo2p = sgj_new_snake_named_object(jsp, jop, np);
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_qualifier",
+                                       pqual, NULL, pqual_str(pqual));
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
+                                       pdt, NULL, pdt_str);
+                    sgj_add_nv_ihex(jsp, jo2p, "page_code", pn);
+                    jap = sgj_new_named_array(jsp, jo2p,
+                                              "supported_vpd_page_list");
+                }
                 for (k = 0; k < num; ++k) {
                     pn = rp[4 + k];
+                    snprintf(b, blen, "0x%02x", pn);
                     vnp = sdp_get_vpd_detail(pn, -1, pdt);
                     if (vnp) {
                         if (op->do_long)
-                            printf("  0x%02x  %s [%s]\n", pn, vnp->name,
-                                   vnp->acron);
+                            sgj_pr_hr(jsp, "  %s  %s [%s]\n", b,
+                                      vnp->name, vnp->acron);
                         else
-                            printf("  %s [%s]\n", vnp->name, vnp->acron);
+                            sgj_pr_hr(jsp, "  %s [%s]\n", vnp->name,
+                                      vnp->acron);
                     } else if (op->vend_prod_num >= 0) {
                         vnp = svpd_find_vendor_by_num(pn, op->vend_prod_num);
                         if (vnp) {
                             if (op->do_long)
-                                printf("  0x%02x  %s [%s]\n", pn, vnp->name,
-                                       vnp->acron);
+                                sgj_pr_hr(jsp, "  %s  %s [%s]\n", b,
+                                          vnp->name, vnp->acron);
                             else
-                                printf("  %s [%s]\n", vnp->name, vnp->acron);
+                                sgj_pr_hr(jsp, "  %s [%s]\n", vnp->name,
+                                          vnp->acron);
                         } else
-                            printf("  0x%x\n", pn);
+                            sgj_pr_hr(jsp, "  %s\n", b);
                     } else
-                        printf("  0x%x\n", pn);
+                        sgj_pr_hr(jsp, "  %s\n", b);
+                    if (as_json) {
+                        jo2p = sgj_new_unattached_object(jsp);
+                        sgj_add_nv_i(jsp, jo2p, "i", pn);
+                        sgj_add_nv_s(jsp, jo2p, "hex", b + 2);
+                        if (vnp) {
+                            sgj_add_nv_s(jsp, jo2p, "name", vnp->name);
+                            sgj_add_nv_s(jsp, jo2p, "acronym", vnp->acron);
+                        } else {
+                            sgj_add_nv_s(jsp, jo2p, "name", "unknown");
+                            sgj_add_nv_s(jsp, jo2p, "acronym", "unknown");
+                        }
+                        sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+                    }
                 }
             }
             return 0;
@@ -2946,28 +3149,33 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         break;
     case VPD_UNIT_SERIAL_NUM:   /* 0x80 */
         np = "Unit serial number VPD page:";
-        if (allow_name)
-            printf("%s%s\n", pre, np);
+        if (allow_name && not_json)
+            sgj_pr_hr(jsp, "%s%s\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
             else if (op->do_hex)
                 hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", pqual, pdt_str);
                 memset(obuff, 0, sizeof(obuff));
                 len -= 4;
                 if (len >= (int)sizeof(obuff))
                     len = sizeof(obuff) - 1;
                 memcpy(obuff, rp + 4, len);
-                printf("  Unit serial number: %s\n", obuff);
+                jo2p = sgj_new_snake_named_object(jsp, jop, np);
+                sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_qualifier",
+                                   pqual, NULL, pqual_str(pqual));
+                sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
+                                   pdt, NULL, pdt_str);
+                sgj_add_nv_ihex(jsp, jo2p, "page_code", pn);
+                sgj_pr_hr_js_vs(jsp, jo2p, 2, "unit_serial_number",
+                                SGJ_SEP_COLON_1_SPACE, obuff);
             }
             return 0;
         }
@@ -2985,12 +3193,20 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else if (op->do_hex)
                 hex2stdout(rp, len, (1 == op->do_hex) ? 0 : -1);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
-                              "%s]\n", (rp[0] & 0xe0) >> 5,
-                              sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_id_vpd_variants(rp, len, subvalue, op, jop);
+                              "%s]\n", pqual, pdt_str);
+                if (as_json) {
+                    jo2p = sgj_new_snake_named_object(jsp, jop, np);
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_qualifier",
+                                       pqual, NULL, pqual_str(pqual));
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
+                                       pdt, NULL, pdt_str);
+                    sgj_add_nv_ihex(jsp, jo2p, "page_code", pn);
+                    jap = sgj_new_named_array(jsp, jo2p,
+                                              "designation_descriptor_list");
+                }
+                device_id_vpd_variants(rp, len, subvalue, op, jap);
             }
             return 0;
         }
@@ -2998,20 +3214,28 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case VPD_SOFTW_INF_ID:      /* 0x84 */
         np = "Software interface identification VPD page:";
         if (allow_name)
-            printf("%s%s\n", pre, np);
+            sgj_pr_hr(jsp, "%s%s\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_softw_inf_id(rp, len, op->do_hex);
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", pqual, pdt_str);
+                if (as_json) {
+                    jo2p = sgj_new_snake_named_object(jsp, jop, np);
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_qualifier",
+                                       pqual, NULL, pqual_str(pqual));
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
+                                       pdt, NULL, pdt_str);
+                    sgj_add_nv_ihex(jsp, jo2p, "page_code", pn);
+                    jap = sgj_new_named_array(jsp, jo2p,
+                                      "software_interface_identifier_list");
+                }
+                decode_softw_inf_id(rp, len, op, jap);
             }
             return 0;
         }
@@ -3019,15 +3243,26 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case VPD_MAN_NET_ADDR:      /* 0x85 */
         np= "Management network addresses VPD page:";
         if (allow_name)
-            printf("%s%s\n", pre, np);
+            sgj_pr_hr(jsp, "%s%s\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
-            else
-                decode_net_man_vpd(rp, len, op->do_hex);
+            else {
+                if (as_json) {
+                    jo2p = sgj_new_snake_named_object(jsp, jop, np);
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_qualifier",
+                                       pqual, NULL, pqual_str(pqual));
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
+                                       pdt, NULL, pdt_str);
+                    sgj_add_nv_ihex(jsp, jo2p, "page_code", pn);
+                    jap = sgj_new_named_array(jsp, jo2p,
+                                      "network_services_descriptor_list");
+                }
+                decode_net_man_vpd(rp, len, op, jap);
+            }
             return 0;
         }
         break;
@@ -3054,11 +3289,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                     } else
                         protect = !!(sir.byte_5 & 0x1); /* SPC-3 and later */
                 }
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_x_inq_vpd(rp, len, op->do_hex, long_notquiet, protect);
             }
             return 0;
@@ -3075,11 +3308,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_mode_policy_vpd(rp, len, op->do_hex);
             }
             return 0;
@@ -3088,20 +3319,28 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case VPD_SCSI_PORTS:        /* 0x88 */
         np = "SCSI Ports VPD page:";
         if (allow_name)
-            printf("%s%s\n", pre, np);
+            sgj_pr_hr(jsp, "%s%s\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
-                decode_scsi_ports_vpd(rp, len, op, jop);
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", pqual, pdt_str);
+                if (as_json) {
+                    jo2p = sgj_new_snake_named_object(jsp, jop, np);
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_qualifier",
+                                       pqual, NULL, pqual_str(pqual));
+                    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
+                                       pdt, NULL, pdt_str);
+                    sgj_add_nv_ihex(jsp, jo2p, "page_code", pn);
+                    jap = sgj_new_named_array(jsp, jo2p,
+                                              "scsi_port_descriptor_list");
+                }
+                decode_scsi_ports_vpd(rp, len, op, jap);
             }
             return 0;
         }
@@ -3126,11 +3365,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_ata_info_vpd(rp, len, long_notquiet, op->do_hex);
             }
             return 0;
@@ -3147,11 +3384,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_power_condition(rp, len, op->do_hex);
             }
             return 0;
@@ -3183,11 +3418,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_power_consumption_vpd(rp, len, op->do_hex);
             }
             return 0;
@@ -3206,11 +3439,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else if (1 == op->do_hex)
                 hex2stdout(rp, len, 0);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_3party_copy_vpd(rp, len, op->do_hex, pdt, vb);
             }
             return 0;
@@ -3227,11 +3458,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rsp_buff[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_proto_lu_vpd(rp, len, op->do_hex);
             }
             return 0;
@@ -3248,11 +3477,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_proto_port_vpd(rp, len, op->do_hex);
             }
             return 0;
@@ -3269,11 +3496,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_feature_sets_vpd(rp, len, op);
             }
             return 0;
@@ -3282,7 +3507,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb0:  /* depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Block limits VPD page (SBC):";
@@ -3304,11 +3528,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_b0_vpd(rp, len, op->do_hex, pdt);
             }
             return 0;
@@ -3319,7 +3541,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb1:  /* depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Block device characteristics VPD page (SBC):";
@@ -3346,8 +3567,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_b1_vpd(rp, len, op->do_hex, pdt);
             }
             return 0;
@@ -3358,7 +3578,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb2:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Logical block provisioning VPD page (SBC):";
@@ -3379,8 +3598,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_b2_vpd(rp, len, pdt, op);
             }
             return 0;
@@ -3412,8 +3630,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_b3_vpd(rp, len, op->do_hex, pdt);
             }
             return 0;
@@ -3424,7 +3641,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb4:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Supported block lengths and protection types VPD page "
@@ -3446,8 +3662,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_b4_vpd(rp, len, op->do_hex, pdt);
             }
             return 0;
@@ -3458,7 +3673,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb5:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Block device characteristics extension VPD page (SBC):";
@@ -3479,8 +3693,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_b5_vpd(rp, len, op->do_hex, pdt);
             }
             return 0;
@@ -3491,7 +3704,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case VPD_ZBC_DEV_CHARS:       /* 0xb6 for both pdt=0 and pdt=0x14 */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Zoned block device characteristics VPD page (SBC, "
@@ -3510,8 +3722,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else {
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_zbdch_vpd(rp, len, op->do_hex);
             }
             return 0;
@@ -3522,7 +3733,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb7:
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Block limits extension VPD page (SBC):";
@@ -3538,11 +3748,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_b7_vpd(rp, len, op->do_hex, pdt);
             }
             return 0;
@@ -3553,7 +3761,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb8:          /* VPD_FORMAT_PRESETS */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Format presets VPD page (SBC):";
@@ -3569,11 +3776,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_format_presets_vpd(rp, len, op->do_hex);
             }
             return 0;
@@ -3584,7 +3789,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb9:          /* VPD_CON_POS_RANGE */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
                 np = "Concurrent positioning ranges VPD page (SBC):";
@@ -3600,11 +3804,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
-                pdt = rp[0] & PDT_MASK;
                 if (vb || long_notquiet)
                     printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           (rp[0] & 0xe0) >> 5,
-                           sg_get_pdt_str(pdt, sizeof(b), b));
+                           pqual, pdt_str);
                 decode_con_pos_range_vpd(rp, len, op->do_hex);
             }
             return 0;
@@ -3689,6 +3891,9 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
         int prev_pn = -1;
 
         res = 0;
+        if (op->page_given && (VPD_NOPE_WANT_STD_INQ == op->vpd_pn))
+            return svpd_decode_t10(-1, op, jop, 0, 0, NULL);
+
         for (k = 0, off = 0; off < in_len; ++k, off += bump) {
             rp = rsp_buff + off;
             pn = rp[1];
@@ -3698,6 +3903,8 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
                         pn, bump);
                 bump = in_len - off;
             }
+            if (op->page_given && (pn != op->vpd_pn))
+                continue;
             if (pn <= prev_pn) {
                 pr2serr("%s: prev_pn=0x%x, this pn=0x%x, not ascending so "
                         "exit\n", __func__, prev_pn, pn);
@@ -3875,6 +4082,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             } else
                 op->page_str = optarg;
+            op->page_given = true;
             break;
         case 'q':
             op->do_quiet = true;
@@ -3987,19 +4195,22 @@ main(int argc, char * argv[])
         jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
 
     if (op->page_str) {
-        if ((0 == strcmp("-1", op->page_str)) ||
-            (0 == strcmp("-2", op->page_str)))
+        if ('-' == op->page_str[0])
             op->vpd_pn = VPD_NOPE_WANT_STD_INQ;
         else if (isalpha((uint8_t)op->page_str[0])) {
             vnp = sdp_find_vpd_by_acron(op->page_str);
             if (NULL == vnp) {
                 vnp = svpd_find_vendor_by_acron(op->page_str);
                 if (NULL == vnp) {
-                    pr2serr("abbreviation doesn't match a VPD page\n");
-                    printf("Available standard VPD pages:\n");
-                    enumerate_vpds(1, 1);
-                    ret = SG_LIB_SYNTAX_ERROR;
-                    goto fini;
+                    if (0 == strcmp("stdinq", op->page_str)) {
+                        vnp = sdp_find_vpd_by_acron("sinq");
+                    } else {
+                        pr2serr("abbreviation doesn't match a VPD page\n");
+                        printf("Available standard VPD pages:\n");
+                        enumerate_vpds(1, 1);
+                        ret = SG_LIB_SYNTAX_ERROR;
+                        goto fini;
+                    }
                 }
             }
             op->vpd_pn = vnp->value;
@@ -4146,7 +4357,7 @@ main(int argc, char * argv[])
     if (op->inhex_fn) {
         if ((0 == op->maxlen) || (inhex_len < op->maxlen))
             op->maxlen = inhex_len;
-        if (op->do_all)
+        if (op->do_all || op->page_given)
             res = svpd_decode_all(-1, op, jop);
         else {
             res = svpd_decode_t10(-1, op, jop, subvalue, 0, NULL);

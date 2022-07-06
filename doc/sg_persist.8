@@ -35,11 +35,10 @@ READ RESERVATION, REPORT CAPABILITIES and READ FULL STATUS.
 .PP
 Before trying to change Persistent reservations and registrations users
 should be aware of what they are doing. The relevant sections of the SCSI
-Primary Commands document (i.e. SPC\-5 whose most recent draft is revision
-18 dated 4 January 2018) are sections 5.14 (titled "Reservations"),
-6.16 (for the PRIN command) and 6.17 (for the PROUT command). To safeguard
-against accidental use, the \fI\-\-out\fR option must be given when a
-PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
+Primary Commands document (i.e. SPC\-5 ANSI INCITS 502\-2020) are sections
+8.14 (titled "Reservations"), 9.16 (for the PRIN command) and 9.17 (for the
+PROUT command). To safeguard against accidental use, the \fI\-\-out\fR option
+must be given when a PROUT sub\-command (e.g.  \fI\-\-register\fR) is used.
 .PP
 The older SCSI RESERVE and RELEASE commands (both 6 and 10 byte variants)
 are not supported by this utility. In SPC\-3, RESERVE and RELEASE are
@@ -245,7 +244,7 @@ and \fI\-\-param\-rk=RK\fR options must also be specified.
 \fB\-X\fR, \fB\-\-transport\-id\fR=\fITIDS\fR
 The \fITIDS\fR argument can take one of several forms. It can be a
 comma (or single space) separated list of ASCII hex bytes representing
-a single TransportID as defined in SPC\-4. They are usually 24 bytes
+a single TransportID as defined in SPC\-5. They are usually 24 bytes
 long apart from in iSCSI. The \fITIDS\fR argument may be a transport
 specific form (e.g. "sas,5000c50005b32001" is clearer than an equivalent
 to the hex byte form: "6,0,0,0,5,0,c5,0,5,b3,20,1"). The \fITIDS\fR argument

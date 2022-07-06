@@ -73,7 +73,8 @@ typedef struct sgj_state_t {
     bool pr_exit_status;        /* 'e' (def: true) */
     bool pr_hex;                /* 'h' (def: false) */
     bool pr_leadin;             /* 'l' (def: true) */
-    bool pr_output;             /* 'o' (def: false) */
+    bool pr_out_hr;             /* 'o' (def: false) */
+    bool pr_packed;             /* 'k' (def: false) only when !pr_pretty */
     bool pr_pretty;             /* 'p' (def: true) */
     bool pr_string;             /* 's' (def: true) */
     char pr_format;             /*  (def: '\0') */
@@ -82,17 +83,17 @@ typedef struct sgj_state_t {
     /* the following hold state information */
     int first_bad_char;         /* = '\0' */
     sgj_opaque_p basep;         /* base JSON object pointer */
-    sgj_opaque_p outputp;       /* 'output' named JSON array pointer */
+    sgj_opaque_p out_hrp;       /* JSON array pointer when pr_out_hr set */
     sgj_opaque_p userp;         /* for temporary usage */
 } sgj_state;
 
 /* If jsp in non-NULL and jsp->pr_as_json is true then this call is ignored
- * unless jsp->pr_output is true. Otherwise this function prints to stdout
- * like printf(fmt, ...); note that no LF is added. In the jsp->pr_output
- * is true case, nothing is printed to stdout but instead is placed into the
- * JSON 'output' array (jsp->outputp) after some preprocessing. That
- * preprocessing involves removing a leading LF from 'fmt' (if present) and
- * up to two trailing LF characters. */
+ * unless jsp->pr_out_hrp is true. Otherwise this function prints to stdout
+ * like printf(fmt, ...); note that no LF is added. In the jsp->pr_out_hrp is
+ * true case, nothing is printed to stdout but instead is placed into a JSON
+ * array (jsp->out_hrp) after some preprocessing. That preprocessing involves
+ * removing a leading LF from 'fmt' (if present) and up to two trailing LF
+ * characters. */
 void sgj_pr_hr(sgj_state * jsp, const char * fmt, ...) __printf(2, 3);
 
 /* Initializes the state object pointed to by jsp based on the argument
@@ -110,7 +111,7 @@ bool sgj_init_state(sgj_state * jsp, const char * j_optarg);
  * in-core tree. If jsp is NULL nothing further happens. Otherwise the pointer
  * to be returned is placed in jsp->basep. If jsp->pr_leadin is true and
  * util_name is non-NULL then a "utility_invoked" JSON object is made with
- * "name", and "version_date" object fields. If the jsp->pr_output field is
+ * "name", and "version_date" object fields. If the jsp->pr_out_hr field is
  * true a named array called "output" is added to the "utility_invoked" object
  * (creating it in the case when jsp->pr_leadin is false) and a pointer to
  * that array object is placed in jsp->objectp . The returned pointer is not
@@ -134,6 +135,8 @@ sgj_opaque_p sgj_new_unattached_array(sgj_state * jsp);
  * and if not, used. */
 sgj_opaque_p sgj_new_named_object(sgj_state * jsp, sgj_opaque_p jop,
                                   const char * name);
+sgj_opaque_p sgj_new_snake_named_object(sgj_state * jsp, sgj_opaque_p jop,
+                                        const char * conv2sname);
 
 /* If jsp is NULL or jsp->pr_as_json is false nothing happens and NULL is
  * returned. Otherwise it creates a new named object (whose name is what
@@ -143,6 +146,8 @@ sgj_opaque_p sgj_new_named_object(sgj_state * jsp, sgj_opaque_p jop,
  * and if not, used. */
 sgj_opaque_p sgj_new_named_array(sgj_state * jsp, sgj_opaque_p jop,
                                  const char * name);
+sgj_opaque_p sgj_new_snake_named_array(sgj_state * jsp, sgj_opaque_p jop,
+                                       const char * conv2sname);
 
 /* If either jsp or value is NULL or jsp->pr_as_json is false then nothing
  * happens and NULL is returned. The insertion point is at jop but if it is
@@ -190,9 +195,9 @@ sgj_opaque_p sgj_add_nv_o(sgj_state * jsp, sgj_opaque_p jop,
                           const char * name, sgj_opaque_p ua_jop);
 
 /* The '_hr_js_' refers to generating output both for human readable and/or
- * JSON with a single invocation. If jsp is non_NULL and jsp->pr_output is
+ * JSON with a single invocation. If jsp is non_NULL and jsp->pr_out_hr is
  * true then both JSON and human readable output is formed (and the latter is
- * placed in the jsp->outputp JSON array). The human readable form will have
+ * placed in the jsp->out_hrp JSON array). The human readable form will have
  * leadin_sp spaces followed by 'name' then a separator, then 'value' with a
  * trailing LF. If 'name' is NULL then it and the separator are ignored. If
  * there is JSON output, then leadin_sp and sep are ignored. If 'jop' is NULL
@@ -260,10 +265,10 @@ void sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop,
                             const char * ane_s);
 
 /* Breaks up the string pointed to by 'sp' into lines and adds them to the
- * jsp->outputp array. Treat '\n' in sp as line breaks. Consumes characters
+ * jsp->out_hrp array. Treat '\n' in sp as line breaks. Consumes characters
  * from sp until either a '\0' is found or slen is exhausted. Add each line
- * to jsp->outputp JSON array (if conditions met). */
-void sgj_pr_str_output(sgj_state * jsp, const char * sp, int slen);
+ * to jsp->out_hrp JSON array (if conditions met). */
+void sgj_pr_str_out_hr(sgj_state * jsp, const char * sp, int slen);
 
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. 'sbp' is assumed to point to sense data as
@@ -292,7 +297,7 @@ void sgj_free_unattached(sgj_opaque_p jop);
 /* If jsp is NULL or jsp->basep is NULL then this function does nothing.
  * This function does bottom up, heap freeing of all the in-core JSON
  * objects and arrays attached to the root JSON object assumed to be
- * found at jsp->basep . After this call jsp->basep, jsp->outputp and
+ * found at jsp->basep . After this call jsp->basep, jsp->out_hrp and
  * jsp->userp will all be set to NULL.  */
 void sgj_finish(sgj_state * jsp);
 

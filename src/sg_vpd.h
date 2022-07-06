@@ -32,6 +32,7 @@ struct opts_t {
     bool do_force;
     bool do_long;
     bool do_quiet;
+    bool page_given;
     bool verbose_given;
     bool version_given;
     int do_hex;

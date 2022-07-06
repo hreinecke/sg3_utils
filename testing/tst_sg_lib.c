@@ -367,10 +367,10 @@ main(int argc, char * argv[])
         }
 #if 1
         if (as_json) {
-            sgj_pr_str_output(jsp, "sg_get_sense_str(ds_data1)", 999);
+            sgj_pr_str_out_hr(jsp, "sg_get_sense_str(ds_data1)", 999);
             sg_get_sense_str(leadin, desc_sense_data1,
                              sizeof(desc_sense_data1), vb, b_len, b);
-            sgj_pr_str_output(jsp, b, strlen(b));
+            sgj_pr_str_out_hr(jsp, b, strlen(b));
 
         } else {
             printf("sg_get_sense_str(ds_data1):\n");
