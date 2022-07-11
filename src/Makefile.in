@@ -187,7 +187,8 @@ sg_get_lba_status_DEPENDENCIES = ../lib/libsgutils2.la
 sg_ident_SOURCES = sg_ident.c
 sg_ident_OBJECTS = sg_ident.$(OBJEXT)
 sg_ident_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_inq_OBJECTS = sg_inq.$(OBJEXT) sg_inq_data.$(OBJEXT)
+am_sg_inq_OBJECTS = sg_inq.$(OBJEXT) sg_inq_data.$(OBJEXT) \
+	sg_vpd_common.$(OBJEXT)
 sg_inq_OBJECTS = $(am_sg_inq_OBJECTS)
 sg_inq_DEPENDENCIES = ../lib/libsgutils2.la
 sg_logs_SOURCES = sg_logs.c
@@ -340,7 +341,8 @@ sg_unmap_DEPENDENCIES = ../lib/libsgutils2.la
 sg_verify_SOURCES = sg_verify.c
 sg_verify_OBJECTS = sg_verify.$(OBJEXT)
 sg_verify_DEPENDENCIES = ../lib/libsgutils2.la
-am_sg_vpd_OBJECTS = sg_vpd.$(OBJEXT) sg_vpd_vendor.$(OBJEXT)
+am_sg_vpd_OBJECTS = sg_vpd.$(OBJEXT) sg_vpd_vendor.$(OBJEXT) \
+	sg_vpd_common.$(OBJEXT)
 sg_vpd_OBJECTS = $(am_sg_vpd_OBJECTS)
 sg_vpd_DEPENDENCIES = ../lib/libsgutils2.la
 sg_wr_mode_SOURCES = sg_wr_mode.c
@@ -429,13 +431,13 @@ am__depfiles_remade = ./$(DEPDIR)/sg_bg_ctl.Po \
 	./$(DEPDIR)/sg_test_rwbuf.Po ./$(DEPDIR)/sg_timestamp.Po \
 	./$(DEPDIR)/sg_turs.Po ./$(DEPDIR)/sg_unmap.Po \
 	./$(DEPDIR)/sg_verify.Po ./$(DEPDIR)/sg_vpd.Po \
-	./$(DEPDIR)/sg_vpd_vendor.Po ./$(DEPDIR)/sg_wr_mode.Po \
-	./$(DEPDIR)/sg_write_buffer.Po ./$(DEPDIR)/sg_write_long.Po \
-	./$(DEPDIR)/sg_write_same.Po ./$(DEPDIR)/sg_write_verify.Po \
-	./$(DEPDIR)/sg_write_x.Po ./$(DEPDIR)/sg_xcopy.Po \
-	./$(DEPDIR)/sg_z_act_query.Po ./$(DEPDIR)/sg_zone.Po \
-	./$(DEPDIR)/sginfo.Po ./$(DEPDIR)/sgm_dd.Po \
-	./$(DEPDIR)/sgp_dd.Po
+	./$(DEPDIR)/sg_vpd_common.Po ./$(DEPDIR)/sg_vpd_vendor.Po \
+	./$(DEPDIR)/sg_wr_mode.Po ./$(DEPDIR)/sg_write_buffer.Po \
+	./$(DEPDIR)/sg_write_long.Po ./$(DEPDIR)/sg_write_same.Po \
+	./$(DEPDIR)/sg_write_verify.Po ./$(DEPDIR)/sg_write_x.Po \
+	./$(DEPDIR)/sg_xcopy.Po ./$(DEPDIR)/sg_z_act_query.Po \
+	./$(DEPDIR)/sg_zone.Po ./$(DEPDIR)/sginfo.Po \
+	./$(DEPDIR)/sgm_dd.Po ./$(DEPDIR)/sgp_dd.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -676,7 +678,7 @@ sg_get_elem_status_LDADD = ../lib/libsgutils2.la
 sg_get_lba_status_LDADD = ../lib/libsgutils2.la
 sg_ident_LDADD = ../lib/libsgutils2.la
 sginfo_LDADD = ../lib/libsgutils2.la
-sg_inq_SOURCES = sg_inq.c sg_inq_data.c
+sg_inq_SOURCES = sg_inq.c sg_inq_data.c sg_vpd_common.c
 sg_inq_LDADD = ../lib/libsgutils2.la
 sg_logs_LDADD = ../lib/libsgutils2.la
 sg_luns_LDADD = ../lib/libsgutils2.la
@@ -728,7 +730,7 @@ sg_timestamp_LDADD = ../lib/libsgutils2.la
 sg_turs_LDADD = ../lib/libsgutils2.la @RT_LIB@
 sg_unmap_LDADD = ../lib/libsgutils2.la
 sg_verify_LDADD = ../lib/libsgutils2.la
-sg_vpd_SOURCES = sg_vpd.c sg_vpd_vendor.c
+sg_vpd_SOURCES = sg_vpd.c sg_vpd_vendor.c sg_vpd_common.c
 sg_vpd_LDADD = ../lib/libsgutils2.la
 sg_wr_mode_LDADD = ../lib/libsgutils2.la
 sg_write_buffer_LDADD = ../lib/libsgutils2.la
@@ -1183,6 +1185,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_unmap.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_verify.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_vpd.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_vpd_common.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_vpd_vendor.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_wr_mode.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_buffer.Po@am__quote@ # am--include-marker
@@ -1419,6 +1422,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sg_unmap.Po
 	-rm -f ./$(DEPDIR)/sg_verify.Po
 	-rm -f ./$(DEPDIR)/sg_vpd.Po
+	-rm -f ./$(DEPDIR)/sg_vpd_common.Po
 	-rm -f ./$(DEPDIR)/sg_vpd_vendor.Po
 	-rm -f ./$(DEPDIR)/sg_wr_mode.Po
 	-rm -f ./$(DEPDIR)/sg_write_buffer.Po
@@ -1540,6 +1544,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sg_unmap.Po
 	-rm -f ./$(DEPDIR)/sg_verify.Po
 	-rm -f ./$(DEPDIR)/sg_vpd.Po
+	-rm -f ./$(DEPDIR)/sg_vpd_common.Po
 	-rm -f ./$(DEPDIR)/sg_vpd_vendor.Po
 	-rm -f ./$(DEPDIR)/sg_wr_mode.Po
 	-rm -f ./$(DEPDIR)/sg_write_buffer.Po

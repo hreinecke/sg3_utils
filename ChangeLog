@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220705] [svn: r958]
+Changelog for pre-release sg3_utils-1.48 [20220711] [svn: r959]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -44,8 +44,9 @@ Changelog for pre-release sg3_utils-1.48 [20220705] [svn: r958]
     - improve 'last_n' log pages; supply VPD and mode pages
       with their name (if T10 defined)
   - sg_modes: improve handling of zbc disks with pdt=0x14
-  - sg_inq, sg_vpd: Device Identication VPD page, change
-    "IEEE Company_id" to "AOI" as per spc6r06.pdf
+  - sg_inq, sg_vpd: merge VPD page processing
+    - Device Identication VPD page, change
+      "IEEE Company_id" to "AOI" as per spc6r06.pdf
     - add support for Hitachi/HP open-v ldev names
   - sg_vpd: apply github pull 18 (missing LF)
   - sg_opcodes: cleanup error reporting

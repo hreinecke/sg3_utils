@@ -106,9 +106,6 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
         case '8':
             jsp->pr_indent_size = 8;
             break;
-        case 'a':       /* abbreviated name expansion */
-            jsp->pr_ane = ! prev_negate;
-            break;
         case 'e':
             jsp->pr_exit_status = ! prev_negate;
             break;
@@ -123,6 +120,9 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
             break;
         case 'l':
             jsp->pr_leadin = ! prev_negate;
+            break;
+        case 'n':
+            jsp->pr_name_ex = ! prev_negate;
             break;
         case 'o':
             jsp->pr_out_hr = ! prev_negate;
@@ -176,9 +176,6 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
     if (n >= (blen - 1))
         goto fini;
     n +=  sg_scnpr(b + n, blen - n,
-                   "      a    show 'abbreviated_name_expansion' "
-                   "fields\n");
-    n +=  sg_scnpr(b + n, blen - n,
                    "      e    show 'exit_status' field\n");
     n +=  sg_scnpr(b + n, blen - n,
                    "      h    show 'hex' fields\n");
@@ -187,6 +184,8 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
     n +=  sg_scnpr(b + n, blen - n,
                    "      l    show lead-in fields (invocation "
                    "information)\n");
+    n +=  sg_scnpr(b + n, blen - n,
+                   "      n    show 'name_extra' information fields\n");
     n +=  sg_scnpr(b + n, blen - n,
                    "      o    non-JSON output placed in 'output' array in "
                    "lead-in\n");
@@ -219,10 +218,10 @@ fini:
 char *
 sg_json_settings(sgj_state * jsp, char * b, int blen)
 {
-    snprintf(b, blen, "%d%sa%se%sh%sk%sl%so%sp%ss%sv", jsp->pr_indent_size,
-             jsp->pr_ane ? "" : "-", jsp->pr_exit_status ? "" : "-",
-             jsp->pr_hex ? "" : "-", jsp->pr_packed ? "" : "-",
-             jsp->pr_leadin ? "" : "-", jsp->pr_out_hr ? "" : "-",
+    snprintf(b, blen, "%d%se%sh%sk%sl%sn%so%sp%ss%sv", jsp->pr_indent_size,
+             jsp->pr_exit_status ? "" : "-", jsp->pr_hex ? "" : "-",
+             jsp->pr_packed ? "" : "-", jsp->pr_leadin ? "" : "-",
+             jsp->pr_name_ex ? "" : "-", jsp->pr_out_hr ? "" : "-",
              jsp->pr_pretty ? "" : "-", jsp->pr_string ? "" : "-",
              jsp->verbose ? "" : "-");
     return b;
@@ -232,11 +231,11 @@ static void
 sgj_def_opts(sgj_state * jsp)
 {
     jsp->pr_as_json = true;
-    jsp->pr_ane = false;
     jsp->pr_exit_status = true;
     jsp->pr_hex = false;
     jsp->pr_leadin = true;
     jsp->pr_out_hr = false;
+    jsp->pr_name_ex = false;
     jsp->pr_packed = false;     /* 'k' control character, needs '-p' */
     jsp->pr_pretty = true;
     jsp->pr_string = true;
@@ -668,18 +667,18 @@ sgj_add_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     }
 }
 
-static const char * sc_ane_s = "abbreviated_name_expansion";
+static const char * sc_nex_s = "name_extra";
 
 void
-sgj_add_nv_ihex_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                    int64_t val_i, bool want_hex, const char * ane_s)
+sgj_add_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                    int64_t val_i, bool want_hex, const char * nex_s)
 {
     bool as_hex = jsp->pr_hex && want_hex;
-    bool as_ane = jsp->pr_ane && ane_s;
+    bool as_nex = jsp->pr_name_ex && nex_s;
 
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
-    if (! (as_hex || as_ane))
+    if (! (as_hex || as_nex))
         sgj_add_nv_i(jsp, jop, name, val_i);
     else {
         char b[64];
@@ -689,12 +688,12 @@ sgj_add_nv_ihex_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
         if (NULL == jo2p)
             return;
         sgj_add_nv_i(jsp, jo2p, "i", (int64_t)val_i);
-        if (as_ane) {
+        if (as_nex) {
             if (jsp->pr_hex && want_hex) {
                 snprintf(b, sizeof(b), "%" PRIx64, val_i);
                 sgj_add_nv_s(jsp, jo2p, "hex", b);
             }
-            sgj_add_nv_s(jsp, jo2p, sc_ane_s, ane_s);
+            sgj_add_nv_s(jsp, jo2p, sc_nex_s, nex_s);
         } else if (as_hex) {
             snprintf(b, sizeof(b), "%" PRIx64, val_i);
             sgj_add_nv_s(jsp, jo2p, "hex", b);
@@ -721,18 +720,18 @@ sgj_add_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 }
 
 void
-sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+sgj_add_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                        int64_t val_i, bool want_hex, const char * str_name,
-                       const char * val_s, const char * ane_s)
+                       const char * val_s, const char * nex_s)
 {
     bool as_hex = jsp->pr_hex && want_hex;
     bool as_str = jsp->pr_string && val_s;
-    bool as_ane = jsp->pr_ane && ane_s;
+    bool as_nex = jsp->pr_name_ex && nex_s;
     const char * sname =  str_name ? str_name : sc_mn_s;
 
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
-    if (! (as_hex || as_ane || as_str))
+    if (! (as_hex || as_nex || as_str))
         sgj_add_nv_i(jsp, jop, name, val_i);
     else {
         char b[64];
@@ -742,7 +741,7 @@ sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
         if (NULL == jo2p)
             return;
         sgj_add_nv_i(jsp, jo2p, "i", (int64_t)val_i);
-        if (as_ane) {
+        if (as_nex) {
             if (as_hex) {
                 snprintf(b, sizeof(b), "%" PRIx64, val_i);
                 sgj_add_nv_s(jsp, jo2p, "hex", b);
@@ -750,7 +749,7 @@ sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
             if (as_str) {
                 sgj_add_nv_s(jsp, jo2p, sname, val_s);
             }
-            sgj_add_nv_s(jsp, jo2p, sc_ane_s, ane_s);
+            sgj_add_nv_s(jsp, jo2p, sc_nex_s, nex_s);
         } else if (as_hex) {
             snprintf(b, sizeof(b), "%" PRIx64, val_i);
             sgj_add_nv_s(jsp, jo2p, "hex", b);
@@ -792,16 +791,26 @@ sgj_pr_str_out_hr(sgj_state * jsp, const char * sp, int slen)
     }
 }
 
+char *
+sgj_convert_to_snake_name(const char * in_name, char * sname,
+                          int max_sname_len)
+{
+    sgj_name_to_snake(in_name, sname, max_sname_len);
+    return sname;
+}
+
 /* This function tries to convert the 'in' C string to "snake_case"
  * convention so the output 'out' only contains lower case ASCII letters,
  * numerals and "_" as a separator. Any leading or trailing underscores
  * are removed as are repeated underscores (e.g. "_Snake __ case" becomes
- * "snake_case").  Returns number of characters placed in 'out' excluding
- * the trailing NULL */
+ * "snake_case"). Parentheses and the characters between them are removed.
+ * Returns number of characters placed in 'out' excluding the trailing
+ * NULL */
 static int
 sgj_name_to_snake(const char * in, char * out, int maxlen_out)
 {
     bool prev_underscore = false;
+    bool within_paren = false;
     int c, k, j, inlen;
 
     if (maxlen_out < 2) {
@@ -812,10 +821,17 @@ sgj_name_to_snake(const char * in, char * out, int maxlen_out)
     inlen = strlen(in);
     for (k = 0, j = 0; (k < inlen) && (j < maxlen_out); ++k) {
         c = in[k];
+        if (within_paren) {
+            if (')' == c)
+                within_paren = false;
+            continue;
+        }
         if (isalnum(c)) {
             out[j++] = isupper(c) ? tolower(c) : c;
             prev_underscore = false;
-        } else if ((j > 0) && (! prev_underscore)) {
+        } else if ('(' == c)
+            within_paren = true;
+        else if ((j > 0) && (! prev_underscore)) {
             out[j++] = '_';
             prev_underscore = true;
         }
@@ -836,12 +852,82 @@ sgj_name_to_snake(const char * in, char * out, int maxlen_out)
     return k;
 }
 
+static int
+sgj_jtype_to_s(char * b, int blen_max, json_value * jvp)
+{
+    json_type jtype = jvp ? jvp->type : json_none;
+
+    switch (jtype) {
+    case json_string:
+        return sg_scnpr(b, blen_max, "%s", jvp->u.string.ptr);
+    case json_integer:
+        return sg_scnpr(b, blen_max, "%" PRIi64, jvp->u.integer);
+    case json_boolean:
+        return sg_scnpr(b, blen_max, "%s", jvp->u.boolean ? "true" : "false");
+    case json_none:
+    default:
+        if ((blen_max > 0) && ('\0' != b[0]))
+            b[0] = '\0';
+        break;
+    }
+    return 0;
+}
+
+static int
+sgj_pr_hr_js_hr(char * b, int blen_max, const char * name,
+                enum sgj_separator_t sep, bool use_jvp,
+                json_value * jvp, int64_t val_instead)
+{
+    int n = 0;
+
+    if (name) {
+        n += sg_scnpr(b + n, blen_max - n, "%s", name);
+        switch (sep) {
+        case SGJ_SEP_NONE:
+            break;
+        case SGJ_SEP_SPACE_1:
+            n += sg_scnpr(b + n, blen_max - n, " ");
+            break;
+        case SGJ_SEP_SPACE_2:
+            n += sg_scnpr(b + n, blen_max - n, "  ");
+            break;
+        case SGJ_SEP_SPACE_3:
+            n += sg_scnpr(b + n, blen_max - n, "   ");
+            break;
+        case SGJ_SEP_SPACE_4:
+            n += sg_scnpr(b + n, blen_max - n, "    ");
+            break;
+        case SGJ_SEP_EQUAL_NO_SPACE:
+            n += sg_scnpr(b + n, blen_max - n, "=");
+            break;
+        case SGJ_SEP_EQUAL_1_SPACE:
+            n += sg_scnpr(b + n, blen_max - n, "= ");
+            break;
+        case SGJ_SEP_COLON_NO_SPACE:
+            n += sg_scnpr(b + n, blen_max - n, ":");
+            break;
+        case SGJ_SEP_COLON_1_SPACE:
+            n += sg_scnpr(b + n, blen_max - n, ": ");
+            break;
+        default:
+            break;
+        }
+    }
+    if (use_jvp)
+        n += sgj_jtype_to_s(b + n, blen_max - n, jvp);
+    else
+        n += sg_scnpr(b + n, blen_max - n, "%" PRIi64, val_instead);
+    return n;
+}
+
 static void
 sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                const char * name, enum sgj_separator_t sep, json_value * jvp)
+                const char * name, enum sgj_separator_t sep,
+                json_value * jvp, const char * nex_s)
 {
     bool eaten = false;
     bool as_json = (jsp && jsp->pr_as_json);
+    bool done;
     int n;
     json_type jtype = jvp ? jvp->type : json_none;
     char b[256];
@@ -855,21 +941,7 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
     b[n] = '\0';
     if (NULL == name) {
         if ((! as_json) || (jsp && jsp->pr_out_hr)) {
-            switch (jtype) {
-            case json_string:
-                sg_scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
-                break;
-            case json_integer:
-                sg_scnpr(b + n, blen - n, "%" PRIi64, jvp->u.integer);
-                break;
-            case json_boolean:
-                sg_scnpr(b + n, blen - n, "%s",
-                         jvp->u.boolean ? "true" : "false");
-                break;
-            case json_none:
-            default:
-                break;
-            }
+            n += sgj_jtype_to_s(b + n, blen - n, jvp);
             printf("%s\n", b);
         }
         if (NULL == jop) {
@@ -885,11 +957,8 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                                 jvp ? jvp : json_null_new());
             }
         }
-        if (jvp && (! eaten))
-            json_builder_free((json_value *)jvp);
-        return;
+        goto fini;
     }
-    n += sg_scnpr(b + n, blen - n, "%s", name);
     if (as_json) {
         int k;
 
@@ -897,61 +966,41 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
             jop = jsp->basep;
         k = sgj_name_to_snake(name, jname, sizeof(jname));
         if (k > 0) {
-            eaten = true;
-            json_object_push((json_value *)jop, jname,
-                             jvp ? jvp : json_null_new());
+            done = false;
+            if (nex_s && (strlen(nex_s) > 0)) {
+                switch (jtype) {
+                case json_string:
+                    break;
+                case json_integer:
+                    sgj_add_nv_ihex_nex(jsp, jop, jname, jvp->u.integer,
+                                        false, nex_s);
+                    done = true;
+                    break;
+                case json_boolean:
+                    sgj_add_nv_ihex_nex(jsp, jop, jname, jvp->u.boolean,
+                                        false, nex_s);
+                    done = true;
+                    break;
+                case json_none:
+                default:
+                    break;
+                }
+            }
+            if (! done) {
+                eaten = true;
+                json_object_push((json_value *)jop, jname,
+                                 jvp ? jvp : json_null_new());
+            }
         }
     }
-    if (jvp && ((as_json && jsp->pr_out_hr) || (! as_json))) {
-        switch (sep) {
-        case SGJ_SEP_NONE:
-            break;
-        case SGJ_SEP_SPACE_1:
-            n += sg_scnpr(b + n, blen - n, " ");
-            break;
-        case SGJ_SEP_SPACE_2:
-            n += sg_scnpr(b + n, blen - n, "  ");
-            break;
-        case SGJ_SEP_SPACE_3:
-            n += sg_scnpr(b + n, blen - n, "   ");
-            break;
-        case SGJ_SEP_SPACE_4:
-            n += sg_scnpr(b + n, blen - n, "    ");
-            break;
-        case SGJ_SEP_EQUAL_NO_SPACE:
-            n += sg_scnpr(b + n, blen - n, "=");
-            break;
-        case SGJ_SEP_EQUAL_1_SPACE:
-            n += sg_scnpr(b + n, blen - n, "= ");
-            break;
-        case SGJ_SEP_COLON_NO_SPACE:
-            n += sg_scnpr(b + n, blen - n, ":");
-            break;
-        case SGJ_SEP_COLON_1_SPACE:
-            n += sg_scnpr(b + n, blen - n, ": ");
-            break;
-        default:
-            break;
-        }
-        switch (jtype) {
-        case json_string:
-            sg_scnpr(b + n, blen - n, "%s", jvp->u.string.ptr);
-            break;
-        case json_integer:
-            sg_scnpr(b + n, blen - n, "%" PRIi64, jvp->u.integer);
-            break;
-        case json_boolean:
-            sg_scnpr(b + n, blen - n, "%s", jvp->u.boolean ? "true" : "false");
-            break;
-        case json_none:
-        default:
-            break;
-        }
-    }
+    if (jvp && ((as_json && jsp->pr_out_hr) || (! as_json)))
+        n += sgj_pr_hr_js_hr(b + n, blen - n, name, sep, true, jvp, 0);
+
     if (as_json && jsp->pr_out_hr)
         json_array_push((json_value *)jsp->out_hrp, json_string_new(b));
-    else if (! as_json)
+    if (! as_json)
         printf("%s\n", b);
+fini:
     if (jvp && (! eaten))
         json_builder_free((json_value *)jvp);
 }
@@ -965,7 +1014,7 @@ sgj_pr_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 
     /* make json_value even if jsp->pr_as_json is false */
     jvp = value ? json_string_new(value) : NULL;
-    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp);
+    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, NULL);
 }
 
 void
@@ -975,7 +1024,18 @@ sgj_pr_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp);
+    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, NULL);
+}
+
+void
+sgj_pr_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                    const char * name, enum sgj_separator_t sep,
+                    int64_t value, const char * nex_s)
+{
+    json_value * jvp;
+
+    jvp = json_integer_new(value);
+    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, nex_s);
 }
 
 void
@@ -985,7 +1045,40 @@ sgj_pr_hr_js_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
     json_value * jvp;
 
     jvp = json_boolean_new(value);
-    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp);
+    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, NULL);
+}
+
+sgj_opaque_p
+sgj_pr_hr_js_subo(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                  const char * name, enum sgj_separator_t sep, int64_t value)
+{
+    bool as_json = (jsp && jsp->pr_as_json);
+    int n = 0;
+    sgj_opaque_p jo2p;
+    char b[256];
+    static const int blen = sizeof(b);
+
+    if (NULL == name)
+        return NULL;
+    for (n = 0; n < leadin_sp; ++n)
+        b[n] = ' ';
+    b[n] = '\0';
+    if ((! as_json) || (jsp && jsp->pr_out_hr))
+        n += sgj_pr_hr_js_hr(b + n, blen - n, name, sep, false, NULL, value);
+
+    if (as_json && jsp->pr_out_hr)
+        json_array_push((json_value *)jsp->out_hrp, json_string_new(b));
+    if (! as_json)
+        printf("%s\n", b);
+
+    if (as_json) {
+        sgj_name_to_snake(name, b, blen);
+        jo2p = sgj_new_named_object(jsp, jop, b);
+        if (jo2p)
+            sgj_add_nv_i(jsp, jo2p, "i", value);
+        return jo2p;
+    }
+    return NULL;
 }
 
 #ifdef SG_PRSE_SENSE_DECODE
@@ -997,8 +1090,8 @@ static const char * naa_exp = "Network Address Authority";
 static const char * aoi_exp = "IEEE-Administered Organizational Identifier";
 
 bool
-sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
-                               const uint8_t * ddp, int dd_len)
+sgj_pr_js_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
+                                 const uint8_t * ddp, int dd_len)
 {
     int p_id, piv, c_set, assoc, desig_type, d_id, naa;
     int n, aoi, vsi, dlen;
@@ -1043,7 +1136,7 @@ sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
         cp = "unknown";
     sgj_add_nv_ihexstr(jsp, jop, "code_set", desig_type,
                        NULL, cp);
-    sgj_add_nv_ihex_ane(jsp, jop, "piv", piv, false,
+    sgj_add_nv_ihex_nex(jsp, jop, "piv", piv, false,
                         "Protocol Identifier Valid");
     sg_get_trans_proto_str(p_id, elen, e);
     sgj_add_nv_ihexstr(jsp, jop, "protocol_identifier", p_id, NULL, e);
@@ -1089,37 +1182,37 @@ sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
         switch (naa) {
         case 2:
             naa_sp = "IEEE Extended";
-            sgj_add_nv_ihexstr_ane(jsp, jop, "naa", naa, false, NULL, naa_sp,
+            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
                                    naa_exp);
             d_id = (((ip[0] & 0xf) << 8) | ip[1]);
             sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier_a", d_id);
             aoi = sg_get_unaligned_be24(ip + 2);
-            sgj_add_nv_ihex_ane(jsp, jop, "aoi", aoi, true, aoi_exp);
+            sgj_add_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
             vsi = sg_get_unaligned_be24(ip + 5);
             sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier_b", vsi);
             break;
         case 3:
             naa_sp = "Locally Assigned";
-            sgj_add_nv_ihexstr_ane(jsp, jop, "naa", naa, false, NULL, naa_sp,
+            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
                                    naa_exp);
             ull = sg_get_unaligned_be64(ip + 0) & 0xfffffffffffffffULL;
             sgj_add_nv_ihex(jsp, jop, "locally_administered_value", ull);
             break;
         case 5:
             naa_sp = "IEEE Registered";
-            sgj_add_nv_ihexstr_ane(jsp, jop, "naa", naa, false, NULL, naa_sp,
+            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
                                    naa_exp);
             aoi = (sg_get_unaligned_be32(ip + 0) >> 4) & 0xffffff;
-            sgj_add_nv_ihex_ane(jsp, jop, "aoi", aoi, true, aoi_exp);
+            sgj_add_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
             ull = sg_get_unaligned_be48(ip + 2) & 0xfffffffffULL;
             sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier", ull);
             break;
         case 6:
             naa_sp = "IEEE Registered Extended";
-            sgj_add_nv_ihexstr_ane(jsp, jop, "naa", naa, false, NULL, naa_sp,
+            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
                                    naa_exp);
             aoi = (sg_get_unaligned_be32(ip + 0) >> 4) & 0xffffff;
-            sgj_add_nv_ihex_ane(jsp, jop, "aoi", aoi, true, aoi_exp);
+            sgj_add_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
             ull = sg_get_unaligned_be48(ip + 2) & 0xfffffffffULL;
             sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier", ull);
             ull = sg_get_unaligned_be64(ip + 8);
@@ -1128,7 +1221,7 @@ sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
             break;
         default:
             snprintf(b, blen, "unknown NAA value=0x%x", naa);
-            sgj_add_nv_ihexstr_ane(jsp, jop, "naa", naa, true, NULL, b,
+            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, true, NULL, b,
                                    naa_exp);
             sgj_add_nv_hex_bytes(jsp, jop, "full_naa_hexbytes", ip, dlen);
             break;
@@ -1238,11 +1331,11 @@ sgj_decode_sks(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * dp, int dlen,
             sgj_add_nv_s(jsp, jop, "illegal_request_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_ane(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
                             sksvp);
-        sgj_add_nv_ihex_ane(jsp, jop, "c_d", !! (dp[0] & 0x40), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "c_d", !! (dp[0] & 0x40), false,
                             "c: cdb; d: data-out");
-        sgj_add_nv_ihex_ane(jsp, jop, "bpv", !! (dp[0] & 0x8), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "bpv", !! (dp[0] & 0x8), false,
                             "bit pointer (index) valid");
         sgj_add_nv_i(jsp, jop, "bit_pointer", dp[0] & 0x7);
         sgj_add_nv_ihex(jsp, jop, "field_pointer",
@@ -1255,7 +1348,7 @@ sgj_decode_sks(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * dp, int dlen,
             sgj_add_nv_s(jsp, jop, "actual_retry_count_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_ane(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
                             sksvp);
         sgj_add_nv_ihex(jsp, jop, "actual_retry_count",
                         sg_get_unaligned_be16(dp + 1));
@@ -1266,7 +1359,7 @@ sgj_decode_sks(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * dp, int dlen,
             sgj_add_nv_s(jsp, jop, "progress_indication_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_ane(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
                             sksvp);
         sgj_progress_indication(jsp, jop, sg_get_unaligned_be16(dp + 1),
                                 false);
@@ -1276,12 +1369,12 @@ sgj_decode_sks(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * dp, int dlen,
             sgj_add_nv_s(jsp, jop, "segment_indication_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_ane(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
                             sksvp);
-        sgj_add_nv_ihex_ane(jsp, jop, "sd", !! (dp[0] & 0x20), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "sd", !! (dp[0] & 0x20), false,
                             "field pointer relative to: 1->segment "
                             "descriptor, 0->parameter list");
-        sgj_add_nv_ihex_ane(jsp, jop, "bpv", !! (dp[0] & 0x8), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "bpv", !! (dp[0] & 0x8), false,
                             "bit pointer (index) valid");
         sgj_add_nv_i(jsp, jop, "bit_pointer", dp[0] & 0x7);
         sgj_add_nv_ihex(jsp, jop, "field_pointer",
@@ -1292,7 +1385,7 @@ sgj_decode_sks(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * dp, int dlen,
             sgj_add_nv_s(jsp, jop, "segment_indication_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_ane(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
                             sksvp);
         sgj_add_nv_i(jsp, jop, "overflow", !! (dp[0] & 0x80));
         break;
@@ -1342,7 +1435,7 @@ sgj_uds_referral_descriptor(sgj_state * jsp, sgj_opaque_p jop,
     sgj_opaque_p jap, jo2p, ja2p, jo3p;
     char c[40];
 
-    sgj_add_nv_ihex_ane(jsp, jop, "not_all_r", (dp[2] & 0x1), false,
+    sgj_add_nv_ihex_nex(jsp, jop, "not_all_r", (dp[2] & 0x1), false,
                         "Not all referrals");
     dp += 4;
     jap = sgj_new_named_array(jsp, jop,
@@ -1391,9 +1484,9 @@ static const char * dd_usage_reason_str_arr[] = {
    };
 
 static bool
-sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
-                          const struct sg_scsi_sense_hdr * sshp,
-                          const uint8_t * sbp, int sb_len)
+sgj_pr_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
+                            const struct sg_scsi_sense_hdr * sshp,
+                            const uint8_t * sbp, int sb_len)
 {
     bool processed = true;
     int add_sb_len, desc_len, k, dt, sense_key, n, sds;
@@ -1473,9 +1566,9 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                                "Stream commands");
             if (add_d_len >= 2) {
                 sgj_add_nv_i(jsp, jo2p, "filemark", !! (descp[3] & 0x80));
-                sgj_add_nv_ihex_ane(jsp, jo2p, "eom", !! (descp[3] & 0x40),
+                sgj_add_nv_ihex_nex(jsp, jo2p, "eom", !! (descp[3] & 0x40),
                                     false, "End Of Medium");
-                sgj_add_nv_ihex_ane(jsp, jo2p, "ili", !! (descp[3] & 0x20),
+                sgj_add_nv_ihex_nex(jsp, jo2p, "ili", !! (descp[3] & 0x20),
                                     false, "Incorrect Length Indicator");
             } else {
                 sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
@@ -1486,7 +1579,7 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
             sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
                                "Block commands");
             if (add_d_len >= 2)
-                sgj_add_nv_ihex_ane(jsp, jo2p, "ili", !! (descp[3] & 0x20),
+                sgj_add_nv_ihex_nex(jsp, jo2p, "ili", !! (descp[3] & 0x20),
                                     false, "Incorrect Length Indicator");
             else {
                 sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
@@ -1571,7 +1664,7 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                 processed = false;
                 break;
             }
-            sgj_add_nv_ihex_ane(jsp, jo2p, "fsdt", !! (0x80 & descp[2]),
+            sgj_add_nv_ihex_nex(jsp, jo2p, "fsdt", !! (0x80 & descp[2]),
                                 false, "Forwarded Sense Data Truncated");
             sds = (0x7 & descp[2]);
             if (sds < 1)
@@ -1588,7 +1681,7 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
             sgj_add_nv_ihexstr(jsp, jo2p, "sense_data_source",
                                (0x7 & descp[2]), NULL, b);
             jo3p = sgj_new_named_object(jsp, jo2p, "forwarded_sense_data");
-            sgj_get_sense(jsp, jo3p, descp + 4, desc_len - 4);
+            sgj_pr_js_sense(jsp, jo3p, descp + 4, desc_len - 4);
             break;
         case 0xd:       /* Added in SBC-3 rev 36d */
             /* this descriptor combines descriptors 0, 1, 2 and 3 */
@@ -1600,7 +1693,7 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                 break;
             }
             sgj_add_nv_i(jsp, jo2p, "valid", (0x80 & descp[2]));
-            sgj_add_nv_ihex_ane(jsp, jo2p, "ili", !! (0x20 & descp[2]),
+            sgj_add_nv_ihex_nex(jsp, jo2p, "ili", !! (0x20 & descp[2]),
                                 false, "Incorrect Length Indicator");
             processed = sgj_decode_sks(jsp, jo2p, descp + 4, desc_len - 4,
                                        sense_key);
@@ -1621,8 +1714,8 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                                n, NULL, cp);
             jo3p = sgj_new_named_object(jsp, jo2p,
                                         "device_designation_descriptor");
-            sgj_get_designation_descriptor(jsp, jo3p, descp + 4,
-                                           desc_len - 4);
+            sgj_pr_js_designation_descriptor(jsp, jo3p, descp + 4,
+                                             desc_len - 4);
             break;
         case 0xf:       /* Added in SPC-5 rev 10 (for Write buffer) */
             sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
@@ -1643,12 +1736,12 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                 processed = false;
                 break;
             }
-            sgj_add_nv_ihex_ane(jsp, jo2p, "dnr", !! (0x80 & descp[5]),
+            sgj_add_nv_ihex_nex(jsp, jo2p, "dnr", !! (0x80 & descp[5]),
                                 false, "Do not retry");
-            sgj_add_nv_ihex_ane(jsp, jo2p, "m", !! (0x40 & descp[5]),
+            sgj_add_nv_ihex_nex(jsp, jo2p, "m", !! (0x40 & descp[5]),
                                 false, "More");
             sct_sc = sg_get_unaligned_be16(descp + 6);
-            sgj_add_nv_ihexstr_ane
+            sgj_add_nv_ihexstr_nex
                 (jsp, jo2p, "sct_sc", sct_sc, true, NULL,
                  sg_get_nvme_cmd_status_str(sct_sc, blen, b),
                  "Status Code Type (upper 8 bits) and Status Code");
@@ -1673,8 +1766,8 @@ sgj_get_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
 
 /* Fetch sense information */
 bool
-sgj_get_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
-              int sb_len)
+sgj_pr_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
+                int sb_len)
 {
     bool descriptor_format = false;
     bool sdat_ovfl = false;
@@ -1736,7 +1829,7 @@ sgj_get_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
     }
     sgj_add_nv_ihexstr(jsp, jop, "response_code", resp_code, NULL, ebp);
     sgj_add_nv_b(jsp, jop, "descriptor_format", descriptor_format);
-    sgj_add_nv_ihex_ane(jsp, jop, "sdat_ovfl", sdat_ovfl, false,
+    sgj_add_nv_ihex_nex(jsp, jop, "sdat_ovfl", sdat_ovfl, false,
                         "Sense data overflow");
     sgj_add_nv_ihexstr(jsp, jop, "sense_key", ssh.sense_key, NULL,
                        sg_lib_sense_key_desc[ssh.sense_key]);
@@ -1747,7 +1840,8 @@ sgj_get_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
                                              blen, b));
     if (descriptor_format) {
         if (len > 8) {
-            ret = sgj_get_sense_descriptors(jsp, jop, &ssh, sbp + 8, len - 8);
+            ret = sgj_pr_js_sense_descriptors(jsp, jop, &ssh, sbp + 8,
+                                              len - 8);
             if (ret == false) {
                 ebp = "unable to decode sense descriptor";
                 goto fini;
@@ -1767,9 +1861,9 @@ sgj_get_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
     } else if (len > 2) {   /* fixed format */
         sgj_add_nv_i(jsp, jop, "valid", valid_info_fld);
         sgj_add_nv_i(jsp, jop, "filemark", !! (sbp[2] & 0x80));
-        sgj_add_nv_ihex_ane(jsp, jop, "eom", !! (sbp[2] & 0x40),
+        sgj_add_nv_ihex_nex(jsp, jop, "eom", !! (sbp[2] & 0x40),
                             false, "End Of Medium");
-        sgj_add_nv_ihex_ane(jsp, jop, "ili", !! (sbp[2] & 0x20),
+        sgj_add_nv_ihex_nex(jsp, jop, "ili", !! (sbp[2] & 0x20),
                             false, "Incorrect Length Indicator");
         info = sg_get_unaligned_be32(sbp + 3);
         sgj_add_nv_ihex(jsp, jop, "information", info);

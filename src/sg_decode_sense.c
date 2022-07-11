@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.28 20220626";
+static const char * version_str = "1.29 20220711";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -504,7 +504,7 @@ main(int argc, char *argv[])
             printf("%s\n", b);
         } else {
             if (as_json) {
-                sgj_get_sense(jsp, jop, op->sense, op->sense_len);
+                sgj_pr_js_sense(jsp, jop, op->sense, op->sense_len);
                 if (jsp->pr_out_hr) {
                     sg_get_sense_str(NULL, op->sense, op->sense_len,
                                      op->verbose, blen, b);

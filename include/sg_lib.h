@@ -640,9 +640,9 @@ void dStrHexFp(const char* str, int len, int no_ascii, FILE * fp);
  * ('.' for non printable chars) to right of each line; 1 don't (so just
  * output ASCII hex). If 'oformat' is 2 output same as 1 but any LFs are
  * replaced by space (and trailing spaces are trimmed). Note that an address
- * is not printed on each line preceding the hex data. Returns number of bytes
- * written to 'b' excluding the trailing '\0'. The only difference between
- * dStrHexStr() and hex2str() is the type of the first argument. */
+ * is _not_ printed on each line preceding the hex data. Returns number of
+ * bytes written to 'b' excluding the trailing '\0'. The only difference
+ * between dStrHexStr() and hex2str() is the type of the first argument. */
 int dStrHexStr(const char * str, int len, const char * leadin, int oformat,
                int cb_len, char * cbp);
 int hex2str(const uint8_t * b_str, int len, const char * leadin, int oformat,

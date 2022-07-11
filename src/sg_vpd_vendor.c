@@ -28,7 +28,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-#include "sg_vpd.h"
+#include "sg_vpd_common.h"
 
 /* This is a companion file to sg_vpd.c . It contains logic to output and
    decode vendor specific VPD pages

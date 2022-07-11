@@ -44,7 +44,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.15 20220625";
+static const char * version_str = "1.16 20220710";
 
 
 #define MY_NAME "tst_sg_lib"
@@ -357,8 +357,8 @@ main(int argc, char * argv[])
         ++did_something;
         if (as_json) {
             jo2p = sgj_new_named_object(jsp, jop, "desc_sense_data__test1");
-            sgj_get_sense(jsp, jo2p,  desc_sense_data1,
-                          (int)sizeof(desc_sense_data1));
+            sgj_pr_js_sense(jsp, jo2p,  desc_sense_data1,
+                            (int)sizeof(desc_sense_data1));
         } else {
             printf("desc_sense_data test1:\n");
             sg_print_sense(leadin, desc_sense_data1,
@@ -383,8 +383,8 @@ main(int argc, char * argv[])
 #endif
         if (as_json) {
             jo2p = sgj_new_named_object(jsp, jop, "desc_sense_data__test2");
-            sgj_get_sense(jsp, jo2p,  desc_sense_data2,
-                          (int)sizeof(desc_sense_data2));
+            sgj_pr_js_sense(jsp, jo2p,  desc_sense_data2,
+                            (int)sizeof(desc_sense_data2));
         } else {
             printf("desc_sense_data test2\n");
             sg_print_sense(leadin, desc_sense_data2,
@@ -394,8 +394,8 @@ main(int argc, char * argv[])
         if (as_json) {
             jo2p = sgj_new_named_object(jsp, jop,
                                         "desc_sense_block_combo_test3");
-            sgj_get_sense(jsp, jo2p,  desc_sense_data3,
-                          (int)sizeof(desc_sense_data3));
+            sgj_pr_js_sense(jsp, jo2p,  desc_sense_data3,
+                            (int)sizeof(desc_sense_data3));
         } else {
             printf("desc_sense block dev combo plus designator test3\n");
             sg_print_sense(leadin, desc_sense_data3,
@@ -405,8 +405,8 @@ main(int argc, char * argv[])
         if (as_json) {
             jo2p = sgj_new_named_object(jsp, jop,
                                         "desc_sense_forwarded_sense_test4");
-            sgj_get_sense(jsp, jo2p,  desc_sense_data4,
-                          (int)sizeof(desc_sense_data4));
+            sgj_pr_js_sense(jsp, jo2p,  desc_sense_data4,
+                            (int)sizeof(desc_sense_data4));
         } else {
             printf("desc_sense forwarded sense test4\n");
             sg_print_sense(leadin, desc_sense_data4,
@@ -416,8 +416,8 @@ main(int argc, char * argv[])
         if (as_json) {
             jo2p = sgj_new_named_object(jsp, jop,
                                         "desc_sense_ata_info_test5");
-            sgj_get_sense(jsp, jo2p,  desc_sense_data5,
-                          (int)sizeof(desc_sense_data5));
+            sgj_pr_js_sense(jsp, jo2p,  desc_sense_data5,
+                            (int)sizeof(desc_sense_data5));
         } else {
             printf("desc_sense ATA Info test5\n");
             sg_print_sense(leadin, desc_sense_data5,
@@ -427,8 +427,8 @@ main(int argc, char * argv[])
         if (as_json) {
             jo2p = sgj_new_named_object(jsp, jop,
                                         "desc_sense_ua_binding_test6");
-            sgj_get_sense(jsp, jo2p,  desc_sense_data6,
-                          (int)sizeof(desc_sense_data6));
+            sgj_pr_js_sense(jsp, jo2p,  desc_sense_data6,
+                            (int)sizeof(desc_sense_data6));
         } else {
             printf("desc_sense UA subsidiary binding changed test6\n");
             sg_print_sense(leadin, desc_sense_data6,

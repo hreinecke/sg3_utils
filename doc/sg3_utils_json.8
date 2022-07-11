@@ -97,23 +97,6 @@ defined to make the short option form look better (e.g. '\-j=av').
 negation character. Toggles the (boolean) sense of the following control
 character.
 .TP
-\fBa\fR
-this is a boolean control character for "abbreviated name expansion". T10
-names fields often depending on the amount of space available in the
-CDB (command descriptor block) table in the relevant specification. This
-leads to some clear names (e.g. "number of blocks) and some not so clear
-names (e.g. "SKSV"). When this character is on (true), then fields that have
-abbreviated names (subjective decision by author) will use the T10 field
-name with a sub\-object containing at least a "i" field with the integer
-value and a "abbreviated_name_expansion" field with a string value that
-should make the T10 name clearer (e.g. "Sense Key Specific Valid").
-.br
-The "abbreviated name expansion" control character is also used to flag
-fields that are obsolete, usually noting the standard or revision of a
-draft standard when they became obsolete.
-.br
-This boolean control character is default off (false).
-.TP
 \fBe\fR
 this is a boolean control character for "exit status". If active an "exit
 status" field is placed at the end of the JSON output. The integer value
@@ -162,12 +145,24 @@ of 'normal' output.
 .br
 This boolean control character is default on (true).
 .TP
+\fBn\fR
+this is a boolean control character for "name_extra". It is used to provide
+additional information about the name it is a sub\-object of. The most
+common usage is to spell out an abbreviated name (e.g. a T10 name like "SKSV"
+to "Sense Key Specific Valid"). Another use is to note that a T10 field is
+obsolete and in which T10 standard it first became obsolete. Also if the
+named field's value is a physical quantity where the unit is unclear (e.g. a
+timeout) then "name_extra" can state that (e.g. "unit: millisecond").
+Only some fields have associated "name_extra" data.
+.br
+This boolean control character is default off (false).
+.TP
 \fBo\fR
 this is a boolean control character to control whether normal (i.e.
 non\-JSON) lines of output are placed in a JSON array (one element per
 line of normal output) within the utility_invoked subject (see control
-character \fIl\fR). This control character is only active when the
-\fIl\fR control character is also active).
+character \fIl\fR). This control character is active even if the
+\fIl\fR control character is negated).
 .br
 This boolean control character is default off (false).
 .TP
@@ -208,6 +203,63 @@ Note that this verbose control character is JSON specific while the
 most utilities support is more general.
 .br
 This integer control character is set to 0 by default.
+.SH OUTPUT PROCESSING
+The default remains the same for all utilities that support the
+\fI\-\-json\fR option, namely the decoded information is sent to stdout in
+human readable form. Errors are reported to stderr and may cause the early
+termination of a utility (e.g. command line option syntax error).
+.PP
+When the \fI\-\-json\fR option is given and no errors are detected, then
+only JSON is sent to stdout. If the 'o' control character is in the \fIJO\fR
+argument to the \fI\-\-json\fR option, then the former "human readable" 
+output is placed in a JSON array named "output" within a JSON object
+named "utility_invoked". Each line of the former "human readable" output
+is placed in its own element of the JSON array named "output".
+.PP
+A JSON tree is built in memory as the utility parses the data returned
+from the SCSI device (e.g. sg_vpd parsing a VPD page returned from a
+SCSI INQUIRY command). SCSI "list"s become JSON named arrays (e.g. in
+the Device Identification VPD page there is a "Designation descriptor
+list" that becomes a JSON array named "designation_descriptor_list").
+.PP
+At the completion of the utility that JSON tree is "measured" taking
+into account the form of output (i.e. pretty-printed, single line or
+packed single line). For the pretty-printed JSON output, the size of
+each indentation in spaces is also given (i.e. the tab width). The JSON
+is then output to a single C string, then sent to stdout. If a NULL
+character (ASCII zero and C string terminator) somehow finds its way
+into a field that should (according to the spec) be space padded, then
+the JSON output may appear truncated.
+.PP
+Note that this JSON processing means that if a utility is aborted for
+whatever reason then no JSON output will appear. With the normal,
+human readable output processing, some output may appear before
+the utility aborts in such bad situations.
+.SH ERRORS
+No attempts has been made to translate errors into JSON form, apart
+from the final "exit_status" JSON object where a value of 0
+means "no errors". Exit status values indicating a problem range
+from 1 to 255.
+.PP
+The sg_decode_sense utility will parse SCSI sense data into JSON
+form if requested. So if another utility is failing with a sense
+data report (most often seen when the \fI\-\-verbose\fR option is
+used). That sense data (in hex bytes) could be cut\-and\-paste
+onto the command line following 'sg_decode_sense \-j ' which should
+then render that sense data in JSON.
+.PP
+Otherwise, when a error is detected while JSON output is selected,
+the error message is sent to stderr in human readable form. Typically
+once an error is detected the utility will exit, first dumping
+the JSON in\-memory tree as discussed above and a non\-zero exit
+status will be set. The JSON output will be well formed but missing
+any fields or list elements following the point that the error
+was detected.
+.PP
+The summary is that when JSON output is selected and an error occurs
+each utility will process the error the same way as it would if JSON
+output had not been selected. In all cases error messages, in human
+readable form, are sent to stderr.
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).
@@ -216,11 +268,8 @@ Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
 Copyright \(co 2022 Douglas Gilbert
 .br
-Some utilities are distributed under a GPL version 2 license while
-others, usually more recent ones, are under a FreeBSD license. The files
-that are common to almost all utilities and thus contain the most reusable
-code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
-under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.
+This software is distributed under the GPL version 2 or the BSD\-2\-Clause
+license. There is NO warranty; not even for MERCHANTABILITY or 
+FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sg3_utils(sg3_utils), smartctl(smartmontools)

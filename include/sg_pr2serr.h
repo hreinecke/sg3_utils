@@ -69,10 +69,10 @@ typedef struct sgj_state_t {
     /* the following set by default, the SG3_UTILS_JSON_OPTS envirinment
      * variable or command line argument to --json option, in that order. */
     bool pr_as_json;            /* = false */
-    bool pr_ane;        /* 'a' abbreviated name expansion (def: false) */
     bool pr_exit_status;        /* 'e' (def: true) */
     bool pr_hex;                /* 'h' (def: false) */
     bool pr_leadin;             /* 'l' (def: true) */
+    bool pr_name_ex;        /* 'n' name extra (information) (def: false) */
     bool pr_out_hr;             /* 'o' (def: false) */
     bool pr_packed;             /* 'k' (def: false) only when !pr_pretty */
     bool pr_pretty;             /* 'p' (def: true) */
@@ -86,6 +86,16 @@ typedef struct sgj_state_t {
     sgj_opaque_p out_hrp;       /* JSON array pointer when pr_out_hr set */
     sgj_opaque_p userp;         /* for temporary usage */
 } sgj_state;
+
+/* This function tries to convert the in_name C string to the "snake_case"
+ * convention so the output sname only contains lower case ASCII letters,
+ * numerals and "_" as a separator. Any leading or trailing underscores
+ * are removed as are repeated underscores (e.g. "_Snake __ case" becomes
+ * "snake_case"). Parentheses and the characters between them are removed.
+ * Returns sname (i.e. the pointer to the output buffer).
+ * Note: strlen(in_name) should be <= max_sname_len . */
+char * sgj_convert_to_snake_name(const char * in_name, char * sname,
+                                 int max_sname_len);
 
 /* If jsp in non-NULL and jsp->pr_as_json is true then this call is ignored
  * unless jsp->pr_out_hrp is true. Otherwise this function prints to stdout
@@ -214,6 +224,12 @@ void sgj_pr_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 void sgj_pr_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                      const char * name, enum sgj_separator_t sep,
                      int64_t value);
+void sgj_pr_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                         const char * name, enum sgj_separator_t sep,
+                         int64_t value, const char * nex_s);
+sgj_opaque_p sgj_pr_hr_js_subo(sgj_state * jsp, sgj_opaque_p jop,
+                               int leadin_sp, const char * name,
+                               enum sgj_separator_t sep, int64_t value);
 
 /* Similar to sgj_pr_hr_js_vs()'s description with 'JSON string object'
  * replaced by 'JSON boolean object'. */
@@ -248,21 +264,26 @@ void sgj_add_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop,
 
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
- * if jop is NULL) along with a value. If jsp->pr_ane is true then that
+ * if jop is NULL) along with a value. If jsp->pr_name_ex is true then that
  * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
- * the other one named "abbreviated_name_expansion" with value ane_s rendered
+ * the other one named "abbreviated_name_expansion" with value nex_s rendered
  * as a JSON string. If jsp->pr_hex and 'want_hex' are true, then a
  * sub-object named 'hex' with a value rendered as a hex string equal to
- * val_i. If jsp->pr_ane is false and either jsp->pr_hex or want_hex are
+ * val_i. If jsp->pr_name_ex is false and either jsp->pr_hex or want_hex are
  * false then there are no sub-objects and the 'val_i' is rendered as a JSON
  * integer. */
-void sgj_add_nv_ihex_ane(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                         int64_t val_i, bool want_hex, const char * ane_s);
+void sgj_add_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                         int64_t val_i, bool want_hex, const char * nex_s);
 
-void sgj_add_nv_ihexstr_ane(sgj_state * jsp, sgj_opaque_p jop,
+void sgj_add_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop,
                             const char * name, int64_t val_i, bool want_hex,
                             const char * str_name, const char * val_s,
-                            const char * ane_s);
+                            const char * nex_s);
+
+/* Add hex byte strings irrespective of jsp->pr_hex setting. */
+void
+sgj_add_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                     const uint8_t * byte_arr, int num_bytes);
 
 /* Breaks up the string pointed to by 'sp' into lines and adds them to the
  * jsp->out_hrp array. Treat '\n' in sp as line breaks. Consumes characters
@@ -274,11 +295,11 @@ void sgj_pr_str_out_hr(sgj_state * jsp, const char * sp, int slen);
  * jsp->pr_as_json is true. 'sbp' is assumed to point to sense data as
  * defined by T10 with a length of 'sb_len' bytes. Returns false if an
  * issue is detetected, else it returns true. */
-bool sgj_get_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
-                   int sb_len);
+bool sgj_pr_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
+                     int sb_len);
 
-bool sgj_get_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
-                                    const uint8_t * ddp, int dd_len);
+bool sgj_pr_js_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
+                                      const uint8_t * ddp, int dd_len);
 
 /* Nothing in the in-core JSON tree is actually printed to 'fp' (typically
  * stdout) until this call is made. If jsp is NULL, jsp->pr_as_json is false
