@@ -1256,7 +1256,7 @@ sgj_pr_js_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
         if (jsp->pr_hex)
             sgj_add_nv_hex_bytes(jsp, jop, "scsi_name_string_hexbytes",
                                  ip, dlen);
-        snprintf(b, blen, "%s", ip);
+        snprintf(b, blen, "%.*s", dlen, ip);
         sgj_add_nv_s(jsp, jop, "scsi_name_string", b);
         break;
     case 9: /* Protocol specific port identifier */

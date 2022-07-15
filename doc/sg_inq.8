@@ -6,10 +6,10 @@ sg_inq \- issue SCSI INQUIRY command and/or decode its response
 [\fI\-\-ata\fR] [\fI\-\-block=0|1\fR] [\fI\-\-cmddt\fR]
 [\fI\-\-descriptors\fR] [\fI\-\-export\fR] [\fI\-\-extended\fR]
 [\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
-[\fI\-\-inhex=FN\fR] [\fI\-\-len=LEN\fR]  [\fI\-\-long\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-only\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
-[\fI\-\-vendor\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR]
-\fIDEVICE\fR
+[\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-len=LEN\fR]
+[\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-only\fR] [\fI\-\-page=PG\fR]
+[\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR]
@@ -157,6 +157,10 @@ with. The hexadecimal should be arranged as 1 or 2 digits representing a
 byte each of which is whitespace or comma separated. Anything from and
 including a hash mark to the end of a line is ignored. If the \fI\-\-raw\fR
 option is also given then \fIFN\fR is treated as binary.
+.TP
+\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. This is an
+EXPERIMENTAL feature; see sg3_utils_json manpage.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
 the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.

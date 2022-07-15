@@ -36,6 +36,13 @@
 /* This file holds common code for sg_inq and sg_vpd as both those utilities
  * decode SCSI VPD pages. */
 
+const char * t10_vendor_id_hr = "T10_vendor_identification";
+const char * t10_vendor_id_js = "t10_vendor_identification";
+const char * product_id_hr = "Product_identification";
+const char * product_id_js = "product_identification";
+const char * product_rev_lev_hr = "Product_revision_level";
+const char * product_rev_lev_js = "product_revision_level";
+
 sgj_opaque_p
 sg_vpd_js_hdr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
               const uint8_t * vpd_hdrp)
@@ -555,4 +562,411 @@ filter_json_dev_ids(uint8_t * buff, int len, int m_assoc, struct opts_t * op,
         return SG_LIB_CAT_MALFORMED;
     }
     return 0;
+}
+
+/* VPD_ATA_INFO    0x89 ['ai"] */
+void
+decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                    sgj_opaque_p jop)
+{
+    bool do_long_nq = op->do_long && (! op->do_quiet);
+    int num, is_be, cc, n;
+    sgj_state * jsp = &op->json_st;
+    const char * cp;
+    const char * ata_transp;
+    char b[512];
+    char d[80];
+    static const int blen = sizeof(b);
+    static const int dlen = sizeof(d);
+    static const char * sat_vip = "SAT Vendor identification";
+    static const char * sat_pip = "SAT Product identification";
+    static const char * sat_prlp = "SAT Product revision level";
+
+    if (len < 36) {
+        pr2serr("ATA information VPD page length too short=%d\n", len);
+        return;
+    }
+    if (op->do_hex && (2 != op->do_hex)) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        return;
+    }
+    memcpy(b, buff + 8, 8);
+    b[8] = '\0';
+    sgj_pr_hr(jsp, "  %s: %s\n", sat_vip, b);
+    memcpy(b, buff + 16, 16);
+    b[16] = '\0';
+    sgj_pr_hr(jsp, "  %s: %s\n", sat_pip, b);
+    memcpy(b, buff + 32, 4);
+    b[4] = '\0';
+    sgj_pr_hr(jsp, "  %s: %s\n", sat_prlp, b);
+    if (len < 56)
+        return;
+    ata_transp = (0x34 == buff[36]) ? "SATA" : "PATA";
+    if (do_long_nq) {
+        sgj_pr_hr(jsp, "  Device signature [%s] (in hex):\n", ata_transp);
+        hex2stdout(buff + 36, 20, 0);
+    } else
+        sgj_pr_hr(jsp, "  Device signature indicates %s transport\n",
+                  ata_transp);
+    cc = buff[56];      /* 0xec for IDENTIFY DEVICE and 0xa1 for IDENTIFY
+                         * PACKET DEVICE (obsolete) */
+    n = snprintf(b, blen, "  Command code: 0x%x\n", cc);
+    if (len < 60)
+        return;
+    if (0xec == cc)
+        cp = "";
+    else if (0xa1 == cc)
+        cp = "PACKET ";
+    else
+        cp = NULL;
+    is_be = sg_is_big_endian();
+    if (cp) {
+        n += sg_scnpr(b + n, blen - n, "  ATA command IDENTIFY %sDEVICE "
+                      "response summary:\n", cp);
+        num = sg_ata_get_chars((const unsigned short *)(buff + 60), 27, 20,
+                               is_be, d);
+        d[num] = '\0';
+        n += sg_scnpr(b + n, blen - n, "    model: %s\n", d);
+        num = sg_ata_get_chars((const unsigned short *)(buff + 60), 10, 10,
+                               is_be, d);
+        d[num] = '\0';
+        n += sg_scnpr(b + n, blen - n, "    serial number: %s\n", d);
+        num = sg_ata_get_chars((const unsigned short *)(buff + 60), 23, 4,
+                               is_be, d);
+        d[num] = '\0';
+        n += sg_scnpr(b + n, blen - n, "    firmware revision: %s\n", d);
+        sgj_pr_hr(jsp, "%s", b);
+        if (do_long_nq)
+            sgj_pr_hr(jsp, "  ATA command IDENTIFY %sDEVICE response in "
+                      "hex:\n", cp);
+    } else if (do_long_nq)
+        sgj_pr_hr(jsp, "  ATA command 0x%x got following response:\n",
+                  (unsigned int)cc);
+    if (jsp->pr_as_json) {
+        sgj_convert_to_snake_name(sat_vip, d, dlen);
+        sgj_add_nv_s_len(jsp, jop, d, (const char *)(buff + 8), 8);
+        sgj_convert_to_snake_name(sat_pip, d, dlen);
+        sgj_add_nv_s_len(jsp, jop, d, (const char *)(buff + 16), 16);
+        sgj_convert_to_snake_name(sat_prlp, d, dlen);
+        sgj_add_nv_s_len(jsp, jop, d, (const char *)(buff + 32), 4);
+        sgj_add_nv_hex_bytes(jsp, jop, "ata_device_signature", buff + 36, 20);
+        sgj_add_nv_ihex(jsp, jop, "command_code", buff[56]);
+        sgj_add_nv_s(jsp, jop, "ata_identify_device_data_example",
+                     "sg_vpd -p ai -HHH /dev/sdc | hdparm --Istdin");
+    }
+    if (len < 572)
+        return;
+    if (2 == op->do_hex)
+        hex2stdout((buff + 60), 512, 0);
+    else if (do_long_nq)
+        dWordHex((const unsigned short *)(buff + 60), 256, 0, is_be);
+}
+
+/* VPD_SCSI_FEATURE_SETS  0x92  ["sfs"] */
+void
+decode_feature_sets_vpd(uint8_t * buff, int len, struct opts_t * op,
+                        sgj_opaque_p jap)
+{
+    int k, bump;
+    uint16_t sf_code;
+    bool found;
+    uint8_t * bp;
+    sgj_opaque_p jo2p;
+    sgj_state * jsp = &op->json_st;
+    char b[256];
+    char d[80];
+
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("SCSI Feature sets VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 8;
+    bp = buff + 8;
+    for (k = 0; k < len; k += bump, bp += bump) {
+        jo2p = sgj_new_unattached_object(jsp);
+        sf_code = sg_get_unaligned_be16(bp);
+        bump = 2;
+        if ((k + bump) > len) {
+            pr2serr("SCSI Feature sets, short descriptor length=%d, "
+                    "left=%d\n", bump, (len - k));
+            return;
+        }
+        if (2 == op->do_hex)
+            hex2stdout(bp + 8, 2, 1);
+        else if (op->do_hex > 2)
+            hex2stdout(bp, 2, 1);
+        else {
+             sg_scnpr(b, sizeof(b), "    %s",
+                      sg_get_sfs_str(sf_code, -2, sizeof(d), d, &found,
+                                     op->verbose));
+            if (op->verbose == 1)
+                sgj_pr_hr(jsp, "%s [0x%x]\n", b, (unsigned int)sf_code);
+            else if (op->verbose > 1)
+                sgj_pr_hr(jsp, "%s [0x%x] found=%s\n", b,
+                          (unsigned int)sf_code, found ? "true" : "false");
+            else
+                sgj_pr_hr(jsp, "%s\n", b);
+            sgj_add_nv_ihexstr(jsp, jo2p, "feature_set_code", sf_code, NULL,
+                               d);
+            if (jsp->verbose)
+                sgj_add_nv_b(jsp, jo2p, "meaning_is_match", found);
+        }
+        sgj_add_nv_o(jsp, jap, NULL, jo2p);
+    }
+}
+
+static const char * constituent_type_arr[] = {
+    "Reserved",
+    "Virtual tape library",
+    "Virtual tape drive",
+    "Direct access block device",
+};
+
+/* VPD_DEVICE_CONSTITUENTS   0x8b ["dc"] */
+void
+decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                       sgj_opaque_p jap, recurse_vpd_decodep fp)
+{
+    uint16_t constit_type;
+    int k, j, res, bump, csd_len;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p, jo3p, ja2p;
+    const uint8_t * bp;
+    char b[256];
+    char d[64];
+    static const int blen = sizeof(b);
+    static const int dlen = sizeof(d);
+
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("page length too short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    bp = buff + 4;
+    for (k = 0, j = 0; k < len; k += bump, bp += bump, ++j) {
+        jo2p = sgj_new_unattached_object(jsp);
+        if (j > 0)
+            sgj_pr_hr(jsp, "\n");
+        sgj_pr_hr(jsp, "  Constituent descriptor %d:\n", j + 1);
+        if ((k + 36) > len) {
+            pr2serr("short descriptor length=36, left=%d\n", (len - k));
+            sgj_add_nv_o(jsp, jap, NULL, jo2p);
+            return;
+        }
+        constit_type = sg_get_unaligned_be16(bp + 0);
+        if (constit_type >= SG_ARRAY_SIZE(constituent_type_arr))
+            sgj_pr_hr(jsp,"    Constituent type: unknown [0x%x]\n",
+                      constit_type);
+        else
+            sgj_pr_hr(jsp, "    Constituent type: %s [0x%x]\n",
+                      constituent_type_arr[constit_type], constit_type);
+        sg_scnpr(b, blen, "    Constituent device type: ");
+        if (0xff == bp[2])
+            sgj_pr_hr(jsp, "%sUnknown [0xff]\n", b);
+        else if (bp[2] >= 0x20)
+            sgj_pr_hr(jsp, "%sReserved [0x%x]\n", b, bp[2]);
+        else
+            sgj_pr_hr(jsp, "%s%s [0x%x]\n", b,
+                   sg_get_pdt_str(PDT_MASK & bp[2], dlen, d), bp[2]);
+        snprintf(b, blen, "%.8s", bp + 4);
+        sgj_pr_hr(jsp, "    %s: %s\n", t10_vendor_id_hr, b);
+        sgj_add_nv_s(jsp, jo2p, t10_vendor_id_js, b);
+        snprintf(b, blen, "%.16s", bp + 12);
+        sgj_pr_hr(jsp, "    %s: %s\n", product_id_hr, b);
+        sgj_add_nv_s(jsp, jo2p, product_id_js, b);
+        snprintf(b, blen, "%.4s", bp + 28);
+        sgj_pr_hr(jsp, "    %s: %s\n", product_rev_lev_hr, b);
+        sgj_add_nv_s(jsp, jo2p, product_rev_lev_js, b);
+        csd_len = sg_get_unaligned_be16(bp + 34);
+        bump = 36 + csd_len;
+        if ((k + bump) > len) {
+            pr2serr("short descriptor length=%d, left=%d\n", bump, (len - k));
+            sgj_add_nv_o(jsp, jap, NULL, jo2p);
+            return;
+        }
+        if (csd_len > 0) {
+            int m, q, cs_bump;
+            uint8_t cs_type;
+            uint8_t cs_len;
+            const uint8_t * cs_bp;
+
+            sgj_pr_hr(jsp, "    Constituent specific descriptors:\n");
+            ja2p = sgj_new_named_array(jsp, jo2p,
+                                "constituent_specific_descriptor_list");
+            for (m = 0, q = 0, cs_bp = bp + 36; m < csd_len;
+                 m += cs_bump, ++q, cs_bp += cs_bump) {
+                jo3p = sgj_new_unattached_object(jsp);
+                cs_type = cs_bp[0];
+                cs_len = sg_get_unaligned_be16(cs_bp + 2);
+                cs_bump = cs_len + 4;
+                sgj_add_nv_ihex(jsp, jo3p, "constituent_specific_type",
+                                cs_type);
+                if (1 == cs_type) {     /* VPD page */
+                    int off = cs_bp + 4 - buff;
+
+                    sgj_pr_hr(jsp, "      Constituent specific VPD page "
+                              "%d:\n", q + 1);
+                    /* SPC-5 says these shall _not_ themselves be Device
+                     *  Constituent VPD pages. So no infinite recursion. */
+                    res = (*fp)(op, jo3p, off);
+                    if (res)
+                        pr2serr("%s: recurse_vpd_decode() failed, res=%d\n",
+                                __func__, res);
+                } else {
+                    if (0xff == cs_type)
+                        sgj_pr_hr(jsp, "      Vendor specific data (in "
+                                  "hex):\n");
+                    else
+                        sgj_pr_hr(jsp, "      Reserved [0x%x] specific "
+                                  "data (in hex):\n", cs_type);
+                    if (jsp->pr_as_json)
+                        sgj_add_nv_hex_bytes(jsp, jo3p,
+                                             "constituent_specific_data_hex",
+                                             cs_bp + 4, cs_len);
+                    else
+                        hex2stdout(cs_bp + 4, cs_len, 0 /* plus ASCII */);
+                }
+                sgj_add_nv_o(jsp, ja2p, NULL, jo3p);
+            }   /* end of Constituent specific descriptor loop */
+        }
+        sgj_add_nv_o(jsp, jap, NULL, jo2p);
+    }   /* end Constituent descriptor loop */
+}
+
+/* Assume index is less than 16 */
+static const char * sg_ansi_version_arr[16] =
+{
+    "no conformance claimed",
+    "SCSI-1",           /* obsolete, ANSI X3.131-1986 */
+    "SCSI-2",           /* obsolete, ANSI X3.131-1994 */
+    "SPC",              /* withdrawn, ANSI INCITS 301-1997 */
+    "SPC-2",            /* ANSI INCITS 351-2001, ISO/IEC 14776-452 */
+    "SPC-3",            /* ANSI INCITS 408-2005, ISO/IEC 14776-453 */
+    "SPC-4",            /* ANSI INCITS 513-2015 */
+    "SPC-5",            /* ANSI INCITS 502-2020 */
+    "ecma=1, [8h]",
+    "ecma=1, [9h]",
+    "ecma=1, [Ah]",
+    "ecma=1, [Bh]",
+    "reserved [Ch]",
+    "reserved [Dh]",
+    "reserved [Eh]",
+    "reserved [Fh]",
+};
+
+static const char *
+hot_pluggable_str(int hp)
+{
+    switch (hp) {
+    case 0:
+        return "No information";
+    case 1:
+        return "target device designed to be removed from SCSI domain";
+    case 2:
+        return "target device not designed to be removed from SCSI domain";
+    default:
+        return "value reserved by T10";
+    }
+}
+
+static const char *
+tpgs_str(int tpgs)
+{
+    switch (tpgs) {
+    case 1:
+        return "only implicit asymmetric logical unit access";
+    case 2:
+        return "only explicit asymmetric logical unit access";
+    case 3:
+        return "both explicit and implicit asymmetric logical unit access";
+    case 0:
+    default:
+        return "not supported";
+    }
+}
+
+sgj_opaque_p
+std_inq_decode_js(const uint8_t * b, int len, struct opts_t * op,
+                  sgj_opaque_p jop)
+{
+    int tpgs;
+    int pqual = (b[0] & 0xe0) >> 5;
+    int pdt = b[0] & PDT_MASK;
+    int hp = (b[1] >> 4) & 0x3;
+    int ver = b[2];
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    char c[256];
+    static const int clen = sizeof(c);
+
+    jo2p = sgj_new_named_object(jsp, jop, "standard_inquiry_data_format");
+    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_qualifier", pqual, NULL,
+                       pqual_str(pqual));
+    sgj_add_nv_ihexstr(jsp, jo2p, "peripheral_device_type", pdt, NULL,
+                       sg_get_pdt_str(pdt, clen, c));
+    sgj_add_nv_ihex_nex(jsp, jo2p, "rmb", !!(b[1] & 0x80), false,
+                        "Removable Medium Bit");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "lu_cong", !!(b[1] & 0x40), false,
+                        "Logical Unit Conglomerate");
+    sgj_add_nv_ihexstr(jsp, jo2p, "hot_pluggable", hp, NULL,
+                       hot_pluggable_str(hp));
+    snprintf(c, clen, "%s", (ver > 0xf) ? "old or reserved version code" :
+                                          sg_ansi_version_arr[ver]);
+    sgj_add_nv_ihexstr(jsp, jo2p, "version", ver, NULL, c);
+    sgj_add_nv_ihex_nex(jsp, jo2p, "aerc", !!(b[3] & 0x80), false,
+                        "Asynchronous Event Reporting Capability (obsolete "
+                        "SPC-3)");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "trmtsk", !!(b[3] & 0x40), false,
+                        "Terminate Task (obsolete SPC-2)");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "normaca", !!(b[3] & 0x20), false,
+                        "Normal ACA (Auto Contingent Allegiance)");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "hisup", !!(b[3] & 0x10), false,
+                        "Hierarchial Support");
+    sgj_add_nv_ihex(jsp, jo2p, "response_data_format", b[3] & 0xf);
+    sgj_add_nv_ihex_nex(jsp, jo2p, "sccs", !!(b[5] & 0x80), false,
+                        "SCC (SCSI Storage Commands) Supported");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "acc", !!(b[5] & 0x40), false,
+                        "Access Commands Coordinator (obsolete SPC-5)");
+    tpgs = (b[5] >> 4) & 0x3;
+    sgj_add_nv_ihexstr_nex(jsp, jo2p, "tpgs", tpgs, false, NULL,
+                           tpgs_str(tpgs), "Target Port Group Support");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "3pc", !!(b[5] & 0x8), false,
+                        "Third Party Copy");
+    sgj_add_nv_ihex(jsp, jo2p, "protect", !!(b[5] & 0x1));
+    /* Skip SPI specific flags which have been obsolete for a while) */
+    sgj_add_nv_ihex_nex(jsp, jo2p, "bque", !!(b[6] & 0x80), false,
+                        "Basic task management model (obsolete SPC-4)");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "encserv", !!(b[6] & 0x40), false,
+                        "Enclousure Services supported");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "multip", !!(b[6] & 0x10), false,
+                        "Multiple SCSI port");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "mchngr", !!(b[6] & 0x8), false,
+                        "Medium changer (obsolete SPC-4)");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "reladr", !!(b[7] & 0x80), false,
+                        "Relative Addressing (obsolete in SPC-4)");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "linked", !!(b[7] & 0x8), false,
+                        "Linked Commands (obsolete in SPC-4)");
+    sgj_add_nv_ihex_nex(jsp, jo2p, "cmdque", !!(b[7] & 0x2), false,
+                        "Command Management Model (command queuing)");
+    if (len < 16)
+        return jo2p;
+    snprintf(c, clen, "%.8s", b + 8);
+    sgj_add_nv_s(jsp, jo2p, t10_vendor_id_js, c);
+    if (len < 32)
+        return jo2p;
+    snprintf(c, clen, "%.16s", b + 16);
+    sgj_add_nv_s(jsp, jo2p, product_id_js, c);
+    if (len < 36)
+        return jo2p;
+    snprintf(c, clen, "%.4s", b + 32);
+    sgj_add_nv_s(jsp, jo2p, product_rev_lev_js, c);
+    return jo2p;
 }

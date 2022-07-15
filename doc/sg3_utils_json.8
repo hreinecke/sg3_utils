@@ -231,35 +231,46 @@ character (ASCII zero and C string terminator) somehow finds its way
 into a field that should (according to the spec) be space padded, then
 the JSON output may appear truncated.
 .PP
-Note that this JSON processing means that if a utility is aborted for
-whatever reason then no JSON output will appear. With the normal,
-human readable output processing, some output may appear before
-the utility aborts in such bad situations.
+Note that this JSON processing means that if a utility is aborted for whatever
+reason then no JSON output will appear. With the normal, human readable output
+processing, some output may appear before the utility aborts in such bad
+situations.
 .SH ERRORS
-No attempts has been made to translate errors into JSON form, apart
-from the final "exit_status" JSON object where a value of 0
-means "no errors". Exit status values indicating a problem range
-from 1 to 255.
+No attempts has been made to translate errors into JSON form, apart from the
+final "exit_status" JSON object where a value of 0 means "no errors". Exit
+status values indicating a problem range from 1 to 255.
 .PP
-The sg_decode_sense utility will parse SCSI sense data into JSON
-form if requested. So if another utility is failing with a sense
-data report (most often seen when the \fI\-\-verbose\fR option is
-used). That sense data (in hex bytes) could be cut\-and\-paste
-onto the command line following 'sg_decode_sense \-j ' which should
-then render that sense data in JSON.
+The sg_decode_sense utility will parse SCSI sense data into JSON form if
+requested. So if another utility is failing with a sense data report (most
+often seen when the \fI\-\-verbose\fR option is used). That sense data (in
+hex bytes) could be cut\-and\-paste onto the command line
+following 'sg_decode_sense \-j ' which should then render that sense data
+in JSON.
 .PP
-Otherwise, when a error is detected while JSON output is selected,
-the error message is sent to stderr in human readable form. Typically
-once an error is detected the utility will exit, first dumping
-the JSON in\-memory tree as discussed above and a non\-zero exit
-status will be set. The JSON output will be well formed but missing
-any fields or list elements following the point that the error
-was detected.
+Otherwise, when a error is detected while JSON output is selected, the error
+message is sent to stderr in human readable form. Typically once an error is
+detected the utility will exit, first dumping the JSON in\-memory tree as
+discussed above and a non\-zero exit status will be set. The JSON output will
+be well formed but missing any fields or list elements following the point
+that the error was detected.
 .PP
-The summary is that when JSON output is selected and an error occurs
-each utility will process the error the same way as it would if JSON
-output had not been selected. In all cases error messages, in human
-readable form, are sent to stderr.
+The summary is that when JSON output is selected and an error occurs each
+utility will process the error the same way as it would if JSON output had
+not been selected. In all cases error messages, in human readable form,
+are sent to stderr.
+.SH INTERACTION WITH OTHER OPTIONS
+As stated above, the default output is in human readable form using 7 bit
+ASCII. The \fI\-\-json[=JO]\fR option is designed to be an alternative
+to that human readable form. There are other alternative output formats
+such as the response output as a hexadecimal sequence of bytes or
+in "raw" binary; both of those take precedence over the \fI\-\-json[=JO]\fR
+option. Other specialized output format (e.g. 'sg_inq \-\-export') will
+usually take precedence over JSON output.
+.PP
+When the \fI\-\-raw\fR option is used together with the \fI\-\-inhex=FN\fR
+option only the data input to the utility is interpreted as binary. So the
+output format defaults to human readable form and thus can be changed to
+JSON if the \fI\-\-json[=JO]\fR option is also used.
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).

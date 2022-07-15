@@ -99,7 +99,6 @@ struct opts_t {
     int do_raw;                 /* sg_inq + sg_vpd */
     int do_vendor;              /* sg_inq */
     int examine;                /* sg_vpd */
-    int inhex_off;              /* sg_inq (for decoding multiple VPD pages) */
     int maxlen;                 /* sg_inq[was: resp_len] + sg_vpd */
     int num_pages;              /* sg_inq */
     int page_pdt;               /* sg_inq */
@@ -113,40 +112,6 @@ struct opts_t {
     sgj_state json_st;
 };
 
-#if 0
-struct opts_t {
-    bool do_ata;
-    bool do_decode;
-    bool do_descriptors;
-    bool do_export;
-    bool do_force;
-    bool do_only;  /* --only  after standard inq don't fetch VPD page 0x80 */
-    bool verbose_given;
-    bool version_given;
-    bool do_vpd;
-    bool page_given;
-    bool possible_nvme;
-    int do_block;
-    int do_cmddt;
-    int do_help;
-    int do_hex;
-    int do_long;
-    int do_raw;
-    int do_vendor;
-    int verbose;
-    int resp_len;
-    int page_num;
-    int page_pdt;
-    int num_pages;
-    const char * page_arg;
-    const char * device_name;
-    const char * inhex_fn;
-#ifdef SG_SCSI_STRINGS
-    bool opt_new;
-#endif
-};
-#endif
-
 struct svpd_values_name_t {
     int value;       /* VPD page number */
     int subvalue;    /* to differentiate if value+pdt are not unique */
@@ -156,17 +121,8 @@ struct svpd_values_name_t {
     const char * name;
 };
 
-#if 0
-struct svpd_values_name_t {
-    int value;
-    int subvalue;
-    int pdt;         /* peripheral device type id, -1 is the default */
-                     /* (all or not applicable) value */
-    int vendor;      /* vendor flag */
-    const char * acron;
-    const char * name;
-};
-#endif
+typedef int (*recurse_vpd_decodep)(struct opts_t *, sgj_opaque_p jop, int off);
+
 
 sgj_opaque_p sg_vpd_js_hdr(sgj_state * jsp, sgj_opaque_p jop,
                            const char * name, const uint8_t * vpd_hdrp);
@@ -182,6 +138,15 @@ void decode_power_condition(uint8_t * buff, int len, struct opts_t * op,
                             sgj_opaque_p jop);
 int filter_json_dev_ids(uint8_t * buff, int len, int m_assoc,
                         struct opts_t * op, sgj_opaque_p jap);
+void decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                        sgj_opaque_p jop);
+void decode_feature_sets_vpd(uint8_t * buff, int len, struct opts_t * op,
+                             sgj_opaque_p jap);
+void decode_dev_constit_vpd(const uint8_t * buff, int len,
+                            struct opts_t * op, sgj_opaque_p jap,
+                            recurse_vpd_decodep fp);
+sgj_opaque_p std_inq_decode_js(const uint8_t * b, int len,
+                               struct opts_t * op, sgj_opaque_p jop);
 const char * pqual_str(int pqual);
 
 void svpd_enumerate_vendor(int vend_prod_num);
@@ -196,6 +161,12 @@ int vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen,
 void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 
 extern uint8_t * rsp_buff;
+extern const char * t10_vendor_id_hr;
+extern const char * t10_vendor_id_js;
+extern const char * product_id_hr;
+extern const char * product_id_js;
+extern const char * product_rev_lev_hr;
+extern const char * product_rev_lev_js;
 
 
 #ifdef __cplusplus

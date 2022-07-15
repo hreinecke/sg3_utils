@@ -3,39 +3,43 @@
 #    sg_vpd --inhex=vpd_consistuents.hex
 
 
-00 8b 00 c6
+# Device constituent VPD page header
+00 8b 00 c2
 
+# First constituent descriptor, fixed part
 00 03 00 00
-
 41 42 43 44 20 20 00 00
 41 42 43 44 45 46 47 48  41 42 43 44 44 44 44 44
 30 31 32 33
+00 00
+00 2a
 
-00 00 00 2e
+# inner constituent specific descriptor (for VPD page)
+01 00 00 10
+# ... the VPD page
+00 b3 00 0c  00 00 00 00
+00 20 00 00
+00 00 00 04
 
-01 00 00 14
-
-01 b5 00 10 00 00 00 00
-03 01 20 e0
-07 02 10 80 00 00 00 00
-
+# another inner constituent specific descriptor (for VPD page)
 01 00 00 12
-
+# ... the VPD page
 00 92 00 0e 00 00 00 00
 00 01 01 01 01 02 02 01
 09 09
 
 
+# Second constituent descriptor, fixed part
 00 03 00 00
-
 53 45 41 47 41 54 45 20
 53 54 32 30 30 46 4d 30  30 37 33 20 20 20 20 20
 30 30 30 37
+00 00
+00 50
 
-00 00 00 50
-
+# inner constituent specific descriptor ("di" VPD page)
 01 00 00 4c
-
+# ... the VPD page
 00 83 00 48 01 03 00 08  50 00 c5 00 30 11 cb 2b
 61 93 00 08 50 00 c5 00  30 11 cb 29 61 94 00 04
 00 00 00 01 61 a3 00 08  50 00 c5 00 30 11 cb 28
