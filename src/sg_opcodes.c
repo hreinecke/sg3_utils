@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.84 20220626";    /* spc6r06 */
+static const char * version_str = "0.85 20220717";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -785,9 +785,9 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
               (op->do_alpha ? opcode_alpha_compare : opcode_num_compare));
     }
 
-    jap = sgj_new_named_array(jsp, jsp->basep, "all_command_descriptor");
+    jap = sgj_named_subarray_r(jsp, jsp->basep, "all_command_descriptor");
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
-        jop = sgj_new_unattached_object(jsp);
+        jop = sgj_new_unattached_object_r(jsp);
 
         bp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
         byt5 = bp[5];
@@ -858,22 +858,22 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
         }
         if (jsp->pr_as_json) {
             snprintf(b, blen, "0x%x", opcode);
-            sgj_add_nv_s(jsp, jop, "operation_code", b);
+            sgj_js_nv_s(jsp, jop, "operation_code", b);
             if (sa_v) {
                 snprintf(b, blen, "0x%x", serv_act);
-                sgj_add_nv_s(jsp, jop, "service_action", b);
+                sgj_js_nv_s(jsp, jop, "service_action", b);
             }
             if (name_buff[0])
-                sgj_add_nv_s(jsp, jop, "name", name_buff);
-            sgj_add_nv_i(jsp, jop, "rwcdlp", (byt5 >> 6) & 0x1);
-            sgj_add_nv_i(jsp, jop, "mlu", (byt5 >> 4) & 0x3);
-            sgj_add_nv_i(jsp, jop, "cdlp", (byt5 >> 2) & 0x3);
-            sgj_add_nv_i(jsp, jop, "ctdp", (byt5 >> 1) & 0x1);
-            sgj_add_nv_i(jsp, jop, "servactv", byt5 & 0x1);
-            sgj_add_nv_i(jsp, jop, "cdb_length",
-                         sg_get_unaligned_be16(bp + 6));
+                sgj_js_nv_s(jsp, jop, "name", name_buff);
+            sgj_js_nv_i(jsp, jop, "rwcdlp", (byt5 >> 6) & 0x1);
+            sgj_js_nv_i(jsp, jop, "mlu", (byt5 >> 4) & 0x3);
+            sgj_js_nv_i(jsp, jop, "cdlp", (byt5 >> 2) & 0x3);
+            sgj_js_nv_i(jsp, jop, "ctdp", (byt5 >> 1) & 0x1);
+            sgj_js_nv_i(jsp, jop, "servactv", byt5 & 0x1);
+            sgj_js_nv_i(jsp, jop, "cdb_length",
+                        sg_get_unaligned_be16(bp + 6));
 
-            sgj_add_nv_o(jsp, jap, NULL /* implies an array add */, jop);
+            sgj_js_nv_o(jsp, jap, NULL /* implies an array add */, jop);
         }
 
         if (op->do_mask && ptvp) {
@@ -903,14 +903,14 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                     if (jsp->pr_as_json) {
                         int l;
                         char *b2p = b + nn;
-                        sgj_opaque_p jo2p = sgj_new_named_object(jsp, jop,
+                        sgj_opaque_p jo2p = sgj_named_subobject_r(jsp, jop,
                                          "one_command_descriptor");
 
                         l = strlen(b2p);
                         if ((l > 0) && (' ' == b2p[l - 1]))
                             b2p[l - 1] = '\0';
-                        sgj_add_nv_i(jsp, jo2p, "cdb_size", cdb_sz);
-                        sgj_add_nv_s(jsp, jo2p, "cdb_usage_data", b2p);
+                        sgj_js_nv_i(jsp, jo2p, "cdb_size", cdb_sz);
+                        sgj_js_nv_s(jsp, jo2p, "cdb_usage_data", b2p);
                     }
                 }
             } else
@@ -948,9 +948,9 @@ decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b,
     else
         snprintf(b, max_b_len, "nominal timeout: %u secs, ", timeout);
     if (jsp->pr_as_json) {
-        sgj_add_nv_i(jsp, jsp->userp, "command_specific", dp[3]);
-        sgj_add_nv_i(jsp, jsp->userp, "nominal_command_processing_timeout",
-                     timeout);
+        sgj_js_nv_i(jsp, jsp->userp, "command_specific", dp[3]);
+        sgj_js_nv_i(jsp, jsp->userp, "nominal_command_processing_timeout",
+                    timeout);
     }
     len = strlen(b);
     max_b_len -= len;
@@ -961,7 +961,7 @@ decode_cmd_timeout_desc(uint8_t * dp, int max_b_len, char * b,
     else
         snprintf(b, max_b_len, "recommended timeout: %u secs", timeout);
     if (jsp->pr_as_json)
-        sgj_add_nv_i(jsp, jsp->userp, "recommended_command_timeout", timeout);
+        sgj_js_nv_i(jsp, jsp->userp, "recommended_command_timeout", timeout);
     return;
 }
 
@@ -986,7 +986,7 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
     const int blen = sizeof(b);
 
 
-    jop = sgj_new_named_object(jsp, jsp->basep, "one_command_descriptor");
+    jop = sgj_named_subobject_r(jsp, jsp->basep, "one_command_descriptor");
     n += sg_scnpr(b + n, blen - n, "\n  Opcode=0x%.2x", op->opcode);
     if (rep_opts > 1)
         n += sg_scnpr(b + n, blen - n, "  Service_action=0x%.4x", op->servact);
@@ -1077,29 +1077,29 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         int l;
 
         snprintf(b, blen, "0x%x", op->opcode);
-        sgj_add_nv_s(jsp, jop, "operation_code", b);
+        sgj_js_nv_s(jsp, jop, "operation_code", b);
         if (rep_opts > 1) {
             snprintf(b, blen, "0x%x", op->servact);
-            sgj_add_nv_s(jsp, jop, "service_action", b);
+            sgj_js_nv_s(jsp, jop, "service_action", b);
         }
-        sgj_add_nv_i(jsp, jop, "rwcdlp", rwcdlp);
-        sgj_add_nv_i(jsp, jop, "ctdp", ctdp);
-        sgj_add_nv_i(jsp, jop, "mlu", mlu);
-        sgj_add_nv_i(jsp, jop, "cdlp", cdlp);
-        sgj_add_nv_i(jsp, jop, "support", support);
-        sgj_add_nv_s(jsp, jop, "support_str", cp);
-        sgj_add_nv_i(jsp, jop, "cdb_size", cd_len);
+        sgj_js_nv_i(jsp, jop, "rwcdlp", rwcdlp);
+        sgj_js_nv_i(jsp, jop, "ctdp", ctdp);
+        sgj_js_nv_i(jsp, jop, "mlu", mlu);
+        sgj_js_nv_i(jsp, jop, "cdlp", cdlp);
+        sgj_js_nv_i(jsp, jop, "support", support);
+        sgj_js_nv_s(jsp, jop, "support_str", cp);
+        sgj_js_nv_i(jsp, jop, "cdb_size", cd_len);
         n = 0;
         for (k = 0; k < cd_len; ++k)
             n += sg_scnpr(b + n, blen - n, "%.2x ", rsoc_buff[k + 4]);
         l = strlen(b);
         if ((l > 0) && (' ' == b[l - 1]))
             b[l - 1] = '\0';
-        sgj_add_nv_s(jsp, jop, "cdb_usage_data", b);
+        sgj_js_nv_s(jsp, jop, "cdb_usage_data", b);
     }
     if (ctdp) {
-        jsp->userp = sgj_new_named_object(jsp, jsp->basep,
-                                          "command_timeouts_descriptor");
+        jsp->userp = sgj_named_subobject_r(jsp, jsp->basep,
+                                           "command_timeouts_descriptor");
         bp = rsoc_buff + 4 + cd_len;
         decode_cmd_timeout_desc(bp, NAME_BUFF_SZ, name_buff, op);
         sgj_pr_hr(jsp, "  %s\n", name_buff);
@@ -1144,7 +1144,7 @@ main(int argc, char * argv[])
     jsp = &op->json_st;
     as_json = jsp->pr_as_json;
     if (as_json) {
-        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
+        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
     }
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
@@ -1375,17 +1375,17 @@ start_response:
             goto fini;
         }
         if (jsp->pr_as_json) {
-            sgj_add_nv_b(jsp, jop, "ats", rsoc_buff[0] & 0x80);
-            sgj_add_nv_b(jsp, jop, "atss", rsoc_buff[0] & 0x40);
-            sgj_add_nv_b(jsp, jop, "cacas", rsoc_buff[0] & 0x20);
-            sgj_add_nv_b(jsp, jop, "ctss", rsoc_buff[0] & 0x10);
-            sgj_add_nv_b(jsp, jop, "lurs", rsoc_buff[0] & 0x8);
-            sgj_add_nv_b(jsp, jop, "qts", rsoc_buff[0] & 0x4);
-            sgj_add_nv_b(jsp, jop, "trs", rsoc_buff[0] & 0x2);
-            sgj_add_nv_b(jsp, jop, "ws", rsoc_buff[0] & 0x1);
-            sgj_add_nv_b(jsp, jop, "qaes", rsoc_buff[1] & 0x4);
-            sgj_add_nv_b(jsp, jop, "qtss", rsoc_buff[1] & 0x2);
-            sgj_add_nv_b(jsp, jop, "itnrs", rsoc_buff[1] & 0x1);
+            sgj_js_nv_b(jsp, jop, "ats", rsoc_buff[0] & 0x80);
+            sgj_js_nv_b(jsp, jop, "atss", rsoc_buff[0] & 0x40);
+            sgj_js_nv_b(jsp, jop, "cacas", rsoc_buff[0] & 0x20);
+            sgj_js_nv_b(jsp, jop, "ctss", rsoc_buff[0] & 0x10);
+            sgj_js_nv_b(jsp, jop, "lurs", rsoc_buff[0] & 0x8);
+            sgj_js_nv_b(jsp, jop, "qts", rsoc_buff[0] & 0x4);
+            sgj_js_nv_b(jsp, jop, "trs", rsoc_buff[0] & 0x2);
+            sgj_js_nv_b(jsp, jop, "ws", rsoc_buff[0] & 0x1);
+            sgj_js_nv_b(jsp, jop, "qaes", rsoc_buff[1] & 0x4);
+            sgj_js_nv_b(jsp, jop, "qtss", rsoc_buff[1] & 0x2);
+            sgj_js_nv_b(jsp, jop, "itnrs", rsoc_buff[1] & 0x1);
             if (! jsp->pr_out_hr)
                 goto fini;
         }
@@ -1493,7 +1493,7 @@ err_out:
     res = (res >= 0) ? res : SG_LIB_CAT_OTHER;
     if (as_json) {
         if (0 == op->do_hex)
-            sgj_pr2file(jsp, NULL, res, stdout);
+            sgj_js2file(jsp, NULL, res, stdout);
         sgj_finish(jsp);
     }
     return res;

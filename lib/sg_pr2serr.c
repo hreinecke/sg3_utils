@@ -267,8 +267,8 @@ sgj_init_state(sgj_state * jsp, const char * j_optarg)
 }
 
 sgj_opaque_p
-sgj_start(const char * util_name, const char * ver_str, int argc,
-          char *argv[], sgj_state * jsp)
+sgj_start_r(const char * util_name, const char * ver_str, int argc,
+            char *argv[], sgj_state * jsp)
 {
     int k;
     json_value * jvp = json_object_new(0);
@@ -336,7 +336,7 @@ sgj_start(const char * util_name, const char * ver_str, int argc,
 
             if (bp) {
                 sg_json_usage(0, bp, 4096);
-                sgj_pr_str_out_hr(jsp, bp, strlen(bp));
+                sgj_js_str_out(jsp, bp, strlen(bp));
                 free(bp);
             }
         }
@@ -345,7 +345,7 @@ sgj_start(const char * util_name, const char * ver_str, int argc,
 }
 
 void
-sgj_pr2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
+sgj_js2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
 {
     size_t len;
     char * b;
@@ -364,7 +364,7 @@ sgj_pr2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
                 strncpy(d, "no errors", sizeof(d) - 1);
         } else
             strncpy(d, "not available", sizeof(d) - 1);
-        sgj_add_nv_istr(jsp, jop, "exit_status", exit_status, NULL, d);
+        sgj_js_nv_istr(jsp, jop, "exit_status", exit_status, NULL, d);
     }
     memcpy(&out_settings, &def_out_settings, sizeof(out_settings));
     if (jsp->pr_indent_size != def_out_settings.indent_size)
@@ -448,7 +448,7 @@ sgj_pr_hr(sgj_state * jsp, const char * fmt, ...)
 
 /* jop will 'own' returned value (if non-NULL) */
 sgj_opaque_p
-sgj_new_named_object(sgj_state * jsp, sgj_opaque_p jop, const char * name)
+sgj_named_subobject_r(sgj_state * jsp, sgj_opaque_p jop, const char * name)
 {
     sgj_opaque_p resp = NULL;
 
@@ -459,8 +459,8 @@ sgj_new_named_object(sgj_state * jsp, sgj_opaque_p jop, const char * name)
 }
 
 sgj_opaque_p
-sgj_new_snake_named_object(sgj_state * jsp, sgj_opaque_p jop,
-                           const char * conv2sname)
+sgj_snake_named_subobject_r(sgj_state * jsp, sgj_opaque_p jop,
+                            const char * conv2sname)
 {
     if (jsp && jsp->pr_as_json && conv2sname) {
         int olen = strlen(conv2sname);
@@ -476,7 +476,7 @@ sgj_new_snake_named_object(sgj_state * jsp, sgj_opaque_p jop,
 
 /* jop will 'own' returned value (if non-NULL) */
 sgj_opaque_p
-sgj_new_named_array(sgj_state * jsp, sgj_opaque_p jop, const char * name)
+sgj_named_subarray_r(sgj_state * jsp, sgj_opaque_p jop, const char * name)
 {
     sgj_opaque_p resp = NULL;
 
@@ -487,8 +487,8 @@ sgj_new_named_array(sgj_state * jsp, sgj_opaque_p jop, const char * name)
 }
 
 sgj_opaque_p
-sgj_new_snake_named_array(sgj_state * jsp, sgj_opaque_p jop,
-                          const char * conv2sname)
+sgj_snake_named_subarray_r(sgj_state * jsp, sgj_opaque_p jop,
+                           const char * conv2sname)
 {
     if (jsp && jsp->pr_as_json && conv2sname) {
         int olen = strlen(conv2sname);
@@ -504,21 +504,21 @@ sgj_new_snake_named_array(sgj_state * jsp, sgj_opaque_p jop,
 
 /* Newly created object is un-attached to jsp->basep tree */
 sgj_opaque_p
-sgj_new_unattached_object(sgj_state * jsp)
+sgj_new_unattached_object_r(sgj_state * jsp)
 {
     return (jsp && jsp->pr_as_json) ? json_object_new(0) : NULL;
 }
 
 /* Newly created array is un-attached to jsp->basep tree */
 sgj_opaque_p
-sgj_new_unattached_array(sgj_state * jsp)
+sgj_new_unattached_array_r(sgj_state * jsp)
 {
     return (jsp && jsp->pr_as_json) ? json_array_new(0) : NULL;
 }
 
 sgj_opaque_p
-sgj_add_nv_s(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-             const char * value)
+sgj_js_nv_s(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+            const char * value)
 {
     if (jsp && jsp->pr_as_json && value) {
         if (name)
@@ -532,8 +532,8 @@ sgj_add_nv_s(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 }
 
 sgj_opaque_p
-sgj_add_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                 const char * value, int slen)
+sgj_js_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                const char * value, int slen)
 {
     int k;
 
@@ -553,8 +553,8 @@ sgj_add_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 }
 
 sgj_opaque_p
-sgj_add_nv_i(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-             int64_t value)
+sgj_js_nv_i(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+            int64_t value)
 {
     if (jsp && jsp->pr_as_json) {
         if (name)
@@ -569,7 +569,7 @@ sgj_add_nv_i(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 }
 
 sgj_opaque_p
-sgj_add_nv_b(sgj_state * jsp, sgj_opaque_p jop, const char * name, bool value)
+sgj_js_nv_b(sgj_state * jsp, sgj_opaque_p jop, const char * name, bool value)
 {
     if (jsp && jsp->pr_as_json) {
         if (name)
@@ -584,8 +584,8 @@ sgj_add_nv_b(sgj_state * jsp, sgj_opaque_p jop, const char * name, bool value)
 
 /* jop will 'own' ua_jop (if returned value is non-NULL) */
 sgj_opaque_p
-sgj_add_nv_o(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-             sgj_opaque_p ua_jop)
+sgj_js_nv_o(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+            sgj_opaque_p ua_jop)
 {
     if (jsp && jsp->pr_as_json && ua_jop) {
         if (name)
@@ -599,70 +599,70 @@ sgj_add_nv_o(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 }
 
 void
-sgj_add_nv_ihex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                uint64_t value)
+sgj_js_nv_ihex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+               uint64_t value)
 {
     if ((NULL == jsp) || (NULL == name) || (! jsp->pr_as_json))
         return;
     else if (jsp->pr_hex)  {
-        sgj_opaque_p jo2p = sgj_new_named_object(jsp, jop, name);
+        sgj_opaque_p jo2p = sgj_named_subobject_r(jsp, jop, name);
         char b[64];
 
         if (NULL == jo2p)
             return;
-        sgj_add_nv_i(jsp, jo2p, "i", (int64_t)value);
+        sgj_js_nv_i(jsp, jo2p, "i", (int64_t)value);
         snprintf(b, sizeof(b), "%" PRIx64, value);
-        sgj_add_nv_s(jsp, jo2p, "hex", b);
+        sgj_js_nv_s(jsp, jo2p, "hex", b);
     } else
-        sgj_add_nv_i(jsp, jop, name, (int64_t)value);
+        sgj_js_nv_i(jsp, jop, name, (int64_t)value);
 }
 
 static const char * sc_mn_s = "meaning";
 
 void
-sgj_add_nv_istr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                int64_t val_i, const char * str_name, const char * val_s)
+sgj_js_nv_istr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+               int64_t val_i, const char * str_name, const char * val_s)
 {
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
     else if (jsp->pr_string) {
-        sgj_opaque_p jo2p = sgj_new_named_object(jsp, jop, name);
+        sgj_opaque_p jo2p = sgj_named_subobject_r(jsp, jop, name);
 
         if (NULL == jo2p)
             return;
-        sgj_add_nv_i(jsp, jo2p, "i", (int64_t)val_i);
+        sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
         if (val_s)
-            sgj_add_nv_s(jsp, jo2p, str_name ? str_name : sc_mn_s, val_s);
+            sgj_js_nv_s(jsp, jo2p, str_name ? str_name : sc_mn_s, val_s);
     } else
-        sgj_add_nv_i(jsp, jop, name, val_i);
+        sgj_js_nv_i(jsp, jop, name, val_i);
 }
 
 void
-sgj_add_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                   int64_t val_i, const char * str_name, const char * val_s)
+sgj_js_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                  int64_t val_i, const char * str_name, const char * val_s)
 {
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
     if ((! jsp->pr_hex) && (! jsp->pr_string))
-        sgj_add_nv_i(jsp, jop, name, val_i);
+        sgj_js_nv_i(jsp, jop, name, val_i);
     else {
         char b[64];
-        sgj_opaque_p jo2p = sgj_new_named_object(jsp, jop, name);
+        sgj_opaque_p jo2p = sgj_named_subobject_r(jsp, jop, name);
 
         if (NULL == jo2p)
             return;
         if (jsp->pr_string) {
-            sgj_add_nv_i(jsp, jo2p, "i", (int64_t)val_i);
+            sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
             if (jsp->pr_hex) {
                 snprintf(b, sizeof(b), "%" PRIx64, val_i);
-                sgj_add_nv_s(jsp, jo2p, "hex", b);
+                sgj_js_nv_s(jsp, jo2p, "hex", b);
             }
             if (val_s)
-                sgj_add_nv_s(jsp, jo2p, str_name ? str_name : sc_mn_s, val_s);
+                sgj_js_nv_s(jsp, jo2p, str_name ? str_name : sc_mn_s, val_s);
         } else if (jsp->pr_hex) {
-            sgj_add_nv_i(jsp, jo2p, "i", (int64_t)val_i);
+            sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
             snprintf(b, sizeof(b), "%" PRIx64, val_i);
-            sgj_add_nv_s(jsp, jo2p, "hex", b);
+            sgj_js_nv_s(jsp, jo2p, "hex", b);
         }
     }
 }
@@ -670,8 +670,8 @@ sgj_add_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 static const char * sc_nex_s = "name_extra";
 
 void
-sgj_add_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                    int64_t val_i, bool want_hex, const char * nex_s)
+sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                   int64_t val_i, bool want_hex, const char * nex_s)
 {
     bool as_hex = jsp->pr_hex && want_hex;
     bool as_nex = jsp->pr_name_ex && nex_s;
@@ -679,32 +679,32 @@ sgj_add_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
     if (! (as_hex || as_nex))
-        sgj_add_nv_i(jsp, jop, name, val_i);
+        sgj_js_nv_i(jsp, jop, name, val_i);
     else {
         char b[64];
         sgj_opaque_p jo2p =
-                 sgj_new_named_object(jsp, jop, name);
+                 sgj_named_subobject_r(jsp, jop, name);
 
         if (NULL == jo2p)
             return;
-        sgj_add_nv_i(jsp, jo2p, "i", (int64_t)val_i);
+        sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
         if (as_nex) {
             if (jsp->pr_hex && want_hex) {
                 snprintf(b, sizeof(b), "%" PRIx64, val_i);
-                sgj_add_nv_s(jsp, jo2p, "hex", b);
+                sgj_js_nv_s(jsp, jo2p, "hex", b);
             }
-            sgj_add_nv_s(jsp, jo2p, sc_nex_s, nex_s);
+            sgj_js_nv_s(jsp, jo2p, sc_nex_s, nex_s);
         } else if (as_hex) {
             snprintf(b, sizeof(b), "%" PRIx64, val_i);
-            sgj_add_nv_s(jsp, jo2p, "hex", b);
+            sgj_js_nv_s(jsp, jo2p, "hex", b);
         }
     }
 }
 
 /* Add hex byte strings irrespective of jsp->pr_hex setting. */
 void
-sgj_add_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                     const uint8_t * byte_arr, int num_bytes)
+sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                    const uint8_t * byte_arr, int num_bytes)
 {
     int blen = num_bytes * 4;
     char * bp;
@@ -714,15 +714,15 @@ sgj_add_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     bp = (char *)calloc(blen + 4, 1);
     if (bp) {
         hex2str(byte_arr, num_bytes, NULL, 2, blen, bp);
-        sgj_add_nv_s(jsp, jop, name, bp);
+        sgj_js_nv_s(jsp, jop, name, bp);
         free(bp);
     }
 }
 
 void
-sgj_add_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                       int64_t val_i, bool want_hex, const char * str_name,
-                       const char * val_s, const char * nex_s)
+sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                      int64_t val_i, bool want_hex, const char * str_name,
+                      const char * val_s, const char * nex_s)
 {
     bool as_hex = jsp->pr_hex && want_hex;
     bool as_str = jsp->pr_string && val_s;
@@ -732,31 +732,31 @@ sgj_add_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
     if (! (as_hex || as_nex || as_str))
-        sgj_add_nv_i(jsp, jop, name, val_i);
+        sgj_js_nv_i(jsp, jop, name, val_i);
     else {
         char b[64];
         sgj_opaque_p jo2p =
-                 sgj_new_named_object(jsp, jop, name);
+                 sgj_named_subobject_r(jsp, jop, name);
 
         if (NULL == jo2p)
             return;
-        sgj_add_nv_i(jsp, jo2p, "i", (int64_t)val_i);
+        sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
         if (as_nex) {
             if (as_hex) {
                 snprintf(b, sizeof(b), "%" PRIx64, val_i);
-                sgj_add_nv_s(jsp, jo2p, "hex", b);
+                sgj_js_nv_s(jsp, jo2p, "hex", b);
             }
             if (as_str) {
-                sgj_add_nv_s(jsp, jo2p, sname, val_s);
+                sgj_js_nv_s(jsp, jo2p, sname, val_s);
             }
-            sgj_add_nv_s(jsp, jo2p, sc_nex_s, nex_s);
+            sgj_js_nv_s(jsp, jo2p, sc_nex_s, nex_s);
         } else if (as_hex) {
             snprintf(b, sizeof(b), "%" PRIx64, val_i);
-            sgj_add_nv_s(jsp, jo2p, "hex", b);
+            sgj_js_nv_s(jsp, jo2p, "hex", b);
             if (as_str)
-                sgj_add_nv_s(jsp, jo2p, sname, val_s);
+                sgj_js_nv_s(jsp, jo2p, sname, val_s);
         } else if (as_str)
-            sgj_add_nv_s(jsp, jo2p, sname, val_s);
+            sgj_js_nv_s(jsp, jo2p, sname, val_s);
     }
 }
 
@@ -764,7 +764,7 @@ sgj_add_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
  * a '\0' is found or slen is exhausted. Add each line to jsp->out_hrp JSON
  * array (if conditions met). */
 void
-sgj_pr_str_out_hr(sgj_state * jsp, const char * sp, int slen)
+sgj_js_str_out(sgj_state * jsp, const char * sp, int slen)
 {
     char c;
     int k, n;
@@ -781,13 +781,13 @@ sgj_pr_str_out_hr(sgj_state * jsp, const char * sp, int slen)
         else if ('\n' == c) {
             n = cur_sp - prev_sp;
             /* when name is NULL, add to array (jsp->out_hrp) */
-            sgj_add_nv_s_len(jsp, jsp->out_hrp, NULL, prev_sp, n);
+            sgj_js_nv_s_len(jsp, jsp->out_hrp, NULL, prev_sp, n);
             prev_sp = cur_sp + 1;
         }
     }
     if (prev_sp < cur_sp) {
         n = cur_sp - prev_sp;
-        sgj_add_nv_s_len(jsp, jsp->out_hrp, NULL, prev_sp, n);
+        sgj_js_nv_s_len(jsp, jsp->out_hrp, NULL, prev_sp, n);
     }
 }
 
@@ -874,9 +874,9 @@ sgj_jtype_to_s(char * b, int blen_max, json_value * jvp)
 }
 
 static int
-sgj_pr_hr_js_hr(char * b, int blen_max, const char * name,
-                enum sgj_separator_t sep, bool use_jvp,
-                json_value * jvp, int64_t val_instead)
+sgj_hr_js_helper(char * b, int blen_max, const char * name,
+                 enum sgj_separator_t sep, bool use_jvp,
+                 json_value * jvp, int64_t val_instead)
 {
     int n = 0;
 
@@ -921,9 +921,9 @@ sgj_pr_hr_js_hr(char * b, int blen_max, const char * name,
 }
 
 static void
-sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                const char * name, enum sgj_separator_t sep,
-                json_value * jvp, const char * nex_s)
+sgj_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+             const char * name, enum sgj_separator_t sep,
+             json_value * jvp, bool hex_as_well, const char * nex_s)
 {
     bool eaten = false;
     bool as_json = (jsp && jsp->pr_as_json);
@@ -972,13 +972,13 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                 case json_string:
                     break;
                 case json_integer:
-                    sgj_add_nv_ihex_nex(jsp, jop, jname, jvp->u.integer,
-                                        false, nex_s);
+                    sgj_js_nv_ihex_nex(jsp, jop, jname, jvp->u.integer,
+                                       hex_as_well, nex_s);
                     done = true;
                     break;
                 case json_boolean:
-                    sgj_add_nv_ihex_nex(jsp, jop, jname, jvp->u.boolean,
-                                        false, nex_s);
+                    sgj_js_nv_ihex_nex(jsp, jop, jname, jvp->u.boolean,
+                                       hex_as_well, nex_s);
                     done = true;
                     break;
                 case json_none:
@@ -994,7 +994,7 @@ sgj_pr_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         }
     }
     if (jvp && ((as_json && jsp->pr_out_hr) || (! as_json)))
-        n += sgj_pr_hr_js_hr(b + n, blen - n, name, sep, true, jvp, 0);
+        n += sgj_hr_js_helper(b + n, blen - n, name, sep, true, jvp, 0);
 
     if (as_json && jsp->pr_out_hr)
         json_array_push((json_value *)jsp->out_hrp, json_string_new(b));
@@ -1006,51 +1006,52 @@ fini:
 }
 
 void
-sgj_pr_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                const char * name, enum sgj_separator_t sep,
-                const char * value)
+sgj_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+             const char * name, enum sgj_separator_t sep,
+             const char * value)
 {
     json_value * jvp;
 
     /* make json_value even if jsp->pr_as_json is false */
     jvp = value ? json_string_new(value) : NULL;
-    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, NULL);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL);
 }
 
 void
-sgj_pr_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                const char * name, enum sgj_separator_t sep, int64_t value)
+sgj_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+             const char * name, enum sgj_separator_t sep, int64_t value,
+             bool hex_as_well)
 {
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, NULL);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, NULL);
 }
 
 void
-sgj_pr_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+sgj_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                     const char * name, enum sgj_separator_t sep,
-                    int64_t value, const char * nex_s)
+                    int64_t value, bool hex_as_well, const char * nex_s)
 {
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, nex_s);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, nex_s);
 }
 
 void
-sgj_pr_hr_js_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+sgj_hr_js_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                 const char * name, enum sgj_separator_t sep, bool value)
 {
     json_value * jvp;
 
     jvp = json_boolean_new(value);
-    sgj_pr_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, NULL);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL);
 }
 
 sgj_opaque_p
-sgj_pr_hr_js_subo(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                  const char * name, enum sgj_separator_t sep, int64_t value)
+sgj_hr_js_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                 const char * name, enum sgj_separator_t sep, int64_t value)
 {
     bool as_json = (jsp && jsp->pr_as_json);
     int n = 0;
@@ -1064,7 +1065,7 @@ sgj_pr_hr_js_subo(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         b[n] = ' ';
     b[n] = '\0';
     if ((! as_json) || (jsp && jsp->pr_out_hr))
-        n += sgj_pr_hr_js_hr(b + n, blen - n, name, sep, false, NULL, value);
+        n += sgj_hr_js_helper(b + n, blen - n, name, sep, false, NULL, value);
 
     if (as_json && jsp->pr_out_hr)
         json_array_push((json_value *)jsp->out_hrp, json_string_new(b));
@@ -1073,9 +1074,9 @@ sgj_pr_hr_js_subo(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 
     if (as_json) {
         sgj_name_to_snake(name, b, blen);
-        jo2p = sgj_new_named_object(jsp, jop, b);
+        jo2p = sgj_named_subobject_r(jsp, jop, b);
         if (jo2p)
-            sgj_add_nv_i(jsp, jo2p, "i", value);
+            sgj_js_nv_i(jsp, jo2p, "i", value);
         return jo2p;
     }
     return NULL;
@@ -1090,8 +1091,8 @@ static const char * naa_exp = "Network Address Authority";
 static const char * aoi_exp = "IEEE-Administered Organizational Identifier";
 
 bool
-sgj_pr_js_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
-                                 const uint8_t * ddp, int dd_len)
+sgj_js_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
+                              const uint8_t * ddp, int dd_len)
 {
     int p_id, piv, c_set, assoc, desig_type, d_id, naa;
     int n, aoi, vsi, dlen;
@@ -1106,14 +1107,14 @@ sgj_pr_js_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
     static const int elen = sizeof(e);
 
     if (dd_len < 4) {
-        sgj_add_nv_s(jsp, jop, ddep, "too short");
+        sgj_js_nv_s(jsp, jop, ddep, "too short");
         return false;
     }
     dlen = ddp[3];
     if (dlen > (dd_len - 4)) {
         snprintf(e, elen, "too long: says it is %d bytes, but given %d "
                  "bytes\n", dlen, dd_len - 4);
-        sgj_add_nv_s(jsp, jop, ddep, e);
+        sgj_js_nv_s(jsp, jop, ddep, e);
         return false;
     }
     ip = ddp + 4;
@@ -1125,172 +1126,171 @@ sgj_pr_js_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
     cp = sg_get_desig_assoc_str(assoc);
     if (assoc == 3)
         cp = "Reserved [0x3]";    /* should not happen */
-    sgj_add_nv_ihexstr(jsp, jop, "association", assoc, NULL, cp);
+    sgj_js_nv_ihexstr(jsp, jop, "association", assoc, NULL, cp);
     cp = sg_get_desig_type_str(desig_type);
     if (NULL == cp)
         cp = "unknown";
-    sgj_add_nv_ihexstr(jsp, jop, "designator_type", desig_type,
+    sgj_js_nv_ihexstr(jsp, jop, "designator_type", desig_type,
                        NULL, cp);
     cp = sg_get_desig_code_set_str(c_set);
     if (NULL == cp)
         cp = "unknown";
-    sgj_add_nv_ihexstr(jsp, jop, "code_set", desig_type,
-                       NULL, cp);
-    sgj_add_nv_ihex_nex(jsp, jop, "piv", piv, false,
-                        "Protocol Identifier Valid");
+    sgj_js_nv_ihexstr(jsp, jop, "code_set", desig_type,
+                      NULL, cp);
+    sgj_js_nv_ihex_nex(jsp, jop, "piv", piv, false,
+                       "Protocol Identifier Valid");
     sg_get_trans_proto_str(p_id, elen, e);
-    sgj_add_nv_ihexstr(jsp, jop, "protocol_identifier", p_id, NULL, e);
+    sgj_js_nv_ihexstr(jsp, jop, "protocol_identifier", p_id, NULL, e);
     switch (desig_type) {
     case 0: /* vendor specific */
-        sgj_add_nv_hex_bytes(jsp, jop, "vendor_specific_hexbytes", ip, dlen);
+        sgj_js_nv_hex_bytes(jsp, jop, "vendor_specific_hexbytes", ip, dlen);
         break;
     case 1: /* T10 vendor identification */
         n = (dlen < 8) ? dlen : 8;
         snprintf(b, blen, "%.*s", n, ip);
-        sgj_add_nv_s(jsp, jop, "t10_vendor_identification", b);
+        sgj_js_nv_s(jsp, jop, "t10_vendor_identification", b);
         b[0] = '\0';
         if (dlen > 8)
             snprintf(b, blen, "%.*s", dlen - 8, ip + 8);
-        sgj_add_nv_s(jsp, jop, "vendor_specific_identifier", b);
+        sgj_js_nv_s(jsp, jop, "vendor_specific_identifier", b);
         break;
     case 2: /* EUI-64 based */
-        sgj_add_nv_i(jsp, jop, "eui_64_based_designator_length", dlen);
+        sgj_js_nv_i(jsp, jop, "eui_64_based_designator_length", dlen);
         ull = sg_get_unaligned_be64(ip);
         switch (dlen) {
         case 8:
-            sgj_add_nv_ihex(jsp, jop, "ieee_identifier", ull);
+            sgj_js_nv_ihex(jsp, jop, "ieee_identifier", ull);
             break;
         case 12:
-            sgj_add_nv_ihex(jsp, jop, "ieee_identifier", ull);
-            sgj_add_nv_ihex(jsp, jop, "directory_id",
+            sgj_js_nv_ihex(jsp, jop, "ieee_identifier", ull);
+            sgj_js_nv_ihex(jsp, jop, "directory_id",
                             sg_get_unaligned_be32(ip + 8));
             break;
         case 16:
-            sgj_add_nv_ihex(jsp, jop, "identifier_extension", ull);
-            sgj_add_nv_ihex(jsp, jop, "ieee_identifier",
+            sgj_js_nv_ihex(jsp, jop, "identifier_extension", ull);
+            sgj_js_nv_ihex(jsp, jop, "ieee_identifier",
                             sg_get_unaligned_be64(ip + 8));
             break;
         default:
-            sgj_add_nv_s(jsp, jop, "eui_64", "decoding failed");
+            sgj_js_nv_s(jsp, jop, "eui_64", "decoding failed");
             break;
         }
         break;
     case 3: /* NAA <n> */
         if (jsp->pr_hex)
-            sgj_add_nv_hex_bytes(jsp, jop, "full_naa_hexbytes", ip, dlen);
+            sgj_js_nv_hex_bytes(jsp, jop, "full_naa_hexbytes", ip, dlen);
         naa = (ip[0] >> 4) & 0xff;
         switch (naa) {
         case 2:
             naa_sp = "IEEE Extended";
-            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
-                                   naa_exp);
+            sgj_js_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
+                                  naa_exp);
             d_id = (((ip[0] & 0xf) << 8) | ip[1]);
-            sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier_a", d_id);
+            sgj_js_nv_ihex(jsp, jop, "vendor_specific_identifier_a", d_id);
             aoi = sg_get_unaligned_be24(ip + 2);
-            sgj_add_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
+            sgj_js_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
             vsi = sg_get_unaligned_be24(ip + 5);
-            sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier_b", vsi);
+            sgj_js_nv_ihex(jsp, jop, "vendor_specific_identifier_b", vsi);
             break;
         case 3:
             naa_sp = "Locally Assigned";
-            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
-                                   naa_exp);
+            sgj_js_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
+                                  naa_exp);
             ull = sg_get_unaligned_be64(ip + 0) & 0xfffffffffffffffULL;
-            sgj_add_nv_ihex(jsp, jop, "locally_administered_value", ull);
+            sgj_js_nv_ihex(jsp, jop, "locally_administered_value", ull);
             break;
         case 5:
             naa_sp = "IEEE Registered";
-            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
-                                   naa_exp);
+            sgj_js_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
+                                  naa_exp);
             aoi = (sg_get_unaligned_be32(ip + 0) >> 4) & 0xffffff;
-            sgj_add_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
+            sgj_js_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
             ull = sg_get_unaligned_be48(ip + 2) & 0xfffffffffULL;
-            sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier", ull);
+            sgj_js_nv_ihex(jsp, jop, "vendor_specific_identifier", ull);
             break;
         case 6:
             naa_sp = "IEEE Registered Extended";
-            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
-                                   naa_exp);
+            sgj_js_nv_ihexstr_nex(jsp, jop, "naa", naa, false, NULL, naa_sp,
+                                  naa_exp);
             aoi = (sg_get_unaligned_be32(ip + 0) >> 4) & 0xffffff;
-            sgj_add_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
+            sgj_js_nv_ihex_nex(jsp, jop, "aoi", aoi, true, aoi_exp);
             ull = sg_get_unaligned_be48(ip + 2) & 0xfffffffffULL;
-            sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier", ull);
+            sgj_js_nv_ihex(jsp, jop, "vendor_specific_identifier", ull);
             ull = sg_get_unaligned_be64(ip + 8);
-            sgj_add_nv_ihex(jsp, jop, "vendor_specific_identifier_extension",
-                            ull);
+            sgj_js_nv_ihex(jsp, jop, "vendor_specific_identifier_extension",
+                           ull);
             break;
         default:
             snprintf(b, blen, "unknown NAA value=0x%x", naa);
-            sgj_add_nv_ihexstr_nex(jsp, jop, "naa", naa, true, NULL, b,
-                                   naa_exp);
-            sgj_add_nv_hex_bytes(jsp, jop, "full_naa_hexbytes", ip, dlen);
+            sgj_js_nv_ihexstr_nex(jsp, jop, "naa", naa, true, NULL, b,
+                                  naa_exp);
+            sgj_js_nv_hex_bytes(jsp, jop, "full_naa_hexbytes", ip, dlen);
             break;
         }
         break;
     case 4: /* Relative target port */
         if (jsp->pr_hex)
-            sgj_add_nv_hex_bytes(jsp, jop, "relative_target_port_hexbytes",
-                                 ip, dlen);
-        sgj_add_nv_ihex(jsp, jop, "relative_target_port_identifier",
-                        sg_get_unaligned_be16(ip + 2));
+            sgj_js_nv_hex_bytes(jsp, jop, "relative_target_port_hexbytes",
+                                ip, dlen);
+        sgj_js_nv_ihex(jsp, jop, "relative_target_port_identifier",
+                       sg_get_unaligned_be16(ip + 2));
         break;
     case 5: /* (primary) Target port group */
         if (jsp->pr_hex)
-            sgj_add_nv_hex_bytes(jsp, jop, "target_port_group_hexbytes",
-                                 ip, dlen);
-        sgj_add_nv_ihex(jsp, jop, "target_port_group",
-                        sg_get_unaligned_be16(ip + 2));
+            sgj_js_nv_hex_bytes(jsp, jop, "target_port_group_hexbytes",
+                                ip, dlen);
+        sgj_js_nv_ihex(jsp, jop, "target_port_group",
+                       sg_get_unaligned_be16(ip + 2));
         break;
     case 6: /* Logical unit group */
         if (jsp->pr_hex)
-            sgj_add_nv_hex_bytes(jsp, jop, "logical_unit_group_hexbytes",
-                                 ip, dlen);
-        sgj_add_nv_ihex(jsp, jop, "logical_unit_group",
-                        sg_get_unaligned_be16(ip + 2));
+            sgj_js_nv_hex_bytes(jsp, jop, "logical_unit_group_hexbytes",
+                                ip, dlen);
+        sgj_js_nv_ihex(jsp, jop, "logical_unit_group",
+                       sg_get_unaligned_be16(ip + 2));
         break;
     case 7: /* MD5 logical unit identifier */
-        sgj_add_nv_hex_bytes(jsp, jop, "md5_logical_unit_hexbytes",
-                                 ip, dlen);
+        sgj_js_nv_hex_bytes(jsp, jop, "md5_logical_unit_hexbytes",
+                            ip, dlen);
         break;
     case 8: /* SCSI name string */
         if (jsp->pr_hex)
-            sgj_add_nv_hex_bytes(jsp, jop, "scsi_name_string_hexbytes",
-                                 ip, dlen);
+            sgj_js_nv_hex_bytes(jsp, jop, "scsi_name_string_hexbytes",
+                                ip, dlen);
         snprintf(b, blen, "%.*s", dlen, ip);
-        sgj_add_nv_s(jsp, jop, "scsi_name_string", b);
+        sgj_js_nv_s(jsp, jop, "scsi_name_string", b);
         break;
     case 9: /* Protocol specific port identifier */
         if (jsp->pr_hex)
-            sgj_add_nv_hex_bytes(jsp, jop,
-                                 "protocol_specific_port_identifier_hexbytes",
-                                 ip, dlen);
+            sgj_js_nv_hex_bytes(jsp, jop,
+                                "protocol_specific_port_identifier_hexbytes",
+                                ip, dlen);
         if (TPROTO_UAS == p_id) {
-            jo2p = sgj_new_named_object(jsp, jop,
+            jo2p = sgj_named_subobject_r(jsp, jop,
                                         "usb_target_port_identifier");
-            sgj_add_nv_ihex(jsp, jo2p, "device_address", 0x7f & ip[0]);
-            sgj_add_nv_ihex(jsp, jo2p, "interface_number", ip[2]);
+            sgj_js_nv_ihex(jsp, jo2p, "device_address", 0x7f & ip[0]);
+            sgj_js_nv_ihex(jsp, jo2p, "interface_number", ip[2]);
         } else if (TPROTO_SOP == p_id) {
-            jo2p = sgj_new_named_object(jsp, jop, "pci_express_routing_id");
-            sgj_add_nv_ihex(jsp, jo2p, "routing_id",
-                            sg_get_unaligned_be16(ip + 0));
+            jo2p = sgj_named_subobject_r(jsp, jop, "pci_express_routing_id");
+            sgj_js_nv_ihex(jsp, jo2p, "routing_id",
+                           sg_get_unaligned_be16(ip + 0));
         } else
-            sgj_add_nv_s(jsp, jop, "protocol_specific_port_identifier",
-                         "decoding failure");
+            sgj_js_nv_s(jsp, jop, "protocol_specific_port_identifier",
+                        "decoding failure");
 
         break;
     case 0xa: /* UUID identifier */
         if (jsp->pr_hex)
-            sgj_add_nv_hex_bytes(jsp, jop, "uuid_hexbytes",
-                                 ip, dlen);
+            sgj_js_nv_hex_bytes(jsp, jop, "uuid_hexbytes", ip, dlen);
         sg_t10_uuid_desig2str(ip, dlen, c_set, false, true, NULL, blen, b);
         n = strlen(b);
         if ((n > 0) && ('\n' == b[n - 1]))
             b[n - 1] = '\0';
-        sgj_add_nv_s(jsp, jop, "uuid", b);
+        sgj_js_nv_s(jsp, jop, "uuid", b);
         break;
     default: /* reserved */
-        sgj_add_nv_hex_bytes(jsp, jop, "reserved_designator_hexbytes",
-                             ip, dlen);
+        sgj_js_nv_hex_bytes(jsp, jop, "reserved_designator_hexbytes",
+                            ip, dlen);
         break;
     }
     return true;
@@ -1305,20 +1305,20 @@ sgj_progress_indication(sgj_state * jsp, sgj_opaque_p jop,
     char b[64];
 
     if (is_another)
-        jo2p = sgj_new_named_object(jsp, jop, "another_progress_indication");
+        jo2p = sgj_named_subobject_r(jsp, jop, "another_progress_indication");
     else
-        jo2p = sgj_new_named_object(jsp, jop, "progress_indication");
+        jo2p = sgj_named_subobject_r(jsp, jop, "progress_indication");
     if (NULL == jo2p)
         return;
     progress = prog_indic;
-    sgj_add_nv_i(jsp, jo2p, "i", progress);
+    sgj_js_nv_i(jsp, jo2p, "i", progress);
     snprintf(b, sizeof(b), "%x", progress);
-    sgj_add_nv_s(jsp, jo2p, "hex", b);
+    sgj_js_nv_s(jsp, jo2p, "hex", b);
     progress *= 100;
     pr = progress / 65536;
     rem = (progress % 65536) / 656;
     snprintf(b, sizeof(b), "%d.02%d%%\n", pr, rem);
-    sgj_add_nv_s(jsp, jo2p, "percentage", b);
+    sgj_js_nv_s(jsp, jo2p, "percentage", b);
 }
 
 static bool
@@ -1328,69 +1328,69 @@ sgj_decode_sks(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * dp, int dlen,
     switch (sense_key) {
     case SPC_SK_ILLEGAL_REQUEST:
         if (dlen < 3) {
-            sgj_add_nv_s(jsp, jop, "illegal_request_sks", dtsp);
+            sgj_js_nv_s(jsp, jop, "illegal_request_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
-                            sksvp);
-        sgj_add_nv_ihex_nex(jsp, jop, "c_d", !! (dp[0] & 0x40), false,
-                            "c: cdb; d: data-out");
-        sgj_add_nv_ihex_nex(jsp, jop, "bpv", !! (dp[0] & 0x8), false,
-                            "bit pointer (index) valid");
-        sgj_add_nv_i(jsp, jop, "bit_pointer", dp[0] & 0x7);
-        sgj_add_nv_ihex(jsp, jop, "field_pointer",
-                        sg_get_unaligned_be16(dp + 1));
+        sgj_js_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+                           sksvp);
+        sgj_js_nv_ihex_nex(jsp, jop, "c_d", !! (dp[0] & 0x40), false,
+                           "c: cdb; d: data-out");
+        sgj_js_nv_ihex_nex(jsp, jop, "bpv", !! (dp[0] & 0x8), false,
+                           "bit pointer (index) valid");
+        sgj_js_nv_i(jsp, jop, "bit_pointer", dp[0] & 0x7);
+        sgj_js_nv_ihex(jsp, jop, "field_pointer",
+                       sg_get_unaligned_be16(dp + 1));
         break;
     case SPC_SK_HARDWARE_ERROR:
     case SPC_SK_MEDIUM_ERROR:
     case SPC_SK_RECOVERED_ERROR:
         if (dlen < 3) {
-            sgj_add_nv_s(jsp, jop, "actual_retry_count_sks", dtsp);
+            sgj_js_nv_s(jsp, jop, "actual_retry_count_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
-                            sksvp);
-        sgj_add_nv_ihex(jsp, jop, "actual_retry_count",
-                        sg_get_unaligned_be16(dp + 1));
+        sgj_js_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+                           sksvp);
+        sgj_js_nv_ihex(jsp, jop, "actual_retry_count",
+                       sg_get_unaligned_be16(dp + 1));
         break;
     case SPC_SK_NO_SENSE:
     case SPC_SK_NOT_READY:
         if (dlen < 7) {
-            sgj_add_nv_s(jsp, jop, "progress_indication_sks", dtsp);
+            sgj_js_nv_s(jsp, jop, "progress_indication_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
-                            sksvp);
+        sgj_js_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+                           sksvp);
         sgj_progress_indication(jsp, jop, sg_get_unaligned_be16(dp + 1),
                                 false);
         break;
     case SPC_SK_COPY_ABORTED:
         if (dlen < 7) {
-            sgj_add_nv_s(jsp, jop, "segment_indication_sks", dtsp);
+            sgj_js_nv_s(jsp, jop, "segment_indication_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
-                            sksvp);
-        sgj_add_nv_ihex_nex(jsp, jop, "sd", !! (dp[0] & 0x20), false,
-                            "field pointer relative to: 1->segment "
-                            "descriptor, 0->parameter list");
-        sgj_add_nv_ihex_nex(jsp, jop, "bpv", !! (dp[0] & 0x8), false,
-                            "bit pointer (index) valid");
-        sgj_add_nv_i(jsp, jop, "bit_pointer", dp[0] & 0x7);
-        sgj_add_nv_ihex(jsp, jop, "field_pointer",
-                        sg_get_unaligned_be16(dp + 1));
+        sgj_js_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+                           sksvp);
+        sgj_js_nv_ihex_nex(jsp, jop, "sd", !! (dp[0] & 0x20), false,
+                           "field pointer relative to: 1->segment "
+                           "descriptor, 0->parameter list");
+        sgj_js_nv_ihex_nex(jsp, jop, "bpv", !! (dp[0] & 0x8), false,
+                           "bit pointer (index) valid");
+        sgj_js_nv_i(jsp, jop, "bit_pointer", dp[0] & 0x7);
+        sgj_js_nv_ihex(jsp, jop, "field_pointer",
+                       sg_get_unaligned_be16(dp + 1));
         break;
     case SPC_SK_UNIT_ATTENTION:
         if (dlen < 7) {
-            sgj_add_nv_s(jsp, jop, "segment_indication_sks", dtsp);
+            sgj_js_nv_s(jsp, jop, "segment_indication_sks", dtsp);
             return false;
         }
-        sgj_add_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
-                            sksvp);
-        sgj_add_nv_i(jsp, jop, "overflow", !! (dp[0] & 0x80));
+        sgj_js_nv_ihex_nex(jsp, jop, "sksv", !! (dp[0] & 0x80), false,
+                           sksvp);
+        sgj_js_nv_i(jsp, jop, "overflow", !! (dp[0] & 0x80));
         break;
     default:
-        sgj_add_nv_ihex(jsp, jop, "unexpected_sense_key", sense_key);
+        sgj_js_nv_ihex(jsp, jop, "unexpected_sense_key", sense_key);
         return false;
     }
     return true;
@@ -1435,41 +1435,41 @@ sgj_uds_referral_descriptor(sgj_state * jsp, sgj_opaque_p jop,
     sgj_opaque_p jap, jo2p, ja2p, jo3p;
     char c[40];
 
-    sgj_add_nv_ihex_nex(jsp, jop, "not_all_r", (dp[2] & 0x1), false,
-                        "Not all referrals");
+    sgj_js_nv_ihex_nex(jsp, jop, "not_all_r", (dp[2] & 0x1), false,
+                       "Not all referrals");
     dp += 4;
-    jap = sgj_new_named_array(jsp, jop,
-                              "user_data_segment_referral_descriptor_list");
+    jap = sgj_named_subarray_r(jsp, jop,
+                               "user_data_segment_referral_descriptor_list");
     for (k = 0, f = 1; (k + 4) < dlen; k += g, dp += g, ++f) {
         int ntpgd = dp[3];
 
-        jo2p = sgj_new_unattached_object(jsp);
+        jo2p = sgj_new_unattached_object_r(jsp);
         g = (ntpgd * 4) + 20;
-        sgj_add_nv_ihex(jsp, jo2p, "number_of_target_port_group_descriptors",
-                        ntpgd);
+        sgj_js_nv_ihex(jsp, jo2p, "number_of_target_port_group_descriptors",
+                       ntpgd);
         if ((k + g) > dlen) {
-            sgj_add_nv_i(jsp, jo2p, "truncated_descriptor_dlen", dlen);
-            sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+            sgj_js_nv_i(jsp, jo2p, "truncated_descriptor_dlen", dlen);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             return false;
         }
         ull = sg_get_unaligned_be64(dp + 4);
-        sgj_add_nv_ihex(jsp, jo2p, "first_user_date_sgment_lba", ull);
+        sgj_js_nv_ihex(jsp, jo2p, "first_user_date_sgment_lba", ull);
         ull = sg_get_unaligned_be64(dp + 12);
-        sgj_add_nv_ihex(jsp, jo2p, "last_user_date_sgment_lba", ull);
-        ja2p = sgj_new_named_array(jsp, jo2p,
-                                   "target_port_group_descriptor_list");
+        sgj_js_nv_ihex(jsp, jo2p, "last_user_date_sgment_lba", ull);
+        ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                    "target_port_group_descriptor_list");
         for (j = 0; j < ntpgd; ++j) {
-            jo3p = sgj_new_unattached_object(jsp);
+            jo3p = sgj_new_unattached_object_r(jsp);
             tp = dp + 20 + (j * 4);
             aas = tp[0] & 0xf;
             decode_tpgs_state(aas, c, sizeof(c));
-            sgj_add_nv_ihexstr(jsp, jo3p, "asymmetric_access_state", aas,
-                               NULL, c);
-            sgj_add_nv_ihex(jsp, jo3p, "target_port_group",
-                            sg_get_unaligned_be16(tp + 2));
-            sgj_add_nv_o(jsp, ja2p, NULL /* name */, jo3p);
+            sgj_js_nv_ihexstr(jsp, jo3p, "asymmetric_access_state", aas,
+                              NULL, c);
+            sgj_js_nv_ihex(jsp, jo3p, "target_port_group",
+                           sg_get_unaligned_be16(tp + 2));
+            sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
         }
-        sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     return true;
 }
@@ -1484,9 +1484,9 @@ static const char * dd_usage_reason_str_arr[] = {
    };
 
 static bool
-sgj_pr_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
-                            const struct sg_scsi_sense_hdr * sshp,
-                            const uint8_t * sbp, int sb_len)
+sgj_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
+                         const struct sg_scsi_sense_hdr * sshp,
+                         const uint8_t * sbp, int sb_len)
 {
     bool processed = true;
     int add_sb_len, desc_len, k, dt, sense_key, n, sds;
@@ -1506,13 +1506,13 @@ sgj_pr_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
     add_sb_len = sshp->additional_length;
     add_sb_len = (add_sb_len < sb_len) ? add_sb_len : sb_len;
     sense_key = sshp->sense_key;
-    jap = sgj_new_named_array(jsp, jop, "sense_data_descriptor_list");
+    jap = sgj_named_subarray_r(jsp, jop, "sense_data_descriptor_list");
 
     for (descp = sbp, k = 0; (k < add_sb_len);
          k += desc_len, descp += desc_len) {
         int add_d_len = (k < (add_sb_len - 1)) ? descp[1] : -1;
 
-        jo2p = sgj_new_unattached_object(jsp);
+        jo2p = sgj_new_unattached_object_r(jsp);
         if ((k + add_d_len + 2) > add_sb_len)
             add_d_len = add_sb_len - k - 2;
         desc_len = add_d_len + 2;
@@ -1520,152 +1520,152 @@ sgj_pr_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
         dt = descp[0];
         switch (dt) {
         case 0:
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt,
-                               NULL, "Information");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt,
+                              NULL, "Information");
             if (add_d_len >= 10) {
                 int valid = !! (0x80 & descp[2]);
-                sgj_add_nv_ihexstr(jsp, jo2p, "valid", valid, NULL,
-                                   valid ? "as per T10" : "Vendor specific");
-                sgj_add_nv_ihex(jsp, jo2p, "information",
-                                sg_get_unaligned_be64(descp + 4));
+                sgj_js_nv_ihexstr(jsp, jo2p, "valid", valid, NULL,
+                                  valid ? "as per T10" : "Vendor specific");
+                sgj_js_nv_ihex(jsp, jo2p, "information",
+                               sg_get_unaligned_be64(descp + 4));
             } else {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
             }
             break;
         case 1:
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt,
-                               NULL, "Command specific");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt,
+                              NULL, "Command specific");
             if (add_d_len >= 10) {
-                sgj_add_nv_ihex(jsp, jo2p, "command_specific_information",
-                                sg_get_unaligned_be64(descp + 4));
+                sgj_js_nv_ihex(jsp, jo2p, "command_specific_information",
+                               sg_get_unaligned_be64(descp + 4));
             } else {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
             }
             break;
         case 2:         /* Sense Key Specific */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Sense key specific");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Sense key specific");
             processed = sgj_decode_sks(jsp, jo2p, descp + 4, desc_len - 4,
                                        sense_key);
             break;
         case 3:
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Field replaceable unit code");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Field replaceable unit code");
             if (add_d_len >= 2)
-                sgj_add_nv_ihex(jsp, jo2p, "field_replaceable_unit_code",
-                                descp[3]);
+                sgj_js_nv_ihex(jsp, jo2p, "field_replaceable_unit_code",
+                               descp[3]);
             else {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
             }
             break;
         case 4:
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Stream commands");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Stream commands");
             if (add_d_len >= 2) {
-                sgj_add_nv_i(jsp, jo2p, "filemark", !! (descp[3] & 0x80));
-                sgj_add_nv_ihex_nex(jsp, jo2p, "eom", !! (descp[3] & 0x40),
-                                    false, "End Of Medium");
-                sgj_add_nv_ihex_nex(jsp, jo2p, "ili", !! (descp[3] & 0x20),
-                                    false, "Incorrect Length Indicator");
+                sgj_js_nv_i(jsp, jo2p, "filemark", !! (descp[3] & 0x80));
+                sgj_js_nv_ihex_nex(jsp, jo2p, "eom", !! (descp[3] & 0x40),
+                                   false, "End Of Medium");
+                sgj_js_nv_ihex_nex(jsp, jo2p, "ili", !! (descp[3] & 0x20),
+                                   false, "Incorrect Length Indicator");
             } else {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
             }
             break;
         case 5:
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Block commands");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Block commands");
             if (add_d_len >= 2)
-                sgj_add_nv_ihex_nex(jsp, jo2p, "ili", !! (descp[3] & 0x20),
-                                    false, "Incorrect Length Indicator");
+                sgj_js_nv_ihex_nex(jsp, jo2p, "ili", !! (descp[3] & 0x20),
+                                   false, "Incorrect Length Indicator");
             else {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
             }
             break;
         case 6:
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "OSD object identification");
-            sgj_add_nv_s(jsp, jo2p, parsing, "Unsupported");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "OSD object identification");
+            sgj_js_nv_s(jsp, jo2p, parsing, "Unsupported");
             processed = false;
             break;
         case 7:
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "OSD response integrity check value");
-            sgj_add_nv_s(jsp, jo2p, parsing, "Unsupported");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "OSD response integrity check value");
+            sgj_js_nv_s(jsp, jo2p, parsing, "Unsupported");
             break;
         case 8:
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "OSD attribute identification");
-            sgj_add_nv_s(jsp, jo2p, parsing, "Unsupported");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "OSD attribute identification");
+            sgj_js_nv_s(jsp, jo2p, parsing, "Unsupported");
             processed = false;
             break;
         case 9:         /* this is defined in SAT (SAT-2) */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "ATA status return");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "ATA status return");
             if (add_d_len >= 12) {
-                sgj_add_nv_i(jsp, jo2p, "extend", !! (descp[2] & 1));
-                sgj_add_nv_ihex(jsp, jo2p, "error", descp[3]);
-                sgj_add_nv_ihex(jsp, jo2p, "count",
-                                sg_get_unaligned_be16(descp + 4));
+                sgj_js_nv_i(jsp, jo2p, "extend", !! (descp[2] & 1));
+                sgj_js_nv_ihex(jsp, jo2p, "error", descp[3]);
+                sgj_js_nv_ihex(jsp, jo2p, "count",
+                               sg_get_unaligned_be16(descp + 4));
                 ull = ((uint64_t)descp[10] << 40) |
                        ((uint64_t)descp[8] << 32) |
                        (descp[6] << 24) |
                        (descp[11] << 16) |
                        (descp[9] << 8) |
                        descp[7];
-                sgj_add_nv_ihex(jsp, jo2p, "lba", ull);
-                sgj_add_nv_ihex(jsp, jo2p, "device", descp[12]);
-                sgj_add_nv_ihex(jsp, jo2p, "status", descp[13]);
+                sgj_js_nv_ihex(jsp, jo2p, "lba", ull);
+                sgj_js_nv_ihex(jsp, jo2p, "device", descp[12]);
+                sgj_js_nv_ihex(jsp, jo2p, "status", descp[13]);
             } else {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
             }
             break;
         case 0xa:
            /* Added in SPC-4 rev 17, became 'Another ...' in rev 34 */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Another progress indication");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Another progress indication");
             if (add_d_len < 6) {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
                 break;
             }
-            sgj_add_nv_ihex(jsp, jo2p, "another_sense_key", descp[2]);
-            sgj_add_nv_ihex(jsp, jo2p, "another_additional_sense_code",
-                            descp[3]);
-            sgj_add_nv_ihex(jsp, jo2p,
-                            "another_additional_sense_code_qualifier",
-                            descp[4]);
+            sgj_js_nv_ihex(jsp, jo2p, "another_sense_key", descp[2]);
+            sgj_js_nv_ihex(jsp, jo2p, "another_additional_sense_code",
+                           descp[3]);
+            sgj_js_nv_ihex(jsp, jo2p,
+                           "another_additional_sense_code_qualifier",
+                           descp[4]);
             sgj_progress_indication(jsp, jo2p,
                                     sg_get_unaligned_be16(descp + 6), true);
             break;
         case 0xb:       /* Added in SPC-4 rev 23, defined in SBC-3 rev 22 */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "User data segment referral");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "User data segment referral");
             if (add_d_len < 2) {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
                 break;
             }
             if (! sgj_uds_referral_descriptor(jsp, jo2p, descp, add_d_len)) {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
             }
             break;
         case 0xc:       /* Added in SPC-4 rev 28 */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Forwarded sense data");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Forwarded sense data");
             if (add_d_len < 2) {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
                 break;
             }
-            sgj_add_nv_ihex_nex(jsp, jo2p, "fsdt", !! (0x80 & descp[2]),
-                                false, "Forwarded Sense Data Truncated");
+            sgj_js_nv_ihex_nex(jsp, jo2p, "fsdt", !! (0x80 & descp[2]),
+                               false, "Forwarded Sense Data Truncated");
             sds = (0x7 & descp[2]);
             if (sds < 1)
                 snprintf(b, blen, "%s [%d]", "Unknown", sds);
@@ -1678,86 +1678,85 @@ sgj_pr_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                 if (sds > 1)
                     n += sg_scnpr(b + n, blen - n, " %d", sds - 1);
             }
-            sgj_add_nv_ihexstr(jsp, jo2p, "sense_data_source",
-                               (0x7 & descp[2]), NULL, b);
-            jo3p = sgj_new_named_object(jsp, jo2p, "forwarded_sense_data");
-            sgj_pr_js_sense(jsp, jo3p, descp + 4, desc_len - 4);
+            sgj_js_nv_ihexstr(jsp, jo2p, "sense_data_source",
+                              (0x7 & descp[2]), NULL, b);
+            jo3p = sgj_named_subobject_r(jsp, jo2p, "forwarded_sense_data");
+            sgj_js_sense(jsp, jo3p, descp + 4, desc_len - 4);
             break;
         case 0xd:       /* Added in SBC-3 rev 36d */
             /* this descriptor combines descriptors 0, 1, 2 and 3 */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Direct-access block device");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Direct-access block device");
             if (add_d_len < 28) {
-                sgj_add_nv_s(jsp, jo2p, parsing, dtsp);
+                sgj_js_nv_s(jsp, jo2p, parsing, dtsp);
                 processed = false;
                 break;
             }
-            sgj_add_nv_i(jsp, jo2p, "valid", (0x80 & descp[2]));
-            sgj_add_nv_ihex_nex(jsp, jo2p, "ili", !! (0x20 & descp[2]),
-                                false, "Incorrect Length Indicator");
+            sgj_js_nv_i(jsp, jo2p, "valid", (0x80 & descp[2]));
+            sgj_js_nv_ihex_nex(jsp, jo2p, "ili", !! (0x20 & descp[2]),
+                               false, "Incorrect Length Indicator");
             processed = sgj_decode_sks(jsp, jo2p, descp + 4, desc_len - 4,
                                        sense_key);
-            sgj_add_nv_ihex(jsp, jo2p, "field_replaceable_unit_code",
-                            descp[7]);
-            sgj_add_nv_ihex(jsp, jo2p, "information",
-                            sg_get_unaligned_be64(descp + 8));
-            sgj_add_nv_ihex(jsp, jo2p, "command_specific_information",
-                            sg_get_unaligned_be64(descp + 16));
+            sgj_js_nv_ihex(jsp, jo2p, "field_replaceable_unit_code",
+                           descp[7]);
+            sgj_js_nv_ihex(jsp, jo2p, "information",
+                           sg_get_unaligned_be64(descp + 8));
+            sgj_js_nv_ihex(jsp, jo2p, "command_specific_information",
+                           sg_get_unaligned_be64(descp + 16));
             break;
         case 0xe:       /* Added in SPC-5 rev 6 (for Bind/Unbind) */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Device designation");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Device designation");
             n = descp[3];
             cp = (n < (int)SG_ARRAY_SIZE(dd_usage_reason_str_arr)) ?
                   dd_usage_reason_str_arr[n] : "Unknown (reserved)";
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_usage_reason",
-                               n, NULL, cp);
-            jo3p = sgj_new_named_object(jsp, jo2p,
-                                        "device_designation_descriptor");
-            sgj_pr_js_designation_descriptor(jsp, jo3p, descp + 4,
-                                             desc_len - 4);
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_usage_reason",
+                              n, NULL, cp);
+            jo3p = sgj_named_subobject_r(jsp, jo2p,
+                                         "device_designation_descriptor");
+            sgj_js_designation_descriptor(jsp, jo3p, descp + 4, desc_len - 4);
             break;
         case 0xf:       /* Added in SPC-5 rev 10 (for Write buffer) */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "Microcode activation");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "Microcode activation");
             if (add_d_len < 6) {
-                sgj_add_nv_s(jsp, jop, parsing, dtsp);
+                sgj_js_nv_s(jsp, jop, parsing, dtsp);
                 processed = false;
                 break;
             }
-            sgj_add_nv_ihex(jsp, jo2p, "microcode_activation_time",
-                            sg_get_unaligned_be16(descp + 6));
+            sgj_js_nv_ihex(jsp, jo2p, "microcode_activation_time",
+                           sg_get_unaligned_be16(descp + 6));
             break;
         case 0xde:       /* NVME Status Field; vendor (sg3_utils) specific */
-            sgj_add_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
-                               "NVME status (sg3_utils)");
+            sgj_js_nv_ihexstr(jsp, jo2p, "descriptor_type", dt, NULL,
+                              "NVME status (sg3_utils)");
             if (add_d_len < 6) {
-                sgj_add_nv_s(jsp, jop, parsing, dtsp);
+                sgj_js_nv_s(jsp, jop, parsing, dtsp);
                 processed = false;
                 break;
             }
-            sgj_add_nv_ihex_nex(jsp, jo2p, "dnr", !! (0x80 & descp[5]),
-                                false, "Do not retry");
-            sgj_add_nv_ihex_nex(jsp, jo2p, "m", !! (0x40 & descp[5]),
-                                false, "More");
+            sgj_js_nv_ihex_nex(jsp, jo2p, "dnr", !! (0x80 & descp[5]),
+                               false, "Do not retry");
+            sgj_js_nv_ihex_nex(jsp, jo2p, "m", !! (0x40 & descp[5]),
+                               false, "More");
             sct_sc = sg_get_unaligned_be16(descp + 6);
-            sgj_add_nv_ihexstr_nex
+            sgj_js_nv_ihexstr_nex
                 (jsp, jo2p, "sct_sc", sct_sc, true, NULL,
                  sg_get_nvme_cmd_status_str(sct_sc, blen, b),
                  "Status Code Type (upper 8 bits) and Status Code");
             break;
         default:
             if (dt >= 0x80)
-                sgj_add_nv_ihex(jsp, jo2p, "vendor_specific_descriptor_type",
-                                dt);
+                sgj_js_nv_ihex(jsp, jo2p, "vendor_specific_descriptor_type",
+                               dt);
             else
-                sgj_add_nv_ihex(jsp, jo2p, "unknown_descriptor_type", dt);
-            sgj_add_nv_hex_bytes(jsp, jo2p, "descriptor_hexbytes",
-                                 descp, desc_len);
+                sgj_js_nv_ihex(jsp, jo2p, "unknown_descriptor_type", dt);
+            sgj_js_nv_hex_bytes(jsp, jo2p, "descriptor_hexbytes",
+                                descp, desc_len);
             processed = false;
             break;
         }
-        sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     return processed;
 }
@@ -1766,8 +1765,8 @@ sgj_pr_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
 
 /* Fetch sense information */
 bool
-sgj_pr_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
-                int sb_len)
+sgj_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
+             int sb_len)
 {
     bool descriptor_format = false;
     bool sdat_ovfl = false;
@@ -1827,21 +1826,20 @@ sgj_pr_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
         ebp = ebuff;
         break;
     }
-    sgj_add_nv_ihexstr(jsp, jop, "response_code", resp_code, NULL, ebp);
-    sgj_add_nv_b(jsp, jop, "descriptor_format", descriptor_format);
-    sgj_add_nv_ihex_nex(jsp, jop, "sdat_ovfl", sdat_ovfl, false,
-                        "Sense data overflow");
-    sgj_add_nv_ihexstr(jsp, jop, "sense_key", ssh.sense_key, NULL,
-                       sg_lib_sense_key_desc[ssh.sense_key]);
-    sgj_add_nv_ihex(jsp, jop, "additional_sense_code", ssh.asc);
-    sgj_add_nv_ihex(jsp, jop, "additional_sense_code_qualifier", ssh.ascq);
-    sgj_add_nv_s(jsp, jop, "additional_sense_str",
-                 sg_get_additional_sense_str(ssh.asc, ssh.ascq, false,
+    sgj_js_nv_ihexstr(jsp, jop, "response_code", resp_code, NULL, ebp);
+    sgj_js_nv_b(jsp, jop, "descriptor_format", descriptor_format);
+    sgj_js_nv_ihex_nex(jsp, jop, "sdat_ovfl", sdat_ovfl, false,
+                       "Sense data overflow");
+    sgj_js_nv_ihexstr(jsp, jop, "sense_key", ssh.sense_key, NULL,
+                      sg_lib_sense_key_desc[ssh.sense_key]);
+    sgj_js_nv_ihex(jsp, jop, "additional_sense_code", ssh.asc);
+    sgj_js_nv_ihex(jsp, jop, "additional_sense_code_qualifier", ssh.ascq);
+    sgj_js_nv_s(jsp, jop, "additional_sense_str",
+                sg_get_additional_sense_str(ssh.asc, ssh.ascq, false,
                                              blen, b));
     if (descriptor_format) {
         if (len > 8) {
-            ret = sgj_pr_js_sense_descriptors(jsp, jop, &ssh, sbp + 8,
-                                              len - 8);
+            ret = sgj_js_sense_descriptors(jsp, jop, &ssh, sbp + 8, len - 8);
             if (ret == false) {
                 ebp = "unable to decode sense descriptor";
                 goto fini;
@@ -1850,36 +1848,36 @@ sgj_pr_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
     } else if ((len > 12) && (0 == ssh.asc) &&
                (ASCQ_ATA_PT_INFO_AVAILABLE == ssh.ascq)) {
         /* SAT ATA PASS-THROUGH fixed format */
-        sgj_add_nv_ihex(jsp, jop, "error", sbp[3]);
-        sgj_add_nv_ihex(jsp, jop, "status", sbp[4]);
-        sgj_add_nv_ihex(jsp, jop, "device", sbp[5]);
-        sgj_add_nv_i(jsp, jop, "extend", !! (0x80 & sbp[8]));
-        sgj_add_nv_i(jsp, jop, "count_upper_nonzero", !! (0x40 & sbp[8]));
-        sgj_add_nv_i(jsp, jop, "lba_upper_nonzero", !! (0x20 & sbp[8]));
-        sgj_add_nv_i(jsp, jop, "log_index", (0x7 & sbp[8]));
-        sgj_add_nv_i(jsp, jop, "lba", sg_get_unaligned_le24(sbp + 9));
+        sgj_js_nv_ihex(jsp, jop, "error", sbp[3]);
+        sgj_js_nv_ihex(jsp, jop, "status", sbp[4]);
+        sgj_js_nv_ihex(jsp, jop, "device", sbp[5]);
+        sgj_js_nv_i(jsp, jop, "extend", !! (0x80 & sbp[8]));
+        sgj_js_nv_i(jsp, jop, "count_upper_nonzero", !! (0x40 & sbp[8]));
+        sgj_js_nv_i(jsp, jop, "lba_upper_nonzero", !! (0x20 & sbp[8]));
+        sgj_js_nv_i(jsp, jop, "log_index", (0x7 & sbp[8]));
+        sgj_js_nv_i(jsp, jop, "lba", sg_get_unaligned_le24(sbp + 9));
     } else if (len > 2) {   /* fixed format */
-        sgj_add_nv_i(jsp, jop, "valid", valid_info_fld);
-        sgj_add_nv_i(jsp, jop, "filemark", !! (sbp[2] & 0x80));
-        sgj_add_nv_ihex_nex(jsp, jop, "eom", !! (sbp[2] & 0x40),
-                            false, "End Of Medium");
-        sgj_add_nv_ihex_nex(jsp, jop, "ili", !! (sbp[2] & 0x20),
-                            false, "Incorrect Length Indicator");
+        sgj_js_nv_i(jsp, jop, "valid", valid_info_fld);
+        sgj_js_nv_i(jsp, jop, "filemark", !! (sbp[2] & 0x80));
+        sgj_js_nv_ihex_nex(jsp, jop, "eom", !! (sbp[2] & 0x40),
+                           false, "End Of Medium");
+        sgj_js_nv_ihex_nex(jsp, jop, "ili", !! (sbp[2] & 0x20),
+                           false, "Incorrect Length Indicator");
         info = sg_get_unaligned_be32(sbp + 3);
-        sgj_add_nv_ihex(jsp, jop, "information", info);
-        sgj_add_nv_ihex(jsp, jop, "additional_sense_length", sbp[7]);
+        sgj_js_nv_ihex(jsp, jop, "information", info);
+        sgj_js_nv_ihex(jsp, jop, "additional_sense_length", sbp[7]);
         if (sb_len > 11) {
             info = sg_get_unaligned_be32(sbp + 8);
-            sgj_add_nv_ihex(jsp, jop, "command_specific_information", info);
+            sgj_js_nv_ihex(jsp, jop, "command_specific_information", info);
         }
         if (sb_len > 14)
-            sgj_add_nv_ihex(jsp, jop, "field_replaceable_unit_code", sbp[14]);
+            sgj_js_nv_ihex(jsp, jop, "field_replaceable_unit_code", sbp[14]);
         if (sb_len > 17)
             sgj_decode_sks(jsp, jop, sbp + 15, sb_len - 15, ssh.sense_key);
         n =  sbp[7];
         n = (sb_len > n) ? n : sb_len;
-        sgj_add_nv_ihex(jsp, jop, "number_of_bytes_beyond_18",
-                        (n > 18) ? n - 18 : 0);
+        sgj_js_nv_ihex(jsp, jop, "number_of_bytes_beyond_18",
+                       (n > 18) ? n - 18 : 0);
     } else {
         snprintf(ebuff, sizeof(ebuff), "sb_len=%d too short", sb_len);
         ebp = ebuff;
@@ -1887,7 +1885,7 @@ sgj_pr_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
     }
 fini:
     if ((! ret) && ebp)
-        sgj_add_nv_s(jsp, jop, "sense_decode_error", ebp);
+        sgj_js_nv_s(jsp, jop, "sense_decode_error", ebp);
     return ret;
 }
 

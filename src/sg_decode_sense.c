@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.29 20220711";
+static const char * version_str = "1.30 20220717";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -118,7 +118,7 @@ usage()
           "    --inhex=HFN|-i HFN    same as action as --file=HFN\n"
           "    --json[=JO]|-j[JO]    output in JSON instead of human "
           "readable text.\n"
-	  "                          Use --json=? for JSON help\n"
+          "                          Use --json=? for JSON help\n"
           "    --nodecode|-N         do not decode, may be neither sense "
           "nor cdb\n"
           "    --nospace|-n          no spaces or other separators between "
@@ -372,7 +372,7 @@ main(int argc, char *argv[])
     as_json = op->json_st.pr_as_json;
     jsp = &op->json_st;
     if (as_json)
-        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
+        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
 
     if (op->err_given) {
         char d[128];
@@ -504,11 +504,11 @@ main(int argc, char *argv[])
             printf("%s\n", b);
         } else {
             if (as_json) {
-                sgj_pr_js_sense(jsp, jop, op->sense, op->sense_len);
+                sgj_js_sense(jsp, jop, op->sense, op->sense_len);
                 if (jsp->pr_out_hr) {
                     sg_get_sense_str(NULL, op->sense, op->sense_len,
                                      op->verbose, blen, b);
-                     sgj_pr_str_out_hr(jsp, b, strlen(b));
+                     sgj_js_str_out(jsp, b, strlen(b));
                 }
             } else {
                 sg_get_sense_str(NULL, op->sense, op->sense_len,
@@ -519,34 +519,8 @@ main(int argc, char *argv[])
     }
 fini:
    if (as_json) {
-
-#if 0
-// <<<<   testing
-{
-    sgj_opaque_p jo2p;
-
-// uint8_t dd[] = {0x1, 0x0, 0x0, 0x6, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
-
-// uint8_t dd[] = {0x01, 0x00, 0x00, 0x16, 0x11, 0x22, 0x33, 0x44 , 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc,
-//                 0xdd, 0xee, 0xff, 0xed, 0xcb, 0xa9, 0x87, 0x65 , 0x43, 0x21};
-
-// uint8_t dd[] = {0x2, 0x1, 0x0, 0x14,
-//              0x41, 0x42, 0x43, 0x20, 0x20, 0x20, 0x20, 0x20,
-//              0x58, 0x59, 0x5a, 0x31, 0x32, 0x33, 0x34, 0x35,  0x36, 0x37, 0x38, 0x39};
-
-// uint8_t dd[] = {0x01, 0x03, 0x00, 0x08, 0x51, 0x22, 0x33, 0x44,  0x55, 0x66, 0x77, 0x88};
-// uint8_t dd[] = {0x01, 0x03, 0x00, 0x10, 0x61, 0x22, 0x33, 0x44,  0x55, 0x66, 0x77, 0x88, 0xaa, 0xbb, 0xcc, 0xdd,  0xee, 0xff, 0xee, 0xdd};
-
-uint8_t dd[] = {0x01, 0x14, 0x00, 0x04, 0x0, 0x0, 0x0, 0x2,  };
-
-jo2p = sgj_new_named_object(jsp, jop, "designation_descriptor");
-sgj_get_designation_descriptor(jsp, jo2p, dd, sizeof(dd));
-}
-// <<<< end of testing
-#endif
-
         if (0 == op->hex_count)
-            sgj_pr2file(&op->json_st, NULL, ret, stdout);
+            sgj_js2file(&op->json_st, NULL, ret, stdout);
         sgj_finish(jsp);
     }
     return ret;

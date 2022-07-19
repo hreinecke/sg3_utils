@@ -754,18 +754,25 @@ hexadecimal values separated by whitespace. "Whitespace consists of either
 spaces, tabs, blank lines, or any combination thereof". Hyphens (e.g. '\-')
 are also allowed as separators. Each one or two digit ASCII hex pair is
 decoded into a byte (i.e. 8 bits). The following will be decoded to
-valid (ascending valued) bytes: '0', '01', '3', 'c', 'F', '4a', 'cC', 'ff'.
-Lines containing only whitespace are ignored. The contents of any line
-containing a hash mark ('#') is ignored from that point until the end of that
-line. Users are encouraged to use hash marks to introduce comments in hex
-files. The author uses the extension'.hex' on such files. Examples can be
-found in the 'inhex' directory.
+valid (ascending valued) bytes: '0', '01', '3', 'c', 'F', '4a', 'cC'
+and 'ff'. Lines containing only whitespace are ignored. The contents of any
+line containing a hash mark ('#') are ignored from that point until the end
+of that line. Users are encouraged to use hash marks to introduce comments
+in hex files. The author uses the extension '.hex' on such files. Examples
+can be found in the 'inhex' directory. Note that this format does _not_
+have an index (counter) value at the beginning of each line (like, for
+example, the hexdump utility outputs).
 .PP
 The hexadecimal format described in the previous paragraph can be converted
 to binary using the sg_decode_sense utility with these
 options: "\fI\-\-inhex=HFN \-\-nodecode \-\-write=WFN\fR". The input (in
 hex) is in the \fIHFN\fR file while the output is placed in the \fIWFN\fR
 file.
+.PP
+To convert a binary file into a hexadecimal form that can be given as input
+to various sg3_utils utilities, the sg_decode_sense utility can also be
+used with these options: "\fI\-\-binary=BFN \-\-nodecode \-HHH\fR" and the
+hex output will be sent to the console (stdout).
 .SH MICROCODE AND FIRMWARE
 There are two standardized methods for downloading microcode (i.e. device
 firmware) to a SCSI device. The more general way is with the SCSI WRITE

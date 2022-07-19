@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.12 20220626";      /* sbc5r01 */
+static const char * version_str = "1.13 20220717";      /* sbc5r02 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -435,7 +435,7 @@ main(int argc, char * argv[])
         return 0;
     }
     if (jsp->pr_as_json)
-        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
+        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
 
     if (maxlen > DEF_GPES_BUFF_LEN) {
         gpesBuffp = (uint8_t *)sg_memalign(maxlen, 0, &free_gpesBuffp,
@@ -556,12 +556,12 @@ start_response:
         goto fini;
     }
 
-    sgj_pr_hr_js_vi(jsp, jop, 0, "Number of descriptors",
-                    SGJ_SEP_COLON_1_SPACE, num_desc);
-    sgj_pr_hr_js_vi(jsp, jop, 0, "Number of descriptors returned",
-                    SGJ_SEP_COLON_1_SPACE, num_desc_ret);
-    sgj_pr_hr_js_vi(jsp, jop, 0, "Identifier of element being depopulated",
-                    SGJ_SEP_COLON_1_SPACE, id_elem_depop);
+    sgj_hr_js_vi(jsp, jop, 0, "Number of descriptors",
+                 SGJ_SEP_COLON_1_SPACE, num_desc, true);
+    sgj_hr_js_vi(jsp, jop, 0, "Number of descriptors returned",
+                 SGJ_SEP_COLON_1_SPACE, num_desc_ret, true);
+    sgj_hr_js_vi(jsp, jop, 0, "Identifier of element being depopulated",
+                 SGJ_SEP_COLON_1_SPACE, id_elem_depop, true);
     if (rlen < 64) {
         sgj_pr_hr(jsp, "No complete physical element status descriptors "
                   "available\n");
@@ -573,27 +573,26 @@ start_response:
     }
 
     if (jsp->pr_as_json)
-        jap = sgj_new_named_array(jsp, jop,
-                                  "physical_element_status_descriptor");
+        jap = sgj_named_subarray_r(jsp, jop,
+                                   "physical_element_status_descriptor");
     for (bp = gpesBuffp + GPES_DESC_OFFSET, k = 0; k < (int)num_desc_ret;
          bp += GPES_DESC_LEN, ++k) {
         if ((0 == k) && (do_brief < 2))
             sgj_pr_hr(jsp, "Element descriptors:\n");
         decode_elem_status_desc(bp, &a_ped);
         if (jsp->pr_as_json) {
-            jo2p = sgj_new_unattached_object(jsp);
-            sgj_add_nv_ihex(jsp, jo2p, "element_identifier",
-                            (int64_t)a_ped.elem_id);
+            jo2p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_ihex(jsp, jo2p, "element_identifier",
+                           (int64_t)a_ped.elem_id);
             cp = (1 == a_ped.phys_elem_type) ? "storage" : "reserved";
-            sgj_add_nv_istr(jsp, jo2p, "physical_element_type",
-                            a_ped.phys_elem_type, "meaning", cp);
+            sgj_js_nv_istr(jsp, jo2p, "physical_element_type",
+                           a_ped.phys_elem_type, "meaning", cp);
             j = a_ped.phys_elem_health;
             fetch_health_str(j, b, blen);
-            sgj_add_nv_istr(jsp, jo2p, "physical_element_health", j,
-                            "meaning", b);
-            sgj_add_nv_ihex(jsp, jo2p, "associated_capacity",
-                            (int64_t)a_ped.assoc_cap);
-            sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+            sgj_js_nv_istr(jsp, jo2p, "physical_element_health", j, NULL, b);
+            sgj_js_nv_ihex(jsp, jo2p, "associated_capacity",
+                           (int64_t)a_ped.assoc_cap);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         } else if (do_brief) {
             sgj_pr_hr(jsp, "%u: %u,%u\n", a_ped.elem_id, a_ped.phys_elem_type,
                       a_ped.phys_elem_health);
@@ -655,7 +654,7 @@ fini:
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
     if (jsp->pr_as_json) {
         if (0 == do_hex)
-            sgj_pr2file(jsp, NULL, ret, stdout);
+            sgj_js2file(jsp, NULL, ret, stdout);
         sgj_finish(jsp);
     }
     return ret;

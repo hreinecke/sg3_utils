@@ -263,14 +263,19 @@ As stated above, the default output is in human readable form using 7 bit
 ASCII. The \fI\-\-json[=JO]\fR option is designed to be an alternative
 to that human readable form. There are other alternative output formats
 such as the response output as a hexadecimal sequence of bytes or
-in "raw" binary; both of those take precedence over the \fI\-\-json[=JO]\fR
-option. Other specialized output format (e.g. 'sg_inq \-\-export') will
-usually take precedence over JSON output.
+in "raw" binary output; both of those take precedence over the
+\fI\-\-json[=JO]\fR option. Other specialized output
+format (e.g. 'sg_inq \-\-export') will usually take precedence over JSON
+output.
 .PP
 When the \fI\-\-raw\fR option is used together with the \fI\-\-inhex=FN\fR
 option only the data input to the utility is interpreted as binary. So the
 output format defaults to human readable form and thus can be changed to
 JSON if the \fI\-\-json[=JO]\fR option is also used.
+.PP
+There is typically only one form of JSON output so options like
+\fI\-\-brief\fR and \fI\-\-quiet\fR are ignored in the JSON output. In some
+cases (i.e 'sg_inq \-\-descriptors') the JSON output is expanded.
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).

@@ -87,6 +87,7 @@ struct opts_t {
     bool verbose_given;         /* sg_inq + sg_vpd */
     bool version_given;         /* sg_inq + sg_vpd */
     bool do_vpd;                /* sg_inq */
+    bool std_inq_a_valid;       /* sg_inq + sg_vpd */
 #ifdef SG_SCSI_STRINGS
     bool opt_new;               /* sg_inq */
 #endif
@@ -108,8 +109,10 @@ struct opts_t {
     const char * device_name;   /* sg_inq + sg_vpd */
     const char * page_str;      /* sg_inq + sg_vpd */
     const char * inhex_fn;      /* sg_inq + sg_vpd */
+    const char * sinq_inraw_fn; /* sg_inq + sg_vpd */
     const char * vend_prod;     /* sg_vpd */
     sgj_state json_st;
+    uint8_t std_inq_a[36];
 };
 
 struct svpd_values_name_t {
@@ -147,6 +150,10 @@ void decode_dev_constit_vpd(const uint8_t * buff, int len,
                             recurse_vpd_decodep fp);
 sgj_opaque_p std_inq_decode_js(const uint8_t * b, int len,
                                struct opts_t * op, sgj_opaque_p jop);
+void decode_power_consumption(uint8_t * buff, int len,
+                              struct opts_t * op, sgj_opaque_p jap);
+void decode_block_limits_vpd(const uint8_t * buff, int len,
+                             struct opts_t * op, sgj_opaque_p jop);
 const char * pqual_str(int pqual);
 
 void svpd_enumerate_vendor(int vend_prod_num);

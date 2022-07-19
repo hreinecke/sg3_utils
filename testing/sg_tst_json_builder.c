@@ -53,7 +53,7 @@ main(int argc, char * argv[])
     char b[8192];
 
     sgj_init_state(jstp, NULL);
-    jvp = sgj_start(MY_NAME, "0.02 20220503", argc, argv, jstp);
+    jvp = sgj_start_r(MY_NAME, "0.02 20220503", argc, argv, jstp);
     jv1p = json_object_push(jvp, "contents", jsp);
 
     if (jvp == jv1p)

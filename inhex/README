@@ -70,13 +70,19 @@ The second form of sg_decode_sense appends an ASCII rendering of the 16
 bytes to the right of each line.
 
 When ASCII hexadecimal is being used as input to a utility in this
-package, the "input offset" at the start of each line must (and the
-optional ASCII rendering to the right of each line, must not be given.
+package, the "input offset" at the start of each line (and the optional
+ASCII rendering to the right of each line) must not be given.
 That can be done with hexdump:
    hexdump -An -C -v vpd_zbdc.raw
+           ^^^
+That is a syntax error, there is no 'A' option <<<<<<<< check
 
-And the sg_decode_sense utility can do it with:
-   sg_decode_sense --binary=vpd_zbdc.raw -HHH
+And the sg_decode_sense utility can do it with (with the --nodecode option):
+   sg_decode_sense -N --binary=vpd_zbdc.raw -HHH
+That will print suitable lines of hexadecimal (16 bytes per line) to the
+console (stdout) To go the other way (i.e. hexadecimal to binary):
+   sg_decode_sense -N --inhex=vpd_zbdc.hex --write=vpd_zbdc.bin
+
 
 Conclusion
 ----------
@@ -85,4 +91,4 @@ that support --inhex and don't have hex data already. Special cases are
 also welcome. They help the author test this code.
 
 Douglas Gilbert
-21st January 2022
+18th July 2022

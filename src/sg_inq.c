@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.21 20220714";  /* spc6r06 */
+static const char * version_str = "2.22 20220718";  /* spc6r06 */
 
 #define MY_NAME "sg_inq"
 
@@ -128,14 +128,15 @@ static void decode_dev_ids(const char * leadin, uint8_t * buff, int len,
 static int vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                       int off);
 
-// Testing <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-#undef SG_SCSI_STRINGS
+// Test define that will only work for Linux
+// #define HDIO_GET_IDENTITY 1
 
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
     defined(HDIO_GET_IDENTITY)
+#include <sys/ioctl.h>
+
 static int try_ata_identify(int ata_fd, int do_hex, int do_raw,
                             int verbose);
-struct opts_t;
 static void prepare_ata_identify(const struct opts_t * op, int inhex_len);
 #endif
 
@@ -1102,12 +1103,12 @@ decode_supported_vpd(uint8_t * buff, int len, struct opts_t * op,
         snprintf(b, sizeof(b), "0x%x", vpd);
         vnp = get_vpd_page_info(vpd, pdt);
         if (jsp->pr_as_json && jap) {
-            jo2p = sgj_new_unattached_object(jsp);
-            sgj_add_nv_i(jsp, jo2p, "i", vpd);
-            sgj_add_nv_s(jsp, jo2p, "hex", b + 2);
-            sgj_add_nv_s(jsp, jo2p, "name", vnp ? vnp->name : "unknown");
-            sgj_add_nv_s(jsp, jo2p, "acronym", vnp ? vnp->acron : "unknown");
-            sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+            jo2p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_i(jsp, jo2p, "i", vpd);
+            sgj_js_nv_s(jsp, jo2p, "hex", b + 2);
+            sgj_js_nv_s(jsp, jo2p, "name", vnp ? vnp->name : "unknown");
+            sgj_js_nv_s(jsp, jo2p, "acronym", vnp ? vnp->acron : "unknown");
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
         if (vnp)
             sgj_pr_hr(jsp, "     %s\t%s\n", b, vnp->name);
@@ -1216,16 +1217,16 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
     len -= 4;
     bp = buff + 4;
     for (k = 0; k < len; k += bump, bp += bump) {
-        jo2p = sgj_new_unattached_object(jsp);
+        jo2p = sgj_new_unattached_object_r(jsp);
         rel_port = sg_get_unaligned_be16(bp + 2);
         sgj_pr_hr(jsp, "Relative port=%d\n", rel_port);
-        sgj_add_nv_i(jsp, jo2p, "relative_port", rel_port);
+        sgj_js_nv_i(jsp, jo2p, "relative_port", rel_port);
         ip_tid_len = sg_get_unaligned_be16(bp + 6);
         bump = 8 + ip_tid_len;
         if ((k + bump) > len) {
             pr2serr("SCSI Ports VPD page, short descriptor "
                     "length=%d, left=%d\n", bump, (len - k));
-            sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             return;
         }
         if (ip_tid_len > 0) {
@@ -1239,7 +1240,7 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
                 sg_decode_transportid_str("    ", bp + 8, ip_tid_len,
                                           true, sizeof(b), b);
                 if (jsp->pr_as_json)
-                    sgj_add_nv_s(jsp, jo2p, "initiator_port_transport_id", b);
+                    sgj_js_nv_s(jsp, jo2p, "initiator_port_transport_id", b);
                 sgj_pr_hr(jsp, "%s",
                           sg_decode_transportid_str("    ", bp + 8,
                                             ip_tid_len, true, sizeof(b), b));
@@ -1249,7 +1250,7 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
         if ((k + bump + tpd_len + 4) > len) {
             pr2serr("SCSI Ports VPD page, short descriptor(tgt) "
                     "length=%d, left=%d\n", bump, (len - k));
-            sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             return;
         }
         if (tpd_len > 0) {
@@ -1258,7 +1259,7 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
                 hex2stdout(bp + bump + 4, tpd_len,
                            (1 == op->do_hex) ? 1 : -1);
             else {
-                sgj_opaque_p ja2p = sgj_new_named_array(jsp, jo2p,
+                sgj_opaque_p ja2p = sgj_named_subarray_r(jsp, jo2p,
                                         "target_port_descriptor_list");
 
                 decode_dev_ids("SCSI Ports", bp + bump + 4, tpd_len,
@@ -1266,7 +1267,7 @@ decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
             }
         }
         bump += tpd_len + 4;
-        sgj_add_nv_o(jsp, jap, NULL /* name */, jo2p);
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
 }
 
@@ -1563,7 +1564,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
             }
             sgj_pr_hr(jsp, "      MD5 logical unit identifier:\n");
             if (jsp->pr_out_hr)
-                sgj_pr_str_out_hr(jsp, (const char *)ip, i_len);
+                sgj_js_str_out(jsp, (const char *)ip, i_len);
             else
                 hex2stdout(ip, i_len, -1);
             break;
@@ -1944,9 +1945,6 @@ static void
 decode_b0_vpd(uint8_t * buff, int len, int do_hex)
 {
     int pdt;
-    unsigned int u;
-    uint64_t ull;
-    bool ugavalid;
 
     if (do_hex) {
         hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
@@ -1955,118 +1953,7 @@ decode_b0_vpd(uint8_t * buff, int len, int do_hex)
     pdt = PDT_MASK & buff[0];
     switch (pdt) {
         case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
-            if (len < 16) {
-                pr2serr("Block limits VPD page length too short=%d\n", len);
-                return;
-            }
-            u = buff[5];
-            printf("  Maximum compare and write length: ");
-            if (0 == u)
-                printf("0 blocks [Command not implemented]\n");
-            else
-                printf("%u blocks\n", buff[5]);
-            u = sg_get_unaligned_be16(buff + 6);
-            printf("  Optimal transfer length granularity: ");
-            if (0 == u)
-                printf("0 blocks [not reported]\n");
-            else
-                printf("%u blocks\n", u);
-            u = sg_get_unaligned_be32(buff + 8);
-            printf("  Maximum transfer length: ");
-            if (0 == u)
-                printf("0 blocks [not reported]\n");
-            else
-                printf("%u blocks\n", u);
-            u = sg_get_unaligned_be32(buff + 12);
-            printf("  Optimal transfer length: ");
-            if (0 == u)
-                printf("0 blocks [not reported]\n");
-            else
-                printf("%u blocks\n", u);
-            if (len > 19) {     /* added in sbc3r09 */
-                u = sg_get_unaligned_be32(buff + 16);
-                printf("  Maximum prefetch transfer length: ");
-                if (0 == u)
-                    printf("0 blocks [ignored]\n");
-                else
-                    printf("%u blocks\n", u);
-            }
-            if (len > 27) {     /* added in sbc3r18 */
-                u = sg_get_unaligned_be32(buff + 20);
-                printf("  Maximum unmap LBA count: ");
-                if (0 == u)
-                    printf("0 [Unmap command not implemented]\n");
-                else if (SG_LIB_UNBOUNDED_32BIT == u)
-                    printf("-1 [unbounded]\n");
-                else
-                    printf("%u\n", u);
-                u = sg_get_unaligned_be32(buff + 24);
-                printf("  Maximum unmap block descriptor count: ");
-                if (0 == u)
-                    printf("0 [Unmap command not implemented]\n");
-                else if (SG_LIB_UNBOUNDED_32BIT == u)
-                    printf("-1 [unbounded]\n");
-                else
-                    printf("%u\n", u);
-            }
-            if (len > 35) {     /* added in sbc3r19 */
-                u = sg_get_unaligned_be32(buff + 28);
-                printf("  Optimal unmap granularity: ");
-                if (0 == u)
-                    printf("0 blocks [not reported]\n");
-                else
-                    printf("%u blocks\n", u);
-
-                ugavalid = !!(buff[32] & 0x80);
-                printf("  Unmap granularity alignment valid: %s\n",
-                       ugavalid ? "true" : "false");
-                u = 0x7fffffff & sg_get_unaligned_be32(buff + 32);
-                printf("  Unmap granularity alignment: %u%s\n", u,
-                       ugavalid ? "" : " [invalid]");
-            }
-            if (len > 43) {     /* added in sbc3r26 */
-                ull = sg_get_unaligned_be64(buff + 36);
-                printf("  Maximum write same length: ");
-                if (0 == ull)
-                    printf("0 blocks [not reported]\n");
-                else
-                    printf("0x%" PRIx64 " blocks\n", ull);
-            }
-            if (len > 44) {     /* added in sbc4r02 */
-                u = sg_get_unaligned_be32(buff + 44);
-                printf("  Maximum atomic transfer length: ");
-                if (0 == u)
-                    printf("0 blocks [not reported]\n");
-                else
-                    printf("%u blocks\n", u);
-                u = sg_get_unaligned_be32(buff + 48);
-                printf("  Atomic alignment: ");
-                if (0 == u)
-                    printf("0 [unaligned atomic writes permitted]\n");
-                else
-                    printf("%u\n", u);
-                u = sg_get_unaligned_be32(buff + 52);
-                printf("  Atomic transfer length granularity: ");
-                if (0 == u)
-                    printf("0 [no granularity requirement\n");
-                else
-                    printf("%u\n", u);
-            }
-            if (len > 56) {
-                u = sg_get_unaligned_be32(buff + 56);
-                printf("  Maximum atomic transfer length with atomic "
-                       "boundary: ");
-                if (0 == u)
-                    printf("0 blocks [not reported]\n");
-                else
-                    printf("%u blocks\n", u);
-                u = sg_get_unaligned_be32(buff + 60);
-                printf("  Maximum atomic boundary size: ");
-                if (0 == u)
-                    printf("0 blocks [can only write atomic 1 block]\n");
-                else
-                    printf("%u blocks\n", u);
-            }
+            /* done by decode_block_limits_vpd() */
             break;
         case PDT_TAPE: case PDT_MCHANGER:
             printf("  WORM=%d\n", !!(buff[4] & 0x1));
@@ -2727,7 +2614,7 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
         if ((0 == op->maxlen) && usn_buff[0])
             sgj_pr_hr(jsp, " Unit serial number: %s\n", usn_buff);
         if (op->do_descriptors) {
-            sgj_opaque_p jap = sgj_new_named_array(jsp, jo2p,
+            sgj_opaque_p jap = sgj_named_subarray_r(jsp, jo2p,
                                                 "version_descriptor_list");
             if (0 == vdesc_arr[0]) {
                 sgj_pr_hr(jsp, "\n");
@@ -2736,7 +2623,7 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
                 sgj_pr_hr(jsp, "\n");
                 sgj_pr_hr(jsp, "  Version descriptors:\n");
                 for (k = 0; k < 8; ++k) {
-                    sgj_opaque_p jo3p = sgj_new_unattached_object(jsp);
+                    sgj_opaque_p jo3p = sgj_new_unattached_object_r(jsp);
                     int vdv = vdesc_arr[k];
 
                     if (0 == vdv)
@@ -2747,9 +2634,9 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
                     else
                         sgj_pr_hr(jsp, "    [unrecognised version descriptor "
                                   "code: 0x%x]\n", vdv);
-                    sgj_add_nv_ihexstr(jsp, jo3p, "version_descriptor", vdv,
-                                       NULL, cp ? cp : "unknown");
-                    sgj_add_nv_o(jsp, jap, NULL /* name */, jo3p);
+                    sgj_js_nv_ihexstr(jsp, jo3p, "version_descriptor", vdv,
+                                      NULL, cp ? cp : "unknown");
+                    sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
                 }
             }
         }
@@ -3208,7 +3095,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         else {
             if (as_json) {
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                jap = sgj_new_named_array(jsp, jo2p,
+                jap = sgj_named_subarray_r(jsp, jo2p,
                                   "supported_vpd_page_list");
             }
             decode_supported_vpd(rp, len, op, jap);
@@ -3256,7 +3143,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
                 k = encode_unicode((uint8_t *)obuff, len);
                 if (k > 0) {
                     sgj_pr_hr(jsp, "  Unit serial number: %s\n", obuff);
-                    sgj_add_nv_s(jsp, jo2p, "unit_serial_number", obuff);
+                    sgj_js_nv_s(jsp, jo2p, "unit_serial_number", obuff);
                 }
             }
         }
@@ -3277,7 +3164,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         else {
             if (as_json) {
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                jap = sgj_new_named_array(jsp, jo2p,
+                jap = sgj_named_subarray_r(jsp, jo2p,
                                   "designation_descriptor_list");
             }
             decode_id_vpd(rp, len, op, jap);
@@ -3295,7 +3182,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         else {
             if (as_json) {
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                jap = sgj_new_named_array(jsp, jo2p,
+                jap = sgj_named_subarray_r(jsp, jo2p,
                                   "software_interface_identifier_list");
             }
             decode_softw_inf_id(rp, len, op, jap);
@@ -3316,7 +3203,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             // pqual = (rp[0] & 0xe0) >> 5;
             if (as_json) {
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                jap = sgj_new_named_array(jsp, jo2p,
+                jap = sgj_named_subarray_r(jsp, jo2p,
                                   "network_services_descriptor_list");
             }
             decode_net_man_vpd(rp, len, op, jap);
@@ -3349,7 +3236,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         else {
             if (as_json) {
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                jap = sgj_new_named_array(jsp, jo2p,
+                jap = sgj_named_subarray_r(jsp, jo2p,
                                   "mode_page_policy_descriptor_list");
             }
             decode_mode_policy_vpd(rp, len, op, jap);
@@ -3367,7 +3254,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         else {
             if (as_json) {
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                jap = sgj_new_named_array(jsp, jo2p,
+                jap = sgj_named_subarray_r(jsp, jo2p,
                                   "scsi_ports_descriptor_list");
             }
             decode_scsi_ports_vpd(rp, len, op, jap);
@@ -3395,7 +3282,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         }
         break;
     case VPD_POWER_CONDITION:   /* 0x8a   ["pc"] */
-        np = "Power condition page VPD page";
+        np = "Power condition VPD page";
         if (!op->do_raw && (op->do_hex < 2))
             sgj_pr_hr(jsp, "VPD INQUIRY: %s\n", np);
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
@@ -3407,6 +3294,24 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             if (as_json)
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
             decode_power_condition(rp, len, op, jo2p);
+        }
+        break;
+    case VPD_POWER_CONSUMPTION:   /* 0x8d   ["psm"] */
+        np = "Power consumption VPD page";
+        if (!op->do_raw && (op->do_hex < 2))
+            sgj_pr_hr(jsp, "VPD INQUIRY: %s\n", np);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else {
+            if (as_json) {
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                jap = sgj_named_subarray_r(jsp, jo2p,
+                                  "power_consumption_descriptor_list");
+            }
+            decode_power_consumption(rp, len, jop, jap);
         }
         break;
     case VPD_DEVICE_CONSTITUENTS:       /* 0x8b  ["dc"] */
@@ -3421,7 +3326,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         else {
             if (as_json) {
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                jap = sgj_new_named_array(jsp, jo2p,
+                jap = sgj_named_subarray_r(jsp, jo2p,
                                   "constituent_descriptor_list");
             }
             decode_dev_constit_vpd(rp, len, op, jap, recurse_vpd_decode);
@@ -3439,36 +3344,57 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         else {
             if (as_json) {
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                jap = sgj_new_named_array(jsp, jo2p,
+                jap = sgj_named_subarray_r(jsp, jo2p,
                                   "feature_set_code_list");
             }
             decode_feature_sets_vpd(rp, len, op, jap);
         }
         break;
     case 0xb0:  /* VPD pages in B0h to BFh range depend on pdt */
+        np = NULL;
         res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
         if (0 == res) {
-            pdt = rp[0] & PDT_MASK;
-            if (! op->do_raw && (op->do_hex < 2)) {
-                switch (pdt) {
-                case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
-                    printf("VPD INQUIRY: Block limits page (SBC)\n");
-                    break;
-                case PDT_TAPE: case PDT_MCHANGER:
-                    printf("VPD INQUIRY: Sequential access device "
-                           "capabilities (SSC)\n");
-                    break;
-                case PDT_OSD:
-                    printf("VPD INQUIRY: OSD information (OSD)\n");
-                    break;
-                default:
-                    printf("VPD INQUIRY: page=0x%x, pdt=0x%x\n", 0xb0, pdt);
-                    break;
-                }
-            }
-            if (op->do_raw)
+            bool bl = false;
+            bool sad = false;
+            bool oi = false;
+            const char * ep = "";
+
+            if (op->do_raw) {
                 dStrRaw((const char *)rp, len);
-            else
+                break;
+            }
+            pdt = rp[0] & PDT_MASK;
+            switch (pdt) {
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+                np = "Block limits VPD page";
+                ep = "(SBC)";
+                bl = true;
+                break;
+            case PDT_TAPE: case PDT_MCHANGER:
+                np = "Sequential-access device capabilities VPD page";
+                ep = "(SSC)";
+                sad = true;
+                break;
+            case PDT_OSD:
+                np = "OSD information VPD page";
+                ep = "(OSD)";
+                oi = true;
+                break;
+            default:
+                np = NULL;
+                break;
+            }
+            if (op->do_hex < 2) {
+                if (NULL == np)
+                    sgj_pr_hr(jsp, "VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+                else
+                    sgj_pr_hr(jsp, "VPD INQUIRY: %s %s\n", np, ep);
+            }
+            if (as_json)
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+            if (bl)
+                decode_block_limits_vpd(rp, len, op, jo2p);
+            else if (sad || oi) // more work here <<<<<<<<<<
                 decode_b0_vpd(rp, len, op->do_hex);
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb0\n");
@@ -4108,7 +4034,7 @@ main(int argc, char * argv[])
     jsp = &op->json_st;
     as_json = jsp->pr_as_json;
     if (as_json)
-        jop = sgj_start(MY_NAME, version_str, argc, argv, jsp);
+        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
 
     rsp_buff = sg_memalign(rsp_buff_sz, 0 /* page align */, &free_rsp_buff,
                            false);
@@ -4397,7 +4323,7 @@ err_out:
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
     if (as_json) {
         if (0 == op->do_hex)
-            sgj_pr2file(jsp, NULL, ret, stdout);
+            sgj_js2file(jsp, NULL, ret, stdout);
         sgj_finish(jsp);
     }
     return ret;
