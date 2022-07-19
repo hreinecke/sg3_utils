@@ -1220,7 +1220,7 @@ while [ ! -z "$opt" ] && [ -z "${opt##-*}" ] ; do
     d) debug=1 ;;
     f) flush=1 ;;
     i) lipreset=0 ;;
-    I) shift; lipreset=$opt ;;
+    I) shift; lipreset=$1 ;;
     l) lunsearch=$(seq 0 7) ;;
     L) lunsearch=$(seq 0 "$2"); shift ;;
     m) mp_enable=1 ;;
@@ -1239,7 +1239,7 @@ while [ ! -z "$opt" ] && [ -z "${opt##-*}" ] ; do
     -ids=*)   arg=${opt#-ids=};         opt_idsearch=$(expandlist "$arg") ; filter_ids=1;;
     -ignore-rev) ignore_rev=1;;
     -issue-lip) lipreset=0 ;;
-    -issue-lip-wait) lipreset=${opt#-issue-lip-wait=};;
+    -issue-lip-wait=*) lipreset=${opt#-issue-lip-wait=};;
     -largelun) scan_flags=$((scan_flags|0x200)) ;;
     -luns=*)  arg=${opt#-luns=};        lunsearch=$(expandlist "$arg") ;;
     -multipath) mp_enable=1 ;;
