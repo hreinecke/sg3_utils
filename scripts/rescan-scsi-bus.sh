@@ -1229,7 +1229,7 @@ while [ ! -z "$opt" ] && [ -z "${opt##-*}" ] ; do
     d) debug=1 ;;
     f) flush=1 ;;
     i) lipreset=0 ;;
-    I) shift; lipreset=$opt ;;
+    I) shift; lipreset=$1 ;;
     l) lunsearch=$(seq -s ' ' 0 7) ;;
     L) lunsearch=$(seq -s ' ' 0 "$2"); shift ;;
     m) mp_enable=1 ;;

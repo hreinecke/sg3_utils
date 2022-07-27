@@ -17,8 +17,8 @@
 # maximum # of open sequential write required
 00 00 00 08
  
-# Zone alignment mode=0 (therefore no gaps)
-00 00 00 00
+# Zone alignment mode=1 (constant zone lengths)
+00 00 00 01
  
 # Zone starting LBA granularity
 00 00 00 02  00 00 00 00

@@ -1,4 +1,4 @@
-.TH SG_DECODE_SENSE "8" "November 2021" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_DECODE_SENSE "8" "July 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_decode_sense \- decode SCSI sense and related data
 .SH SYNOPSIS
@@ -40,13 +40,18 @@ Another alternate action is when the \fI\-\-err=ES\fR is given. \fIES\fR
 is assumed to be an "exit status" value between 0 and 255 from one of the
 utilities in this package. A descriptive string is printed. Other options
 are ignored apart from \fI\-\-verbose\fR.
+.PP
+When the \fI\-\-nodecode\fR option is given, this utility may be used to
+convert a binary file to hexadecimal or vice versa. The data converted does
+not need to be sense data.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
 \fB\-b\fR, \fB\-\-binary\fR=\fIBFN\fR
-the sense data is read in binary from a file called \fIBFN\fR. The option
+the data is read in binary from a file called \fIBFN\fR. The option
 cannot be given with \fI\-\-file=HFN\fR or \fI\-\-inhex=HFN\fR as they
-contradict.
+contradict. The data is assumed to be sense data unless the
+fI\-\-nodecode\fR is given.
 .TP
 \fB\-c\fR, \fB\-\-cdb\fR
 treat the given string of hex arguments as bytes in a SCSI CDB and
@@ -94,7 +99,7 @@ with other utilities in this package that have a \fI\-\-inhex=\fR option.
 .TP
 \fB\-N\fR, \fB\-\-nodecode\fR
 Do not decode the given data as sense or a cdb. Useful when arbitrary data
-is given (e.g. when converting hex to binary).
+is given (e.g. when converting hex to binary or vice versa).
 .TP
 \fB\-n\fR, \fB\-\-nospace\fR
 expect ASCII hexadecimal to be a string of hexadecimal digits with no
@@ -168,6 +173,21 @@ and for this sense data the output should look like this:
 For a medium error the Info field is the logical block address (LBA)
 of the lowest numbered block that the associated SCSI command was not
 able to read (verify or write).
+.PP
+To convert arbitrary binary data to hex, suitable to be parsed by other
+sg3_utils utilities. The \fI\-\-nodecode\fR option is used in this case:
+.PP
+  sg_decode_sense \-N \-i vpd_zbdc.hex \-w vpd_zbdc.bin
+.PP
+The '\-HHH' will output hex to the console (stdout) in a form suitable for
+other utilities in this package to parse as input. And sg_decode_sense can
+also be used to convert from arbitrary hex to binary with:
+.PP
+  sg_decode_sense \-N \-b vpd_zbdc.raw \-HHH
+.PP
+Note that tools like hexdump and od place a counter (i.e. an index starting
+at 0) at the beginning of each line which is a pain when parsing hex.
+The '/-HHH' option(s) does not output that leading counter on each line.
 .SH EXIT STATUS
 The exit status of sg_decode_sense is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.
@@ -176,7 +196,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2010\-2021 Douglas Gilbert
+Copyright \(co 2010\-2022 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

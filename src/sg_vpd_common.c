@@ -42,6 +42,14 @@ const char * product_id_hr = "Product_identification";
 const char * product_id_js = "product_identification";
 const char * product_rev_lev_hr = "Product_revision_level";
 const char * product_rev_lev_js = "product_revision_level";
+static const char * const nl_s = "no limit";
+static const char * const nlr_s = "no limit reported";
+static const char * const nr_s = "not reported";
+static const char * const ns_s = "not supported";
+static const char * const rsv_s = "Reserved";
+static const char * const vs_s = "Vendor specific";
+static const char * const null_s = "";
+static const char * const mn_s = "meaning";
 
 sgj_opaque_p
 sg_vpd_js_hdr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
@@ -286,12 +294,12 @@ decode_x_inq_vpd(uint8_t * b, int len, bool protect, struct opts_t * op,
                 cp = "Logical unit group";
                 break;
             default:
-                cp = "reserved";
+                cp = rsv_s;
                 break;
             }
             jo2p = sgj_hr_js_subo_r(jsp, jop, 2, np, SGJ_SEP_EQUAL_NO_SPACE,
-                                    n);
-            sgj_js_nv_s(jsp, jo2p, "meaning", cp);
+                                    n, false);
+            sgj_js_nv_s(jsp, jo2p, mn_s, cp);
             if (jsp->pr_name_ex)
                 sgj_js_nv_s(jsp, jo2p, "abbreviated_name_expansion", nex_p);
         } else
@@ -479,7 +487,7 @@ decode_mode_policy_vpd(uint8_t * buff, int len, struct opts_t * op,
             n = 0;
             ppc =  (bp[0] & 0x3f);
             pspc = bp[1];
-            snprintf(b + n, blen - n, "  Policy page code: 0x%x", ppc);
+            n = snprintf(b + n, blen - n, "  Policy page code: 0x%x", ppc);
             if (pspc)
                 n += snprintf(b + n, blen - n, ",  subpage code: 0x%x", pspc);
             sgj_pr_hr(jsp, "%s\n", b);
@@ -626,7 +634,7 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
     if (len < 60)
         return;
     if (0xec == cc)
-        cp = "";
+        cp = null_s;
     else if (0xa1 == cc)
         cp = "PACKET ";
     else
@@ -784,7 +792,7 @@ decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op,
         if (0xff == bp[2])
             sgj_pr_hr(jsp, "%sUnknown [0xff]\n", b);
         else if (bp[2] >= 0x20)
-            sgj_pr_hr(jsp, "%sReserved [0x%x]\n", b, bp[2]);
+            sgj_pr_hr(jsp, "%s%s [0x%x]\n", b, rsv_s, bp[2]);
         else
             sgj_pr_hr(jsp, "%s%s [0x%x]\n", b,
                    sg_get_pdt_str(PDT_MASK & bp[2], dlen, d), bp[2]);
@@ -837,8 +845,8 @@ decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op,
                         sgj_pr_hr(jsp, "      Vendor specific data (in "
                                   "hex):\n");
                     else
-                        sgj_pr_hr(jsp, "      Reserved [0x%x] specific "
-                                  "data (in hex):\n", cs_type);
+                        sgj_pr_hr(jsp, "      %s [0x%x] specific data (in "
+                                  "hex):\n", rsv_s, cs_type);
                     if (jsp->pr_as_json)
                         sgj_js_nv_hex_bytes(jsp, jo3p,
                                             "constituent_specific_data_hex",
@@ -901,7 +909,7 @@ tpgs_str(int tpgs)
         return "both explicit and implicit asymmetric logical unit access";
     case 0:
     default:
-        return "not supported";
+        return ns_s;
     }
 }
 
@@ -1057,6 +1065,7 @@ decode_power_consumption(uint8_t * buff, int len, struct opts_t * op,
     }
 }
 
+
 /* VPD_BLOCK_LIMITS    0xb0 ["bl"] */
 void
 decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
@@ -1071,7 +1080,6 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     static const char * mcawl = "Maximum compare and write length";
     static const char * otlg = "Optimal transfer length granularity";
     static const char * cni = "command not implemented";
-    static const char * nr = "not reported";
     static const char * ul = "unlimited";
     static const char * mtl = "Maximum transfer length";
     static const char * otl = "Optimal transfer length";
@@ -1108,36 +1116,36 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
 
     u = sg_get_unaligned_be16(buff + 6);
     if (0 == u) {
-        sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", otlg, nr);
+        sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", otlg, nr_s);
         sgj_convert_to_snake_name(otlg, b, blen);
-        sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr);
+        sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
         sgj_hr_js_vi_nex(jsp, jop, 2, otlg, SGJ_SEP_COLON_1_SPACE, u,
                             true, "unit: LB");
 
     u = sg_get_unaligned_be32(buff + 8);
     if (0 == u) {
-        sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mtl, nr);
+        sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mtl, nr_s);
         sgj_convert_to_snake_name(mtl, b, blen);
-        sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr);
+        sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
         sgj_hr_js_vi_nex(jsp, jop, 2, mtl, SGJ_SEP_COLON_1_SPACE, u,
                          true, "unit: LB");
 
     u = sg_get_unaligned_be32(buff + 12);
     if (0 == u) {
-        sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", otl, nr);
+        sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", otl, nr_s);
         sgj_convert_to_snake_name(otl, b, blen);
-        sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr);
+        sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
         sgj_hr_js_vi_nex(jsp, jop, 2, otl, SGJ_SEP_COLON_1_SPACE, u,
                          true, "unit: LB");
     if (len > 19) {     /* added in sbc3r09 */
         u = sg_get_unaligned_be32(buff + 16);
         if (0 == u) {
-            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mpl, nr);
+            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mpl, nr_s);
             sgj_convert_to_snake_name(mpl, b, blen);
-            sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr);
+            sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
             sgj_hr_js_vi_nex(jsp, jop, 2, mpl, SGJ_SEP_COLON_1_SPACE, u,
                              true, "unit: LB");
@@ -1170,9 +1178,9 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     if (len > 35) {     /* added in sbc3r19 */
         u = sg_get_unaligned_be32(buff + 28);
         if (0 == u) {
-            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", oug, nr);
+            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", oug, nr_s);
             sgj_convert_to_snake_name(oug, b, blen);
-            sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr);
+            sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
             sgj_hr_js_vi_nex(jsp, jop, 2, oug, SGJ_SEP_COLON_1_SPACE, u,
                              true, "unit: LB");
@@ -1189,9 +1197,9 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     if (len > 43) {     /* added in sbc3r26 */
         ull = sg_get_unaligned_be64(buff + 36);
         if (0 == ull) {
-            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mwsl, nr);
+            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mwsl, nr_s);
             sgj_convert_to_snake_name(mwsl, b, blen);
-            sgj_js_nv_ihexstr(jsp, jop, b, ull, NULL, nr);
+            sgj_js_nv_ihexstr(jsp, jop, b, ull, NULL, nr_s);
         } else
             sgj_hr_js_vi_nex(jsp, jop, 2, mwsl, SGJ_SEP_COLON_1_SPACE,
                              ull, true, "unit: LB");
@@ -1199,9 +1207,9 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     if (len > 47) {     /* added in sbc4r02 */
         u = sg_get_unaligned_be32(buff + 44);
         if (0 == u) {
-            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", matl, nr);
+            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", matl, nr_s);
             sgj_convert_to_snake_name(matl, b, blen);
-            sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr);
+            sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
             sgj_hr_js_vi_nex(jsp, jop, 2, matl, SGJ_SEP_COLON_1_SPACE,
                              u, true, "unit: LB");
@@ -1231,9 +1239,9 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     if (len > 56) {
         u = sg_get_unaligned_be32(buff + 56);
         if (0 == u) {
-            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", matlwab, nr);
+            sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", matlwab, nr_s);
             sgj_convert_to_snake_name(matlwab, b, blen);
-            sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr);
+            sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
             sgj_hr_js_vi_nex(jsp, jop, 2, matlwab, SGJ_SEP_COLON_1_SPACE,
                              u, true, "unit: LB");
@@ -1248,5 +1256,708 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         } else
             sgj_hr_js_vi_nex(jsp, jop, 2, mabs, SGJ_SEP_COLON_1_SPACE,
                              u, true, "unit: LB");
+    }
+}
+
+static const char * product_type_arr[] =
+{
+    "Not specified",
+    "CFast",
+    "CompactFlash",
+    "MemoryStick",
+    "MultiMediaCard",
+    "Secure Digital Card (SD)",
+    "XQD",
+    "Universal Flash Storage Card (UFS)",
+};
+
+/* ZONED field here replaced by ZONED BLOCK DEVICE EXTENSION field in the
+ * Zoned Block Device Characteristics VPD page. The new field includes
+ * Zone Domains and Realms (see ZBC-2) */
+static const char * bdc_zoned_strs[] = {
+    nr_s,
+    "host-aware",
+    "host-managed",
+    rsv_s,
+};
+
+/* VPD_BLOCK_DEV_CHARS    0xb1 ["bdc"] */
+void
+decode_block_dev_ch_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                        sgj_opaque_p jop)
+{
+    int zoned;
+    unsigned int u, k;
+    sgj_state * jsp = &op->json_st;
+    const char * cp;
+    char b[144];
+    static const int blen = sizeof(b);
+    static const char * mrr_j = "medium_rotation_rate";
+    static const char * mrr_h = "Medium rotation rate";
+    static const char * nrm = "Non-rotating medium (e.g. solid state)";
+    static const char * pt_j = "product_type";
+
+    if (len < 64) {
+        pr2serr("page length too short=%d\n", len);
+        return;
+    }
+    u = sg_get_unaligned_be16(buff + 4);
+    if (0 == u) {
+        sgj_pr_hr(jsp, "  %s is %s\n", mrr_h, nr_s);
+        sgj_js_nv_ihexstr(jsp, jop, mrr_j, 0, NULL, nr_s);
+    } else if (1 == u) {
+        sgj_pr_hr(jsp, "  %s\n", nrm);
+        sgj_js_nv_ihexstr(jsp, jop, mrr_j, 1, NULL, nrm);
+    } else if ((u < 0x401) || (0xffff == u)) {
+        sgj_pr_hr(jsp, "  %s [0x%x]\n", rsv_s, u);
+        sgj_js_nv_ihexstr(jsp, jop, mrr_j, u, NULL, rsv_s);
+    } else {
+        sgj_js_nv_ihex_nex(jsp, jop, mrr_j, u, true,
+                           "unit: rpm; nominal rotation rate");
+    }
+    u = buff[6];
+    k = SG_ARRAY_SIZE(product_type_arr);
+    if (u < k) {
+        sgj_pr_hr(jsp, "  %s: %s\n", "Product type", product_type_arr[u]);
+        sgj_js_nv_ihexstr(jsp, jop, pt_j, u, NULL, product_type_arr[u]);
+    } else {
+        sgj_pr_hr(jsp, "  %s: %s [0x%x]\n", "Product type",
+                  (u < 0xf0) ? rsv_s : vs_s, u);
+        sgj_js_nv_ihexstr(jsp, jop, pt_j, u, NULL, (u < 0xf0) ? rsv_s : vs_s);
+    }
+    sgj_hr_js_vi_nex(jsp, jop, 2, "WABEREQ", SGJ_SEP_EQUAL_NO_SPACE,
+                     (buff[7] >> 6) & 0x3, false,
+                     "Write After Block Erase REQuired");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "WACEREQ", SGJ_SEP_EQUAL_NO_SPACE,
+                     (buff[7] >> 4) & 0x3, false,
+                     "Write After Cryptographic Erase REQuired");
+    u = buff[7] & 0xf;
+    switch (u) {
+    case 0:
+        snprintf(b, blen, nr_s);
+        break;
+    case 1:
+        snprintf(b, blen, "5.25 inch");
+        break;
+    case 2:
+        snprintf(b, blen, "3.5 inch");
+        break;
+    case 3:
+        snprintf(b, blen, "2.5 inch");
+        break;
+    case 4:
+        snprintf(b, blen, "1.8 inch");
+        break;
+    case 5:
+        snprintf(b, blen, "less then 1.8 inch");
+        break;
+    default:
+        snprintf(b, blen, rsv_s);
+        break;
+    }
+    sgj_pr_hr(jsp, "  Nominal form factor: %s\n", b);
+    sgj_js_nv_ihexstr(jsp, jop, "nominal_forn_factor", u, NULL, b);
+    sgj_hr_js_vi_nex(jsp, jop, 2, "MACT", SGJ_SEP_EQUAL_NO_SPACE,
+                     !!(buff[8] & 0x40), false, "Multiple ACTuator");
+    printf("  MACT=%d\n", !!(buff[8] & 0x40));      /* added sbc5r01 */
+    zoned = (buff[8] >> 4) & 0x3;   /* added sbc4r04, obsolete sbc5r01 */
+    cp = bdc_zoned_strs[zoned];
+    sgj_pr_hr(jsp, "  ZONED=%d [%s]\n", zoned, cp);
+    sgj_js_nv_ihexstr_nex(jsp, jop, "zoned", zoned, false, NULL,
+                          cp, "Added in SBC-4, obsolete in SBC-5");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "RBWZ", SGJ_SEP_EQUAL_NO_SPACE,
+                     !!(buff[8] & 0x4), false,
+                     "Background Operation Control Supported");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "FUAB", SGJ_SEP_EQUAL_NO_SPACE,
+                     !!(buff[8] & 0x2), false,
+                     "Force Unit Access Behaviour");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "VBULS", SGJ_SEP_EQUAL_NO_SPACE,
+                     !!(buff[8] & 0x1), false,
+                     "Verify Byte check Unmapped Lba Supported");
+    u = sg_get_unaligned_be32(buff + 12);
+    sgj_hr_js_vi_nex(jsp, jop, 2, "DEPOPULATION TIME", SGJ_SEP_COLON_1_SPACE,
+                     u, true, "unit: second");
+}
+
+static const char * prov_type_arr[8] = {
+    "not known or fully provisioned",
+    "resource provisioned",
+    "thin provisioned",
+    rsv_s,
+    rsv_s,
+    rsv_s,
+    rsv_s,
+    rsv_s,
+};
+
+/* VPD_LB_PROVISIONING   0xb2 ["lbpv"] */
+int
+decode_block_lb_prov_vpd(uint8_t * buff, int len, struct opts_t * op,
+                         sgj_opaque_p jop)
+{
+    unsigned int u, dp, pt, t_exp;
+    sgj_state * jsp = &op->json_st;
+    const char * cp;
+    char b[1024];
+    static const int blen = sizeof(b);
+    static const char * mp = "Minimum percentage";
+    static const char * tp = "Threshold percentage";
+    static const char * pgd = "Provisioning group descriptor";
+
+    if (len < 4) {
+        pr2serr("page too short=%d\n", len);
+        return SG_LIB_CAT_MALFORMED;
+    }
+    t_exp = buff[4];
+    sgj_js_nv_ihexstr(jsp, jop, "threshold_exponent", t_exp, NULL,
+                      (0 == t_exp) ? ns_s : NULL);
+    sgj_hr_js_vi_nex(jsp, jop, 2, "LBPU", SGJ_SEP_EQUAL_NO_SPACE,
+                     !!(buff[5] & 0x80), false,
+                     "Logical Block Provisioning Unmap command supported");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "LBPWS", SGJ_SEP_EQUAL_NO_SPACE,
+                     !!(buff[5] & 0x40), false, "Logical Block Provisioning "
+                     "Write Same (16) command supported");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "LBPWS10", SGJ_SEP_EQUAL_NO_SPACE,
+                     !!(buff[5] & 0x20), false,
+                     "Logical Block Provisioning Write Same (10) command "
+                     "supported");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "LBPRZ", SGJ_SEP_EQUAL_NO_SPACE,
+                     (0x7 & (buff[5] >> 2)), true,
+                     "Logical Block Provisioning Read Zero");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "ANC_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                     !!(buff[5] & 0x2), false,
+                     "ANChor SUPported");
+    dp = !!(buff[5] & 0x1);
+    sgj_hr_js_vi_nex(jsp, jop, 2, "DP", SGJ_SEP_EQUAL_NO_SPACE,
+                     dp, false, "Descriptor Present");
+    u = 0x1f & (buff[6] >> 3);  /* minimum percentage */
+    if (0 == u)
+        sgj_pr_hr(jsp, "  %s: 0 [%s]\n", mp, nr_s);
+    else
+        sgj_pr_hr(jsp, "  %s: %u\n", mp, u);
+    sgj_convert_to_snake_name(mp, b, blen);
+    sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, (0 == u) ? nr_s : NULL);
+    pt = buff[6] & 0x7;
+    cp = prov_type_arr[pt];
+    if (pt > 2)
+        snprintf(b, blen, " [%u]]", u);
+    else
+        b[0] = '\0';
+    sgj_pr_hr(jsp, "  Provisioning type: %s%s\n", cp, b);
+    sgj_js_nv_ihexstr(jsp, jop, "provisioning_type", pt, NULL, cp);
+    u = buff[7];        /* threshold percentage */
+    snprintf(b, blen, "%s ", tp);
+    if (0 == u)
+        sgj_pr_hr(jsp, "  %s: 0 [percentages %s]\n", b, ns_s);
+    else
+        sgj_pr_hr(jsp, "  %s: %u", b, u);
+    sgj_convert_to_snake_name(tp, b, blen);
+    sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, (0 == u) ? ns_s : NULL);
+    if (dp && (len > 11)) {
+        int i_len;
+        const uint8_t * bp;
+        sgj_opaque_p jo2p;
+
+        bp = buff + 8;
+        i_len = bp[3];
+        if (0 == i_len) {
+            pr2serr("%s too short=%d\n", pgd, i_len);
+            return 0;
+        }
+        if (jsp->pr_as_json) {
+            jo2p = sgj_snake_named_subobject_r(jsp, jop, pgd);
+            sgj_js_designation_descriptor(jsp, jo2p, bp, i_len + 4);
+        }
+        sgj_pr_hr(jsp, "  %s:\n", pgd);
+        sg_get_designation_descriptor_str("    ", bp, i_len + 4, true,
+                                          op->do_long, blen, b);
+        if (jsp->pr_as_json && jsp->pr_out_hr)
+            sgj_js_str_out(jsp, b, strlen(b));
+        else
+            printf("%s", b);
+    }
+    return 0;
+}
+
+/* VPD_REFERRALS   0xb3 ["ref"] */
+void
+decode_referrals_vpd(uint8_t * buff, int len, struct opts_t * op,
+                     sgj_opaque_p jop)
+{
+    uint32_t u;
+    sgj_state * jsp = &op->json_st;
+    char b[64];
+
+    if (len < 16) {
+        pr2serr("Referrals VPD page length too short=%d\n", len);
+        return;
+    }
+    u = sg_get_unaligned_be32(buff + 8);
+    snprintf(b, sizeof(b), "  User data segment size: ");
+    if (0 == u)
+        sgj_pr_hr(jsp, "%s0 [per sense descriptor]\n", b);
+    else
+        sgj_pr_hr(jsp, "%s%u\n", b, u);
+    sgj_js_nv_ihex(jsp, jop, "user_data_segment_size", u);
+    u = sg_get_unaligned_be32(buff + 12);
+    sgj_hr_js_vi(jsp, jop, 2, "User data segment multiplier",
+                 SGJ_SEP_COLON_1_SPACE, u, true);
+}
+
+/* VPD_SUP_BLOCK_LENS  0xb4 ["sbl"] (added sbc4r01) */
+void
+decode_sup_block_lens_vpd(uint8_t * buff, int len, struct opts_t * op,
+                          sgj_opaque_p jap)
+{
+    int k;
+    unsigned int u;
+    uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+
+    if (len < 4) {
+        pr2serr("page length too short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    bp = buff + 4;
+    for (k = 0; k < len; k += 8, bp += 8) {
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object_r(jsp);
+        u = sg_get_unaligned_be32(bp);
+        sgj_hr_js_vi(jsp, jo2p, 2, "Logical block length",
+                     SGJ_SEP_COLON_1_SPACE, u, true);
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "P_I_I_SUP",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x40), false,
+                         "Protection Information Interval SUPported");
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "NO_PI_CHK",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x8), false,
+                         "NO Protection Information CHecKing");
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "GRD_CHK",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x4), false,
+                         "GuaRD CHecK");
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "APP_CHK",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x2), false,
+                         "APPlication tag CHecK");
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "REF_CHK",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x1), false,
+                         "REFerence tag CHecK");
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "T3PS",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[5] & 0x8), false,
+                         "Type 3 Protection Supported");
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "T2PS",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[5] & 0x4), false,
+                         "Type 2 Protection Supported");
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "T1PS",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[5] & 0x2), false,
+                         "Type 1 Protection Supported");
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "T0PS",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[5] & 0x1), false,
+                         "Type 0 Protection Supported");
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }
+}
+
+/* VPD_BLOCK_DEV_C_EXTENS  0xb5 ["bdce"] (added sbc4r02) */
+void
+decode_block_dev_char_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
+                              sgj_opaque_p jop)
+{
+    bool b_active = false;
+    bool combined = false;
+    int n;
+    uint32_t u;
+    sgj_state * jsp = &op->json_st;
+    const char * utp = null_s;
+    const char * uup = null_s;
+    const char * uip = null_s;
+    char b[128];
+    static const int blen = sizeof(b);
+
+    if (len < 16) {
+        pr2serr("page length too short=%d\n", len);
+        return;
+    }
+    switch (buff[5]) {
+    case 1:
+        utp = "Combined writes and reads";
+        combined = true;
+        break;
+    case 2:
+        utp = "Writes only";
+        break;
+    case 3:
+        utp = "Separate writes and reads";
+        b_active = true;
+        break;
+    default:
+        utp = rsv_s;
+        break;
+    }
+    sgj_hr_js_vistr(jsp, jop, 2, "Utilization type", SGJ_SEP_COLON_1_SPACE,
+                    buff[5], true, utp);
+    switch (buff[6]) {
+    case 2:
+        uup = "megabytes";
+        break;
+    case 3:
+        uup = "gigabytes";
+        break;
+    case 4:
+        uup = "terabytes";
+        break;
+    case 5:
+        uup = "petabytes";
+        break;
+    case 6:
+        uup = "exabytes";
+        break;
+    default:
+        uup = rsv_s;
+        break;
+    }
+    sgj_hr_js_vistr(jsp, jop, 2, "Utilization units", SGJ_SEP_COLON_1_SPACE,
+                    buff[6], true, uup);
+    switch (buff[7]) {
+    case 0xa:
+        uip = "per day";
+        break;
+    case 0xe:
+        uip = "per year";
+        break;
+    default:
+        uip = rsv_s;
+        break;
+    }
+    sgj_hr_js_vistr(jsp, jop, 2, "Utilization interval",
+                    SGJ_SEP_COLON_1_SPACE, buff[7], true, uip);
+    u = sg_get_unaligned_be32(buff + 8);
+    sgj_hr_js_vistr(jsp, jop, 2, "Utilization B", SGJ_SEP_COLON_1_SPACE,
+                    u, true, (b_active ? NULL : rsv_s));
+    n = sg_scnpr(b, blen, "%s: ", "Designed utilization");
+    if (b_active)
+        n += sg_scnpr(b + n, blen - n, "%u %s for reads and ", u, uup);
+    u = sg_get_unaligned_be32(buff + 12);
+    sgj_hr_js_vi(jsp, jop, 2, "Utilization A", SGJ_SEP_COLON_1_SPACE, u, true);
+    n += sg_scnpr(b + n, blen - n, "%u %s for %swrites, %s", u, uup,
+                  combined ? "reads and " : null_s, uip);
+    sgj_pr_hr(jsp, "  %s\n", b);
+    if (jsp->pr_string)
+        sgj_js_nv_s(jsp, jop, "summary", b);
+}
+
+/* VPD_ZBC_DEV_CHARS 0xb6  ["zdbch"]  sbc or zbc [zbc2r04] */
+void
+decode_zbdch_vpd(uint8_t * buff, int len, struct opts_t * op,
+                              sgj_opaque_p jop)
+{
+    uint32_t u, pdt;
+    sgj_state * jsp = &op->json_st;
+    char b[128];
+    static const int blen = sizeof(b);
+
+    if (op->do_hex) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 64) {
+        pr2serr("Zoned block device characteristics VPD page length too "
+                "short=%d\n", len);
+        return;
+    }
+    pdt = PDT_MASK & buff[0];
+    sgj_pr_hr(jsp, "  Peripheral device type: %s\n",
+              sg_get_pdt_str(pdt, blen, b));
+
+    printf("  Zoned block device extension: ");
+    u = (buff[4] >> 4) & 0xf;
+    switch (u) {
+    case 0:
+        if (PDT_ZBC == (PDT_MASK & buff[0]))
+            snprintf(b, blen, "host managed zoned block device");
+        else
+            snprintf(b, blen, "%s", nr_s);
+        break;
+    case 1:
+        snprintf(b, blen, "host aware zoned block device model");
+        break;
+    case 2:
+        snprintf(b, blen, "Domains and realms zoned block device model");
+        break;
+    default:
+        snprintf(b, blen, "%s", rsv_s);
+        break;
+    }
+    sgj_hr_js_vistr(jsp, jop, 2, "Zoned block device extension",
+                    SGJ_SEP_COLON_1_SPACE, u, true, b);
+    sgj_hr_js_vi_nex(jsp, jop, 2, "AAORB", SGJ_SEP_COLON_1_SPACE,
+                     !!(buff[4] & 0x2), false,
+                     "Activation Aligned On Realm Boundaries");
+    sgj_hr_js_vi_nex(jsp, jop, 2, "URSWRZ", SGJ_SEP_COLON_1_SPACE,
+                     !!(buff[4] & 0x1), false,
+                     "Unrestricted Read in Sequential Write Required Zone");
+    u = sg_get_unaligned_be32(buff + 8);
+    sgj_hr_js_vistr(jsp, jop, 2, "Optimal number of open sequential write "
+                    "preferred zones", SGJ_SEP_COLON_1_SPACE, u, true,
+                    (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL);
+    u = sg_get_unaligned_be32(buff + 12);
+    sgj_hr_js_vistr(jsp, jop, 2, "Optimal number of non-sequentially "
+                    "written sequential write preferred zones",
+                    SGJ_SEP_COLON_1_SPACE, u, true,
+                    (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL);
+    u = sg_get_unaligned_be32(buff + 16);
+    sgj_hr_js_vistr(jsp, jop, 2, "Maximum number of open sequential write "
+                    "required zones", SGJ_SEP_COLON_1_SPACE, u, true,
+                    (SG_LIB_UNBOUNDED_32BIT == u) ? nl_s : NULL);
+    u = buff[23] & 0xf;
+    switch (u) {
+    case 0:
+        snprintf(b, blen, "not reported\n");
+        break;
+    case 1:
+        snprintf(b, blen, "Zoned starting LBAs aligned using constant zone "
+                 "lengths");
+        break;
+    case 0x8:
+        snprintf(b, blen, "Zoned starting LBAs potentially non-constant (as "
+                 "reported by REPORT ZONES)");
+        break;
+    default:
+        snprintf(b, blen, "%s", rsv_s);
+        break;
+    }
+    sgj_hr_js_vistr(jsp, jop, 2, "Zoned alignment method",
+                    SGJ_SEP_COLON_1_SPACE, u, true, b);
+    sgj_hr_js_vi(jsp, jop, 2, "Zone starting LBA granularity",
+                 SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be64(buff + 24),
+                 true);
+}
+
+/* VPD_BLOCK_LIMITS_EXT  0xb7 ["ble"] SBC */
+void
+decode_block_limits_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
+                            sgj_opaque_p jop)
+{
+    uint32_t u;
+    sgj_state * jsp = &op->json_st;
+
+    if (op->do_hex) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 12) {
+        pr2serr("page length too short=%d\n", len);
+        return;
+    }
+    u = sg_get_unaligned_be16(buff + 6);
+    sgj_hr_js_vistr(jsp, jop, 2, "Maximum number of streams",
+                    SGJ_SEP_COLON_1_SPACE, u, true,
+                    (0 == u) ? "Stream control not supported" : NULL);
+    u = sg_get_unaligned_be16(buff + 8);
+    sgj_hr_js_vi_nex(jsp, jop, 2, "Optimal stream write size",
+                     SGJ_SEP_COLON_1_SPACE, u, true, "unit: LB");
+    u = sg_get_unaligned_be32(buff + 10);
+    sgj_hr_js_vi_nex(jsp, jop, 2, "Stream granularity size",
+                     SGJ_SEP_COLON_1_SPACE, u, true,
+                     "unit: number of optimal stream write size blocks");
+    if (len < 28)
+        return;
+    u = sg_get_unaligned_be32(buff + 16);
+    sgj_hr_js_vistr_nex(jsp, jop, 2, "Maximum scattered LBA range transfer "
+                        "length", SGJ_SEP_COLON_1_SPACE, u, true,
+                        (0 == u ? nlr_s : NULL),
+                        "unit: LB (in a single LBA range descriptor)");
+    u = sg_get_unaligned_be16(buff + 22);
+    sgj_hr_js_vistr(jsp, jop, 2, "Maximum scattered LBA range descriptor "
+                    "count", SGJ_SEP_COLON_1_SPACE, u, true,
+                    (0 == u ? nlr_s : NULL));
+    u = sg_get_unaligned_be32(buff + 24);
+    sgj_hr_js_vistr_nex(jsp, jop, 2, "Maximum scattered transfer length",
+                        SGJ_SEP_COLON_1_SPACE, u, true,
+                        (0 == u ? nlr_s : NULL),
+                        "unit: LB (per single Write Scattered command)");
+}
+
+static const char * sch_type_arr[8] = {
+    rsv_s,
+    "non-zoned",
+    "host aware zoned",
+    "host managed zoned",
+    "zone domain and realms zoned",
+    rsv_s,
+    rsv_s,
+    rsv_s,
+};
+
+static char *
+get_zone_align_method(uint8_t val, char * b, int blen)
+{
+   switch (val) {
+    case 0:
+        snprintf(b, blen, "%s", nr_s);
+        break;
+    case 1:
+        snprintf(b, blen, "%s", "using constant zone lengths");
+        break;
+    case 8:
+        snprintf(b, blen, "%s", "taking gap zones into account");
+        break;
+    default:
+        snprintf(b, blen, "%s", rsv_s);
+        break;
+    }
+    return b;
+}
+
+/* VPD_FORMAT_PRESETS  0xb8 ["fp"] (added sbc4r18) */
+void
+decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
+                          sgj_opaque_p jap)
+{
+    uint8_t sch_type;
+    int k;
+    uint32_t u;
+    uint64_t ul;
+    sgj_state * jsp = &op->json_st;
+    uint8_t * bp;
+    sgj_opaque_p jo2p, jo3p;
+    const char * cp;
+    char b[128];
+    char d[64];
+    static const int blen = sizeof(b);
+    static const int dlen = sizeof(d);
+    static const char * llczp = "Low LBA conventional zones percentage";
+    static const char * hlczp = "High LBA conventional zones percentage";
+    static const char * ztzd = "Zone type for zone domain";
+
+    if (op->do_hex) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    bp = buff + 4;
+    for (k = 0; k < len; k += 64, bp += 64) {
+        jo2p = sgj_new_unattached_object_r(jsp);
+        sgj_hr_js_vi(jsp, jo2p, 2, "Preset identifier", SGJ_SEP_COLON_1_SPACE,
+                     sg_get_unaligned_be64(bp + 0), true);
+        sch_type = bp[4];
+        if (sch_type < 8) {
+            cp = sch_type_arr[sch_type];
+            if (rsv_s != cp)
+                snprintf(b, blen, "%s block device", cp);
+            else
+                snprintf(b, blen, "%s", cp);
+        } else
+            snprintf(b, blen, "%s", rsv_s);
+        sgj_hr_js_vistr(jsp, jo2p, 4, "Schema type", SGJ_SEP_COLON_1_SPACE,
+                        sch_type, true, b);
+        sgj_hr_js_vi(jsp, jo2p, 4, "Logical blocks per physical block "
+                     "exponent", SGJ_SEP_COLON_1_SPACE,
+                     0xf & bp[7], true);
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "Logical block length",
+                         SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 8),
+                         true, "unit: byte");
+        sgj_hr_js_vi(jsp, jo2p, 4, "Designed last Logical Block Address",
+                     SGJ_SEP_COLON_1_SPACE,
+                     sg_get_unaligned_be64(bp + 16), true);
+        sgj_hr_js_vi_nex(jsp, jo2p, 4, "FMTPINFO", SGJ_SEP_COLON_1_SPACE,
+                         (bp[38] >> 6) & 0x3, false,
+                         "ForMaT Protecion INFOrmation (see Format Unit)");
+        sgj_hr_js_vi(jsp, jo2p, 4, "Protection field usage",
+                     SGJ_SEP_COLON_1_SPACE, bp[38] & 0x7, false);
+        sgj_hr_js_vi(jsp, jo2p, 4, "Protection interval exponent",
+                     SGJ_SEP_COLON_1_SPACE, bp[39] & 0xf, true);
+        jo3p = sgj_named_subobject_r(jsp, jo2p,
+                                     "schema_type_specific_information");
+        switch (sch_type) {
+        case 2:
+            sgj_pr_hr(jsp, "    Defines zones for host aware device:\n");
+            u = bp[40 + 0];
+            sgj_pr_hr(jsp, "      %s: %u.%u %%\n", llczp, u / 10, u % 10);
+            sgj_convert_to_snake_name(llczp, b, blen);
+            sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
+                               "percent");
+            u = bp[40 + 1];
+            sgj_pr_hr(jsp, "      %s: %u.%u %%\n", hlczp, u / 10, u % 10);
+            sgj_convert_to_snake_name(hlczp, b, blen);
+            sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
+                               "percent");
+            u = sg_get_unaligned_be32(bp + 40 + 12);
+            sgj_hr_js_vistr(jsp, jo3p, 6, "Logical blocks per zone",
+                            SGJ_SEP_COLON_1_SPACE, u, true,
+                            (0 == u ? rsv_s : NULL));
+            break;
+        case 3:
+            sgj_pr_hr(jsp, "    Defines zones for host managed device:\n");
+            u = bp[40 + 0];
+            sgj_pr_hr(jsp, "      %s: %u.%u %%\n", llczp, u / 10, u % 10);
+            sgj_convert_to_snake_name(llczp, b, blen);
+            sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
+                               "percent");
+            u = bp[40 + 1];
+            sgj_pr_hr(jsp, "      %s: %u.%u %%\n", hlczp, u / 10, u % 10);
+            sgj_convert_to_snake_name(hlczp, b, blen);
+            sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
+                               "percent");
+            u = bp[40 + 3] & 0x7;
+            sgj_hr_js_vistr(jsp, jo3p, 6, "Designed zone alignment method",
+                            SGJ_SEP_COLON_1_SPACE, u, true,
+                            get_zone_align_method(u, b, blen));
+            ul = sg_get_unaligned_be64(bp + 40 + 4);
+            sgj_hr_js_vi_nex(jsp, jo3p, 6, "Designed zone starting LBA "
+                             "granularity", SGJ_SEP_COLON_1_SPACE, ul, true,
+                             "unit: LB");
+            u = sg_get_unaligned_be32(bp + 40 + 12);
+            sgj_hr_js_vistr(jsp, jo3p, 6, "Logical blocks per zone",
+                            SGJ_SEP_COLON_1_SPACE, u, true,
+                            (0 == u ? rsv_s : NULL));
+            break;
+        case 4:
+            sgj_pr_hr(jsp, "    Defines zones for zone domains and realms "
+                      "device:\n");
+            snprintf(b, blen, "%s 0", ztzd);
+            u = bp[40 + 0];
+            sg_get_zone_type_str((u >> 4) & 0xf, dlen, d);
+            sgj_hr_js_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true,
+                            d);
+            snprintf(b, blen, "%s 1", ztzd);
+            sg_get_zone_type_str(u & 0xf, dlen, d);
+            sgj_hr_js_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true,
+                            d);
+
+            snprintf(b, blen, "%s 2", ztzd);
+            u = bp[40 + 1];
+            sg_get_zone_type_str((u >> 4) & 0xf, dlen, d);
+            sgj_hr_js_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true,
+                            d);
+            snprintf(b, blen, "%s 3", ztzd);
+            sg_get_zone_type_str(u & 0xf, dlen, d);
+            sgj_hr_js_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true,
+                            d);
+            u = bp[40 + 3] & 0x7;
+            sgj_hr_js_vistr(jsp, jo3p, 6, "Designed zone alignment method",
+                            SGJ_SEP_COLON_1_SPACE, u, true,
+                            get_zone_align_method(u, d, dlen));
+            ul = sg_get_unaligned_be64(bp + 40 + 4);
+            sgj_hr_js_vi_nex(jsp, jo3p, 6, "Designed zone starting LBA "
+                             "granularity", SGJ_SEP_COLON_1_SPACE, ul, true,
+                             "unit: LB");
+            u = sg_get_unaligned_be32(bp + 40 + 12);
+            sgj_hr_js_vistr(jsp, jo3p, 6, "Logical blocks per zone",
+                            SGJ_SEP_COLON_1_SPACE, u, true,
+                            (0 == u ? rsv_s : NULL));
+            ul = sg_get_unaligned_be64(bp + 40 + 16);
+            sgj_hr_js_vi_nex(jsp, jo3p, 6, "Designed zone maximum address",
+                             SGJ_SEP_COLON_1_SPACE, ul, true, "unit: LBA");
+            break;
+        default:
+            sgj_pr_hr(jsp, "    No schema type specific information\n");
+            break;
+        }
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
 }

@@ -625,14 +625,13 @@ sgj_js_nv_istr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 {
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
-    else if (jsp->pr_string) {
+    else if (val_s && jsp->pr_string) {
         sgj_opaque_p jo2p = sgj_named_subobject_r(jsp, jop, name);
 
         if (NULL == jo2p)
             return;
         sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
-        if (val_s)
-            sgj_js_nv_s(jsp, jo2p, str_name ? str_name : sc_mn_s, val_s);
+        sgj_js_nv_s(jsp, jo2p, str_name ? str_name : sc_mn_s, val_s);
     } else
         sgj_js_nv_i(jsp, jop, name, val_i);
 }
@@ -641,9 +640,12 @@ void
 sgj_js_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                   int64_t val_i, const char * str_name, const char * val_s)
 {
+    bool as_str;
+
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
-    if ((! jsp->pr_hex) && (! jsp->pr_string))
+    as_str = jsp->pr_string && val_s;
+    if ((! jsp->pr_hex) && (! as_str))
         sgj_js_nv_i(jsp, jop, name, val_i);
     else {
         char b[64];
@@ -651,19 +653,13 @@ sgj_js_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 
         if (NULL == jo2p)
             return;
-        if (jsp->pr_string) {
-            sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
-            if (jsp->pr_hex) {
-                snprintf(b, sizeof(b), "%" PRIx64, val_i);
-                sgj_js_nv_s(jsp, jo2p, "hex", b);
-            }
-            if (val_s)
-                sgj_js_nv_s(jsp, jo2p, str_name ? str_name : sc_mn_s, val_s);
-        } else if (jsp->pr_hex) {
-            sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
+        sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
+        if (jsp->pr_hex) {
             snprintf(b, sizeof(b), "%" PRIx64, val_i);
             sgj_js_nv_s(jsp, jo2p, "hex", b);
         }
+        if (as_str)
+            sgj_js_nv_s(jsp, jo2p, str_name ? str_name : sc_mn_s, val_s);
     }
 }
 
@@ -671,9 +667,9 @@ static const char * sc_nex_s = "name_extra";
 
 void
 sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                   int64_t val_i, bool want_hex, const char * nex_s)
+                   int64_t val_i, bool hex_as_well, const char * nex_s)
 {
-    bool as_hex = jsp->pr_hex && want_hex;
+    bool as_hex = jsp->pr_hex && hex_as_well;
     bool as_nex = jsp->pr_name_ex && nex_s;
 
     if ((NULL == jsp) || (! jsp->pr_as_json))
@@ -688,16 +684,12 @@ sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
         if (NULL == jo2p)
             return;
         sgj_js_nv_i(jsp, jo2p, "i", (int64_t)val_i);
-        if (as_nex) {
-            if (jsp->pr_hex && want_hex) {
-                snprintf(b, sizeof(b), "%" PRIx64, val_i);
-                sgj_js_nv_s(jsp, jo2p, "hex", b);
-            }
-            sgj_js_nv_s(jsp, jo2p, sc_nex_s, nex_s);
-        } else if (as_hex) {
+        if (as_hex) {
             snprintf(b, sizeof(b), "%" PRIx64, val_i);
             sgj_js_nv_s(jsp, jo2p, "hex", b);
         }
+        if (as_nex)
+            sgj_js_nv_s(jsp, jo2p, sc_nex_s, nex_s);
     }
 }
 
@@ -721,10 +713,10 @@ sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
 
 void
 sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                      int64_t val_i, bool want_hex, const char * str_name,
+                      int64_t val_i, bool hex_as_well, const char * str_name,
                       const char * val_s, const char * nex_s)
 {
-    bool as_hex = jsp->pr_hex && want_hex;
+    bool as_hex = jsp->pr_hex && hex_as_well;
     bool as_str = jsp->pr_string && val_s;
     bool as_nex = jsp->pr_name_ex && nex_s;
     const char * sname =  str_name ? str_name : sc_mn_s;
@@ -923,7 +915,8 @@ sgj_hr_js_helper(char * b, int blen_max, const char * name,
 static void
 sgj_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
              const char * name, enum sgj_separator_t sep,
-             json_value * jvp, bool hex_as_well, const char * nex_s)
+             json_value * jvp, bool hex_as_well, const char * val_s,
+             const char * nex_s)
 {
     bool eaten = false;
     bool as_json = (jsp && jsp->pr_as_json);
@@ -972,14 +965,29 @@ sgj_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                 case json_string:
                     break;
                 case json_integer:
-                    sgj_js_nv_ihex_nex(jsp, jop, jname, jvp->u.integer,
-                                       hex_as_well, nex_s);
+                    sgj_js_nv_ihexstr_nex(jsp, jop, jname, jvp->u.integer,
+                                          hex_as_well, sc_mn_s, val_s, nex_s);
                     done = true;
                     break;
                 case json_boolean:
-                    sgj_js_nv_ihex_nex(jsp, jop, jname, jvp->u.boolean,
-                                       hex_as_well, nex_s);
+                    sgj_js_nv_ihexstr_nex(jsp, jop, jname, jvp->u.boolean,
+                                          false, sc_mn_s, val_s, nex_s);
                     done = true;
+                    break;
+                case json_none:
+                default:
+                    break;
+                }
+            } else {
+                switch (jtype) {
+                case json_string:
+                    break;
+                case json_integer:
+                    if (hex_as_well) {
+                        sgj_js_nv_ihexstr(jsp, jop, jname, jvp->u.integer,
+                                          sc_mn_s, val_s);
+                        done = true;
+                    }
                     break;
                 case json_none:
                 default:
@@ -1014,7 +1022,7 @@ sgj_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 
     /* make json_value even if jsp->pr_as_json is false */
     jvp = value ? json_string_new(value) : NULL;
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL, NULL);
 }
 
 void
@@ -1025,18 +1033,45 @@ sgj_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, NULL);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, NULL,
+                 NULL);
 }
 
 void
-sgj_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                    const char * name, enum sgj_separator_t sep,
-                    int64_t value, bool hex_as_well, const char * nex_s)
+sgj_hr_js_vistr(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                const char * name, enum sgj_separator_t sep, int64_t value,
+                bool hex_as_well, const char * val_s)
 {
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, nex_s);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, val_s,
+                 NULL);
+}
+
+void
+sgj_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                 const char * name, enum sgj_separator_t sep,
+                 int64_t value, bool hex_as_well, const char * nex_s)
+{
+    json_value * jvp;
+
+    jvp = json_integer_new(value);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, NULL,
+                 nex_s);
+}
+
+void
+sgj_hr_js_vistr_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                    const char * name, enum sgj_separator_t sep,
+                    int64_t value, bool hex_as_well,
+                    const char * val_s, const char * nex_s)
+{
+    json_value * jvp;
+
+    jvp = json_integer_new(value);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, val_s,
+                 nex_s);
 }
 
 void
@@ -1046,12 +1081,13 @@ sgj_hr_js_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
     json_value * jvp;
 
     jvp = json_boolean_new(value);
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL);
+    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL, NULL);
 }
 
 sgj_opaque_p
 sgj_hr_js_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                 const char * name, enum sgj_separator_t sep, int64_t value)
+                 const char * name, enum sgj_separator_t sep, int64_t value,
+                 bool hex_as_well)
 {
     bool as_json = (jsp && jsp->pr_as_json);
     int n = 0;
@@ -1075,8 +1111,13 @@ sgj_hr_js_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
     if (as_json) {
         sgj_name_to_snake(name, b, blen);
         jo2p = sgj_named_subobject_r(jsp, jop, b);
-        if (jo2p)
+        if (jo2p) {
             sgj_js_nv_i(jsp, jo2p, "i", value);
+            if (hex_as_well && jsp->pr_hex) {
+                snprintf(b, blen, "%" PRIx64, value);
+                sgj_js_nv_s(jsp, jo2p, "hex", b);
+            }
+        }
         return jo2p;
     }
     return NULL;

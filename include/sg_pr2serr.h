@@ -102,6 +102,7 @@ char * sgj_convert_to_snake_name(const char * in_name, char * sname,
  *    sgj_  - prefix of all the functions related to (non-)JSON output
  *    hr    - human readable form (as it was before JSON)
  *    js    - JSON only output (unless 'hr_js' given)
+ *    hr_js - human readable and JSON output
  *    pr    - has printf() like variadic arguments
  *    _r    - suffix indicating the return value should/must be used
  *    nv    - adds a name-value JSON field (or several)
@@ -183,8 +184,9 @@ sgj_opaque_p sgj_snake_named_subarray_r(sgj_state * jsp, sgj_opaque_p jop,
  * NULL jsp->basep is used. If 'name' is non-NULL a new named JSON object is
  * added using 'name' and the associated value is a JSON string formed from
  * 'value'. If 'name' is NULL then 'jop' is assumed to be a JSON array and
- * a JSON string formed from 'value' is added. If successful returns a
- * a pointer newly formed JSON string. */
+ * a JSON string formed from 'value' is added. Note that the jsp->pr_string
+ * setting is ignored by this function. If successful returns a * a pointer
+ * newly formed JSON string. */
 sgj_opaque_p sgj_js_nv_s(sgj_state * jsp, sgj_opaque_p jop,
                          const char * name, const char * value);
 sgj_opaque_p sgj_js_nv_s_len(sgj_state * jsp, sgj_opaque_p jop,
@@ -243,6 +245,10 @@ void sgj_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 void sgj_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                   const char * name, enum sgj_separator_t sep,
                   int64_t value, bool hex_as_well);
+void sgj_hr_js_vistr(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                     const char * name, enum sgj_separator_t sep,
+                     int64_t value, bool hex_as_well, const char * val_s);
+
 /* The '_nex' refers to a "name_extra" (information) sub-object (a JSON
  * string) which explains a bit more about the 'name' entry. This is useful
  * when T10 specifies the name as an abbreviation (e.g. SYSV). Whether this
@@ -251,13 +257,18 @@ void sgj_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 void sgj_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                       const char * name, enum sgj_separator_t sep,
                       int64_t value, bool hex_as_well, const char * nex_s);
+void sgj_hr_js_vistr_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                         const char * name, enum sgj_separator_t sep,
+                         int64_t value, bool hex_as_well,
+                         const char * val_s, const char * nex_s);
 
 /* Similar to above '_hr_js_' calls but a named sub-object is always formed
  * containing a JSON integer object named "i" whose value is 'value'. The
  * returned pointer is to that sub-object. */
 sgj_opaque_p sgj_hr_js_subo_r(sgj_state * jsp, sgj_opaque_p jop,
                               int leadin_sp, const char * name,
-                              enum sgj_separator_t sep, int64_t value);
+                              enum sgj_separator_t sep, int64_t value,
+                              bool hex_as_well);
 
 /* Similar to sgj_hr_js_vs()'s description with 'JSON string object'
  * replaced by 'JSON boolean object'. */
@@ -295,16 +306,16 @@ void sgj_js_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop,
  * if jop is NULL) along with a value. If jsp->pr_name_ex is true then that
  * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
  * the other one named "abbreviated_name_expansion" with value nex_s rendered
- * as a JSON string. If jsp->pr_hex and 'want_hex' are true, then a
+ * as a JSON string. If jsp->pr_hex and 'hex_as_well' are true, then a
  * sub-object named 'hex' with a value rendered as a hex string equal to
- * val_i. If jsp->pr_name_ex is false and either jsp->pr_hex or want_hex are
+ * val_i. If jsp->pr_name_ex is false and either jsp->pr_hex or hex_as_well are
  * false then there are no sub-objects and the 'val_i' is rendered as a JSON
  * integer. */
 void sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                        int64_t val_i, bool want_hex, const char * nex_s);
+                        int64_t val_i, bool hex_as_well, const char * nex_s);
 
 void sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop,
-                           const char * name, int64_t val_i, bool want_hex,
+                           const char * name, int64_t val_i, bool hex_as_well,
                            const char * str_name, const char * val_s,
                            const char * nex_s);
 

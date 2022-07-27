@@ -1,7 +1,7 @@
 #
 # The VPD responses in this file where generated from a dummy device
 # (ramdisk) associated with the Linux scsi_debug driver as follows:
-#        sg_vpd -a /dev/sg0 -HHHH
+#        sg_vpd -a /dev/sg3 -HHHH
 
 # Supported VPD pages VPD page
 00 00 00 0c 00 80 83 84  85 86 87 88 89 b0 b1 b2

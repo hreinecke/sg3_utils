@@ -10,6 +10,8 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+/* This is a common header file for the sg_inq and sg_vpd utilities */
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -154,6 +156,22 @@ void decode_power_consumption(uint8_t * buff, int len,
                               struct opts_t * op, sgj_opaque_p jap);
 void decode_block_limits_vpd(const uint8_t * buff, int len,
                              struct opts_t * op, sgj_opaque_p jop);
+void decode_block_dev_ch_vpd(const uint8_t * buff, int len,
+                             struct opts_t * op, sgj_opaque_p jop);
+int decode_block_lb_prov_vpd(uint8_t * buff, int len,
+                             struct opts_t * op, sgj_opaque_p jop);
+void decode_referrals_vpd(uint8_t * buff, int len, struct opts_t * op,
+                          sgj_opaque_p jop);
+void decode_sup_block_lens_vpd(uint8_t * buff, int len, struct opts_t * op,
+                               sgj_opaque_p jap);
+void decode_block_dev_char_ext_vpd(uint8_t * buff, int len,
+                                   struct opts_t * op, sgj_opaque_p jop);
+void decode_zbdch_vpd(uint8_t * buff, int len, struct opts_t * op,
+                      sgj_opaque_p jop);
+void decode_block_limits_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
+                                 sgj_opaque_p jop);
+void decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
+                               sgj_opaque_p jap);
 const char * pqual_str(int pqual);
 
 void svpd_enumerate_vendor(int vend_prod_num);
