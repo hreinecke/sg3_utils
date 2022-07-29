@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.78 20220727";  /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.78 20220729";  /* spc6r06 + sbc5r01 */
 
 #define MY_NAME "sg_vpd"
 
@@ -1838,35 +1838,6 @@ decode_format_presets_vpd(uint8_t * buff, int len, int do_hex)
 }
 #endif
 
-/* VPD_CON_POS_RANGE  0xb9 (added sbc5r01) */
-static void
-decode_con_pos_range_vpd(uint8_t * buff, int len, int do_hex)
-{
-    int k;
-    uint64_t u;
-    uint8_t * bp;
-
-    if (do_hex) {
-        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
-        return;
-    }
-    if (len < 64) {
-        pr2serr("Concurrent position ranges VPD page length too short=%d\n",
-                len);
-        return;
-    }
-    len -= 64;
-    bp = buff + 64;
-    for (k = 0; k < len; k += 32, bp += 32) {
-        printf("  LBA range number: %u\n", bp[0]);
-        printf("    number of storage elements: %u\n", bp[1]);
-        printf("    starting LBA: 0x%" PRIx64 "\n",
-               sg_get_unaligned_be64(bp + 8));
-        u = sg_get_unaligned_be64(bp + 16);
-        printf("    number of LBAs: 0x%" PRIx64 " [%" PRIu64 "]\n", u, u);
-    }
-}
-
 /* Returns 0 if successful */
 static int
 svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
@@ -2836,7 +2807,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                     jap = sgj_named_subarray_r(jsp, jo2p, "format_preset_"
                                                "descriptor_list");
                 }
-		if (fp)
+                if (fp)
                     decode_format_presets_vpd(rp, len, op, jap);
                 else
                     return SG_LIB_CAT_OTHER;
@@ -2849,30 +2820,43 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     case 0xb9:          /* VPD_CON_POS_RANGE */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
+            bool cpr = false;           /* ["cpr"] */
+
+            pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
-                np = "Concurrent positioning ranges VPD page (SBC):";
+                np = "Concurrent positioning ranges VPD page";
+                ep = "(SBC)";
+                cpr = true;
                 break;
             default:
                 np = NULL;
                 break;
             }
             if (NULL == np)
-                printf("VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+                sgj_pr_hr(jsp, "VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
             else if (allow_name || allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s %s:\n", pre, np, ep ? ep : "");
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           pqual, pdt_str);
-                decode_con_pos_range_vpd(rp, len, op->do_hex);
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", pqual, pdt_str);
+                if (as_json) {
+                    jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                    jap = sgj_named_subarray_r(jsp, jo2p, "lba_range_"
+                                               "descriptor_list");
+                }
+                if (cpr)
+                    decode_con_pos_range_vpd(rp, len, op, jap);
+                else
+                    return SG_LIB_CAT_OTHER;
             }
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    (0 == op->examine))
-            printf("%sVPD page=0xb7\n", pre);
+            printf("%sVPD page=0xb8\n", pre);
         break;
     default:
         return SG_LIB_CAT_OTHER;

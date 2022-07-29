@@ -390,9 +390,9 @@ tsafe_strerror(int code, char * ebp)
  * ISBN 0-201-63392-2 . [Highly recommended book.] Changed __FILE__
  * to __func__ */
 #define err_exit(code,text) do { \
-    char strerr_buff[STRERR_BUFF_LEN + 1]; \
+    char _strerr_buff[STRERR_BUFF_LEN + 1]; \
     pr2serr("%s at \"%s\":%d: %s\n", \
-        text, __func__, __LINE__, tsafe_strerror(code, strerr_buff)); \
+        text, __func__, __LINE__, tsafe_strerror(code, _strerr_buff)); \
     exit(1); \
     } while (0)
 

@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.29 20220717";      /* sbc5r01 */
+static const char * version_str = "1.30 20220729";      /* sbc5r01 */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -629,7 +629,7 @@ start_response:
                 sgj_js_nv_istr(jsp, jo2p, add_stat_s, add_status, NULL,
                                get_pr_status_str(add_status, b, blen));
             } else {
-                char c[64];
+                char d[64];
 
                 n = 0;
                 n += sg_scnpr(b + n, blen - n, "[%d] LBA: 0x", k + 1);
@@ -637,16 +637,16 @@ start_response:
                     n += sg_scnpr(b + n, blen - n, "%02x", bp[j]);
                 if (1 == (blockhex % 2)) {
 
-                    snprintf(c, sizeof(c), "0x%x", d_blocks);
-                    n += sg_scnpr(b + n, blen - n, "  blocks: %10s", c);
+                    snprintf(d, sizeof(d), "0x%x", d_blocks);
+                    n += sg_scnpr(b + n, blen - n, "  blocks: %10s", d);
                 } else
                     n += sg_scnpr(b + n, blen - n, "  blocks: %10u",
                                   (unsigned int)d_blocks);
-                get_prov_status_str(res, c, sizeof(c));
-                n += sg_scnpr(b + n, blen - n, "  %s", c);
-                get_pr_status_str(add_status, c, sizeof(c));
-                if (strlen(c) > 0)
-                    n += sg_scnpr(b + n, blen - n, "  [%s]", c);
+                get_prov_status_str(res, d, sizeof(d));
+                n += sg_scnpr(b + n, blen - n, "  %s", d);
+                get_pr_status_str(add_status, d, sizeof(d));
+                if (strlen(d) > 0)
+                    n += sg_scnpr(b + n, blen - n, "  [%s]", d);
                 sgj_pr_hr(jsp, "%s\n", b);
             }
         }
@@ -663,8 +663,6 @@ error:
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         pr2serr("Get LBA Status command: bad field in cdb\n");
     else {
-        char b[80];
-
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
         pr2serr("Get LBA Status command: %s\n", b);
     }

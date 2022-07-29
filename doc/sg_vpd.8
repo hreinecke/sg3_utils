@@ -136,7 +136,7 @@ command is sent with a larger value in the cdb's "allocation length" field.
 If this option is given and \fILEN\fR is greater than 0 then only one INQUIRY
 command is sent. Since many simple devices implement the INQUIRY command
 badly (and do not support VPD pages) then the safest value to use for
-\fILEN\fR is 36. See the sg_inq man page for the more information.
+\fILEN\fR is 36. See the sg_inq(8) man page for the more information.
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
 where \fIPG\fR is the VPD page to be decoded or output. The \fIPG\fR argument
@@ -209,12 +209,6 @@ output as a pseudo VPD page when \fIPG\fR is set to '\-1' or 'sinq'. Also
 the decoding of some fields (e.g. the Extended INQUIRY page's SPT field)
 is expanded when the '\-\-long' option is given using the standard INQUIRY
 response information (e.g. the PDT and the PROTECT fields).
-.PP
-In the 2.4 series of Linux kernels the \fIDEVICE\fR must be
-a SCSI generic (sg) device. In the 2.6 series block devices (e.g. disks
-and ATAPI DVDs) can also be specified. For example "sg_inq /dev/sda"
-will work in the 2.6 series kernels. From lk 2.6.6 other SCSI "char"
-device names may be used as well (e.g. "/dev/st0m").
 .PP
 The \fIDEVICE\fR is opened with a read\-only flag (e.g. in Unix with the
 O_RDONLY flag).

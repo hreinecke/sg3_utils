@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.98 20220310";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.99 20220729";    /* spc6r06 + sbc5r01 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define MX_INLEN_ALLOC_LEN (0x800000)
@@ -2804,16 +2804,16 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
                 int vpd = *(bp + 5);
                 printf("VPD page 0x%x changed\n", vpd);
                 if (0 == op->do_brief) {
-                    int k;
-                    const int num = sg_lib_names_mode_len;
+                    int m;
+                    const int nn = sg_lib_names_mode_len;
                     struct sg_lib_simple_value_name_t * nvp =
                                                     sg_lib_names_vpd_arr;
 
-                    for (k = 0; k < num; ++k, ++nvp) {
+                    for (m = 0; m < nn; ++m, ++nvp) {
                         if (nvp->value == vpd)
                             break;
                     }
-                    if (k < num)
+                    if (m < nn)
                         printf("    name: %s\n", nvp->name);
                 }
             } else
@@ -2877,16 +2877,16 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
                 printf("mode page 0x%x changed\n", pg_code);
             if (0 == op->do_brief) {
                 int k;
-                const int num = sg_lib_names_mode_len;
                 int val = (pg_code << 8) | spg_code;
+                const int nn = sg_lib_names_mode_len;
                 struct sg_lib_simple_value_name_t * nmp =
                                                 sg_lib_names_mode_arr;
 
-                for (k = 0; k < num; ++k, ++nmp) {
+                for (k = 0; k < nn; ++k, ++nmp) {
                     if (nmp->value == val)
                         break;
                 }
-                if (k < num)
+                if (k < nn)
                     printf("    name: %s\n", nmp->name);
             }
         }
@@ -3220,10 +3220,8 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
         if (op->do_raw) {
             dStrRaw(bp, extra);
             break;
-        } else if (0 == op->do_hex)
-            hex2stdout(bp, extra, op->dstrhex_no_ascii);
-        else
-            hex2stdout(bp, extra, op->dstrhex_no_ascii);
+        }
+        hex2stdout(bp, extra, op->dstrhex_no_ascii);
         printf("\n");
         if (op->do_pcb)
             printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));

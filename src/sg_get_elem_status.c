@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.13 20220717";      /* sbc5r02 */
+static const char * version_str = "1.14 20220729";      /* sbc5r03 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -302,7 +302,7 @@ main(int argc, char * argv[])
     struct gpes_desc_t a_ped;
     sgj_state json_st = {0};
     sgj_state * jsp = &json_st;
-    char b[64];
+    char b[80];
     static const int blen = sizeof(b);
 
     while (1) {
@@ -629,8 +629,6 @@ error:
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         pr2serr("Get LBA Status command: bad field in cdb\n");
     else {
-        char b[80];
-
         sg_get_category_sense_str(res, sizeof(b), b, verbose);
         pr2serr("Get LBA Status command: %s\n", b);
     }

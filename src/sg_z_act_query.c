@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 Douglas Gilbert.
+ * Copyright (c) 2014-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
  * command to the given SCSI device. Based on zbc2r12.pdf .
  */
 
-static const char * version_str = "1.03 20211217";
+static const char * version_str = "1.04 20220729";
 
 #define SG_ZBC_IN_CMDLEN 16
 #define Z_ACTIVATE_SA 0x8
@@ -556,8 +556,6 @@ main(int argc, char * argv[])
         if (SG_LIB_CAT_INVALID_OP == res)
             pr2serr("%s command not supported\n", sa_name);
         else {
-            char b[80];
-
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
             pr2serr("%s command: %s\n", sa_name, b);
         }

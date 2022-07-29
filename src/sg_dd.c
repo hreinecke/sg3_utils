@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.33 20220418";
+static const char * version_str = "6.34 20220729";
 
 
 #define ME "sg_dd: "
@@ -2420,21 +2420,21 @@ main(int argc, char * argv[])
             else if (iflag.ff)
                 memset(wrkPos, 0xff, res);
             else {
-                int kk, j;
+                int kk, jj;
                 const int jbump = sizeof(uint32_t);
                 long rn;
                 uint8_t * bp;
 
                 bp = wrkPos;
                 for (kk = 0; kk < blocks; ++kk, bp += blk_sz) {
-                    for (j = 0; j < blk_sz; j += jbump) {
+                    for (jj = 0; jj < blk_sz; jj += jbump) {
                        /* mrand48 takes uniformly from [-2^31, 2^31) */
 #ifdef HAVE_SRAND48_R
                         mrand48_r(&drand, &rn);
 #else
                         rn = mrand48();
 #endif
-                        *((uint32_t *)(bp + j)) = (uint32_t)rn;
+                        *((uint32_t *)(bp + jj)) = (uint32_t)rn;
                     }
                 }
             }

@@ -39,8 +39,11 @@ options.
 An important "non\-standard" INQUIRY page is the Device Identification
 Vital Product Data (VPD) page [0x83]. Since SPC\-3, support for this page
 is mandatory. The \fI\-\-id\fR option decodes this page. New VPD page
-information is no longer being added to this utility. To get information
-on new VPD pages see the sg_vpd(8) or sdparm(8) utilities.
+information is no longer being added to this utility. The sg_vpd(8) utility
+is specialized for decoding VPD pages and shares code with this utility for
+that purpose. The sdparm(8) utility which is in a package of that name also
+decodes VPD pages although its major purpose is to access and modify SCSI
+mode pages.
 .PP
 In Linux, if the \fIDEVICE\fR exists and the SCSI INQUIRY fails (e.g. because
 the SG_IO ioctl is not supported) then an ATA IDENTIFY (PACKET) DEVICE is
@@ -239,8 +242,7 @@ print out version string then exit.
 set the Enable Vital Product Data (EVPD) bit (defaults to clear(0)). Used in
 conjunction with the \fI\-\-page=PG\fR option where \fIPG\fR specifies the
 VPD page number to query. If the \fI\-\-page=PG\fR is not given then \fIPG\fR
-defaults to zero which is the "Supported VPD pages" VPD page. A more up to
-date decoding of VPD pages can be found in the sg_vpd(8) utility.
+defaults to zero which is the "Supported VPD pages" VPD page.
 .SH NOTES
 Some devices with weak SCSI command set implementations lock up when they
 receive commands they don't understand (and some lock up if they receive
@@ -335,8 +337,7 @@ get the controller's Identify decoded use the \fI\-\-only\fR option.
 .PP
 It is possible that even though the \fIDEVICE\fR presents as a NVMe device,
 it has a SNTL and accepts SCSI commands. In this case to send a SCSI INQUIRY
-command (and fetch its VPD pages) use 'sg_vpd \-p sinq <dev>' (or to get VPD
-pages: 'sg_vpd \-p <vpd_page> <dev>').
+command (and fetch its VPD pages) use the sg_vpd(8) utility.
 .SH EXIT STATUS
 The exit status of sg_inq is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

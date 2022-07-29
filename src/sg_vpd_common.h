@@ -172,6 +172,8 @@ void decode_block_limits_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
                                  sgj_opaque_p jop);
 void decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
                                sgj_opaque_p jap);
+void decode_con_pos_range_vpd(uint8_t * buff, int len, struct opts_t * op,
+                              sgj_opaque_p jap);
 const char * pqual_str(int pqual);
 
 void svpd_enumerate_vendor(int vend_prod_num);

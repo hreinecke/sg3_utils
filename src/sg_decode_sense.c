@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.30 20220717";
+static const char * version_str = "1.31 20220729";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -478,8 +478,7 @@ main(int argc, char *argv[])
             else if (op->hex_count)
                 dStrHexFp((const char *)op->sense, op->sense_len, 0, fp);
             else {
-                size_t s = fwrite(op->sense, 1, op->sense_len, fp);
-
+                s = fwrite(op->sense, 1, op->sense_len, fp);
                 if ((int)s != op->sense_len)
                     pr2serr("only able to write %d of %d bytes to %s\n",
                             (int)s, op->sense_len, op->wfname);

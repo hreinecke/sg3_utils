@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.24 20220727";  /* spc6r06 */
+static const char * version_str = "2.26 20220729";  /* spc6r06 */
 
 #define MY_NAME "sg_inq"
 
@@ -2390,7 +2390,7 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
     }
     pqual = (rp[0] & 0xe0) >> 5;
     if (! op->do_raw && ! op->do_export) {
-        snprintf(b, blen, "standard INQUIRY:");
+        strcpy(b, "standard INQUIRY:");
         if (0 == pqual)
             sgj_pr_hr(jsp, "%s\n", b);
         else if (1 == pqual)
@@ -2997,9 +2997,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
     sgj_opaque_p jap = NULL;
     const char * np;
     const char * ep = "";
-    // const char * pdt_str;
     uint8_t * rp;
-    // char d[80];
 
     rp = rsp_buff + off;
     vb = op->verbose;
@@ -3297,8 +3295,8 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             bool bl = false;
             bool sad = false;
             bool oi = false;
-            const char * ep = "";
 
+            ep = "";
             if (op->do_raw) {
                 dStrRaw((const char *)rp, len);
                 break;
@@ -3658,11 +3656,45 @@ xxxxx
             pr2serr("VPD INQUIRY: page=0xb8\n");
         break;
     case 0xb9:
-// yyyyyyyy
-        bad = true;
-        pr2serr("Please try the sg_vpd utility which decodes more VPD "
-                "pages\n\n");
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        if (0 == res) {
+            bool cpr = false;
+
+            if (op->do_raw) {
+                dStrRaw((const char *)rp, len);
+                break;
+            }
+            pdt = rp[0] & PDT_MASK;
+            switch (pdt) {
+            case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
+                np = "Concurrent positioning LBAs VPD page";
+                ep = "(SBC)";
+                cpr = true;
+                break;
+            default:
+                np = NULL;
+                break;
+            }
+            if (op->do_hex < 2) {
+                if (NULL == np)
+                    sgj_pr_hr(jsp, "VPD page=0x%x, pdt=0x%x:\n", pn, pdt);
+                else
+                    sgj_pr_hr(jsp, "VPD INQUIRY: %s %s\n", np, ep);
+            }
+            if (as_json) {
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                jap = sgj_named_subarray_r(jsp, jo2p, "lba_range_"
+                                           "descriptor_list");
+            }
+            if (cpr)
+                decode_con_pos_range_vpd(rp, len, op, jap);
+            else
+                return vpd_mainly_hex(sg_fd, op, NULL, off);
+            return 0;
+        } else if (! op->do_raw)
+            pr2serr("VPD INQUIRY: page=0xb8\n");
         break;
+// yyyyyyyy
     case VPD_UPR_EMC:   /* 0xc0 */
         if (!op->do_raw && (op->do_hex < 2))
             printf("VPD INQUIRY: Unit Path Report Page (EMC)\n");
