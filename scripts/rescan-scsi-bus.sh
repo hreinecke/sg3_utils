@@ -184,18 +184,21 @@ sgdevice26 ()
 {
   local gendev
 
+  # if the scsi device has not been added, then there would not
+  # a related sgdev. So it's pointless to scan all sgs to find
+  # a related sg.
+  scsidev=/sys/class/scsi_device/${host}:${channel}:${id}:${lun}
+  if [ ! -e "$scsidev" ]; then
+    SGDEV=""
+    return
+  fi
+
   gendev=/sys/class/scsi_device/${host}:${channel}:${id}:${lun}/device/generic
   if [ -e "$gendev" ] ; then
     SGDEV=$(basename "$(readlink "$gendev")")
-  else
-    for SGDEV in /sys/class/scsi_generic/sg*; do
-      DEV=$(readlink "$SGDEV/device")
-      if [ "${DEV##*/}" = "$host:$channel:$id:$lun" ] ; then
-        SGDEV=$(basename "$SGDEV"); return
-      fi
-    done
-    SGDEV=""
+    return
   fi
+  SGDEV=""
 }
 
 # Find sg device with 2.4 report-devs extensions
