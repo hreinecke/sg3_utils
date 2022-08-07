@@ -42,7 +42,7 @@ extern "C" {
 #define VPD_DEVICE_CONSTITUENTS 0x8b
 #define VPD_CFA_PROFILE_INFO 0x8c
 #define VPD_POWER_CONSUMPTION  0x8d
-#define VPD_3PARTY_COPY 0x8f            /* 3PC, XCOPY, SPC-4, SBC-3 */
+#define VPD_3PARTY_COPY 0x8f            /* 3PC, XCOPY, SPC-5, SBC-4 */
 #define VPD_PROTO_LU 0x90
 #define VPD_PROTO_PORT 0x91
 #define VPD_SCSI_FEATURE_SETS 0x92      /* spc5r11 */
@@ -174,6 +174,14 @@ void decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
                                sgj_opaque_p jap);
 void decode_con_pos_range_vpd(uint8_t * buff, int len, struct opts_t * op,
                               sgj_opaque_p jap);
+void decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
+                            sgj_opaque_p jap);
+void
+decode_proto_lu_vpd(uint8_t * buff, int len, struct opts_t * op,
+                    sgj_opaque_p jap);
+void
+decode_proto_port_vpd(uint8_t * buff, int len, struct opts_t * op,
+                      sgj_opaque_p jap);
 const char * pqual_str(int pqual);
 
 void svpd_enumerate_vendor(int vend_prod_num);

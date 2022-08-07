@@ -43,6 +43,8 @@ const char * product_id_hr = "Product_identification";
 const char * product_id_js = "product_identification";
 const char * product_rev_lev_hr = "Product_revision_level";
 const char * product_rev_lev_js = "product_revision_level";
+static const char * const y_s = "yes";
+static const char * const n_s = "no";
 static const char * const nl_s = "no limit";
 static const char * const nlr_s = "no limit reported";
 static const char * const nr_s = "not reported";
@@ -1865,7 +1867,7 @@ decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
                      sg_get_unaligned_be64(bp + 16), true);
         sgj_hr_js_vi_nex(jsp, jo2p, 4, "FMTPINFO", SGJ_SEP_COLON_1_SPACE,
                          (bp[38] >> 6) & 0x3, false,
-                         "ForMaT Protecion INFOrmation (see Format Unit)");
+                         "ForMaT Protection INFOrmation (see Format Unit)");
         sgj_hr_js_vi(jsp, jo2p, 4, "Protection field usage",
                      SGJ_SEP_COLON_1_SPACE, bp[38] & 0x7, false);
         sgj_hr_js_vi(jsp, jo2p, 4, "Protection interval exponent",
@@ -1994,6 +1996,687 @@ decode_con_pos_range_vpd(uint8_t * buff, int len, struct opts_t * op,
                      sg_get_unaligned_be64(bp + 8), true);
         sgj_hr_js_vi(jsp, jo2p, 4, "Number of LBAs", SGJ_SEP_COLON_1_SPACE,
                      sg_get_unaligned_be64(bp + 16), true);
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }
+}
+
+/* This is xcopy(LID4) related: "ROD" == Representation Of Data
+ * Used by VPD_3PARTY_COPY   0x8f ["tpc"] */
+static void
+decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
+                      sgj_opaque_p jap)
+{
+    uint8_t pdt;
+    uint32_t u;
+    int k, bump;
+    uint64_t ull;
+    const uint8_t * bp = buff;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    static const char * ab_pdt = "abnormal use of 'pdt'";
+
+    for (k = 0; k < len; k += bump, bp += bump) {
+        jo2p = sgj_new_unattached_object_r(jsp);
+        bump = sg_get_unaligned_be16(bp + 2) + 4;
+        pdt = 0x1f & bp[0];
+        u = (bp[0] >> 5) & 0x7;
+        sgj_js_nv_i(jsp, jo2p, "descriptor_format", u);
+        if (0 != u) {
+            sgj_pr_hr(jsp, "  Unhandled descriptor (format %u, device type "
+                      "%u)\n", u, pdt);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            break;
+        }
+        switch (pdt) {
+        case 0:
+            /* Block ROD device type specific descriptor */
+            sgj_js_nv_ihexstr_nex(jsp, jo2p, "peripheral_device_type",
+                                  pdt, false, NULL, "Block ROD device "
+                                  "type specific descriptor", ab_pdt);
+            sgj_hr_js_vi_nex(jsp, jo2p, 4, "Optimal block ROD length "
+                             "granularity", SGJ_SEP_COLON_1_SPACE,
+                             sg_get_unaligned_be16(bp + 6), true, "unit: LB");
+            ull = sg_get_unaligned_be64(bp + 8);
+            sgj_hr_js_vi(jsp, jo2p, 4, "Maximum bytes in block ROD",
+                         SGJ_SEP_COLON_1_SPACE, ull, true);
+            ull = sg_get_unaligned_be64(bp + 16);
+            sgj_hr_js_vistr(jsp, jo2p, 4, "Optimal Bytes in block ROD "
+                            "transfer", SGJ_SEP_COLON_1_SPACE, ull, true,
+                            (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
+            ull = sg_get_unaligned_be64(bp + 24);
+            sgj_hr_js_vistr(jsp, jo2p, 4, "Optimal Bytes to token per "
+                            "segment", SGJ_SEP_COLON_1_SPACE, ull, true,
+                            (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
+            ull = sg_get_unaligned_be64(bp + 32);
+            sgj_hr_js_vistr(jsp, jo2p, 4, "Optimal Bytes from token per "
+                            "segment", SGJ_SEP_COLON_1_SPACE, ull, true,
+                            (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
+            break;
+        case 1:
+            /* Stream ROD device type specific descriptor */
+            sgj_js_nv_ihexstr_nex(jsp, jo2p, "peripheral_device_type",
+                                  pdt, false, NULL, "Stream ROD device "
+                                  "type specific descriptor", ab_pdt);
+            ull = sg_get_unaligned_be64(bp + 8);
+            sgj_hr_js_vi(jsp, jo2p, 4, "Maximum bytes in stream ROD",
+                         SGJ_SEP_COLON_1_SPACE, ull, true);
+            ull = sg_get_unaligned_be64(bp + 16);
+            printf("  Optimal Bytes in stream ROD transfer: ");
+            if (SG_LIB_UNBOUNDED_64BIT == ull)
+                printf("-1 [no limit]\n");
+            else
+                printf("%" PRIu64 "\n", ull);
+            break;
+        case 3:
+            /* Copy manager ROD device type specific descriptor */
+            sgj_js_nv_ihexstr_nex(jsp, jo2p, "peripheral_device_type",
+                                  pdt, false, NULL, "Copy manager ROD "
+                                  "device type specific descriptor",
+                                  ab_pdt);
+            printf("  Maximum Bytes in processor ROD: %" PRIu64 "\n",
+                   sg_get_unaligned_be64(bp + 8));
+            ull = sg_get_unaligned_be64(bp + 16);
+            printf("  Optimal Bytes in processor ROD transfer: ");
+            if (SG_LIB_UNBOUNDED_64BIT == ull)
+                printf("-1 [no limit]\n");
+            else
+                printf("%" PRIu64 "\n", ull);
+            break;
+        default:
+            sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
+                              pdt, false, "unknown");
+            break;
+        }
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }
+}
+
+struct tpc_desc_type {
+    uint8_t code;
+    const char * name;
+};
+
+static struct tpc_desc_type tpc_desc_arr[] = {
+    {0x0, "block -> stream"},
+    {0x1, "stream -> block"},
+    {0x2, "block -> block"},
+    {0x3, "stream -> stream"},
+    {0x4, "inline -> stream"},
+    {0x5, "embedded -> stream"},
+    {0x6, "stream -> discard"},
+    {0x7, "verify CSCD"},
+    {0x8, "block<o> -> stream"},
+    {0x9, "stream -> block<o>"},
+    {0xa, "block<o> -> block<o>"},
+    {0xb, "block -> stream & application_client"},
+    {0xc, "stream -> block & application_client"},
+    {0xd, "block -> block & application_client"},
+    {0xe, "stream -> stream&application_client"},
+    {0xf, "stream -> discard&application_client"},
+    {0x10, "filemark -> tape"},
+    {0x11, "space -> tape"},            /* obsolete: spc5r02 */
+    {0x12, "locate -> tape"},           /* obsolete: spc5r02 */
+    {0x13, "<i>tape -> <i>tape"},
+    {0x14, "register persistent reservation key"},
+    {0x15, "third party persistent reservation source I_T nexus"},
+    {0x16, "<i>block -> <i>block"},
+    {0x17, "positioning -> tape"},      /* this and next added spc5r02 */
+    {0x18, "<loi>tape -> <loi>tape"},   /* loi: logical object identifier */
+    {0xbe, "ROD <- block range(n)"},
+    {0xbf, "ROD <- block range(1)"},
+    {0xe0, "CSCD: FC N_Port_Name"},
+    {0xe1, "CSCD: FC N_Port_ID"},
+    {0xe2, "CSCD: FC N_Port_ID with N_Port_Name, checking"},
+    {0xe3, "CSCD: Parallel interface: I_T"},
+    {0xe4, "CSCD: Identification Descriptor"},
+    {0xe5, "CSCD: IPv4"},
+    {0xe6, "CSCD: Alias"},
+    {0xe7, "CSCD: RDMA"},
+    {0xe8, "CSCD: IEEE 1394 EUI-64"},
+    {0xe9, "CSCD: SAS SSP"},
+    {0xea, "CSCD: IPv6"},
+    {0xeb, "CSCD: IP copy service"},
+    {0xfe, "CSCD: ROD"},
+    {0xff, "CSCD: extension"},
+    {0x0, NULL},
+};
+
+static const char *
+get_tpc_desc_name(uint8_t code)
+{
+    const struct tpc_desc_type * dtp;
+
+    for (dtp = tpc_desc_arr; dtp->name; ++dtp) {
+        if (code == dtp->code)
+            return dtp->name;
+    }
+    return "";
+}
+
+struct tpc_rod_type {
+    uint32_t type;
+    const char * name;
+};
+
+static struct tpc_rod_type tpc_rod_arr[] = {
+    {0x0, "copy manager internal"},
+    {0x10000, "access upon reference"},
+    {0x800000, "point in time copy - default"},
+    {0x800001, "point in time copy - change vulnerable"},
+    {0x800002, "point in time copy - persistent"},
+    {0x80ffff, "point in time copy - any"},
+    {0xffff0001, "block device zero"},
+    {0x0, NULL},
+};
+
+static const char *
+get_tpc_rod_name(uint32_t rod_type)
+{
+    const struct tpc_rod_type * rtp;
+
+    for (rtp = tpc_rod_arr; rtp->name; ++rtp) {
+        if (rod_type == rtp->type)
+            return rtp->name;
+    }
+    return "";
+}
+
+struct cscd_desc_id_t {
+    uint16_t id;
+    const char * name;
+};
+
+static struct cscd_desc_id_t cscd_desc_id_arr[] = {
+    /* only values higher than 0x7ff are listed */
+    {0xc000, "copy src or dst null LU, pdt=0"},
+    {0xc001, "copy src or dst null LU, pdt=1"},
+    {0xf800, "copy src or dst in ROD token"},
+    {0xffff, "copy src or dst is copy manager LU"},
+    {0x0, NULL},
+};
+
+static const char *
+get_cscd_desc_id_name(uint16_t cscd_desc_id)
+{
+    const struct cscd_desc_id_t * cdip;
+
+    for (cdip = cscd_desc_id_arr; cdip->name; ++cdip) {
+        if (cscd_desc_id == cdip->id)
+            return cdip->name;
+    }
+    return "";
+}
+
+static const char *
+get_tpc_desc_type_s(uint32_t desc_type)
+{
+    switch(desc_type) {
+    case 0:
+        return "Block Device ROD Limits";
+    case 1:
+        return "Supported Commands";
+    case 4:
+        return "Parameter Data";
+    case 8:
+        return "Supported Descriptors";
+    case 0xc:
+        return "Supported CSCD Descriptor IDs";
+    case 0xd:
+        return "Copy Group Identifier";
+    case 0x106:
+        return "ROD Token Features";
+    case 0x108:
+        return "Supported ROD Token and ROD Types";
+    case 0x8001:
+        return "General Copy Operations";
+    case 0x9101:
+        return "Stream Copy Operations";
+    case 0xC001:
+        return "Held Data";
+    default:
+        if ((desc_type >= 0xE000) && (desc_type <= 0xEFFF))
+            return "Restricted";
+        else
+            return "Reserved";
+    }
+}
+
+/* VPD_3PARTY_COPY   3PC, third party copy  0x8f ["tpc"] */
+void
+decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
+                       sgj_opaque_p jap)
+{
+    int j, k, m, bump, desc_type, desc_len, sa_len, pdt;
+    uint32_t u, v;
+    uint64_t ull;
+    const uint8_t * bp;
+    const char * cp;
+    const char * dtp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p ja2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    char b[144];
+    static const int blen = sizeof(b);
+
+    if (len < 4) {
+        pr2serr("VPD page length too short=%d\n", len);
+        return;
+    }
+    if (3 == op->do_hex) {
+        hex2stdout(buff, len, -1);
+        return;
+    }
+    pdt = buff[0] & PDT_MASK;
+    len -= 4;
+    bp = buff + 4;
+    for (k = 0; k < len; k += bump, bp += bump) {
+        jo2p = sgj_new_unattached_object_r(jsp);
+        desc_type = sg_get_unaligned_be16(bp);
+        desc_len = sg_get_unaligned_be16(bp + 2);
+        if (op->verbose)
+            sgj_pr_hr(jsp, "Descriptor type=%d [0x%x] , len %d\n", desc_type,
+                      desc_type, desc_len);
+        bump = 4 + desc_len;
+        if ((k + bump) > len) {
+            pr2serr("VPD page, short descriptor length=%d, left=%d\n", bump,
+                    (len - k));
+            break;
+        }
+        if (0 == desc_len)
+            goto skip;          /* continue plus attach jo2p */
+        if (2 == op->do_hex)
+            hex2stdout(bp + 4, desc_len, 1);
+        else if (op->do_hex > 2)
+            hex2stdout(bp, bump, 1);
+        else {
+            int csll;
+
+            dtp = get_tpc_desc_type_s(desc_type);
+            sgj_js_nv_ihexstr(jsp, jo2p, "third_party_copy_descriptor_type",
+                              desc_type, NULL, dtp);
+            sgj_js_nv_ihex(jsp, jo2p, "third_party_copy_descriptor_length",
+                           desc_len);
+
+            switch (desc_type) {
+            case 0x0000:    /* Required if POPULATE TOKEN (or friend) used */
+                sgj_pr_hr(jsp, " %s:\n", dtp);
+                u = sg_get_unaligned_be16(bp + 10);
+                sgj_hr_js_vistr(jsp, jo2p, 2, "Maximum range descriptors",
+                                SGJ_SEP_COLON_1_SPACE, u, true,
+                                (0 == u) ? nr_s : NULL);
+                u = sg_get_unaligned_be32(bp + 12);
+                if (0 == u)
+                    cp = nr_s;
+                else if (SG_LIB_UNBOUNDED_32BIT == u)
+                    cp = "No maximum given";
+                else
+                    cp = NULL;
+                sgj_hr_js_vistr_nex(jsp, jo2p, 2, "Maximum inactivity "
+                                    "timeout", SGJ_SEP_COLON_1_SPACE, u, true,
+                                    cp, "unit: second");
+                u = sg_get_unaligned_be32(bp + 16);
+                sgj_hr_js_vistr_nex(jsp, jo2p, 2, "Default inactivity "
+                                    "timeout", SGJ_SEP_COLON_1_SPACE, u, true,
+                                    (0 == u) ? nr_s : NULL, "unit: second");
+                ull = sg_get_unaligned_be64(bp + 20);
+                sgj_hr_js_vistr_nex(jsp, jo2p, 2, "Maximum token transfer "
+                                    "size", SGJ_SEP_COLON_1_SPACE, ull, true,
+                                    (0 == ull) ? nr_s : NULL, "unit: LB");
+                ull = sg_get_unaligned_be64(bp + 28);
+                sgj_hr_js_vistr_nex(jsp, jo2p, 2, "Optimal transfer count",
+                                    SGJ_SEP_COLON_1_SPACE, ull, true,
+                                    (0 == ull) ? nr_s : NULL, "unit: LB");
+                break;
+            case 0x0001:    /* Mandatory (SPC-4) */
+                sgj_pr_hr(jsp, " %s:\n", "Commands supported list");
+                ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                            "commands_supported_list");
+                j = 0;
+                csll = bp[4];
+                if (csll >= desc_len) {
+                    pr2serr("Command supported list length (%d) >= "
+                            "descriptor length (%d), wrong so trim\n",
+                            csll, desc_len);
+                    csll = desc_len - 1;
+                }
+                while (j < csll) {
+                    uint8_t opc, sa;
+                    static const char * soc = "supported_operation_code";
+                    static const char * ssa = "supported_service_action";
+
+                    jo3p = NULL;
+                    opc = bp[5 + j];
+                    sa_len = bp[6 + j];
+                    for (m = 0; (m < sa_len) && ((j + m) < csll); ++m) {
+                        jo3p = sgj_new_unattached_object_r(jsp);
+                        sa = bp[7 + j + m];
+                        sg_get_opcode_sa_name(opc, sa, pdt, blen, b);
+                        sgj_pr_hr(jsp, "  %s\n", b);
+                        sgj_js_nv_s(jsp, jo3p, "name", b);
+                        sgj_js_nv_ihex(jsp, jo3p, soc, opc);
+                        sgj_js_nv_ihex(jsp, jo3p, ssa, sa);
+                        sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
+                    }
+                    if (0 == sa_len) {
+                        jo3p = sgj_new_unattached_object_r(jsp);
+                        sg_get_opcode_name(opc, pdt, blen, b);
+                        sgj_pr_hr(jsp, "  %s\n", b);
+                        sgj_js_nv_s(jsp, jo3p, "name", b);
+                        sgj_js_nv_ihex(jsp, jo3p, soc, opc);
+                        sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
+                    } else if (m < sa_len)
+                        pr2serr("Supported service actions list length (%d) "
+                                "is too large\n", sa_len);
+                    j += m + 2;
+                }
+                break;
+            case 0x0004:
+                sgj_pr_hr(jsp, " %s:\n", dtp);
+                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum CSCD descriptor count",
+                             SGJ_SEP_COLON_1_SPACE,
+                             sg_get_unaligned_be16(bp + 8), true);
+                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum segment descriptor count",
+                             SGJ_SEP_COLON_1_SPACE,
+                             sg_get_unaligned_be16(bp + 10), true);
+                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum descriptor list length",
+                             SGJ_SEP_COLON_1_SPACE,
+                             sg_get_unaligned_be32(bp + 12), true);
+                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum inline data length",
+                             SGJ_SEP_COLON_1_SPACE,
+                             sg_get_unaligned_be32(bp + 17), true);
+                break;
+            case 0x0008:
+                sgj_pr_hr(jsp, " Supported descriptors:\n");
+                ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                            "supported_descriptor_list");
+                for (j = 0; j < bp[4]; j++) {
+                    bool found_name;
+
+                    jo3p = sgj_new_unattached_object_r(jsp);
+                    u = bp[5 + j];
+                    cp = get_tpc_desc_name(u);
+                    found_name = (strlen(cp) > 0);
+                    if (found_name)
+                        sgj_pr_hr(jsp, "  %s [0x%x]\n", cp, u);
+                    else
+                        sgj_pr_hr(jsp, "  0x%x\n", u);
+                    sgj_js_nv_s(jsp, jo3p, "name", found_name ? cp : nr_s);
+                    sgj_js_nv_ihex(jsp, jo3p, "code", u);
+                    sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
+                }
+                break;
+            case 0x000C:
+                sgj_pr_hr(jsp, " Supported CSCD IDs (above 0x7ff):\n");
+                ja2p = sgj_named_subarray_r(jsp, jo2p, "supported_cscd_"
+                                            "descriptor_id_list");
+                v = sg_get_unaligned_be16(bp + 4);
+                for (j = 0; j < (int)v; j += 2) {
+                    bool found_name;
+
+                    jo3p = sgj_new_unattached_object_r(jsp);
+                    u = sg_get_unaligned_be16(bp + 6 + j);
+                    cp = get_cscd_desc_id_name(u);
+                    found_name = (strlen(cp) > 0);
+                    if (found_name)
+                        sgj_pr_hr(jsp, "  %s [0x%04x]\n", cp, u);
+                    else
+                        sgj_pr_hr(jsp, "  0x%04x\n", u);
+                    sgj_js_nv_s(jsp, jo3p, "name", found_name ? cp : nr_s);
+                    sgj_js_nv_ihex(jsp, jo3p, "id", u);
+                    sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
+                }
+                break;
+            case 0x000D:
+                sgj_pr_hr(jsp, " Copy group identifier:\n");
+                u = bp[4];
+                sg_t10_uuid_desig2str(bp + 5, u, 1 /* c_set */, false,
+                                      true, NULL, blen, b);
+                sgj_pr_hr(jsp, "  Locally assigned UUID: %s", b);
+                sgj_js_nv_s(jsp, jo2p, "locally_assigned_uuid", b);
+                break;
+            case 0x0106:
+                sgj_pr_hr(jsp, " ROD token features:\n");
+                sgj_hr_js_vi(jsp, jo2p, 2, "Remote tokens",
+                             SGJ_SEP_COLON_1_SPACE, bp[4] & 0x0f, true);
+                u = sg_get_unaligned_be32(bp + 16);
+                sgj_pr_hr(jsp, "  Minimum token lifetime: %u seconds\n", u);
+                sgj_js_nv_ihex_nex(jsp, jo2p, "minimum_token_lifetime", u,
+                                   true, "unit: second");
+                u = sg_get_unaligned_be32(bp + 20);
+                sgj_pr_hr(jsp, "  Maximum token lifetime: %u seconds\n", u);
+                sgj_js_nv_ihex_nex(jsp, jo2p, "maximum_token_lifetime", u,
+                                   true, "unit: second");
+                u = sg_get_unaligned_be32(bp + 24);
+                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Maximum token inactivity "
+                                 "timeout", SGJ_SEP_COLON_1_SPACE, u,
+                                 true, "unit: second");
+                u = sg_get_unaligned_be16(bp + 46);
+                ja2p = sgj_named_subarray_r(jsp, jo2p,
+                    "rod_device_type_specific_features_descriptor_list");
+                decode_rod_descriptor(bp + 48, u, op, ja2p);
+                break;
+            case 0x0108:
+                sgj_pr_hr(jsp, " Supported ROD token and ROD types:\n");
+                ja2p = sgj_named_subarray_r(jsp, jo2p, "rod_type_"
+                                            "descriptor_list");
+                for (j = 0; j < sg_get_unaligned_be16(bp + 6); j+= 64) {
+                    bool found_name;
+
+                    jo3p = sgj_new_unattached_object_r(jsp);
+                    u = sg_get_unaligned_be32(bp + 8 + j);
+                    cp = get_tpc_rod_name(u);
+                    found_name = (strlen(cp) > 0);
+                    if (found_name > 0)
+                        sgj_pr_hr(jsp, "  ROD type: %s [0x%x]\n", cp, u);
+                    else
+                        sgj_pr_hr(jsp, "  ROD type: 0x%x\n", u);
+                    sgj_js_nv_ihexstr(jsp, jo3p, "rod_type", u, NULL,
+                                      found_name ? cp : NULL);
+                    u = bp[8 + j + 4];
+                    sgj_pr_hr(jsp, "    ECPY_INT: %s\n",
+                              (u & 0x80) ? y_s : n_s);
+                    sgj_js_nv_ihex_nex(jsp, jo3p, "ecpy_int", !!(0x80 & u),
+                                       false, "Extended CoPY INTernal rods");
+                    sgj_pr_hr(jsp, "    Token in: %s\n",
+                              (u & 0x2) ? y_s : n_s);
+                    sgj_js_nv_i(jsp, jo3p, "token_in", !!(0x2 & u));
+                    sgj_pr_hr(jsp, "    Token out: %s\n",
+                              (u & 0x1) ? y_s : n_s);
+                    sgj_js_nv_i(jsp, jo3p, "token_out", !!(0x2 & u));
+                    u = sg_get_unaligned_be16(bp + 8 + j + 6);
+                    sgj_hr_js_vi(jsp, jo3p, 4, "Preference indicator",
+                                 SGJ_SEP_COLON_1_SPACE, u, true);
+                    sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
+                }
+                break;
+            case 0x8001:    /* Mandatory (SPC-4) */
+                sgj_pr_hr(jsp, " General copy operations:\n");
+                u = sg_get_unaligned_be32(bp + 4);
+                sgj_hr_js_vi(jsp, jo2p, 2, "Total concurrent copies",
+                             SGJ_SEP_COLON_1_SPACE, u, true);
+                u = sg_get_unaligned_be32(bp + 8);
+                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum identified concurrent "
+                             "copies", SGJ_SEP_COLON_1_SPACE, u, true);
+                u = sg_get_unaligned_be32(bp + 12);
+                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Maximum segment length",
+                                 SGJ_SEP_COLON_1_SPACE, u, true,
+                                 "unit: byte");
+                u = bp[16];     /* field is power of 2 */
+                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Data segment granularity",
+                                 SGJ_SEP_COLON_1_SPACE, u, true,
+                                 "unit: 2^val LB");
+                u = bp[17];     /* field is power of 2 */
+                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Inline data granularity",
+                                 SGJ_SEP_COLON_1_SPACE, u, true,
+                                 "unit: 2^val LB");
+                break;
+            case 0x9101:
+                sgj_pr_hr(jsp, " Stream copy operations:\n");
+                u = sg_get_unaligned_be32(bp + 4);
+                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Maximum stream device "
+                                 "transfer size", SGJ_SEP_COLON_1_SPACE, u,
+                                 true, "unit: byte");
+                break;
+            case 0xC001:
+                sgj_pr_hr(jsp, " Held data:\n");
+                u = sg_get_unaligned_be32(bp + 4);
+                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Held data limit",
+                                 SGJ_SEP_COLON_1_SPACE, u, true,
+                                 "unit: byte; (lower limit: minimum)");
+                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Held data granularity",
+                                 SGJ_SEP_COLON_1_SPACE, bp[8], true,
+                                 "unit: 2^val byte");
+                break;
+            default:
+                pr2serr("Unexpected type=%d\n", desc_type);
+                hex2stderr(bp, bump, 1);
+                break;
+            }
+        }
+skip:
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+        jo2p = NULL;
+    }
+    if (jo2p)
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+}
+
+/* VPD_PROTO_LU  0x90 ["pslu"] */
+void
+decode_proto_lu_vpd(uint8_t * buff, int len, struct opts_t * op,
+                    sgj_opaque_p jap)
+{
+    int k, bump, rel_port, desc_len, proto;
+    uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    char b[128];
+    static const int blen = sizeof(b);
+
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    bp = buff + 4;
+    for (k = 0; k < len; k += bump, bp += bump) {
+        jo2p = sgj_new_unattached_object_r(jsp);
+        rel_port = sg_get_unaligned_be16(bp);
+        sgj_hr_js_vi(jsp, jo2p, 2, "Relative port",
+                     SGJ_SEP_COLON_1_SPACE, rel_port, true);
+        proto = bp[2] & 0xf;
+        sg_get_trans_proto_str(proto, blen, b);
+        sgj_hr_js_vistr(jsp, jo2p, 4, "Protocol identifier",
+                        SGJ_SEP_COLON_1_SPACE, proto, false, b);
+        desc_len = sg_get_unaligned_be16(bp + 6);
+        bump = 8 + desc_len;
+        if ((k + bump) > len) {
+            pr2serr("Protocol-specific logical unit information VPD page, "
+                    "short descriptor length=%d, left=%d\n", bump, (len - k));
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            return;
+        }
+        if (0 == desc_len)
+            goto again;;
+        if (2 == op->do_hex) {
+            hex2stdout(bp + 8, desc_len, 1);
+            goto again;;
+        }
+        switch (proto) {
+        case TPROTO_SAS:
+            sgj_hr_js_vi(jsp, jo2p, 2, "TLR control supported",
+                         SGJ_SEP_COLON_1_SPACE, !!(bp[8] & 0x1), false);
+            break;
+        default:
+            pr2serr("Unexpected proto=%d\n", proto);
+            hex2stderr(bp, bump, 1);
+            break;
+        }
+again:
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }
+}
+
+/* VPD_PROTO_PORT  0x91 ["pspo"] */
+void
+decode_proto_port_vpd(uint8_t * buff, int len, struct opts_t * op,
+                      sgj_opaque_p jap)
+{
+    bool pds, ssp_pers;
+    int k, j, bump, rel_port, desc_len, proto, phy;
+    uint8_t * bp;
+    uint8_t * pidp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p ja2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    char b[128];
+    static const int blen = sizeof(b);
+
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    bp = buff + 4;
+    for (k = 0; k < len; k += bump, bp += bump) {
+        jo2p = sgj_new_unattached_object_r(jsp);
+        rel_port = sg_get_unaligned_be16(bp);
+        sgj_hr_js_vi(jsp, jo2p, 2, "Relative port",
+                     SGJ_SEP_COLON_1_SPACE, rel_port, true);
+        proto = bp[2] & 0xf;
+        sg_get_trans_proto_str(proto, blen, b);
+        sgj_hr_js_vistr(jsp, jo2p, 4, "Protocol identifier",
+                        SGJ_SEP_COLON_1_SPACE, proto, false, b);
+        desc_len = sg_get_unaligned_be16(bp + 6);
+        bump = 8 + desc_len;
+        if ((k + bump) > len) {
+            pr2serr("VPD page, short descriptor length=%d, left=%d\n",
+                    bump, (len - k));
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            return;
+        }
+        if (0 == desc_len)
+            goto again;
+        if (2 == op->do_hex) {
+            hex2stdout(bp + 8, desc_len, 1);
+            goto again;
+        }
+        switch (proto) {
+        case TPROTO_SAS:    /* page added in spl3r02 */
+            pds = !!(bp[3] & 0x1);
+            sgj_pr_hr(jsp, "    power disable supported (pwr_d_s)=%d\n", pds);
+            sgj_js_nv_ihex_nex(jsp, jo2p, "pwr_d_s", pds, false,
+                       "PoWeR Disable Supported");
+            ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                    "sas_phy_information_descriptor_list");
+            pidp = bp + 8;
+            for (j = 0; j < desc_len; j += 4, pidp += 4) {
+                jo3p = sgj_new_unattached_object_r(jsp);
+                phy = pidp[1];
+                ssp_pers = !!(0x1 & pidp[2]);
+                sgj_pr_hr(jsp, "      phy id=%d, SSP persistent capable=%d\n",
+                          phy, ssp_pers);
+                sgj_js_nv_ihex(jsp, jo3p, "phy_identifier", phy);
+                sgj_js_nv_i(jsp, jo3p, "ssp_persistent_capable", ssp_pers);
+                sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
+            }
+            break;
+        default:
+            pr2serr("Unexpected proto=%d\n", proto);
+            hex2stderr(bp, bump, 1);
+            break;
+        }
+again:
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
 }

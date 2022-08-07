@@ -19,8 +19,8 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.90 20220622";
-/* spc6r06, sbc5r01, zbc2r13 */
+const char * sg_lib_version_str = "2.91 20220730";
+/* spc6r06, sbc5r03, zbc2r13 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -434,7 +434,7 @@ struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
  * as there is no need to differentiate. */
 struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {    /* originating */
     {0x0, PDT_ALL, "Extended copy(LID1)"},
-    {0x1, PDT_ALL, "Extended copy"},          /* was 'Extended copy(LID4)' */
+    {0x1, PDT_ALL, "Extended copy"}, /* 'Extended copy(LID4)' until spc5r01 */
     {0x10, PDT_ALL, "Populate token"},
     {0x11, PDT_ALL, "Write using token"},
     {0x16, PDT_TAPE, "Set tape stream mirroring"},     /* ADC-4 and SSC-5 */

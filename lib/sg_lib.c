@@ -3559,18 +3559,23 @@ sg_get_llnum_nomult(const char * buf)
 
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as
  * stdin). If reading ASCII hex then there should be either one entry per
- * line or a comma, space, hyphen or tab separated list of bytes. If
- * no_space is * set then a string of ACSII hex digits is expected, 2 per
- * byte. Everything from and including a '#' on a line is ignored. Returns
- * 0 if ok, or an error code. If the error code is
- * SG_LIB_LBA_OUT_OF_RANGE then mp_arr would be exceeded and both mp_arr
- * and mp_arr_len are written to. */
+ * line or a comma, space, hyphen or tab separated list of bytes. If no_space
+ * is set then a string of ACSII hex digits is expected, 2 perbyte.
+ * Everything from and including a '#' on a line is ignored. Returns 0 if ok,
+ * or an error code. If the error code is SG_LIB_LBA_OUT_OF_RANGE then mp_arr
+ * would be exceeded and both mp_arr and mp_arr_len are written to.
+ * The max_arr_len_and argument may carry extra information: when it
+ * is negative its absolute value is used for the maximum number of bytes to
+ * write to mp_arr _and_ the first hexadecimal value on each line is skipped.
+ * Many hexadecimal output programs place a running address (index) as the
+ * first field on each line. When as_binary and/or no_space are true, the
+ * absolute value of max_arr_len_and is used. */
 int
 sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
-             uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
+             uint8_t * mp_arr, int * mp_arr_len, int max_arr_len_and)
 {
-    bool has_stdin, split_line;
-    int fn_len, in_len, k, j, m, fd, err;
+    bool has_stdin, split_line, skip_first, redo_first;
+    int fn_len, in_len, k, j, m, fd, err, max_arr_len;
     int off = 0;
     int ret = 0;
     unsigned int h;
@@ -3583,6 +3588,13 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
     if ((NULL == fname) || (NULL == mp_arr) || (NULL == mp_arr_len)) {
         pr2ws("%s: bad arguments\n", __func__);
         return SG_LIB_LOGIC_ERROR;
+    }
+    if (max_arr_len_and < 0) {
+        skip_first = true;
+        max_arr_len = -max_arr_len_and;
+    } else {
+        skip_first = false;
+        max_arr_len = max_arr_len_and;
     }
     fn_len = strlen(fname);
     if (0 == fn_len)
@@ -3727,8 +3739,9 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
             if (isxdigit(*lcp) && (! isxdigit(*(lcp + 1))))
                 carry_over[0] = *lcp;
             off += k;
-        } else {
-            for (k = 0; k < 1024; ++k) {
+        } else {        /* (white)space separated ASCII hexadecimal bytes */
+            for (redo_first = false, k = 0; k < 1024;
+                 k = (redo_first ? k : k + 1)) {
                 if (1 == sscanf(lcp, "%10x", &h)) {
                     if (h > 0xff) {
                         pr2ws("%s: hex number larger than 0xff in line "
@@ -3746,8 +3759,12 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                         ret = SG_LIB_LBA_OUT_OF_RANGE;
                         *mp_arr_len = max_arr_len;
                         goto fini;
-                    } else
+                    } else if ((0 == k) && skip_first && (! redo_first))
+                        redo_first = true;
+                    else {
+                        redo_first = false;
                         mp_arr[off + k] = h;
+                    }
                     lcp = strpbrk(lcp, " ,-\t");
                     if (NULL == lcp)
                         break;

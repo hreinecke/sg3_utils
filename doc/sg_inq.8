@@ -25,7 +25,9 @@ This utility, when \fIDEVICE\fR is given, sends a SCSI INQUIRY command to it
 then outputs the response. All SCSI devices are meant to respond to
 a "standard" INQUIRY command with at least a 36 byte response (in SCSI 2 and
 higher). An INQUIRY is termed as "standard" when both the EVPD and CmdDt (now
-obsolete) bits are clear.
+obsolete) bits are clear. Formally (i.e. as per SPC stardards) the name of
+a standard INQUIRY response is the "standard INQUIRY data format" but here
+the "standard INQUIRY response" is used as it is shorter and more descriptive.
 .PP
 Alternatively the \fI\-\-inhex=FN\fR option can be given. In this case
 \fIFN\fR is assumed to be a file name ('\-' for stdin) containing ASCII
@@ -125,7 +127,8 @@ page is given it prints out information in the form:
 useful for tools like udev(7) in Linux.
 .TP
 \fB\-E\fR, \fB\-x\fR, \fB\-\-extended\fR
-prints the extended INQUIRY VPD page [0x86].
+prints the extended INQUIRY VPD page [0x86]. It has the same effect
+as giving the \fI\-\-page=ei\fR option.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit. When used twice, after the
@@ -148,7 +151,8 @@ later invocation with the \fI\-\-inhex=FN\fR option, use the '\-HHHH'
 option (e.g. 'sg_inq \-p di \-HHHH /dev/sg3 > dev_id.hex').
 .TP
 \fB\-i\fR, \fB\-\-id\fR
-prints the device identification VPD page [0x83].
+prints the device identification VPD page [0x83]. It has the same effect
+as giving the \fI\-\-page=di\fR option.
 .TP
 \fB\-I\fR, \fB\-\-inhex\fR=\fIFN\fR
 \fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
@@ -338,6 +342,20 @@ get the controller's Identify decoded use the \fI\-\-only\fR option.
 It is possible that even though the \fIDEVICE\fR presents as a NVMe device,
 it has a SNTL and accepts SCSI commands. In this case to send a SCSI INQUIRY
 command (and fetch its VPD pages) use the sg_vpd(8) utility.
+.SH SG_INQ and SG_VPD
+Both these utilities have much in common since VPD pages are fetched with the
+SCSI INQUIRY command. As more VPD pages have been added (and existing pages
+expanded) the newer ones were only decoded with sg_vpd. Recently with the
+optional JSON output work, it was decided to place all VPD page decoding in
+a source file called sg_vpd_common.c that is linked in by both sg_inq and
+sg_vpd.
+.PP
+This means that the VPD page decoding capabilities of both sg_inq and sg_vpd
+will be the same. Their default actions remain as they were, namely when
+sg_inq is used without command line options, it decodes the "standard INQUIRY
+data format" (usually called the "standard INQUIRY response") response while
+when sg_vpd is used without options, it decodes the "Supported VPD pages" VPD
+page.
 .SH EXIT STATUS
 The exit status of sg_inq is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

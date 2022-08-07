@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.78 20220729";  /* spc6r06 + sbc5r01 */
+static const char * version_str = "1.79 20220806";  /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_vpd"
 
@@ -872,508 +872,6 @@ filter_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
         return SG_LIB_CAT_MALFORMED;
     }
     return 0;
-}
-
-/* This is xcopy(LID4) related: "ROD" == Representation Of Data
- * Used by VPD_3PARTY_COPY */
-static void
-decode_rod_descriptor(const uint8_t * buff, int len)
-{
-    const uint8_t * bp = buff;
-    int k, bump;
-    uint64_t ul;
-
-    for (k = 0; k < len; k += bump, bp += bump) {
-        bump = sg_get_unaligned_be16(bp + 2) + 4;
-        switch (bp[0]) {
-            case 0:
-                /* Block ROD device type specific descriptor */
-                printf("  Optimal block ROD length granularity: %d\n",
-                       sg_get_unaligned_be16(bp + 6));
-                printf("  Maximum Bytes in block ROD: %" PRIu64 "\n",
-                       sg_get_unaligned_be64(bp + 8));
-                ul = sg_get_unaligned_be64(bp + 16);
-                printf("  Optimal Bytes in block ROD transfer: ");
-                if (SG_LIB_UNBOUNDED_64BIT == ul)
-                    printf("-1 [no limit]\n");
-                else
-                    printf("%" PRIu64 "\n", ul);
-                ul = sg_get_unaligned_be64(bp + 24);
-                printf("  Optimal Bytes to token per segment: ");
-                if (SG_LIB_UNBOUNDED_64BIT == ul)
-                    printf("-1 [no limit]\n");
-                else
-                    printf("%" PRIu64 "\n", ul);
-                ul = sg_get_unaligned_be64(bp + 32);
-                printf("  Optimal Bytes from token per segment: ");
-                if (SG_LIB_UNBOUNDED_64BIT == ul)
-                    printf("-1 [no limit]\n");
-                else
-                    printf("%" PRIu64 "\n", ul);
-                break;
-            case 1:
-                /* Stream ROD device type specific descriptor */
-                printf("  Maximum Bytes in stream ROD: %" PRIu64 "\n",
-                       sg_get_unaligned_be64(bp + 8));
-                ul = sg_get_unaligned_be64(bp + 16);
-                printf("  Optimal Bytes in stream ROD transfer: ");
-                if (SG_LIB_UNBOUNDED_64BIT == ul)
-                    printf("-1 [no limit]\n");
-                else
-                    printf("%" PRIu64 "\n", ul);
-                break;
-            case 3:
-                /* Copy manager ROD device type specific descriptor */
-                printf("  Maximum Bytes in processor ROD: %" PRIu64 "\n",
-                       sg_get_unaligned_be64(bp + 8));
-                ul = sg_get_unaligned_be64(bp + 16);
-                printf("  Optimal Bytes in processor ROD transfer: ");
-                if (SG_LIB_UNBOUNDED_64BIT == ul)
-                    printf("-1 [no limit]\n");
-                else
-                    printf("%" PRIu64 "\n", ul);
-                break;
-            default:
-                printf("  Unhandled descriptor (format %d, device type %d)\n",
-                       bp[0] >> 5, bp[0] & 0x1F);
-                break;
-        }
-    }
-}
-
-struct tpc_desc_type {
-    uint8_t code;
-    const char * name;
-};
-
-static struct tpc_desc_type tpc_desc_arr[] = {
-    {0x0, "block -> stream"},
-    {0x1, "stream -> block"},
-    {0x2, "block -> block"},
-    {0x3, "stream -> stream"},
-    {0x4, "inline -> stream"},
-    {0x5, "embedded -> stream"},
-    {0x6, "stream -> discard"},
-    {0x7, "verify CSCD"},
-    {0x8, "block<o> -> stream"},
-    {0x9, "stream -> block<o>"},
-    {0xa, "block<o> -> block<o>"},
-    {0xb, "block -> stream & application_client"},
-    {0xc, "stream -> block & application_client"},
-    {0xd, "block -> block & application_client"},
-    {0xe, "stream -> stream&application_client"},
-    {0xf, "stream -> discard&application_client"},
-    {0x10, "filemark -> tape"},
-    {0x11, "space -> tape"},            /* obsolete: spc5r02 */
-    {0x12, "locate -> tape"},           /* obsolete: spc5r02 */
-    {0x13, "<i>tape -> <i>tape"},
-    {0x14, "register persistent reservation key"},
-    {0x15, "third party persistent reservation source I_T nexus"},
-    {0x16, "<i>block -> <i>block"},
-    {0x17, "positioning -> tape"},      /* this and next added spc5r02 */
-    {0x18, "<loi>tape -> <loi>tape"},   /* loi: logical object identifier */
-    {0xbe, "ROD <- block range(n)"},
-    {0xbf, "ROD <- block range(1)"},
-    {0xe0, "CSCD: FC N_Port_Name"},
-    {0xe1, "CSCD: FC N_Port_ID"},
-    {0xe2, "CSCD: FC N_Port_ID with N_Port_Name, checking"},
-    {0xe3, "CSCD: Parallel interface: I_T"},
-    {0xe4, "CSCD: Identification Descriptor"},
-    {0xe5, "CSCD: IPv4"},
-    {0xe6, "CSCD: Alias"},
-    {0xe7, "CSCD: RDMA"},
-    {0xe8, "CSCD: IEEE 1394 EUI-64"},
-    {0xe9, "CSCD: SAS SSP"},
-    {0xea, "CSCD: IPv6"},
-    {0xeb, "CSCD: IP copy service"},
-    {0xfe, "CSCD: ROD"},
-    {0xff, "CSCD: extension"},
-    {0x0, NULL},
-};
-
-static const char *
-get_tpc_desc_name(uint8_t code)
-{
-    const struct tpc_desc_type * dtp;
-
-    for (dtp = tpc_desc_arr; dtp->name; ++dtp) {
-        if (code == dtp->code)
-            return dtp->name;
-    }
-    return "";
-}
-
-struct tpc_rod_type {
-    uint32_t type;
-    const char * name;
-};
-
-static struct tpc_rod_type tpc_rod_arr[] = {
-    {0x0, "copy manager internal"},
-    {0x10000, "access upon reference"},
-    {0x800000, "point in time copy - default"},
-    {0x800001, "point in time copy - change vulnerable"},
-    {0x800002, "point in time copy - persistent"},
-    {0x80ffff, "point in time copy - any"},
-    {0xffff0001, "block device zero"},
-    {0x0, NULL},
-};
-
-static const char *
-get_tpc_rod_name(uint32_t rod_type)
-{
-    const struct tpc_rod_type * rtp;
-
-    for (rtp = tpc_rod_arr; rtp->name; ++rtp) {
-        if (rod_type == rtp->type)
-            return rtp->name;
-    }
-    return "";
-}
-
-struct cscd_desc_id_t {
-    uint16_t id;
-    const char * name;
-};
-
-static struct cscd_desc_id_t cscd_desc_id_arr[] = {
-    /* only values higher than 0x7ff are listed */
-    {0xc000, "copy src or dst null LU, pdt=0"},
-    {0xc001, "copy src or dst null LU, pdt=1"},
-    {0xf800, "copy src or dst in ROD token"},
-    {0xffff, "copy src or dst is copy manager LU"},
-    {0x0, NULL},
-};
-
-static const char *
-get_cscd_desc_id_name(uint16_t cscd_desc_id)
-{
-    const struct cscd_desc_id_t * cdip;
-
-    for (cdip = cscd_desc_id_arr; cdip->name; ++cdip) {
-        if (cscd_desc_id == cdip->id)
-            return cdip->name;
-    }
-    return "";
-}
-
-/* VPD_3PARTY_COPY [3PC, third party copy] */
-static void
-decode_3party_copy_vpd(uint8_t * buff, int len, int do_hex, int pdt,
-                       int verbose)
-{
-    int j, k, m, bump, desc_type, desc_len, sa_len, blen;
-    unsigned int u;
-    const uint8_t * bp;
-    const char * cp;
-    uint64_t ull;
-    char b[120];
-
-    if (len < 4) {
-        pr2serr("Third-party Copy VPD page length too short=%d\n", len);
-        return;
-    }
-    if (3 == do_hex) {
-        hex2stdout(buff, len, -1);
-        return;
-    }
-    blen = sizeof(b);
-    len -= 4;
-    bp = buff + 4;
-    for (k = 0; k < len; k += bump, bp += bump) {
-        desc_type = sg_get_unaligned_be16(bp);
-        desc_len = sg_get_unaligned_be16(bp + 2);
-        if (verbose)
-            printf("Descriptor type=%d [0x%x] , len %d\n", desc_type,
-                   desc_type, desc_len);
-        bump = 4 + desc_len;
-        if ((k + bump) > len) {
-            pr2serr("Third-party Copy VPD page, short descriptor length=%d, "
-                    "left=%d\n", bump, (len - k));
-            return;
-        }
-        if (0 == desc_len)
-            continue;
-        if (2 == do_hex)
-            hex2stdout(bp + 4, desc_len, 1);
-        else if (do_hex > 2)
-            hex2stdout(bp, bump, 1);
-        else {
-            int csll;
-
-            switch (desc_type) {
-            case 0x0000:    /* Required if POPULATE TOKEN (or friend) used */
-                printf(" Block Device ROD Token Limits:\n");
-                u = sg_get_unaligned_be16(bp + 10);
-                printf("  Maximum range descriptors: ");
-                if (0 == u)
-                    printf("0 [not reported]\n");
-                else
-                    printf("%u\n", u);
-                u = sg_get_unaligned_be32(bp + 12);
-                printf("  Maximum inactivity timeout: ");
-                if (0 == u)
-                    printf("0 [not reported]\n");
-                else if (SG_LIB_UNBOUNDED_32BIT == u)
-                    printf("-1 [no maximum given]\n");
-                else
-                    printf("%u seconds\n", u);
-                u = sg_get_unaligned_be32(bp + 16);
-                printf("  Default inactivity timeout: ");
-                if (0 == u)
-                    printf("0 [not reported]\n");
-                else
-                    printf("%u seconds\n", u);
-                ull = sg_get_unaligned_be64(bp + 20);
-                printf("  Maximum token transfer size: ");
-                if (0 == ull)
-                    printf("0 [not reported]\n");
-                else
-                    printf("%" PRIu64 "\n", ull);
-                ull = sg_get_unaligned_be64(bp + 28);
-                printf("  Optimal transfer count: ");
-                if (0 == ull)
-                    printf("0 [not reported]\n");
-                else
-                    printf("%" PRIu64 "\n", ull);
-                break;
-            case 0x0001:    /* Mandatory (SPC-4) */
-                printf(" Supported commands:\n");
-                j = 0;
-                csll = bp[4];
-                if (csll >= desc_len) {
-                    pr2serr("Command supported list length (%d) >= "
-                            "descriptor length (%d), wrong so trim\n",
-                            csll, desc_len);
-                    csll = desc_len - 1;
-                }
-                while (j < csll) {
-                    sa_len = bp[6 + j];
-                    for (m = 0; (m < sa_len) && ((j + m) < csll); ++m) {
-                        sg_get_opcode_sa_name(bp[5 + j], bp[7 + j + m],
-                                              pdt, blen, b);
-                        printf("  %s\n", b);
-                    }
-                    if (0 == sa_len) {
-                        sg_get_opcode_name(bp[5 + j], pdt, blen, b);
-                        printf("  %s\n",  b);
-                    } else if (m < sa_len)
-                        pr2serr("Supported service actions list length (%d) "
-                                "is too large\n", sa_len);
-                    j += m + 2;
-                }
-                break;
-            case 0x0004:
-                printf(" Parameter data:\n");
-                printf("  Maximum CSCD descriptor count: %d\n",
-                       sg_get_unaligned_be16(bp + 8));
-                printf("  Maximum segment descriptor count: %d\n",
-                       sg_get_unaligned_be16(bp + 10));
-                u = sg_get_unaligned_be32(bp + 12);
-                printf("  Maximum descriptor list length: %u\n", u);
-                u = sg_get_unaligned_be32(bp + 16);
-                printf("  Maximum inline data length: %u\n", u);
-                break;
-            case 0x0008:
-                printf(" Supported descriptors:\n");
-                for (j = 0; j < bp[4]; j++) {
-                    cp = get_tpc_desc_name(bp[5 + j]);
-                    if (strlen(cp) > 0)
-                        printf("  %s [0x%x]\n", cp, bp[5 + j]);
-                    else
-                        printf("  0x%x\n", bp[5 + j]);
-                }
-                break;
-            case 0x000C:
-                printf(" Supported CSCD IDs (above 0x7ff):\n");
-                for (j = 0; j < sg_get_unaligned_be16(bp + 4); j += 2) {
-                    u = sg_get_unaligned_be16(bp + 6 + j);
-                    cp = get_cscd_desc_id_name(u);
-                    if (strlen(cp) > 0)
-                        printf("  %s [0x%04x]\n", cp, u);
-                    else
-                        printf("  0x%04x\n", u);
-                }
-                break;
-            case 0x000D:
-                printf(" Copy group identifier:\n");
-                u = bp[4];
-                sg_t10_uuid_desig2str(bp + 5, u, 1 /* c_set */, false,
-                                      false, NULL, blen, b);
-                printf("%s", b);
-                break;
-            case 0x0106:
-                printf(" ROD token features:\n");
-                printf("  Remote tokens: %d\n", bp[4] & 0x0f);
-                u = sg_get_unaligned_be32(bp + 16);
-                printf("  Minimum token lifetime: %u seconds\n", u);
-                u = sg_get_unaligned_be32(bp + 20);
-                printf("  Maximum token lifetime: %u seconds\n", u);
-                u = sg_get_unaligned_be32(bp + 24);
-                printf("  Maximum token inactivity timeout: %u\n", u);
-                decode_rod_descriptor(bp + 48,
-                                      sg_get_unaligned_be16(bp + 46));
-                break;
-            case 0x0108:
-                printf(" Supported ROD token and ROD types:\n");
-                for (j = 0; j < sg_get_unaligned_be16(bp + 6); j+= 64) {
-                    u = sg_get_unaligned_be32(bp + 8 + j);
-                    cp = get_tpc_rod_name(u);
-                    if (strlen(cp) > 0)
-                        printf("  ROD type: %s [0x%x]\n", cp, u);
-                    else
-                        printf("  ROD type: 0x%x\n", u);
-                    printf("    Internal: %s\n",
-                           (bp[8 + j + 4] & 0x80) ? "yes" : "no");
-                    printf("    Token in: %s\n",
-                           (bp[8 + j + 4] & 0x02) ? "yes" : "no");
-                    printf("    Token out: %s\n",
-                           (bp[8 + j + 4] & 0x01) ? "yes" : "no");
-                    printf("    Preference: %d\n",
-                           sg_get_unaligned_be16(bp + 8 + j + 6));
-                }
-                break;
-            case 0x8001:    /* Mandatory (SPC-4) */
-                printf(" General copy operations:\n");
-                u = sg_get_unaligned_be32(bp + 4);
-                printf("  Total concurrent copies: %u\n", u);
-                u = sg_get_unaligned_be32(bp + 8);
-                printf("  Maximum identified concurrent copies: %u\n", u);
-                u = sg_get_unaligned_be32(bp + 12);
-                printf("  Maximum segment length: %u\n", u);
-                printf("  Data segment granularity: ");
-                u = bp[16];     /* field is power of 2 */
-                if (u < 64)
-                    printf("%" PRIu64 "\n", (uint64_t)1 << u);
-                else
-                    printf("too large [2^%u]\n", u);
-                printf("  Inline data granularity: ");
-                u = bp[17];     /* field is power of 2 */
-                if (u < 64)
-                    printf("%" PRIu64 "\n", (uint64_t)1 << u);
-                else
-                    printf("too large [2^%u]\n", u);
-                break;
-            case 0x9101:
-                printf(" Stream copy operations:\n");
-                u = sg_get_unaligned_be32(bp + 4);
-                printf("  Maximum stream device transfer size: %u\n", u);
-                break;
-            case 0xC001:
-                printf(" Held data:\n");
-                u = sg_get_unaligned_be32(bp + 4);
-                printf("  Held data limit: %u\n", u);
-                ull = ((uint64_t)1 << bp[8]);
-                printf("  Held data granularity: %" PRIu64 "\n", ull);
-                break;
-            default:
-                pr2serr("Unexpected type=%d\n", desc_type);
-                hex2stderr(bp, bump, 1);
-                break;
-            }
-        }
-    }
-}
-
-/* VPD_PROTO_LU */
-static void
-decode_proto_lu_vpd(uint8_t * buff, int len, int do_hex)
-{
-    int k, bump, rel_port, desc_len, proto;
-    uint8_t * bp;
-
-    if ((1 == do_hex) || (do_hex > 2)) {
-        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
-        return;
-    }
-    if (len < 4) {
-        pr2serr("Protocol-specific logical unit information VPD page length "
-                "too short=%d\n", len);
-        return;
-    }
-    len -= 4;
-    bp = buff + 4;
-    for (k = 0; k < len; k += bump, bp += bump) {
-        rel_port = sg_get_unaligned_be16(bp);
-        printf("  Relative port=%d\n", rel_port);
-        proto = bp[2] & 0xf;
-        desc_len = sg_get_unaligned_be16(bp + 6);
-        bump = 8 + desc_len;
-        if ((k + bump) > len) {
-            pr2serr("Protocol-specific logical unit information VPD page, "
-                    "short descriptor length=%d, left=%d\n", bump, (len - k));
-            return;
-        }
-        if (0 == desc_len)
-            continue;
-        if (2 == do_hex) {
-            hex2stdout(bp + 8, desc_len, 1);
-            continue;
-        }
-        switch (proto) {
-        case TPROTO_SAS:
-            printf("    Protocol identifier: SAS\n");
-            printf("    TLR control supported: %d\n", !!(bp[8] & 0x1));
-            break;
-        default:
-            pr2serr("Unexpected proto=%d\n", proto);
-            hex2stderr(bp, bump, 1);
-            break;
-        }
-    }
-}
-
-/* VPD_PROTO_PORT */
-static void
-decode_proto_port_vpd(uint8_t * buff, int len, int do_hex)
-{
-    int k, j, bump, rel_port, desc_len, proto;
-    uint8_t * bp;
-    uint8_t * pidp;
-
-    if ((1 == do_hex) || (do_hex > 2)) {
-        hex2stdout(buff, len, (1 == do_hex) ? 1 : -1);
-        return;
-    }
-    if (len < 4) {
-        pr2serr("Protocol-specific port information VPD page length too "
-                "short=%d\n", len);
-        return;
-    }
-    len -= 4;
-    bp = buff + 4;
-    for (k = 0; k < len; k += bump, bp += bump) {
-        rel_port = sg_get_unaligned_be16(bp);
-        printf("  Relative port=%d\n", rel_port);
-        proto = bp[2] & 0xf;
-        desc_len = sg_get_unaligned_be16(bp + 6);
-        bump = 8 + desc_len;
-        if ((k + bump) > len) {
-            pr2serr("Protocol-specific port VPD page, short descriptor "
-                    "length=%d, left=%d\n", bump, (len - k));
-            return;
-        }
-        if (0 == desc_len)
-            continue;
-        if (2 == do_hex) {
-            hex2stdout(bp + 8, desc_len, 1);
-            continue;
-        }
-        switch (proto) {
-        case TPROTO_SAS:    /* page added in spl3r02 */
-            printf("    power disable supported (pwr_d_s)=%d\n",
-                   !!(bp[3] & 0x1));       /* added spl3r03 */
-            pidp = bp + 8;
-            for (j = 0; j < desc_len; j += 4, pidp += 4)
-                printf("      phy id=%d, SSP persistent capable=%d\n",
-                       pidp[1], (0x1 & pidp[2]));
-            break;
-        default:
-            pr2serr("Unexpected proto=%d\n", proto);
-            hex2stderr(bp, bump, 1);
-            break;
-        }
-    }
 }
 
 /* VPD_BLOCK_LIMITS sbc */
@@ -2343,60 +1841,73 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         }
         break;
     case VPD_3PARTY_COPY:   /* 0x8f */
-        np = "Third party copy VPD page:";
+        np = "Third party copy VPD page";       /* ["tpc"] */
         if (allow_name)
-            printf("%s%s\n", pre, np);
+            sgj_pr_hr(jsp, "%s%s:\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
-            else if (1 == op->do_hex)
-                hex2stdout(rp, len, 0);
             else {
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           pqual, pdt_str);
-                decode_3party_copy_vpd(rp, len, op->do_hex, pdt, vb);
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", pqual, pdt_str);
+                if (as_json) {
+                    jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                    jap = sgj_named_subarray_r(jsp, jo2p,
+                                      "third_party_copy_descriptors");
+                }
+                decode_3party_copy_vpd(rp, len, op, jap);
             }
             return 0;
         }
         break;
-    case VPD_PROTO_LU:          /* 0x90 */
-        np = "Protocol-specific logical unit information:";
+    case VPD_PROTO_LU:          /* 0x90 ["pslu"] */
+        np = "Protocol-specific logical unit information VPD page";
         if (allow_name)
-            printf("%s%s\n", pre, np);
+            sgj_pr_hr(jsp, "%s%s:\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s:\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           pqual, pdt_str);
-                decode_proto_lu_vpd(rp, len, op->do_hex);
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", pqual, pdt_str);
+                if (as_json) {
+                    jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                    jap = sgj_named_subarray_r(jsp, jo2p,
+                              "logical_unit_information_descriptor_list");
+                }
+                decode_proto_lu_vpd(rp, len, op, jap);
             }
             return 0;
         }
         break;
-    case VPD_PROTO_PORT:        /* 0x91 */
-        np = "Protocol-specific port information:";
+    case VPD_PROTO_PORT:        /* 0x91  ["pspo"] */
+        np = "Protocol-specific port VPD page";
         if (allow_name)
-            printf("%s%s\n", pre, np);
+            sgj_pr_hr(jsp, "%s%s\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s:\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
-                    printf("   [PQual=%d  Peripheral device type: %s]\n",
-                           pqual, pdt_str);
-                decode_proto_port_vpd(rp, len, op->do_hex);
+                    sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
+                              "%s]\n", pqual, pdt_str);
+                if (as_json) {
+                    jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                    jap = sgj_named_subarray_r(jsp, jo2p,
+                              "port_information_descriptor_list");
+                }
+                decode_proto_port_vpd(rp, len, op, jsp);
             }
             return 0;
         }

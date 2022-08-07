@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.26 20220729";  /* spc6r06 */
+static const char * version_str = "2.27 20220806";  /* spc6r06, sbc5r03 */
 
 #define MY_NAME "sg_inq"
 
@@ -328,8 +328,7 @@ usage()
             "Performs a SCSI INQUIRY command on DEVICE or decodes INQUIRY "
             "response\nheld in file FN. If no options given then does a "
             "'standard' INQUIRY.\nCan list VPD pages with '--vpd' or "
-            "'--page=PG' option. The sg_vpd\nand sdparm utilities decode "
-            "more VPD pages than this utility.\n");
+            "'--page=PG' option.\n");
 }
 
 #ifdef SG_SCSI_STRINGS
@@ -3268,6 +3267,60 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
                                   "constituent_descriptor_list");
             }
             decode_dev_constit_vpd(rp, len, op, jap, recurse_vpd_decode);
+        }
+        break;
+    case VPD_3PARTY_COPY:       /* 0x8f  ["tpc"] */
+        np = "Third party copy VPD page";
+        if (!op->do_raw && (op->do_hex < 2))
+            sgj_pr_hr(jsp, "VPD INQUIRY: %s\n", np);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else {
+            if (as_json) {
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                jap = sgj_named_subarray_r(jsp, jo2p,
+                                  "third_party_copy_descriptor_list");
+            }
+            decode_3party_copy_vpd(rp, len, op, jap);
+        }
+        break;
+    case VPD_PROTO_LU:          /* 0x90  ["pslu"] */
+        np = "Protocol specific logical unit information VPD page";
+        if (!op->do_raw && (op->do_hex < 2))
+            sgj_pr_hr(jsp, "VPD INQUIRY: %s\n", np);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else {
+            if (as_json) {
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                jap = sgj_named_subarray_r(jsp, jo2p,
+                                  "logical_unit_information_descriptor_list");
+            }
+            decode_proto_lu_vpd(rp, len, op, jap);
+        }
+        break;
+    case VPD_PROTO_PORT:        /* 0x91  ["pspo"] */
+        np = "Protocol specific port information VPD page";
+        if (!op->do_raw && (op->do_hex < 2))
+            sgj_pr_hr(jsp, "VPD INQUIRY: %s\n", np);
+        res = vpd_fetch_page_from_dev(sg_fd, rp, pn, op->maxlen, vb, &len);
+        if (res)
+            break;
+        if (op->do_raw)
+            dStrRaw((const char *)rp, len);
+        else {
+            if (as_json) {
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+                jap = sgj_named_subarray_r(jsp, jo2p,
+                                  "port_information_descriptor_list");
+            }
+            decode_proto_port_vpd(rp, len, op, jap);
         }
         break;
     case VPD_SCSI_FEATURE_SETS:         /* 0x92  ["sfs"] */

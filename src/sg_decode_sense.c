@@ -30,11 +30,11 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.31 20220729";
+static const char * version_str = "1.32 20220730";
 
 #define MY_NAME "sg_decode_sense"
 
-#define MAX_SENSE_LEN 4096 /* max descriptor format actually: 255+8 */
+#define MAX_SENSE_LEN 8192 /* max descriptor format actually: 255+8 */
 
 static struct option long_options[] = {
     {"binary", required_argument, 0, 'b'},
@@ -46,8 +46,10 @@ static struct option long_options[] = {
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
     {"in", required_argument, 0, 'i'},          /* don't advertise */
-    {"json", optional_argument, 0, 'j'},
     {"inhex", required_argument, 0, 'i'},       /* same as --file */
+    {"ignore-first", no_argument, 0, 'I'},
+    {"ignore_first", no_argument, 0, 'I'},
+    {"json", optional_argument, 0, 'j'},
     {"nodecode", no_argument, 0, 'N'},
     {"nospace", no_argument, 0, 'n'},
     {"status", required_argument, 0, 's'},
@@ -68,6 +70,7 @@ struct opts_t {
     bool version_given;
     bool err_given;
     bool file_given;
+    bool ignore_first;
     const char * fname;
     int es_val;
     int hex_count;
@@ -89,10 +92,11 @@ usage()
   pr2serr("Usage: sg_decode_sense [--binary=BFN] [--cdb] [--err=ES] "
           "[--file=HFN]\n"
           "                       [--help] [--hex] [--inhex=HFN] "
-          "[--json[=JO]]\n"
-          "                       [--nodecode] [--nospace] [--status=SS] "
-          "[--verbose]\n"
-          "                       [--version] [--write=WFN] H1 H2 H3 ...\n"
+          "[--ignore-first]\n"
+          "                       [--json[=JO]] [--nodecode] [--nospace] "
+          "[--status=SS]\n"
+          "                       [--verbose] [--version] [--write=WFN] "
+          "H1 H2 H3 ...\n"
           "  where:\n"
           "    --binary=BFN|-b BFN    BFN is a file name to read sense "
           "data in\n"
@@ -116,6 +120,10 @@ usage()
           "                          hex (used '-HH' or '-HHH' for different "
           "formats)\n"
           "    --inhex=HFN|-i HFN    same as action as --file=HFN\n"
+          "    --ignore-first|-I     when reading hex (e.g. with --file=HFN) "
+          "skip\n"
+          "                          the first hexadecimal value on each "
+          "line\n"
           "    --json[=JO]|-j[JO]    output in JSON instead of human "
           "readable text.\n"
           "                          Use --json=? for JSON help\n"
@@ -149,7 +157,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     char *endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:ce:f:hHi:j::nNs:vVw:", long_options,
+        c = getopt_long(argc, argv, "b:ce:f:hHi:Ij::nNs:vVw:", long_options,
                         NULL);
         if (c == -1)
             break;
@@ -200,6 +208,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             }
             op->file_given = true;
             op->fname = optarg;
+            break;
+        case 'I':
+            op->ignore_first = true;
             break;
        case 'j':
             if (! sgj_init_state(&op->json_st, optarg)) {
@@ -333,12 +344,17 @@ main(int argc, char *argv[])
     const char * cp;
     sgj_state * jsp;
     sgj_opaque_p jop = NULL;
+    uint8_t * free_op_buff = NULL;
     char b[2048];
-    struct opts_t opts;
 
-    op = &opts;
+    op = (struct opts_t *)sg_memalign(sizeof(*op), 0 /* page align */,
+				      &free_op_buff, false);
+    if (NULL == op) {
+        pr2serr("Unable to allocate heap for options structure\n");
+        ret = sg_convert_errno(ENOMEM);
+        goto clean_op;
+    }
     blen = sizeof(b);
-    memset(op, 0, sizeof(opts));
     memset(b, 0, blen);
     ret = parse_cmd_line(op, argc, argv);
 
@@ -360,14 +376,14 @@ main(int argc, char *argv[])
 #endif
     if (op->version_given) {
         pr2serr("version: %s\n", version_str);
-        return 0;
+        goto clean_op;
     }
     if (ret != 0) {
         usage();
-        return ret;
+        goto clean_op;
     } else if (op->do_help) {
         usage();
-        return 0;
+        goto clean_op;
     }
     as_json = op->json_st.pr_as_json;
     jsp = &op->json_st;
@@ -450,7 +466,9 @@ main(int argc, char *argv[])
         op->sense_len = s;
     } else if (op->file_given) {
         ret = sg_f2hex_arr(op->fname, false, op->no_space, op->sense,
-                           &op->sense_len, MAX_SENSE_LEN);
+                           &op->sense_len,
+                           (op->ignore_first ? -MAX_SENSE_LEN :
+                                               MAX_SENSE_LEN));
         if (ret) {
             pr2serr("unable to decode ASCII hex from file: %s\n", op->fname);
             goto fini;
@@ -522,5 +540,8 @@ fini:
             sgj_js2file(&op->json_st, NULL, ret, stdout);
         sgj_finish(jsp);
     }
+clean_op:
+    if (free_op_buff)
+        free(free_op_buff);
     return ret;
 }

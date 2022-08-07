@@ -4,9 +4,10 @@ sg_decode_sense \- decode SCSI sense and related data
 .SH SYNOPSIS
 .B sg_decode_sense
 [\fI\-\-binary=BFN\fR] [\fI\-\-cdb\fR] [\fI\-\-err=ES\fR] [\fI\-\-file=HFN\fR]
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=HFN\fR] [\fI\-\-nodecode\fR]
-[\fI\-\-nospace\fR] [\fI\-\-status=SS\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=HFN\fR]
+[\fI\-\-ignore\-first\fR] [\fI\-\-nodecode\fR] [\fI\-\-nospace\fR]
+[\fI\-\-status=SS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This utility takes SCSI sense data in binary or as a sequence of ASCII
@@ -96,6 +97,14 @@ this option three times (e.g. '\-HHH').
 \fB\-i\fR, \fB\-\-inhex\fR=\fIHFN\fR
 same action as \fI\-\-file=HFN\fR. This option was added for compatibility
 with other utilities in this package that have a \fI\-\-inhex=\fR option.
+.TP
+\fB\-I\fR, \fB\-\-ignore\-first\fR
+many programs that output hex bytes (e.g. 'hexdump \-C') have a running
+count (or index) in the first column of each line. This option ignores the
+first hexadecimal value on each line. This option has no effect if
+\fI\-\-binary=BFN\fR or \fI\-\-nospace\fR are given. Blank lines and any
+character from and after "#" on a line are ignored. Useful with the
+\fI\-\-file=HFN\fR and \fI\-\-nodecode\fR options.
 .TP
 \fB\-N\fR, \fB\-\-nodecode\fR
 Do not decode the given data as sense or a cdb. Useful when arbitrary data

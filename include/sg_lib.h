@@ -661,14 +661,19 @@ void hex2stderr(const uint8_t * b_str, int len, int no_ascii);
 
 /* Read ASCII hex bytes or binary from fname (a file named '-' taken as
  * stdin). If reading ASCII hex then there should be either one entry per
- * line or a comma, space, hyphen or tab separated list of bytes. If
- * no_space is * set then a string of ACSII hex digits is expected, 2 per
- * byte. Everything from and including a '#' on a line is ignored. Returns
- * 0 if ok, or an error code. If the error code is
- * SG_LIB_LBA_OUT_OF_RANGE then mp_arr would be exceeded and both mp_arr
- * and mp_arr_len are written to. */
+ * line or a comma, space, hyphen or tab separated list of bytes. If no_space
+ * is set then a string of ACSII hex digits is expected, 2 per byte.
+ * Everything from and including a '#' on a line is ignored. Returns 0 if ok,
+ * or an error code. If the error code is SG_LIB_LBA_OUT_OF_RANGE then mp_arr
+ * would be exceeded and both mp_arr and mp_arr_len are written to.
+ * The max_arr_len_and argument may carry extra information: when it is
+ * negative its absolute value is used for the maximum number of bytes to
+ * write to mp_arr _and_ the first hexadecimal value on each line is skipped.
+ * Many hexadecimal output programs place a running address (index) as the
+ * first field on each line. When as_binary and/or no_space are true, the
+ * absolute value of max_arr_len_and is used. */
 int sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
-                 uint8_t * mp_arr, int * mp_arr_len, int max_arr_len);
+                 uint8_t * mp_arr, int * mp_arr_len, int max_arr_len_and);
 
 /* Returns true when executed on big endian machine; else returns false.
  * Useful for displaying ATA identify words (which need swapping on a
