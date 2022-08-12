@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220811] [svn: r966]
+Changelog for pre-release sg3_utils-1.48 [20220812] [svn: r968]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -71,6 +71,8 @@ Changelog for pre-release sg3_utils-1.48 [20220811] [svn: r966]
     - add SG_C_CPP_ZERO_INIT to better handle aggregate stack
       instance zeroing (C23 adding 'struct T t {};' will help)
   - initialize all sense buffers to 0
+  - linux: replace references to /proc/scsi/sg with
+    /sys/module/sg/parameters/
   - rework main README file
   - rev 921+922 are bugfix revs on release 1.47 [r919,920]
   - configure.ac: map msys to mingw
@@ -1829,7 +1831,7 @@ Changelog for sg3_utils-0.96 [20011221]
 Changelog for sg3_utils-0.95 [20010915]
 ----------------------------
   - make sg_dd, sgp_dd and archive/sgq_dd warn if dio selected but
-    /proc/scsi/sg/allow_dio is '0'
+    /sys/module/sg/parameters/allow_dio is '0'
   - sg_map can now do any INQUIRY (when '-i' argument given)
   - expand example in scsi_inquiry
 

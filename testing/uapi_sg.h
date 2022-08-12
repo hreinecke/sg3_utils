@@ -442,8 +442,8 @@ struct sg_header {
 #define SG_SET_COMMAND_Q 0x2271   /* Change queuing state with 0 or 1 */
 
 /*
- * Turn on/off error sense trace (1 and 0 respectively, default is off).
- * Try using: "# cat /proc/scsi/sg/debug" instead in the v3 driver
+ * Turn on/off error sense trace in the kernel log (1 and 0 respectively, default is
+ * off).
  */
 #define SG_SET_DEBUG 0x227e    /* 0 -> turn off debug */
 

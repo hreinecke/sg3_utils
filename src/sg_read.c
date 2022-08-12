@@ -98,7 +98,7 @@ static int in_partial = 0;
 static int pack_id_count = 0;
 static int verbose = 0;
 
-static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
+static const char * sg_allow_dio = "/sys/module/sg/parameters/allow_dio";
 
 
 static void
@@ -916,11 +916,11 @@ main(int argc, char * argv[])
 
         pr2serr(">> Direct IO requested but incomplete %d times\n",
                 dio_incomplete);
-        if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+        if ((fd = open(sg_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
                 if ('0' == c)
                     pr2serr(">>> %s set to '0' but should be set to '1' for "
-                            "direct IO\n", proc_allow_dio);
+                            "direct IO\n", sg_allow_dio);
             }
             close(fd);
         }

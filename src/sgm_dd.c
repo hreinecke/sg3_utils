@@ -126,7 +126,7 @@ static struct timeval start_tm;
 static int blk_sz = 0;
 static uint32_t glob_pack_id = 0;       /* pre-increment */
 
-static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
+static const char * sg_allow_dio = "/sys/module/sg/parameters/allow_dio";
 
 struct flags_t {
     bool append;
@@ -1285,11 +1285,11 @@ main(int argc, char * argv[])
         int fd;
         char c;
 
-        if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+        if ((fd = open(sg_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
                 if ('0' == c)
                     pr2serr(">>> %s set to '0' but should be set to '1' for "
-                            "direct IO\n", proc_allow_dio);
+                            "direct IO\n", sg_allow_dio);
             }
             close(fd);
         }

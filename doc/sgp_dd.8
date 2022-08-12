@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "October 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SGP_DD "8" "August 2022" "sg3_utils\-1.47" SG3_UTILS
 .SH NAME
 sgp_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -77,7 +77,7 @@ of debug (max debug output when \fIVERB\fR is 9).
 \fBdio\fR=0 | 1
 default is 0 which selects indirect IO. Value of 1 attempts direct
 IO which, if not available, falls back to indirect IO and notes this
-at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
+at completion. If direct IO is selected and /sys/module/sg/parameters/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed)
 For finer grain control use 'iflag=dio' or 'oflag=dio'.
 .TP
@@ -184,8 +184,9 @@ reported to stderr and the copy continues (as if nothing went wrong).
 dio
 request the sg device node associated with this flag does direct IO.
 If direct IO is not available, falls back to indirect IO and notes
-this at completion. If direct IO is selected and /proc/scsi/sg/allow_dio
-has the value of 0 then a warning is issued (and indirect IO is performed).
+this at completion. If direct IO is selected and
+/sys/module/sg/parameters/allow_dio has the value of 0 then a warning is
+issued (and indirect IO is performed).
 .TP
 direct
 causes the O_DIRECT flag to be added to the open of \fIIFILE\fR and/or
@@ -246,7 +247,7 @@ A raw device must be bound to a block device prior to using sgp_dd.
 See
 .B raw(8)
 for more information about binding raw devices. To be safe, the sg device
-mapping to SCSI block devices should be checked with 'cat /proc/scsi/scsi'
+mapping to SCSI block devices should be checked with 'sg_map'
 before use.
 .PP
 Raw device partition information can often be found with
@@ -330,7 +331,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2021 Douglas Gilbert
+Copyright \(co 2000\-2022 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

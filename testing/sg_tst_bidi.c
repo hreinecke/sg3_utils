@@ -585,7 +585,7 @@ rep_async:
     }
     if (direct_io && (dirio_count < q_len)) {
         pr2serr("Direct IO requested %d times, done %d times\nMaybe need "
-                "'echo 1 > /proc/scsi/sg/allow_dio'\n", q_len, dirio_count);
+                "'echo 1 > /sys/module/sg/parameters/allow_dio'\n", q_len, dirio_count);
     }
     if (rep_count-- > 0)
         goto rep_async;

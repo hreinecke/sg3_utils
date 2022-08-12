@@ -396,7 +396,7 @@ static atomic<bool> vb_first_time(true);
 static sigset_t signal_set;
 static sigset_t orig_signal_set;
 
-static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
+static const char * sg_allow_dio = "/sys/module/sg/parameters/allow_dio";
 
 static int do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
                               scat_gath_iter & o_sg_it, int seg_blks,
@@ -632,12 +632,12 @@ page4:
             "each issued\nSCSI command. When both IFILE and OFILE are sg "
             "devices, then the READ in\neach read-write pair is issued an "
             "even pack_id and its WRITE pair is\ngiven the pack_id one "
-            "higher (i.e. an odd number). This enables a\n'cat '"
-            "/proc/scsi/sg/debug' user to see that progress is being "
+            "higher (i.e. an odd number). This enables a\n'dmesg -w' "
+            "user to see that progress is being "
             "made.\n\n");
     pr2serr("Debugging:\n"
             "Apart from using one or more '--verbose' options which gets a "
-            "bit noisy\n'cat /proc/scsi/sg/debug' can give a good overview "
+            "bit noisy\n'dmesg -w' can give a good overview "
             "of what is happening.\nThat does a sg driver object tree "
             "traversal that does minimal locking\nto make sure that each "
             "traversal is 'safe'. So it is important to note\nthe whole "
@@ -650,7 +650,7 @@ page4:
             "request entered it while some other nodes were being "
             "printed.\n\n");
     pr2serr("Busy state:\n"
-            "Busy state (abbreviated to 'bsy' in the /proc/scsi/sg/debug "
+            "Busy state (abbreviated to 'bsy' in the dmesg "
             "output)\nis entered during request setup and completion. It "
             "is intended to be\na temporary state. It should not block "
             "but does sometimes (e.g. in\nblock_get_request()). Even so "
@@ -1255,7 +1255,7 @@ bypass:
     }
     if (clp->verbose) {
         t = 1;
-        /* more info in /proc/scsi/sg/debug */
+        /* more info in the kernel log */
         res = ioctl(fd, SG_SET_DEBUG, &t);
         if (res < 0)
             perror("sg_mrq_dd: SG_SET_DEBUG error");
@@ -1507,7 +1507,7 @@ sig_listen_thread(struct global_collection * clp)
                     } else
                         pr2serr_lk("%s: subsequent stall at pack_id=%d\n",
                                    __func__, pack_id);
-                    system_wrapper("/usr/bin/cat /proc/scsi/sg/debug\n");
+                    system_wrapper("/usr/bin/dmesg\n");
                 } else
                     prev_pack_id = pack_id;
             } else if (EAGAIN != err)
@@ -4614,11 +4614,11 @@ fini:
 
         pr2serr(">> Direct IO requested but incomplete %d times\n",
                 clp->dio_incomplete_count.load());
-        if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+        if ((fd = open(sg_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
                 if ('0' == c)
                     pr2serr(">>> %s set to '0' but should be set to '1' for "
-                            "direct IO\n", proc_allow_dio);
+                            "direct IO\n", sg_allow_dio);
             }
             close(fd);
         }

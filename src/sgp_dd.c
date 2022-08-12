@@ -214,7 +214,7 @@ typedef struct request_element
 static sigset_t signal_set;
 static pthread_t sig_listen_thread_id;
 
-static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
+static const char * sg_allow_dio = "/sys/module/sg/parameters/allow_dio";
 
 static void sg_in_operation(struct opts_t * clp, Rq_elem * rep);
 static void sg_out_operation(struct opts_t * clp, Rq_elem * rep,
@@ -1991,11 +1991,11 @@ fini:
 
         pr2serr(">> Direct IO requested but incomplete %d times\n",
                 clp->dio_incomplete_count);
-        if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+        if ((fd = open(sg_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
                 if ('0' == c)
                     pr2serr(">>> %s set to '0' but should be set to '1' for "
-                            "direct IO\n", proc_allow_dio);
+                            "direct IO\n", sg_allow_dio);
             }
             close(fd);
         }

@@ -71,7 +71,7 @@ to be transferred. This option is mandatory.
 default is 0 which selects indirect IO. Value of 1 attempts direct
 IO which, if not available, falls back to indirect IO and notes this
 at completion. This option is only active if \fIIFILE\fR is an sg device.
-If direct IO is selected and /proc/scsi/sg/allow_dio
+If direct IO is selected and /sys/module/sg/parameters/allow_dio
 has the value of 0 then a warning is issued (and indirect IO is performed)
 .TP
 \fBdpo\fR=0 | 1
@@ -140,7 +140,7 @@ This is called "indirect IO" and there is a "dio" option to select
 "direct IO" which will DMA directly into user memory. Due to some
 issues "direct IO" is disabled in the sg driver and needs a
 configuration change to activate it. This is typically done with
-"echo 1 > /proc/scsi/sg/allow_dio". An alternate way to avoid the
+"echo 1 > /sys/module/sg/parameters/allow_dio". An alternate way to avoid the
 2 stage copy is to select memory mapped IO with 'mmap=1'.
 .SH SIGNALS
 The signal handling has been borrowed from dd: SIGINT, SIGQUIT and

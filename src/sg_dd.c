@@ -182,7 +182,7 @@ static long seed;
 static struct drand48_data drand;/* opaque, used by srand48_r and mrand48_r */
 #endif
 
-static const char * proc_allow_dio = "/proc/scsi/sg/allow_dio";
+static const char * sg_allow_dio = "/sys/module/sg/parameters/allow_dio";
 
 struct flags_t {
     bool append;
@@ -2733,11 +2733,11 @@ bypass_copy:
 
         pr2serr(">> Direct IO requested but incomplete %d times\n",
                 dio_incomplete_count);
-        if ((fd = open(proc_allow_dio, O_RDONLY)) >= 0) {
+        if ((fd = open(sg_allow_dio, O_RDONLY)) >= 0) {
             if (1 == read(fd, &c, 1)) {
                 if ('0' == c)
                     pr2serr(">>> %s set to '0' but should be set to '1' for "
-                            "direct IO\n", proc_allow_dio);
+                            "direct IO\n", sg_allow_dio);
             }
             close(fd);
         }
