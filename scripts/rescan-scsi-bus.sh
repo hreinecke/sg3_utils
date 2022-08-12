@@ -4,7 +4,7 @@
 # (c) 2006--2022 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20220622"
+VERSION="20220811"
 SCAN_WILD_CARD=4294967295
 
 setcolor ()
@@ -1151,6 +1151,7 @@ if [ "@$1" = @--help ] || [ "@$1" = @-h ] || [ "@$1" = "@-?" ] ; then
     echo "--largelun:      Tell kernel to support LUNs > 7 even on SCSI2 devs"
     echo "--luns=LIST:     Scan only lun(s) in LIST"
     echo "--multipath:     same as -m"
+    echo "--no-lip-scan:   don't scan FC Host with issue-lip"
     echo "--nooptscan:     don't stop looking for LUNs if 0 is not found"
     echo "--remove:        same as -r"
     echo "--reportlun2:    Tell kernel to try REPORT_LUN even on SCSI2 devices"
@@ -1221,6 +1222,7 @@ lipreset=-1
 timeout=30
 declare -i scan_flags=0
 ignore_rev=0
+no_lip_scan=0
 
 # Scan options
 opt="$1"
@@ -1256,6 +1258,7 @@ while [ ! -z "$opt" ] && [ -z "${opt##-*}" ] ; do
     -largelun) scan_flags=$((scan_flags|0x200)) ;;
     -luns=*)  arg=${opt#-luns=};        lunsearch=$(expandlist "$arg") ;;
     -multipath) mp_enable=1 ;;
+    -no-lip-scan) no_lip_scan=1 ;;
     -nooptscan) optscan=0 ;;
     -nosync) sync=0 ;;
     -remove)      remove=1 ;;
@@ -1334,7 +1337,7 @@ elif [ $resize -eq 1 ] ; then
 else
   for host in $hosts; do
   echo -n "Scanning host $host "
-  if [ -e "/sys/class/fc_host/host$host" ] ; then
+  if [ $no_lip_scan -eq 0 ] && [ -e "/sys/class/fc_host/host$host" ] ; then
     # It's pointless to do a target scan on FC
     issue_lip=/sys/class/fc_host/host$host/issue_lip
     if [ -e "$issue_lip" ] && [ "$lipreset" -ge 0 ] ; then

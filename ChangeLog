@@ -25,6 +25,7 @@ Changelog for pre-release sg3_utils-1.48 [20220811] [svn: r966]
     - fix handling of '-I <secs>' option
     - sgdevice26: do not traverse sg class if scsi_device
       is not added
+    - add -no-lip-scan option
   - sg_rep_zones: add Report zone starting LBA granularity
     field in REPORT ZONES response [zbc2r12]
     - add --brief option, show part of header and last
