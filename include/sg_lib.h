@@ -149,6 +149,14 @@ extern "C" {
 /* Borrowed from Linux kernel; no check that 'arr' actually is one */
 #define SG_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
+/* Doesn't seem to be a common C and C++ technique for clearing an
+ * aggregrate (e.g. a struct instance) on the stack. Hence this hack: */
+#ifdef __cplusplus
+#define SG_C_CPP_ZERO_INIT {}
+#else
+#define SG_C_CPP_ZERO_INIT ={0}
+#endif
+
 
 /* The format of the version string is like this: "2.26 20170906" */
 const char * sg_lib_version();
@@ -628,7 +636,7 @@ void dStrHex(const char * str, int len, int no_ascii);
 void dStrHexErr(const char * str, int len, int no_ascii);
 
 /* Read binary starting at 'str' for 'len' bytes and output as ASCII
- * hexadecinal into file pointer (fp). 16 bytes per line are output with an
+ * hexadecimal into file pointer (fp). 16 bytes per line are output with an
  * additional space between 8th and 9th byte on each line (for readability).
  * 'no_ascii' selects one of 3 output format types as shown in dStrHex() . */
 void dStrHexFp(const char* str, int len, int no_ascii, FILE * fp);

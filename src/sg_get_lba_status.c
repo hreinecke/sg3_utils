@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.30 20220729";      /* sbc5r01 */
+static const char * version_str = "1.31 20220807";      /* sbc5r03 */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -249,7 +249,7 @@ main(int argc, char * argv[])
     sgj_opaque_p jop = NULL;
     sgj_opaque_p jo2p = NULL;
     sgj_opaque_p jap = NULL;
-    sgj_state json_st = {0};
+    sgj_state json_st SG_C_CPP_ZERO_INIT;
     sgj_state * jsp = &json_st;
     char b[144];
     static const size_t blen = sizeof(b);
@@ -563,8 +563,8 @@ start_response:
     num_descs = (rlen - 8) / 16;
     completion_cond = (*(glbasBuffp + 7) >> 1) & 7; /* added sbc4r14 */
     if (do_brief)
-        sgj_hr_js_vi(jsp, jop, 0, compl_cond_s, SGJ_SEP_EQUAL_NO_SPACE,
-                     completion_cond, true);
+        sgj_haj_vi(jsp, jop, 0, compl_cond_s, SGJ_SEP_EQUAL_NO_SPACE,
+                   completion_cond, true);
     else {
         switch (completion_cond) {
         case 0:
@@ -590,8 +590,8 @@ start_response:
         sgj_js_nv_istr(jsp, jop, compl_cond_s, completion_cond,
                        NULL /* "meaning" */, b);
     }
-    sgj_hr_js_vi(jsp, jop, 0, "RTP", SGJ_SEP_EQUAL_NO_SPACE,
-                 *(glbasBuffp + 7) & 0x1, true);    /* added sbc4r12 */
+    sgj_haj_vi(jsp, jop, 0, "RTP", SGJ_SEP_EQUAL_NO_SPACE,
+               *(glbasBuffp + 7) & 0x1, true);    /* added sbc4r12 */
     if (verbose)
         pr2serr("%d complete LBA status descriptors found\n", num_descs);
     if (jsp->pr_as_json)

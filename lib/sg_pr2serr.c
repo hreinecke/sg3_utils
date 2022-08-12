@@ -464,7 +464,7 @@ sgj_snake_named_subobject_r(sgj_state * jsp, sgj_opaque_p jop,
 {
     if (jsp && jsp->pr_as_json && conv2sname) {
         int olen = strlen(conv2sname);
-        char * sname = malloc(olen + 8);
+        char * sname = (char *)malloc(olen + 8);
         int nlen = sgj_name_to_snake(conv2sname, sname, olen + 8);
 
         if (nlen > 0)
@@ -492,7 +492,7 @@ sgj_snake_named_subarray_r(sgj_state * jsp, sgj_opaque_p jop,
 {
     if (jsp && jsp->pr_as_json && conv2sname) {
         int olen = strlen(conv2sname);
-        char * sname = malloc(olen + 8);
+        char * sname = (char *)malloc(olen + 8);
         int nlen = sgj_name_to_snake(conv2sname, sname, olen + 8);
 
         if (nlen > 0)
@@ -866,9 +866,9 @@ sgj_jtype_to_s(char * b, int blen_max, json_value * jvp)
 }
 
 static int
-sgj_hr_js_helper(char * b, int blen_max, const char * name,
-                 enum sgj_separator_t sep, bool use_jvp,
-                 json_value * jvp, int64_t val_instead)
+sgj_haj_helper(char * b, int blen_max, const char * name,
+               enum sgj_separator_t sep, bool use_jvp,
+               json_value * jvp, int64_t val_instead)
 {
     int n = 0;
 
@@ -913,10 +913,9 @@ sgj_hr_js_helper(char * b, int blen_max, const char * name,
 }
 
 static void
-sgj_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-             const char * name, enum sgj_separator_t sep,
-             json_value * jvp, bool hex_as_well, const char * val_s,
-             const char * nex_s)
+sgj_haj_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+           const char * name, enum sgj_separator_t sep, json_value * jvp,
+           bool hex_as_well, const char * val_s, const char * nex_s)
 {
     bool eaten = false;
     bool as_json = (jsp && jsp->pr_as_json);
@@ -1002,7 +1001,7 @@ sgj_hr_js_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         }
     }
     if (jvp && ((as_json && jsp->pr_out_hr) || (! as_json)))
-        n += sgj_hr_js_helper(b + n, blen - n, name, sep, true, jvp, 0);
+        n += sgj_haj_helper(b + n, blen - n, name, sep, true, jvp, 0);
 
     if (as_json && jsp->pr_out_hr)
         json_array_push((json_value *)jsp->out_hrp, json_string_new(b));
@@ -1014,80 +1013,77 @@ fini:
 }
 
 void
-sgj_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-             const char * name, enum sgj_separator_t sep,
-             const char * value)
+sgj_haj_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+           const char * name, enum sgj_separator_t sep, const char * value)
 {
     json_value * jvp;
 
     /* make json_value even if jsp->pr_as_json is false */
     jvp = value ? json_string_new(value) : NULL;
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL, NULL);
+    sgj_haj_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL, NULL);
 }
 
 void
-sgj_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-             const char * name, enum sgj_separator_t sep, int64_t value,
-             bool hex_as_well)
+sgj_haj_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+          const char * name, enum sgj_separator_t sep, int64_t value,
+           bool hex_as_well)
 {
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, NULL,
+    sgj_haj_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, NULL, NULL);
+}
+
+void
+sgj_haj_vistr(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+              const char * name, enum sgj_separator_t sep, int64_t value,
+              bool hex_as_well, const char * val_s)
+{
+    json_value * jvp;
+
+    jvp = json_integer_new(value);
+    sgj_haj_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, val_s,
                  NULL);
 }
 
 void
-sgj_hr_js_vistr(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                const char * name, enum sgj_separator_t sep, int64_t value,
-                bool hex_as_well, const char * val_s)
+sgj_haj_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+               const char * name, enum sgj_separator_t sep,
+               int64_t value, bool hex_as_well, const char * nex_s)
 {
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, val_s,
-                 NULL);
+    sgj_haj_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, NULL, nex_s);
 }
 
 void
-sgj_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                 const char * name, enum sgj_separator_t sep,
-                 int64_t value, bool hex_as_well, const char * nex_s)
+sgj_haj_vistr_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                  const char * name, enum sgj_separator_t sep,
+                  int64_t value, bool hex_as_well,
+                  const char * val_s, const char * nex_s)
 {
     json_value * jvp;
 
     jvp = json_integer_new(value);
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, NULL,
-                 nex_s);
+    sgj_haj_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, val_s,
+               nex_s);
 }
 
 void
-sgj_hr_js_vistr_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                    const char * name, enum sgj_separator_t sep,
-                    int64_t value, bool hex_as_well,
-                    const char * val_s, const char * nex_s)
-{
-    json_value * jvp;
-
-    jvp = json_integer_new(value);
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, hex_as_well, val_s,
-                 nex_s);
-}
-
-void
-sgj_hr_js_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                const char * name, enum sgj_separator_t sep, bool value)
+sgj_haj_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+           const char * name, enum sgj_separator_t sep, bool value)
 {
     json_value * jvp;
 
     jvp = json_boolean_new(value);
-    sgj_hr_js_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL, NULL);
+    sgj_haj_xx(jsp, jop, leadin_sp, name, sep, jvp, false, NULL, NULL);
 }
 
 sgj_opaque_p
-sgj_hr_js_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                 const char * name, enum sgj_separator_t sep, int64_t value,
-                 bool hex_as_well)
+sgj_haj_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+               const char * name, enum sgj_separator_t sep, int64_t value,
+               bool hex_as_well)
 {
     bool as_json = (jsp && jsp->pr_as_json);
     int n = 0;
@@ -1101,7 +1097,7 @@ sgj_hr_js_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         b[n] = ' ';
     b[n] = '\0';
     if ((! as_json) || (jsp && jsp->pr_out_hr))
-        n += sgj_hr_js_helper(b + n, blen - n, name, sep, false, NULL, value);
+        n += sgj_haj_helper(b + n, blen - n, name, sep, false, NULL, value);
 
     if (as_json && jsp->pr_out_hr)
         json_array_push((json_value *)jsp->out_hrp, json_string_new(b));

@@ -142,7 +142,7 @@ sg_ll_zone_act_query(int sg_fd, const struct opts_t * op, void * resp,
     struct sg_pt_base * ptvp;
     uint8_t zi_cdb[SG_ZBC_IN_CMDLEN] =
           {SG_ZBC_IN, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     char b[64];
 
     zi_cdb[1] = 0x1f & sa;
@@ -365,7 +365,7 @@ main(int argc, char * argv[])
     uint8_t * free_zibp = NULL;
     const char * sa_name;
     char b[80];
-    struct opts_t opts = {0};
+    struct opts_t opts SG_C_CPP_ZERO_INIT;
     struct opts_t * op = &opts;
 
     while (1) {

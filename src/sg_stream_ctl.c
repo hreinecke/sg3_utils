@@ -116,7 +116,7 @@ sg_ll_get_stream_status(int sg_fd, uint16_t s_str_id, uint8_t * resp,
     int k, ret, res, sense_cat;
     uint8_t gssCdb[16] = {SG_SERVICE_ACTION_IN_16,
            GET_STREAM_STATUS_SA, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
     static const char * const cmd_name = "Get stream status";
 
@@ -184,7 +184,7 @@ sg_ll_stream_control(int sg_fd, uint32_t str_ctl, uint16_t str_id,
     int k, ret, res, sense_cat;
     uint8_t scCdb[16] = {SG_SERVICE_ACTION_IN_16,
            STREAM_CONTROL_SA, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
     static const char * const cmd_name = "Stream control";
 

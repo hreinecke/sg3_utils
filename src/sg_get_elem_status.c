@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.14 20220729";      /* sbc5r03 */
+static const char * version_str = "1.15 20220807";      /* sbc5r03 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -153,7 +153,7 @@ sg_ll_get_phy_elem_status(int sg_fd, uint32_t starting_elem, uint8_t filter,
     uint8_t gpesCmd[16] = {SG_SERVICE_ACTION_IN_16,
                            GET_PHY_ELEM_STATUS_SA, 0, 0, 0, 0,
                            0, 0, 0, 0,  0, 0, 0, 0,  0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
     static const char * const cmd_name = "Get physical element status";
 
@@ -300,7 +300,7 @@ main(int argc, char * argv[])
     sgj_opaque_p jo2p;
     sgj_opaque_p jap = NULL;
     struct gpes_desc_t a_ped;
-    sgj_state json_st = {0};
+    sgj_state json_st SG_C_CPP_ZERO_INIT;
     sgj_state * jsp = &json_st;
     char b[80];
     static const int blen = sizeof(b);
@@ -556,12 +556,12 @@ start_response:
         goto fini;
     }
 
-    sgj_hr_js_vi(jsp, jop, 0, "Number of descriptors",
-                 SGJ_SEP_COLON_1_SPACE, num_desc, true);
-    sgj_hr_js_vi(jsp, jop, 0, "Number of descriptors returned",
-                 SGJ_SEP_COLON_1_SPACE, num_desc_ret, true);
-    sgj_hr_js_vi(jsp, jop, 0, "Identifier of element being depopulated",
-                 SGJ_SEP_COLON_1_SPACE, id_elem_depop, true);
+    sgj_haj_vi(jsp, jop, 0, "Number of descriptors",
+               SGJ_SEP_COLON_1_SPACE, num_desc, true);
+    sgj_haj_vi(jsp, jop, 0, "Number of descriptors returned",
+               SGJ_SEP_COLON_1_SPACE, num_desc_ret, true);
+    sgj_haj_vi(jsp, jop, 0, "Identifier of element being depopulated",
+               SGJ_SEP_COLON_1_SPACE, id_elem_depop, true);
     if (rlen < 64) {
         sgj_pr_hr(jsp, "No complete physical element status descriptors "
                   "available\n");

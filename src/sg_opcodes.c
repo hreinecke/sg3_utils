@@ -217,7 +217,7 @@ do_rsoc(struct sg_pt_base * ptvp, bool rctd, int rep_opts, int rq_opcode,
     int ret, res, sense_cat;
     uint8_t rsoc_cdb[RSOC_CMD_LEN] = {SG_MAINTENANCE_IN, RSOC_SA, 0,
                                               0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 
     if (rctd)
         rsoc_cdb[2] |= 0x80;
@@ -281,7 +281,7 @@ do_rstmf(struct sg_pt_base * ptvp, bool repd, void * resp, int mx_resp_len,
     int ret, res, sense_cat;
     uint8_t rstmf_cdb[RSTMF_CMD_LEN] = {SG_MAINTENANCE_IN, RSTMF_SA,
                                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 
     if (repd)
         rstmf_cdb[2] = 0x80;

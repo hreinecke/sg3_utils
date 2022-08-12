@@ -66,6 +66,58 @@ extern "C" {
 #define VPD_CON_POS_RANGE 0xb9          /* sbc5r01 */
 #define VPD_NOPE_WANT_STD_INQ -2        /* request for standard inquiry */
 
+/* vendor/product identifiers */
+#define VPD_VP_SEAGATE 0
+#define VPD_VP_RDAC 1
+#define VPD_VP_EMC 2
+#define VPD_VP_DDS 3
+#define VPD_VP_HP3PAR 4
+#define VPD_VP_IBM_LTO 5
+#define VPD_VP_HP_LTO 6
+#define VPD_VP_WDC_HITACHI 7
+#define VPD_VP_NVME 8
+#define VPD_VP_SG 9     /* this package/library as a vendor */
+
+
+/* vendor VPD pages */
+#define VPD_V_HIT_PG3 0x3
+#define VPD_V_HP3PAR 0xc0
+#define VPD_V_FIRM_SEA  0xc0
+#define VPD_V_UPR_EMC  0xc0
+#define VPD_V_HVER_RDAC  0xc0
+#define VPD_V_FVER_DDS 0xc0
+#define VPD_V_FVER_LTO 0xc0
+#define VPD_V_DCRL_LTO 0xc0
+#define VPD_V_DATC_SEA  0xc1
+#define VPD_V_FVER_RDAC  0xc1
+#define VPD_V_HVER_LTO 0xc1
+#define VPD_V_DSN_LTO 0xc1
+#define VPD_V_JUMP_SEA 0xc2
+#define VPD_V_SVER_RDAC 0xc2
+#define VPD_V_PCA_LTO 0xc2
+#define VPD_V_DEV_BEH_SEA 0xc3
+#define VPD_V_FEAT_RDAC 0xc3
+#define VPD_V_MECH_LTO 0xc3
+#define VPD_V_SUBS_RDAC 0xc4
+#define VPD_V_HEAD_LTO 0xc4
+#define VPD_V_ACI_LTO 0xc5
+#define VPD_V_DUCD_LTO 0xc7
+#define VPD_V_EDID_RDAC 0xc8
+#define VPD_V_MPDS_LTO 0xc8
+#define VPD_V_VAC_RDAC 0xc9
+#define VPD_V_RVSI_RDAC 0xca
+#define VPD_V_SAID_RDAC 0xd0
+#define VPD_V_HIT_PG_D1 0xd1
+#define VPD_V_HIT_PG_D2 0xd2
+
+#ifndef SG_NVME_VPD_NICR
+#define SG_NVME_VPD_NICR 0xde   /* NVME Identify Controller Response */
+#endif
+
+#define DEF_ALLOC_LEN 252
+#define MX_ALLOC_LEN (0xc000 + 0x80)
+#define DEF_PT_TIMEOUT  60       /* 60 seconds */
+
 enum sg_vpd_invoker_e {
     SG_VPD_INV_NONE = 0,
     SG_VPD_INV_SG_INQ,
@@ -122,6 +174,12 @@ struct svpd_values_name_t {
     int subvalue;    /* to differentiate if value+pdt are not unique */
     int pdt;         /* peripheral device type id, -1 is the default */
                      /* (all or not applicable) value */
+    const char * acron;
+    const char * name;
+};
+
+struct svpd_vp_name_t {
+    int vend_prod_num;       /* vendor/product identifier */
     const char * acron;
     const char * name;
 };
@@ -202,6 +260,8 @@ extern const char * product_id_hr;
 extern const char * product_id_js;
 extern const char * product_rev_lev_hr;
 extern const char * product_rev_lev_js;
+extern struct svpd_vp_name_t vp_arr[];
+extern struct svpd_values_name_t vendor_vpd_pg[];
 
 
 #ifdef __cplusplus

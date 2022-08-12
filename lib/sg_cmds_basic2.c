@@ -93,7 +93,7 @@ sg_ll_sync_cache_10(int sg_fd, bool sync_nv, bool immed, int group,
     int res, ret, sense_cat;
     uint8_t sc_cdb[SYNCHRONIZE_CACHE_CMDLEN] =
                 {SYNCHRONIZE_CACHE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if (sync_nv)
@@ -154,7 +154,7 @@ sg_ll_readcap_16(int sg_fd, bool pmi, uint64_t llba, void * resp,
     uint8_t rc_cdb[SERVICE_ACTION_IN_16_CMDLEN] =
                         {SERVICE_ACTION_IN_16_CMD, READ_CAPACITY_16_SA,
                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if (pmi) { /* lbs only valid when pmi set */
@@ -209,7 +209,7 @@ sg_ll_readcap_10(int sg_fd, bool pmi, unsigned int lba, void * resp,
     int ret, res, sense_cat;
     uint8_t rc_cdb[READ_CAPACITY_10_CMDLEN] =
                          {READ_CAPACITY_10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if (pmi) { /* lbs only valid when pmi set */
@@ -262,7 +262,7 @@ sg_ll_mode_sense6(int sg_fd, bool dbd, int pc, int pg_code, int sub_pg_code,
     int res, ret, sense_cat, resid;
     uint8_t modes_cdb[MODE_SENSE6_CMDLEN] =
         {MODE_SENSE6_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     modes_cdb[1] = (uint8_t)(dbd ? 0x8 : 0);
@@ -361,7 +361,7 @@ sg_ll_mode_sense10_v2(int sg_fd, bool llbaa, bool dbd, int pc, int pg_code,
     struct sg_pt_base * ptvp;
     uint8_t modes_cdb[MODE_SENSE10_CMDLEN] =
         {MODE_SENSE10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 
     modes_cdb[1] = (uint8_t)((dbd ? 0x8 : 0) | (llbaa ? 0x10 : 0));
     modes_cdb[2] = (uint8_t)(((pc << 6) & 0xc0) | (pg_code & 0x3f));
@@ -448,7 +448,7 @@ sg_ll_mode_select6_v2(int sg_fd, bool pf, bool rtd, bool sp, void * paramp,
     int res, ret, sense_cat;
     uint8_t modes_cdb[MODE_SELECT6_CMDLEN] =
         {MODE_SELECT6_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     modes_cdb[1] = (uint8_t)((pf ? 0x10 : 0x0) | (sp ? 0x1 : 0x0));
@@ -519,7 +519,7 @@ sg_ll_mode_select10_v2(int sg_fd, bool pf, bool rtd, bool sp, void * paramp,
     int res, ret, sense_cat;
     uint8_t modes_cdb[MODE_SELECT10_CMDLEN] =
         {MODE_SELECT10_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     modes_cdb[1] = (uint8_t)((pf ? 0x10 : 0x0) | (sp ? 0x1 : 0x0));
@@ -818,7 +818,7 @@ sg_ll_log_sense_v2(int sg_fd, bool ppc, bool sp, int pc, int pg_code,
     int res, ret, sense_cat, resid;
     uint8_t logs_cdb[LOG_SENSE_CMDLEN] =
         {LOG_SENSE_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if (mx_resp_len > 0xffff) {
@@ -902,7 +902,7 @@ sg_ll_log_select(int sg_fd, bool pcr, bool sp, int pc, int pg_code,
     int res, ret, sense_cat;
     uint8_t logs_cdb[LOG_SELECT_CMDLEN] =
         {LOG_SELECT_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if (param_len > 0xffff) {
@@ -973,7 +973,7 @@ sg_ll_start_stop_unit_com(struct sg_pt_base * ptvp, int sg_fd, bool immed,
     bool local_cdb = true;
     int res, ret, sense_cat;
     uint8_t ssuBlk[START_STOP_CMDLEN] = {START_STOP_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 
     if (immed)
         ssuBlk[1] = 0x1;
@@ -1073,7 +1073,7 @@ sg_ll_prevent_allow(int sg_fd, int prevent, bool noisy, int verbose)
     int res, ret, sense_cat;
     uint8_t p_cdb[PREVENT_ALLOW_CMDLEN] =
                 {PREVENT_ALLOW_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if ((prevent < 0) || (prevent > 3)) {

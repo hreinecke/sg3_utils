@@ -61,7 +61,7 @@ int main(int argc, char * argv[])
     struct sg_io_v4 rio_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    uint8_t sense_buffer[16][SENSE_BUFFER_LEN] = {0};
+    uint8_t sense_buffer[16][SENSE_BUFFER_LEN] SG_C_CPP_ZERO_INIT;
     int q_at_tail = 0;
 
     for (k = 1; k < argc; ++k) {

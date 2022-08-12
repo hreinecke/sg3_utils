@@ -169,8 +169,8 @@ do_write_same(int sg_fd, const struct opts_t * op, const void * dataoutp,
 {
     int ret, res, sense_cat, cdb_len;
     uint64_t llba;
-    uint8_t ws_cdb[WRITE_SAME32_LEN] = {0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t ws_cdb[WRITE_SAME32_LEN] SG_C_CPP_ZERO_INIT;
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     cdb_len = op->pref_cdb_size;

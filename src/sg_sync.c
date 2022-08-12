@@ -101,7 +101,7 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
     uint8_t sc_cdb[SYNCHRONIZE_CACHE16_CMDLEN] =
                 {SYNCHRONIZE_CACHE16_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if (sync_nv)

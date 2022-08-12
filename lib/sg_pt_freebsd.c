@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_freebsd version 1.47 20220127 */
+/* sg_pt_freebsd version 1.48 20220811 */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -238,7 +238,7 @@ int
 scsi_pt_open_flags(const char * device_name, int oflags, int vb)
 {
     bool maybe_non_cam_nvme = false;
-    bool basnam0_n;
+    bool basnam0_n = false;
     char first_ch;
     int k, err, dev_fd, ret, handle_idx;
     ssize_t s;
@@ -378,8 +378,8 @@ scsi_pt_open_flags(const char * device_name, int oflags, int vb)
         if (stat(dev_nm, &a_stat) < 0) {
             err = errno;
             if (vb)
-                pr2ws("%s: unable to stat(%s): %s\n", __func__, dev_nm,
-                      strerror(err));
+                pr2ws("%s: unable to stat(%s): %s; basnam0_n=%d\n",
+                      __func__, dev_nm, strerror(err), basnam0_n);
             ret = -err;
             goto err_out;
         }

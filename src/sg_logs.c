@@ -7253,7 +7253,7 @@ main(int argc, char * argv[])
     uint8_t * free_parr = NULL;
     struct opts_t * op;
     struct sg_simple_inquiry_resp inq_out;
-    struct opts_t opts = {0};
+    struct opts_t opts SG_C_CPP_ZERO_INIT;
     uint8_t supp_pgs_rsp[256];
 
     op = &opts;

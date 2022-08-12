@@ -129,7 +129,7 @@ run_scsi_transaction(int sg_fd, const uint8_t *cdbp, int cdb_len,
 {
     int res, sense_cat, ret;
     struct sg_pt_base * ptvp;
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     char b[32];
 
     snprintf(b, sizeof(b), "Write and verify(%d)", cdb_len);

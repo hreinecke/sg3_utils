@@ -139,8 +139,8 @@ do_read_gplog(int sg_fd, int ata_cmd, uint8_t *inbuff,
     int resid = 0;
     int sb_sz;
     struct sg_scsi_sense_hdr ssh;
-    uint8_t sense_buffer[64] = {0};
-    uint8_t ata_return_desc[16] = {0};
+    uint8_t sense_buffer[64] SG_C_CPP_ZERO_INIT;
+    uint8_t ata_return_desc[16] SG_C_CPP_ZERO_INIT;
     uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};

@@ -183,7 +183,7 @@ do_tur(struct sg_pt_base * ptp, int id)
 {
     int slen, res, cat;
     unsigned char turCmdBlk [TUR_CMD_LEN] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
-    unsigned char sense_buffer[64] = {0};
+    unsigned char sense_buffer[64] SG_C_CPP_ZERO_INIT;
 
     clear_scsi_pt_obj(ptp);
     set_scsi_pt_cdb(ptp, turCmdBlk, sizeof(turCmdBlk));
@@ -228,7 +228,7 @@ do_ssu(struct sg_pt_base * ptp, int id, bool start)
 {
     int slen, res, cat;
     unsigned char ssuCmdBlk [SSU_CMD_LEN] = {0x1b, 0x0, 0x0, 0x0, 0x0, 0x0};
-    unsigned char sense_buffer[64] = {0};
+    unsigned char sense_buffer[64] SG_C_CPP_ZERO_INIT;
 
     if (start)
         ssuCmdBlk[4] |= 0x1;

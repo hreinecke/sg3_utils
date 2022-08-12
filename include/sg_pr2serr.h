@@ -37,7 +37,7 @@ int pr2serr(const char * fmt, ...) __printf(1, 2);
 int pr2ws(const char * fmt, ...) __printf(1, 2);
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
- * functions that can be called mulriple times. Returns number of chars
+ * functions that can be called multiple times. Returns number of chars
  * placed in cp excluding the trailing null char. So for cp_max_len > 0 the
  * return value is always < cp_max_len; for cp_max_len <= 1 the return value
  * is 0 and no chars are written to cp. Note this means that when
@@ -63,13 +63,13 @@ enum sgj_separator_t {
 
 typedef void * sgj_opaque_p;
 
-/* Apart from the pointers at the end the other fields are initialized
- * from the argument given to --json= . If there is no argument then
- * they initialized as shown. */
+/* Apart from the state information at the end of this structure, the earlier
+ * fields are initialized from the command line argument given to the
+ * --json= option. If there is no argument then they initialized as shown. */
 typedef struct sgj_state_t {
-    /* the following set by default, the SG3_UTILS_JSON_OPTS envirinment
+    /* the following set by default, the SG3_UTILS_JSON_OPTS environment
      * variable or command line argument to --json option, in that order. */
-    bool pr_as_json;            /* = false */
+    bool pr_as_json;            /* = false (def: is human readable output) */
     bool pr_exit_status;        /* 'e' (def: true) */
     bool pr_hex;                /* 'h' (def: false) */
     bool pr_leadin;             /* 'l' (def: true) */
@@ -81,6 +81,7 @@ typedef struct sgj_state_t {
     char pr_format;             /*  (def: '\0') */
     int pr_indent_size;         /* digit (def: 4) */
     int verbose;                /* 'v' (def: 0) incremented each appearance */
+
     /* the following hold state information */
     int first_bad_char;         /* = '\0' */
     sgj_opaque_p basep;         /* base JSON object pointer */
@@ -97,12 +98,13 @@ typedef struct sgj_state_t {
  * Note: strlen(in_name) should be <= max_sname_len . */
 char * sgj_convert_to_snake_name(const char * in_name, char * sname,
                                  int max_sname_len);
+
 /* There are many variants of JSON supporting functions below and some
- * abbreaviations are used to shorten their function names:
+ * abbreviations are used to shorten their function names:
  *    sgj_  - prefix of all the functions related to (non-)JSON output
  *    hr    - human readable form (as it was before JSON)
- *    js    - JSON only output (unless 'hr_js' given)
- *    hr_js - human readable and JSON output
+ *    js    - JSON only output
+ *    haj   - human readable and JSON output, hr goes in 'output' array
  *    pr    - has printf() like variadic arguments
  *    _r    - suffix indicating the return value should/must be used
  *    nv    - adds a name-value JSON field (or several)
@@ -113,7 +115,7 @@ char * sgj_convert_to_snake_name(const char * in_name, char * sname,
  *    str   - same as s
  *    hex   - value is hexadecimal in a JSON string object
  *    _nex  - extra 'name_extra' JSON string object about name
- *    new   - object that needs sgj_free_unattached() it not attached
+ *    new   - object that needs sgj_free_unattached() if not attached
  *
  *    */
 
@@ -225,7 +227,7 @@ sgj_opaque_p sgj_js_nv_b(sgj_state * jsp, sgj_opaque_p jop,
 sgj_opaque_p sgj_js_nv_o(sgj_state * jsp, sgj_opaque_p jop,
                          const char * name, sgj_opaque_p ua_jop);
 
-/* The '_hr_js_' refers to generating output both for human readable and/or
+/* The '_haj_' refers to generating output both for human readable and/or
  * JSON with a single invocation. If jsp is non-NULL and jsp->pr_out_hr is
  * true then both JSON and human readable output is formed (and the latter is
  * placed in the jsp->out_hrp JSON array). The human readable form will have
@@ -236,44 +238,43 @@ sgj_opaque_p sgj_js_nv_o(sgj_state * jsp, sgj_opaque_p jop,
  * made from 'value' is added to the JSON array pointed to by 'jop'.
  * Otherwise a 'name'-d JSON object whose value is a JSON string object made
  * from 'value' is added at 'jop'. */
-void sgj_hr_js_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                  const char * name, enum sgj_separator_t sep,
-                  const char * value);
+void sgj_haj_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                const char * name, enum sgj_separator_t sep,
+                const char * value);
 
-/* Similar to sgj_hr_js_vs()'s description with 'JSON string object'
+/* Similar to sgj_haj_vs()'s description with 'JSON string object'
  * replaced by 'JSON integer object'. */
-void sgj_hr_js_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                  const char * name, enum sgj_separator_t sep,
-                  int64_t value, bool hex_as_well);
-void sgj_hr_js_vistr(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                     const char * name, enum sgj_separator_t sep,
-                     int64_t value, bool hex_as_well, const char * val_s);
+void sgj_haj_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                const char * name, enum sgj_separator_t sep,
+                int64_t value, bool hex_as_well);
+void sgj_haj_vistr(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                   const char * name, enum sgj_separator_t sep,
+                   int64_t value, bool hex_as_well, const char * val_s);
 
 /* The '_nex' refers to a "name_extra" (information) sub-object (a JSON
  * string) which explains a bit more about the 'name' entry. This is useful
  * when T10 specifies the name as an abbreviation (e.g. SYSV). Whether this
  * sub-object is shown in the JSON output is controlled by the 'n' control
  * character. */
-void sgj_hr_js_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                      const char * name, enum sgj_separator_t sep,
-                      int64_t value, bool hex_as_well, const char * nex_s);
-void sgj_hr_js_vistr_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                         const char * name, enum sgj_separator_t sep,
-                         int64_t value, bool hex_as_well,
-                         const char * val_s, const char * nex_s);
+void sgj_haj_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                    const char * name, enum sgj_separator_t sep,
+                    int64_t value, bool hex_as_well, const char * nex_s);
+void sgj_haj_vistr_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                       const char * name, enum sgj_separator_t sep,
+                       int64_t value, bool hex_as_well,
+                       const char * val_s, const char * nex_s);
 
-/* Similar to above '_hr_js_' calls but a named sub-object is always formed
+/* Similar to above '_haj_' calls but a named sub-object is always formed
  * containing a JSON integer object named "i" whose value is 'value'. The
  * returned pointer is to that sub-object. */
-sgj_opaque_p sgj_hr_js_subo_r(sgj_state * jsp, sgj_opaque_p jop,
-                              int leadin_sp, const char * name,
-                              enum sgj_separator_t sep, int64_t value,
-                              bool hex_as_well);
+sgj_opaque_p sgj_haj_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                            const char * name, enum sgj_separator_t sep,
+                            int64_t value, bool hex_as_well);
 
-/* Similar to sgj_hr_js_vs()'s description with 'JSON string object'
- * replaced by 'JSON boolean object'. */
-void sgj_hr_js_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
-                  const char * name, enum sgj_separator_t sep, bool value);
+/* Similar to sgj_haj_vs()'s description with 'JSON string object' replaced
+ * by 'JSON boolean object'. */
+void sgj_haj_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
+                const char * name, enum sgj_separator_t sep, bool value);
 
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
@@ -332,7 +333,7 @@ void sgj_js_str_out(sgj_state * jsp, const char * sp, int slen);
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. 'sbp' is assumed to point to sense data as
  * defined by T10 with a length of 'sb_len' bytes. Returns false if an
- * issue is detetected, else it returns true. */
+ * issue is detected, else it returns true. */
 bool sgj_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
                   int sb_len);
 

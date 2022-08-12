@@ -113,7 +113,7 @@ sg_ll_report_density(int sg_fd, bool media, bool m_type, void * resp,
     int ret, res, sense_cat;
     uint8_t rds_cdb[REPORT_DENSITY_SUPPORT_CMDLEN] =
           {REPORT_DENSITY_SUPPORT_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if (media)

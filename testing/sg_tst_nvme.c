@@ -381,7 +381,7 @@ nvme_din_admin_cmd(struct sg_pt_base * ptvp, const uint8_t *cmdp,
     int res, k;
     uint16_t sct_sc = 0;
     uint32_t result, clen;
-    uint8_t sense_b[SENSE_BUFF_NVME_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_NVME_LEN] SG_C_CPP_ZERO_INIT;
     uint8_t ucmd[128];
     char b[32];
 
@@ -514,7 +514,7 @@ sg_scsi_inquiry(struct sg_pt_base * ptvp, bool evpd, int pg_op, void * resp,
 {
     int res, ret, k, sense_cat, resid;
     uint8_t inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     uint8_t * up;
 
     if (evpd)

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220805] [svn: r964]
+Changelog for pre-release sg3_utils-1.48 [20220811] [svn: r966]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -23,6 +23,8 @@ Changelog for pre-release sg3_utils-1.48 [20220805] [svn: r964]
       applied with tweaks: add timeout parameter
     - clean $norm handling
     - fix handling of '-I <secs>' option
+    - sgdevice26: do not traverse sg class if scsi_device
+      is not added
   - sg_rep_zones: add Report zone starting LBA granularity
     field in REPORT ZONES response [zbc2r12]
     - add --brief option, show part of header and last
@@ -65,6 +67,8 @@ Changelog for pre-release sg3_utils-1.48 [20220805] [svn: r964]
     - cleanup masks for PDT [0x1f] and group_number [0x3f]
     - new sg_json_builder.[hc] files local to lib folder
     - document internal json interface in include/sg_pr2serr.h
+    - add SG_C_CPP_ZERO_INIT to better handle aggregate stack
+      instance zeroing (C23 adding 'struct T t {};' will help)
   - initialize all sense buffers to 0
   - rework main README file
   - rev 921+922 are bugfix revs on release 1.47 [r919,920]

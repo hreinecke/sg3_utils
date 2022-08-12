@@ -233,7 +233,7 @@ main(int argc, char * argv[])
     int ret = 0;
     sgj_opaque_p jop = NULL;
     sgj_opaque_p jo2p;
-    sgj_state json_st = {0};
+    sgj_state json_st SG_C_CPP_ZERO_INIT;
     sgj_state * jsp = &json_st;
     char b[2048];
     char bb[256];

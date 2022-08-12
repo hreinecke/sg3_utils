@@ -46,7 +46,7 @@ struct osf1_dev_channel {
 
 // Private table of open devices: guaranteed zero on startup since
 // part of static data.
-static struct osf1_dev_channel *devicetable[OSF1_MAXDEV] = {0};
+static struct osf1_dev_channel *devicetable[OSF1_MAXDEV] SG_C_CPP_ZERO_INIT;
 static char *cam_dev = "/dev/cam";
 static int camfd;
 static int camopened = 0;

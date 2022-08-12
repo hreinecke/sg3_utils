@@ -386,7 +386,7 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
     int packet_id = 0;
     int vb = op->verbose;
     char b[80];
-    uint8_t sense_b[32] = {0};
+    uint8_t sense_b[32] SG_C_CPP_ZERO_INIT;
 
     if (op->do_low) {
         int rs, n, sense_cat;

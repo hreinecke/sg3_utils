@@ -198,7 +198,7 @@ do_rd_inc_wr_twice(const char * dev_name, unsigned int lba, int block,
                 {0x88, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
     unsigned char w16CmdBlk [WRITE16_CMD_LEN] =
                 {0x8a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
-    unsigned char sense_buffer[64] = {0};
+    unsigned char sense_buffer[64] SG_C_CPP_ZERO_INIT;
     unsigned char lb[READ16_REPLY_LEN];
     char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;
@@ -323,7 +323,7 @@ do_inquiry_prod_id(const char * dev_name, int block, int wait_ms,
     unsigned char inqCmdBlk [INQ_CMD_LEN] =
                                 {0x12, 0, 0, 0, INQ_REPLY_LEN, 0};
     unsigned char inqBuff[INQ_REPLY_LEN];
-    unsigned char sense_buffer[64] = {0};
+    unsigned char sense_buffer[64] SG_C_CPP_ZERO_INIT;
     char ebuff[EBUFF_SZ];
     int open_flags = O_RDWR;    /* since O_EXCL | O_RDONLY gives EPERM */
 

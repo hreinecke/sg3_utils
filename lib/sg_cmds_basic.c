@@ -382,7 +382,7 @@ sg_ll_inquiry_com(struct sg_pt_base * ptvp, int sg_fd, bool cmddt, bool evpd,
     bool local_cdb = true;
     int res, ret, sense_cat, resid;
     uint8_t inq_cdb[INQUIRY_CMDLEN] = {INQUIRY_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     uint8_t * up;
 
     if (resp == NULL) {
@@ -630,7 +630,7 @@ sg_ll_test_unit_ready_com(struct sg_pt_base * ptvp, int sg_fd, int pack_id,
     bool local_cdb = true;
     int res, ret, sense_cat;
     uint8_t tur_cdb[TUR_CMDLEN] = {TUR_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 
     if (verbose) {
         char b[128];
@@ -741,7 +741,7 @@ sg_ll_request_sense_com(struct sg_pt_base * ptvp, int sg_fd, bool desc,
     static const char * const rq_s = "request sense";
     uint8_t rs_cdb[REQUEST_SENSE_CMDLEN] =
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 
     if (desc)
         rs_cdb[1] |= 0x1;
@@ -840,7 +840,7 @@ sg_ll_report_luns_com(struct sg_pt_base * ptvp, int sg_fd, int select_report,
     int ret, res, sense_cat;
     uint8_t rl_cdb[REPORT_LUNS_CMDLEN] =
                          {REPORT_LUNS_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 
     rl_cdb[2] = select_report & 0xff;
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rl_cdb + 6);

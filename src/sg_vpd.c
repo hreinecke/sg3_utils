@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.79 20220806";  /* spc6r06 + sbc5r03 */
+static const char * version_str = "1.80 20220811";  /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_vpd"
 
@@ -180,7 +180,7 @@ usage()
             "               [--ident] [--inhex=FN] [--long] [--maxlen=LEN] "
             "[--page=PG]\n"
             "               [--quiet] [--raw] [--sinq_inraw=RFN] "
-            "[--vendor=VP] [--verbose] "
+            "[--vendor=VP] [--verbose]\n"
             "               [--version] DEVICE\n");
     pr2serr("  where:\n"
             "    --all|-a        output all pages listed in the supported "
@@ -231,83 +231,6 @@ usage()
             "decodes VPD\npage response held in file FN. To list available "
             "pages use '-e'. Also\n'-p -1' or '-p sinq' yields the standard "
             "INQUIRY response.\n");
-}
-
-/* mxlen is command line --maxlen=LEN option (def: 0) or -1 for a VPD page
- * with a short length (1 byte). Returns 0 for success. */
-int     /* global: use by sg_vpd_vendor.c */
-vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen, bool qt,
-               int vb, int * rlenp)
-{
-    int res, resid, rlen, len, n;
-
-    if (sg_fd < 0) {
-        len = sg_get_unaligned_be16(rp + 2) + 4;
-        if (vb && (len > mxlen))
-            pr2serr("warning: VPD page's length (%d) > bytes in --inhex=FN "
-                    "file (%d)\n",  len , mxlen);
-        if (rlenp)
-            *rlenp = (len < mxlen) ? len : mxlen;
-        return 0;
-    }
-    if (mxlen > MX_ALLOC_LEN) {
-        pr2serr("--maxlen=LEN too long: %d > %d\n", mxlen, MX_ALLOC_LEN);
-        return SG_LIB_SYNTAX_ERROR;
-    }
-    n = (mxlen > 0) ? mxlen : DEF_ALLOC_LEN;
-    res = sg_ll_inquiry_v2(sg_fd, true, page, rp, n, DEF_PT_TIMEOUT, &resid,
-                           ! qt, vb);
-    if (res)
-        return res;
-    rlen = n - resid;
-    if (rlen < 4) {
-        pr2serr("VPD response too short (len=%d)\n", rlen);
-        return SG_LIB_CAT_MALFORMED;
-    }
-    if (page != rp[1]) {
-        pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
-                "response\n");
-        n = (rlen < 32) ? rlen : 32;
-        if (vb) {
-            pr2serr("First %d bytes of bad response\n", n);
-            hex2stderr(rp, n, 0);
-        }
-        return SG_LIB_CAT_MALFORMED;
-    } else if ((0x80 == page) && (0x2 == rp[2]) && (0x2 == rp[3])) {
-        /* could be a Unit Serial number VPD page with a very long
-         * length of 4+514 bytes; more likely standard response for
-         * SCSI-2, RMB=1 and a response_data_format of 0x2. */
-        pr2serr("invalid Unit Serial Number VPD response; probably a "
-                "STANDARD INQUIRY response\n");
-        return SG_LIB_CAT_MALFORMED;
-    }
-    if (mxlen < 0)
-        len = rp[3] + 4;
-    else
-        len = sg_get_unaligned_be16(rp + 2) + 4;
-    if (len <= rlen) {
-        if (rlenp)
-            *rlenp = len;
-        return 0;
-    } else if (mxlen) {
-        if (rlenp)
-            *rlenp = rlen;
-        return 0;
-    }
-    if (len > MX_ALLOC_LEN) {
-        pr2serr("response length too long: %d > %d\n", len, MX_ALLOC_LEN);
-        return SG_LIB_CAT_MALFORMED;
-    } else {
-        res = sg_ll_inquiry_v2(sg_fd, true, page, rp, len, DEF_PT_TIMEOUT,
-                               &resid, ! qt, vb);
-        if (res)
-            return res;
-        rlen = len - resid;
-        /* assume it is well behaved: hence page and len still same */
-        if (rlenp)
-            *rlenp = rlen;
-        return 0;
-    }
 }
 
 static const struct svpd_values_name_t *
@@ -521,10 +444,79 @@ device_id_vpd_variants(uint8_t * buff, int len, int subvalue,
     }
 }
 
+static void             /* VPD_SUPPORTED_VPDS  ["sv"] */
+decode_supported_vpd_4vpd(uint8_t * buff, int len, struct opts_t * op,
+                          sgj_opaque_p jap)
+{
+    uint8_t pn;
+    int k, rlen, pdt;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    const struct svpd_values_name_t * vnp;
+    uint8_t * bp;
+    char b[144];
+    static const int blen = sizeof(b);
+    static const char * svps = "Supported VPD pages";
+
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        return;
+    }
+    pdt = PDT_MASK & buff[0];
+    rlen = buff[3] + 4;
+    if (rlen > len)
+        pr2serr("%s VPD page truncated, indicates %d, got %d\n", svps, rlen,
+                len);
+    else
+        len = rlen;
+    if (len < 4) {
+        pr2serr("%s VPD page length too short=%d\n", svps, len);
+        return;
+    }
+    len -= 4;
+    bp = buff + 4;
+
+    for (k = 0; k < len; ++k) {
+        pn = bp[k];
+        snprintf(b, blen, "0x%02x", pn);
+        vnp = sdp_get_vpd_detail(pn, -1, pdt);
+        if (vnp) {
+            if (op->do_long)
+                sgj_pr_hr(jsp, "  %s  %s [%s]\n", b, vnp->name, vnp->acron);
+            else
+                sgj_pr_hr(jsp, "  %s [%s]\n", vnp->name, vnp->acron);
+        } else if (op->vend_prod_num >= 0) {
+            vnp = svpd_find_vendor_by_num(pn, op->vend_prod_num);
+            if (vnp) {
+                if (op->do_long)
+                    sgj_pr_hr(jsp, "  %s  %s [%s]\n", b, vnp->name,
+                              vnp->acron);
+                else
+                    sgj_pr_hr(jsp, "  %s [%s]\n", vnp->name, vnp->acron);
+            } else
+                sgj_pr_hr(jsp, "  %s\n", b);
+        } else
+            sgj_pr_hr(jsp, "  %s\n", b);
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_i(jsp, jo2p, "i", pn);
+            sgj_js_nv_s(jsp, jo2p, "hex", b + 2);
+            if (vnp) {
+                sgj_js_nv_s(jsp, jo2p, "name", vnp->name);
+                sgj_js_nv_s(jsp, jo2p, "acronym", vnp->acron);
+            } else {
+                sgj_js_nv_s(jsp, jo2p, "name", "unknown");
+                sgj_js_nv_s(jsp, jo2p, "acronym", "unknown");
+            }
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+        }
+    }
+}
+
 /* VPD_SCSI_PORTS     0x88  ["sp"] */
 static void
-decode_scsi_ports_vpd(uint8_t * buff, int len, struct opts_t * op,
-                      sgj_opaque_p jap)
+decode_scsi_ports_vpd_4vpd(uint8_t * buff, int len, struct opts_t * op,
+                           sgj_opaque_p jap)
 {
     int k, bump, rel_port, ip_tid_len, tpd_len;
     sgj_state * jsp = &op->json_st;
@@ -878,134 +870,26 @@ filter_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
 /* VPD_SA_DEV_CAP ssc */
 /* VPD_OSD_INFO osd */
 static void
-decode_b0_vpd(uint8_t * buff, int len, int do_hex, int pdt)
+decode_b0_vpd(uint8_t * buff, int len, struct opts_t * op, sgj_opaque_p jop)
 {
-    unsigned int u;
-    uint64_t ull;
-    bool ugavalid;
+    int pdt = PDT_MASK & buff[0];
+    sgj_state * jsp = &op->json_st;
 
-    if (do_hex) {
-        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
+    if (op->do_hex) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
         return;
     }
     switch (pdt) {
     case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
-        if (len < 16) {
-            pr2serr("Block limits VPD page length too short=%d\n", len);
-            return;
-        }
-        printf("  Write same non-zero (WSNZ): %d\n", !!(buff[4] & 0x1));
-        u = buff[5];
-        printf("  Maximum compare and write length: ");
-        if (0 == u)
-            printf("0 blocks [Command not implemented]\n");
-        else
-            printf("%u blocks\n", buff[5]);
-        u = sg_get_unaligned_be16(buff + 6);
-        printf("  Optimal transfer length granularity: ");
-        if (0 == u)
-            printf("0 blocks [not reported]\n");
-        else
-            printf("%u blocks\n", u);
-        u = sg_get_unaligned_be32(buff + 8);
-        printf("  Maximum transfer length: ");
-        if (0 == u)
-            printf("0 blocks [not reported]\n");
-        else
-            printf("%u blocks\n", u);
-        u = sg_get_unaligned_be32(buff + 12);
-        printf("  Optimal transfer length: ");
-        if (0 == u)
-            printf("0 blocks [not reported]\n");
-        else
-            printf("%u blocks\n", u);
-        if (len > 19) {     /* added in sbc3r09 */
-            u = sg_get_unaligned_be32(buff + 16);
-            printf("  Maximum prefetch transfer length: ");
-            if (0 == u)
-                printf("0 blocks [ignored]\n");
-            else
-                printf("%u blocks\n", u);
-        }
-        if (len > 27) {     /* added in sbc3r18 */
-            u = sg_get_unaligned_be32(buff + 20);
-            printf("  Maximum unmap LBA count: ");
-            if (0 == u)
-                printf("0 [Unmap command not implemented]\n");
-            else if (SG_LIB_UNBOUNDED_32BIT == u)
-                printf("-1 [unbounded]\n");
-            else
-                printf("%u\n", u);
-            u = sg_get_unaligned_be32(buff + 24);
-            printf("  Maximum unmap block descriptor count: ");
-            if (0 == u)
-                printf("0 [Unmap command not implemented]\n");
-            else if (SG_LIB_UNBOUNDED_32BIT == u)
-                printf("-1 [unbounded]\n");
-            else
-                printf("%u\n", u);
-        }
-        if (len > 35) {     /* added in sbc3r19 */
-            u = sg_get_unaligned_be32(buff + 28);
-            printf("  Optimal unmap granularity: ");
-            if (0 == u)
-                printf("0 blocks [not reported]\n");
-            else
-                printf("%u blocks\n", u);
-
-            ugavalid = !!(buff[32] & 0x80);
-            printf("  Unmap granularity alignment valid: %s\n",
-                   ugavalid ? "true" : "false");
-            u = 0x7fffffff & sg_get_unaligned_be32(buff + 32);
-            printf("  Unmap granularity alignment: %u%s\n", u,
-                   ugavalid ? "" : " [invalid]");
-        }
-        if (len > 43) {     /* added in sbc3r26 */
-            ull = sg_get_unaligned_be64(buff + 36);
-            printf("  Maximum write same length: ");
-            if (0 == ull)
-                printf("0 blocks [not reported]\n");
-            else
-                printf("0x%" PRIx64 " blocks\n", ull);
-        }
-        if (len > 44) {     /* added in sbc4r02 */
-            u = sg_get_unaligned_be32(buff + 44);
-            printf("  Maximum atomic transfer length: ");
-            if (0 == u)
-                printf("0 blocks [not reported]\n");
-            else
-                printf("%u blocks\n", u);
-            u = sg_get_unaligned_be32(buff + 48);
-            printf("  Atomic alignment: ");
-            if (0 == u)
-                printf("0 [unaligned atomic writes permitted]\n");
-            else
-                printf("%u\n", u);
-            u = sg_get_unaligned_be32(buff + 52);
-            printf("  Atomic transfer length granularity: ");
-            if (0 == u)
-                printf("0 [no granularity requirement\n");
-            else
-                printf("%u\n", u);
-        }
-        if (len > 56) {
-            u = sg_get_unaligned_be32(buff + 56);
-            printf("  Maximum atomic transfer length with atomic "
-                   "boundary: ");
-            if (0 == u)
-                printf("0 blocks [not reported]\n");
-            else
-                printf("%u blocks\n", u);
-            u = sg_get_unaligned_be32(buff + 60);
-            printf("  Maximum atomic boundary size: ");
-            if (0 == u)
-                printf("0 blocks [can only write atomic 1 block]\n");
-            else
-                printf("%u blocks\n", u);
-        }
+         /* now done by decode_block_limits_vpd() in sg_vpd_common.c */
         break;
     case PDT_TAPE: case PDT_MCHANGER:
-        printf("  WORM=%d\n", !!(buff[4] & 0x1));
+        sgj_haj_vi_nex(jsp, jop, 2, "TSMC", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(buff[4] & 0x2), false, "Tape Stream Mirror "
+                       "Capable");
+        sgj_haj_vi_nex(jsp, jop, 2, "WORM", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(buff[4] & 0x1), false, "Write Once Read Multple "
+                       "supported");
         break;
     case PDT_OSD:
     default:
@@ -1039,72 +923,6 @@ decode_b1_vpd(uint8_t * buff, int len, int do_hex, int pdt)
         break;
     }
 }
-
-#if 0
-/* VPD_BLOCK_DEV_C_EXTENS  0xb5 (added sbc4r02) */
-static void
-decode_block_dev_char_ext_vpd(uint8_t * b, int len)
-{
-    if (len < 16) {
-        pr2serr("Block device characteristics extension VPD page "
-                "length too short=%d\n", len);
-        return;
-    }
-    printf("  Utilization type: ");
-    switch (b[5]) {
-    case 1:
-        printf("Combined writes and reads");
-        break;
-    case 2:
-        printf("Writes only");
-        break;
-    case 3:
-        printf("Separate writes and reads");
-        break;
-    default:
-        printf("Reserved");
-        break;
-    }
-    printf(" [0x%x]\n", b[5]);
-    printf("  Utilization units: ");
-    switch (b[6]) {
-    case 2:
-        printf("megabytes");
-        break;
-    case 3:
-        printf("gigabytes");
-        break;
-    case 4:
-        printf("terabytes");
-        break;
-    case 5:
-        printf("petabytes");
-        break;
-    case 6:
-        printf("exabytes");
-        break;
-    default:
-        printf("Reserved");
-        break;
-    }
-    printf(" [0x%x]\n", b[6]);
-    printf("  Utilization interval: ");
-    switch (b[7]) {
-    case 0xa:
-        printf("per day");
-        break;
-    case 0xe:
-        printf("per year");
-        break;
-    default:
-        printf("Reserved");
-        break;
-    }
-    printf(" [0x%x]\n", b[7]);
-    printf("  Utilization B: %u\n", sg_get_unaligned_be32(b + 8));
-    printf("  Utilization A: %u\n", sg_get_unaligned_be32(b + 12));
-}
-#endif
 
 /* VPD_LB_PROTECTION 0xb5 (SSC)  [added in ssc5r02a] */
 static void
@@ -1265,77 +1083,6 @@ decode_b5_vpd(uint8_t * b, int len, int do_hex, int pdt)
     }
 }
 
-#if 0
-/* VPD_FORMAT_PRESETS  0xb8 (added sbc4r18) */
-static void
-decode_format_presets_vpd(uint8_t * buff, int len, int do_hex)
-{
-    int k;
-    unsigned int sch_type;
-    uint8_t * bp;
-
-    if (do_hex) {
-        hex2stdout(buff, len, (1 == do_hex) ? 0 : -1);
-        return;
-    }
-    if (len < 4) {
-        pr2serr("Format presets VPD page length too short=%d\n", len);
-        return;
-    }
-    len -= 4;
-    bp = buff + 4;
-    for (k = 0; k < len; k += 64, bp += 64) {
-        printf("  Preset identifier: 0x%x\n", sg_get_unaligned_be32(bp));
-        sch_type = bp[4];
-        printf("    schema type: %u\n", sch_type);
-        printf("    logical blocks per physical block exponent type: %u\n",
-               0xf & bp[7]);
-        printf("    logical block length: %u\n",
-               sg_get_unaligned_be32(bp + 8));
-        printf("    designed last LBA: 0x%" PRIx64 "\n",
-               sg_get_unaligned_be64(bp + 16));
-        printf("    FMPT_INFO: %u\n", (bp[38] >> 6) & 0x3);
-        printf("    protection field usage: %u\n", bp[38] & 0x7);
-        printf("    protection interval exponent: %u\n", bp[39] & 0xf);
-        if (2 == sch_type)
-            printf("    Defines zones for host aware device:\n");
-        else if (3 == sch_type)
-            printf("    Defines zones for host managed device:\n");
-        else if (4 == sch_type)
-            printf("    Defines zones for zone domains and realms device:\n");
-        if ((2 == sch_type) || (3 == sch_type)) {
-            unsigned int u = bp[40 + 0];
-
-            printf("        low LBA conventional zones percentage: "
-                   "%u.%u %%\n", u / 10, u % 10);
-            u = bp[40 + 1];
-            printf("        high LBA conventional zones percentage: "
-                   "%u.%u %%\n", u / 10, u % 10);
-            printf("        logical blocks per zone: %u\n",
-                   sg_get_unaligned_be32(bp + 40 + 12));
-        } else if (4 == sch_type) {
-            uint8_t u;
-            char b[128];
-
-            u = bp[40 + 0];
-            printf("        zone type for zone domain 0: %s\n",
-                   sg_get_zone_type_str((u >> 4) & 0xf, sizeof(b), b));
-            printf("        zone type for zone domain 1: %s\n",
-                   sg_get_zone_type_str(u & 0xf, sizeof(b), b));
-            u = bp[40 + 1];
-            printf("        zone type for zone domain 2: %s\n",
-                   sg_get_zone_type_str((u >> 4) & 0xf, sizeof(b), b));
-            printf("        zone type for zone domain 3: %s\n",
-                   sg_get_zone_type_str(u & 0xf, sizeof(b), b));
-            printf("        logical blocks per zone: %u\n",
-                   sg_get_unaligned_be32(bp + 40 + 12));
-            printf("        designed zone maximum address: 0x%" PRIx64 "\n",
-                   sg_get_unaligned_be64(bp + 40 + 16));
-        }
-    }
-}
-#endif
-
 /* Returns 0 if successful */
 static int
 svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
@@ -1404,7 +1151,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     bool inhex_active = (-1 == sg_fd);
     int len, pdt, pqual, num, k, resid, alloc_len, pn, vb;
     int res = 0;
-    const struct svpd_values_name_t * vnp;
     sgj_state * jsp = &op->json_st;
     uint8_t * rp;
     sgj_opaque_p jap = NULL;
@@ -1416,9 +1162,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     bool as_json = jsp->pr_as_json;
     bool not_json = ! as_json;
     char obuff[DEF_ALLOC_LEN];
-    char b[120];
     char d[48];
-    static const int blen = sizeof(b);
 
     vb = op->verbose;
     qt = op->do_quiet;
@@ -1520,44 +1264,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                     jap = sgj_named_subarray_r(jsp, jo2p,
                                                "supported_vpd_page_list");
                 }
-                for (k = 0; k < num; ++k) {
-                    pn = rp[4 + k];
-                    snprintf(b, blen, "0x%02x", pn);
-                    vnp = sdp_get_vpd_detail(pn, -1, pdt);
-                    if (vnp) {
-                        if (op->do_long)
-                            sgj_pr_hr(jsp, "  %s  %s [%s]\n", b,
-                                      vnp->name, vnp->acron);
-                        else
-                            sgj_pr_hr(jsp, "  %s [%s]\n", vnp->name,
-                                      vnp->acron);
-                    } else if (op->vend_prod_num >= 0) {
-                        vnp = svpd_find_vendor_by_num(pn, op->vend_prod_num);
-                        if (vnp) {
-                            if (op->do_long)
-                                sgj_pr_hr(jsp, "  %s  %s [%s]\n", b,
-                                          vnp->name, vnp->acron);
-                            else
-                                sgj_pr_hr(jsp, "  %s [%s]\n", vnp->name,
-                                          vnp->acron);
-                        } else
-                            sgj_pr_hr(jsp, "  %s\n", b);
-                    } else
-                        sgj_pr_hr(jsp, "  %s\n", b);
-                    if (as_json) {
-                        jo2p = sgj_new_unattached_object_r(jsp);
-                        sgj_js_nv_i(jsp, jo2p, "i", pn);
-                        sgj_js_nv_s(jsp, jo2p, "hex", b + 2);
-                        if (vnp) {
-                            sgj_js_nv_s(jsp, jo2p, "name", vnp->name);
-                            sgj_js_nv_s(jsp, jo2p, "acronym", vnp->acron);
-                        } else {
-                            sgj_js_nv_s(jsp, jo2p, "name", "unknown");
-                            sgj_js_nv_s(jsp, jo2p, "acronym", "unknown");
-                        }
-                        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
-                    }
-                }
+                decode_supported_vpd_4vpd(rp, len, op, jap);
             }
             return 0;
         }
@@ -1584,7 +1291,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                     len = sizeof(obuff) - 1;
                 memcpy(obuff, rp + 4, len);
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                sgj_hr_js_vs(jsp, jo2p, 2, np, SGJ_SEP_COLON_1_SPACE, obuff);
+                sgj_haj_vs(jsp, jo2p, 2, np, SGJ_SEP_COLON_1_SPACE, obuff);
             }
             return 0;
         }
@@ -1736,7 +1443,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                     jap = sgj_named_subarray_r(jsp, jo2p,
                                                "scsi_ports_descriptor_list");
                 }
-                decode_scsi_ports_vpd(rp, len, op, jap);
+                decode_scsi_ports_vpd_4vpd(rp, len, op, jap);
             }
             return 0;
         }
@@ -1978,9 +1685,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 if (bl)
                     decode_block_limits_vpd(rp, len, op, jo2p);
                 else if (sad) {
-                    decode_b0_vpd(rp, len, op->do_hex, pdt);
+                    decode_b0_vpd(rp, len, op, jop);
                 } else if (oi) {
-                    decode_b0_vpd(rp, len, op->do_hex, pdt);
+                    decode_b0_vpd(rp, len, op, jop);
                 } else {
 
                 }
@@ -2549,7 +2256,7 @@ main(int argc, char * argv[])
     sgj_state * jsp;
     sgj_opaque_p jop = NULL;
     const struct svpd_values_name_t * vnp;
-    struct opts_t opts = {0};
+    struct opts_t opts SG_C_CPP_ZERO_INIT;
     struct opts_t * op = &opts;
 
     op->invoker = SG_VPD_INV_SG_VPD;
@@ -2822,6 +2529,9 @@ main(int argc, char * argv[])
                 subvalue = op->vend_prod_num;
             }
         }
+        if (op->verbose > 3)
+               pr2serr("'--page=' matched pn=%d [0x%x], subvalue=%d\n",
+                       op->vpd_pn, op->vpd_pn, subvalue);
     } else if (op->vend_prod) {
         if (isdigit((uint8_t)op->vend_prod[0]))
             op->vend_prod_num = sg_get_num_nomult(op->vend_prod);

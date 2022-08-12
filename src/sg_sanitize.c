@@ -173,7 +173,7 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
     bool immed;
     int ret, res, sense_cat, timeout;
     uint8_t san_cdb[SANITIZE_OP_LEN];
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     if (op->early || op->wait)

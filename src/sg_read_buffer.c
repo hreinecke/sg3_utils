@@ -200,7 +200,7 @@ sg_ll_read_buffer_10(void * resp, int * residp, bool noisy,
     int ret, res, sense_cat;
     uint8_t rb10_cb[SG_READ_BUFFER_10_CMDLEN] =
           {SG_READ_BUFFER_10_CMD, 0, 0, 0,  0, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     rb10_cb[1] = (uint8_t)(op->rb_mode & 0x1f);
@@ -267,7 +267,7 @@ sg_ll_read_buffer_16(void * resp, int * residp, bool noisy,
     uint8_t rb16_cb[SG_READ_BUFFER_16_CMDLEN] =
           {SG_READ_BUFFER_16_CMD, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
            0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     rb16_cb[1] = (uint8_t)(op->rb_mode & 0x1f);
@@ -506,7 +506,7 @@ main(int argc, char * argv[])
     uint8_t * resp = NULL;
     uint8_t * free_resp = NULL;
     const struct mode_s * mp;
-    struct opts_t opts = {0};
+    struct opts_t opts SG_C_CPP_ZERO_INIT;
     struct opts_t * op = &opts;
 
     op->sg_fd = -1;

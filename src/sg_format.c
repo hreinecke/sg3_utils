@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.67 20220607";
+static const char * version_str = "1.68 20220609";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -267,7 +267,7 @@ sg_ll_format_medium(int sg_fd, bool verify, bool immed, int format,
         int ret, res, sense_cat;
         uint8_t fm_cdb[SG_FORMAT_MEDIUM_CMDLEN] =
                                   {SG_FORMAT_MEDIUM_CMD, 0, 0, 0, 0, 0};
-        uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+        uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
         struct sg_pt_base * ptvp;
 
         if (verify)
@@ -332,7 +332,7 @@ sg_ll_format_with_preset(int sg_fd, bool immed, bool fmtmaxlba,
         int ret, res, sense_cat;
         uint8_t fwp_cdb[SG_FORMAT_WITH_PRESET_CMDLEN] =
                      {SG_FORMAT_WITH_PRESET_CMD, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+        uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
         struct sg_pt_base * ptvp;
 
         if (immed)

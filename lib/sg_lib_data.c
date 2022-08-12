@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.91 20220730";
+const char * sg_lib_version_str = "2.92 20220809";
 /* spc6r06, sbc5r03, zbc2r13 */
 
 

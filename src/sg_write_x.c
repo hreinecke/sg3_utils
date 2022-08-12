@@ -1053,7 +1053,7 @@ do_write_x(int sg_fd, const void * dataoutp, int dout_len,
 {
     int k, ret, res, sense_cat, cdb_len, vb, err;
     uint8_t x_cdb[WRITE_X_32_LEN];        /* use for both lengths */
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     memset(x_cdb, 0, sizeof(x_cdb));
@@ -2197,7 +2197,7 @@ main(int argc, char * argv[])
     uint64_t addr_arr[MAX_NUM_ADDR];
     uint32_t num_arr[MAX_NUM_ADDR];
     struct stat if_stat, sf_stat;
-    struct opts_t opts = {0};
+    struct opts_t opts SG_C_CPP_ZERO_INIT;
 
     op = &opts;
     memset(&if_stat, 0, sizeof(if_stat));

@@ -102,7 +102,7 @@ sg_ll_report_pip(int sg_fd, void * resp, int mx_resp_len, int * residp,
     uint8_t rpip_cdb[SG_MAINT_IN_CMDLEN] =
           {SG_MAINTENANCE_IN, REPORT_PROVISIONING_INITIALIZATION_PATTERN_SA,
            0, 0,  0, 0, 0, 0,  0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be32((uint32_t)mx_resp_len, rpip_cdb + 6);

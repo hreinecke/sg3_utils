@@ -3887,12 +3887,12 @@ void
 sg_warn_and_wait(const char * cmd_name, const char * dev_name,
                  bool stress_all)
 {
-    int k;
+    int k, j;
     const char * stressp = stress_all ? "ALL d" : "D";
     const char * will_mayp = stress_all ? "will" : "may";
 
-    for (k = 0; k < 3; ++k) {
-        printf("\nA %s command will commence in 15 seconds\n", cmd_name);
+    for (k = 0, j = 15; k < 3; ++k, j -= 5) {
+        printf("\nA %s command will commence in %d seconds\n", cmd_name, j);
         printf("    %sata on %s %s be DESTROYED%s\n", stressp, dev_name,
                will_mayp, (stress_all ? "" : " or modified"));
         printf("        Press control-C to abort\n");

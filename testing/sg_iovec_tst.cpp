@@ -147,7 +147,7 @@ sg_read(int sg_fd, uint8_t * buff, int num_blocks, int from_block, int bs,
         int elem_size, int async)
 {
     uint8_t rdCmd[10] = {READ_10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
+    uint8_t senseBuff[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_io_hdr io_hdr;
     struct pollfd a_poll;
     int dxfer_len = bs * num_blocks;
@@ -251,7 +251,7 @@ sg_read_v4(int sg_fd, uint8_t * buff, int num_blocks, int from_block, int bs,
            int elem_size, int async)
 {
     uint8_t rdCmd[10] = {READ_10, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
+    uint8_t senseBuff[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_io_v4 io_hdr;
     struct pollfd a_poll;
     int dxfer_len = bs * num_blocks;

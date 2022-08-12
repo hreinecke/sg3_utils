@@ -141,7 +141,7 @@ main(int argc, char * argv[])
     char b[256];
     uint8_t rs_cdb[REQUEST_SENSE_CMDLEN] =
         {REQUEST_SENSE_CMD, 0, 0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 #ifndef SG_LIB_MINGW
     bool do_time = false;
     struct timeval start_tm, end_tm;

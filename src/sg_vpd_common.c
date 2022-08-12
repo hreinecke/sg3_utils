@@ -54,6 +54,206 @@ static const char * const vs_s = "Vendor specific";
 static const char * const null_s = "";
 static const char * const mn_s = "meaning";
 
+/* Supported vendor specific VPD pages */
+/* Arrange in alphabetical order by acronym */
+struct svpd_vp_name_t vp_arr[] = {
+    {VPD_VP_DDS, "dds", "DDS tape family from IBM"},
+    {VPD_VP_EMC, "emc", "EMC (company)"},
+    {VPD_VP_WDC_HITACHI, "hit", "WDC/Hitachi disk"},
+    {VPD_VP_HP3PAR, "hp3par", "3PAR array (HP was Left Hand)"},
+    {VPD_VP_HP_LTO, "hp_lto", "HP LTO tape/systems"},
+    {VPD_VP_IBM_LTO, "ibm_lto", "IBM LTO tape/systems"},
+    {VPD_VP_NVME, "nvme", "NVMe related"},
+    {VPD_VP_RDAC, "rdac", "RDAC array (NetApp E-Series)"},
+    {VPD_VP_SEAGATE, "sea", "Seagate disk"},
+    {VPD_VP_SG, "sg", "sg3_utils extensions"},
+    {VPD_VP_WDC_HITACHI, "wdc", "WDC/Hitachi disk"},
+    {0, NULL, NULL},
+};
+
+/* Supported vendor specific VPD pages */
+/* 'subvalue' holds vendor/product number to disambiguate */
+/* Arrange in alphabetical order by acronym */
+struct svpd_values_name_t vendor_vpd_pg[] = {
+    {VPD_V_ACI_LTO, VPD_VP_HP_LTO, 1, "aci", "ACI revision level (HP LTO)"},
+    {VPD_V_DATC_SEA, VPD_VP_SEAGATE, 0, "datc", "Date code (Seagate)"},
+    {VPD_V_DCRL_LTO, VPD_VP_IBM_LTO, 1, "dcrl", "Drive component revision "
+     "levels (IBM LTO)"},
+    {VPD_V_FVER_DDS, VPD_VP_DDS, 1, "ddsver", "Firmware revision (DDS)"},
+    {VPD_V_DEV_BEH_SEA, VPD_VP_SEAGATE, 0, "devb", "Device behavior "
+     "(Seagate)"},
+    {VPD_V_DSN_LTO, VPD_VP_IBM_LTO, 1, "dsn", "Drive serial numbers (IBM "
+     "LTO)"},
+    {VPD_V_DUCD_LTO, VPD_VP_IBM_LTO, 1, "ducd", "Device unique "
+     "configuration data (IBM LTO)"},
+    {VPD_V_EDID_RDAC, VPD_VP_RDAC, 0, "edid", "Extended device "
+     "identification (RDAC)"},
+    {VPD_V_FIRM_SEA, VPD_VP_SEAGATE, 0, "firm", "Firmware numbers "
+     "(Seagate)"},
+    {VPD_V_FVER_LTO, VPD_VP_HP_LTO, 0, "frl", "Firmware revision level "
+     "(HP LTO)"},
+    {VPD_V_FVER_RDAC, VPD_VP_RDAC, 0, "fwr4", "Firmware version (RDAC)"},
+    {VPD_V_HEAD_LTO, VPD_VP_HP_LTO, 1, "head", "Head Assy revision level "
+     "(HP LTO)"},
+    {VPD_V_HP3PAR, VPD_VP_HP3PAR, 0, "hp3par", "Volume information "
+     "(HP/3PAR)"},
+    {VPD_V_HVER_LTO, VPD_VP_HP_LTO, 1, "hrl", "Hardware revision level "
+     "(HP LTO)"},
+    {VPD_V_HVER_RDAC, VPD_VP_RDAC, 0, "hwr4", "Hardware version (RDAC)"},
+    {VPD_V_JUMP_SEA, VPD_VP_SEAGATE, 0, "jump", "Jump setting (Seagate)"},
+    {VPD_V_MECH_LTO, VPD_VP_HP_LTO, 1, "mech", "Mechanism revision level "
+     "(HP LTO)"},
+    {VPD_V_MPDS_LTO, VPD_VP_IBM_LTO, 1, "mpds", "Mode parameter default "
+     "settings (IBM LTO)"},
+    {SG_NVME_VPD_NICR, VPD_VP_SG, 0, "nicr",
+     "NVMe Identify Controller Response (sg3_utils)"},
+    {VPD_V_PCA_LTO, VPD_VP_HP_LTO, 1, "pca", "PCA revision level (HP LTO)"},
+    {VPD_V_FEAT_RDAC, VPD_VP_RDAC, 0, "prm4", "Feature Parameters (RDAC)"},
+    {VPD_V_RVSI_RDAC, VPD_VP_RDAC, 0, "rvsi", "Replicated volume source "
+     "identifier (RDAC)"},
+    {VPD_V_SAID_RDAC, VPD_VP_RDAC, 0, "said", "Storage array world wide "
+     "name (RDAC)"},
+    {VPD_V_SUBS_RDAC, VPD_VP_RDAC, 0, "subs", "Subsystem identifier (RDAC)"},
+    {VPD_V_SVER_RDAC, VPD_VP_RDAC, 0, "swr4", "Software version (RDAC)"},
+    {VPD_V_UPR_EMC, VPD_VP_EMC, 0, "upr", "Unit path report (EMC)"},
+    {VPD_V_VAC_RDAC, VPD_VP_RDAC, 0, "vac1", "Volume access control (RDAC)"},
+    {VPD_V_HIT_PG3, VPD_VP_WDC_HITACHI, 0, "wp3", "Page 0x3 (WDC/Hitachi)"},
+    {VPD_V_HIT_PG_D1, VPD_VP_WDC_HITACHI, 0, "wpd1",
+     "Page 0xd1 (WDC/Hitachi)"},
+    {VPD_V_HIT_PG_D2, VPD_VP_WDC_HITACHI, 0, "wpd2",
+     "Page 0xd2 (WDC/Hitachi)"},
+    {0, 0, 0, NULL, NULL},
+};
+
+
+int
+svpd_find_vp_num_by_acron(const char * vp_ap)
+{
+    size_t len;
+    const struct svpd_vp_name_t * vpp;
+
+    for (vpp = vp_arr; vpp->acron; ++vpp) {
+        len = strlen(vpp->acron);
+        if (0 == strncmp(vpp->acron, vp_ap, len))
+            return vpp->vend_prod_num;
+    }
+    return -1;
+}
+
+/* if vend_prod_num < -1 then list vendor_product ids + vendor pages, =-1
+ * list only vendor_product ids, else list pages for that vend_prod_num */
+void
+svpd_enumerate_vendor(int vend_prod_num)
+{
+    bool seen;
+    const struct svpd_vp_name_t * vpp;
+    const struct svpd_values_name_t * vnp;
+
+    if (vend_prod_num < 0) {
+        for (seen = false, vpp = vp_arr; vpp->acron; ++vpp) {
+            if (vpp->name) {
+                if (! seen) {
+                    printf("\nVendor/product identifiers:\n");
+                    seen = true;
+                }
+                printf("  %-10s %d      %s\n", vpp->acron,
+                       vpp->vend_prod_num, vpp->name);
+            }
+        }
+    }
+    if (-1 == vend_prod_num)
+        return;
+    for (seen = false, vnp = vendor_vpd_pg; vnp->acron; ++vnp) {
+        if ((vend_prod_num >= 0) && (vend_prod_num != vnp->subvalue))
+            continue;
+        if (vnp->name) {
+            if (! seen) {
+                printf("\nVendor specific VPD pages:\n");
+                seen = true;
+            }
+            printf("  %-10s 0x%02x,%d      %s\n", vnp->acron,
+                   vnp->value, vnp->subvalue, vnp->name);
+        }
+    }
+}
+
+/* mxlen is command line --maxlen=LEN option (def: 0) or -1 for a VPD page
+ * with a short length (1 byte). Returns 0 for success. */
+int     /* global: use by sg_vpd_vendor.c */
+vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen, bool qt,
+               int vb, int * rlenp)
+{
+    int res, resid, rlen, len, n;
+
+    if (sg_fd < 0) {
+        len = sg_get_unaligned_be16(rp + 2) + 4;
+        if (vb && (len > mxlen))
+            pr2serr("warning: VPD page's length (%d) > bytes in --inhex=FN "
+                    "file (%d)\n",  len , mxlen);
+        if (rlenp)
+            *rlenp = (len < mxlen) ? len : mxlen;
+        return 0;
+    }
+    if (mxlen > MX_ALLOC_LEN) {
+        pr2serr("--maxlen=LEN too long: %d > %d\n", mxlen, MX_ALLOC_LEN);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    n = (mxlen > 0) ? mxlen : DEF_ALLOC_LEN;
+    res = sg_ll_inquiry_v2(sg_fd, true, page, rp, n, DEF_PT_TIMEOUT, &resid,
+                           ! qt, vb);
+    if (res)
+        return res;
+    rlen = n - resid;
+    if (rlen < 4) {
+        pr2serr("VPD response too short (len=%d)\n", rlen);
+        return SG_LIB_CAT_MALFORMED;
+    }
+    if (page != rp[1]) {
+        pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
+                "response\n");
+        n = (rlen < 32) ? rlen : 32;
+        if (vb) {
+            pr2serr("First %d bytes of bad response\n", n);
+            hex2stderr(rp, n, 0);
+        }
+        return SG_LIB_CAT_MALFORMED;
+    } else if ((0x80 == page) && (0x2 == rp[2]) && (0x2 == rp[3])) {
+        /* could be a Unit Serial number VPD page with a very long
+         * length of 4+514 bytes; more likely standard response for
+         * SCSI-2, RMB=1 and a response_data_format of 0x2. */
+        pr2serr("invalid Unit Serial Number VPD response; probably a "
+                "STANDARD INQUIRY response\n");
+        return SG_LIB_CAT_MALFORMED;
+    }
+    if (mxlen < 0)
+        len = rp[3] + 4;
+    else
+        len = sg_get_unaligned_be16(rp + 2) + 4;
+    if (len <= rlen) {
+        if (rlenp)
+            *rlenp = len;
+        return 0;
+    } else if (mxlen) {
+        if (rlenp)
+            *rlenp = rlen;
+        return 0;
+    }
+    if (len > MX_ALLOC_LEN) {
+        pr2serr("response length too long: %d > %d\n", len, MX_ALLOC_LEN);
+        return SG_LIB_CAT_MALFORMED;
+    } else {
+        res = sg_ll_inquiry_v2(sg_fd, true, page, rp, len, DEF_PT_TIMEOUT,
+                               &resid, ! qt, vb);
+        if (res)
+            return res;
+        rlen = len - resid;
+        /* assume it is well behaved: hence page and len still same */
+        if (rlenp)
+            *rlenp = rlen;
+        return 0;
+    }
+}
+
 sgj_opaque_p
 sg_vpd_js_hdr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
               const uint8_t * vpd_hdrp)
@@ -240,48 +440,46 @@ decode_x_inq_vpd(uint8_t * b, int len, bool protect, struct opts_t * op,
         sgj_pr_hr(jsp, "  SPT=%d%s\n", n, d);
         sgj_js_nv_ihexstr_nex(jsp, jop, "spt", n, false, NULL,
                               cp, "Supported Protection Type");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "GRD_CHK", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[4] & 0x4), false, "guard check");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "APP_CHK", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[4] & 0x2), false, "application tag check");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "REF_CHK", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[4] & 0x1), false, "reference tag check");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "UASK_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[5] & 0x20), false, "Unit Attention "
-                         "condition Sense Key specific data Supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "GROUP_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[5] & 0x10), false, "grouping function "
-                         "supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "PRIOR_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[5] & 0x8), false, "priority supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "HEADSUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[5] & 0x4), false, "head of queue supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "ORDSUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[5] & 0x2), false, "ordered (task attribute) "
-                         "supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "SIMPSUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[5] & 0x1), false, "simple (task attribute) "
-                         "supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "WU_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[6] & 0x8), false, "Write uncorrectable "
-                         "supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "CRD_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[6] & 0x4), false, "Correction disable "
-                         "supported (obsolete SPC-5)");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "NV_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[6] & 0x2), false, "Nonvolatile cache "
-                         "supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "V_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[6] & 0x1), false, "Volatile cache supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "NO_PI_CHK", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[7] & 0x20), false, "No protection "
-                         "information checking");        /* spc5r02 */
-        sgj_hr_js_vi_nex(jsp, jop, 2, "P_I_I_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[7] & 0x10), false, "Protection information "
-                         "interval supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "LUICLR", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[7] & 0x1), false, "Logical unit I_T nexus "
-                         "clear");
+        sgj_haj_vi_nex(jsp, jop, 2, "GRD_CHK", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[4] & 0x4), false, "guard check");
+        sgj_haj_vi_nex(jsp, jop, 2, "APP_CHK", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[4] & 0x2), false, "application tag check");
+        sgj_haj_vi_nex(jsp, jop, 2, "REF_CHK", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[4] & 0x1), false, "reference tag check");
+        sgj_haj_vi_nex(jsp, jop, 2, "UASK_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[5] & 0x20), false, "Unit Attention "
+                       "condition Sense Key specific data Supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "GROUP_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[5] & 0x10), false, "grouping function supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "PRIOR_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[5] & 0x8), false, "priority supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "HEADSUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[5] & 0x4), false, "head of queue supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "ORDSUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[5] & 0x2), false, "ordered (task attribute) "
+                       "supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "SIMPSUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[5] & 0x1), false, "simple (task attribute) "
+                       "supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "WU_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[6] & 0x8), false, "Write uncorrectable "
+                       "supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "CRD_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[6] & 0x4), false, "Correction disable "
+                       "supported (obsolete SPC-5)");
+        sgj_haj_vi_nex(jsp, jop, 2, "NV_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[6] & 0x2), false, "Nonvolatile cache "
+                       "supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "V_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[6] & 0x1), false, "Volatile cache supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "NO_PI_CHK", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[7] & 0x20), false, "No protection "
+                       "information checking");        /* spc5r02 */
+        sgj_haj_vi_nex(jsp, jop, 2, "P_I_I_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[7] & 0x10), false, "Protection information "
+                       "interval supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "LUICLR", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[7] & 0x1), false, "Logical unit I_T nexus clear");
         np = "LU_COLL_TYPE";
         n = (b[8] >> 5) & 0x7;
         nex_p = "Logical unit collection type";
@@ -300,87 +498,86 @@ decode_x_inq_vpd(uint8_t * b, int len, bool protect, struct opts_t * op,
                 cp = rsv_s;
                 break;
             }
-            jo2p = sgj_hr_js_subo_r(jsp, jop, 2, np, SGJ_SEP_EQUAL_NO_SPACE,
-                                    n, false);
+            jo2p = sgj_haj_subo_r(jsp, jop, 2, np, SGJ_SEP_EQUAL_NO_SPACE,
+                                  n, false);
             sgj_js_nv_s(jsp, jo2p, mn_s, cp);
             if (jsp->pr_name_ex)
                 sgj_js_nv_s(jsp, jo2p, "abbreviated_name_expansion", nex_p);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, np, SGJ_SEP_EQUAL_NO_SPACE, n,
-                             true, nex_p);
+            sgj_haj_vi_nex(jsp, jop, 2, np, SGJ_SEP_EQUAL_NO_SPACE, n,
+                           true, nex_p);
 
-        sgj_hr_js_vi_nex(jsp, jop, 2, "R_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[8] & 0x10), false, "Referrals supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "RTD_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[8] & 0x8), false,
-                         "Revert to defaults supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "HSSRELEF", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[8] & 0x2), false,
-                         "History snapshots release effects");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "CBCS", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[8] & 0x1), false, "Capability-based command "
-                         "security (obsolete SPC-5)");
-        sgj_hr_js_vi(jsp, jop, 2, "Multi I_T nexus microcode download",
-                     SGJ_SEP_EQUAL_NO_SPACE, b[9] & 0xf, true);
-        sgj_hr_js_vi(jsp, jop, 2, "Extended self-test completion minutes",
-                      SGJ_SEP_EQUAL_NO_SPACE,
-                      sg_get_unaligned_be16(b + 10), true);
-        sgj_hr_js_vi_nex(jsp, jop, 2, "POA_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                          !!(b[12] & 0x80), false,
-                          "Power on activation supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "HRA_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[12] & 0x40), false,
-                         "Hard reset activation supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "VSA_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[12] & 0x20), false,
-                         "Vendor specific activation supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "DMS_VALID", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[12] & 0x10), false,
-                         "Download microcode support byte valid");
-        sgj_hr_js_vi(jsp, jop, 2, "Maximum supported sense data length",
-                     SGJ_SEP_EQUAL_NO_SPACE, b[13], true);
-        sgj_hr_js_vi_nex(jsp, jop, 2, "IBS", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[14] & 0x80), false,
-                         "Implicit bind supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "IAS", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[14] & 0x40), false,
-                         "Implicit affiliation supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "SAC", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[14] & 0x4), false,
-                         "Set affiliation command supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "NRD1", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[14] & 0x2), false,
-                         "No redirect one supported (BIND)");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "NRD0", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[14] & 0x1), false,
-                         "No redirect zero supported (BIND)");
-        sgj_hr_js_vi(jsp, jop, 2, "Maximum inquiry change logs",
-                     SGJ_SEP_EQUAL_NO_SPACE,
-                     sg_get_unaligned_be16(b + 15), true);
-        sgj_hr_js_vi(jsp, jop, 2, "Maximum mode page change logs",
-                     SGJ_SEP_EQUAL_NO_SPACE,
-                     sg_get_unaligned_be16(b + 17), true);
-        sgj_hr_js_vi_nex(jsp, jop, 2, "DM_MD_4", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[19] & 0x80), false,
-                         "Download microcode mode 4 supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "DM_MD_5", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[19] & 0x40), false,
-                         "Download microcode mode 5 supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "DM_MD_6", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[19] & 0x20), false,
-                         "Download microcode mode 6 supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "DM_MD_7", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[19] & 0x10), false,
-                         "Download microcode mode 7 supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "DM_MD_D", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[19] & 0x8), false,
-                         "Download microcode mode 0xd supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "DM_MD_E", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[19] & 0x4), false,
-                         "Download microcode mode 0xe supported");
-        sgj_hr_js_vi_nex(jsp, jop, 2, "DM_MD_F", SGJ_SEP_EQUAL_NO_SPACE,
-                         !!(b[19] & 0x2), false,
-                         "Download microcode mode 0xf supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "R_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[8] & 0x10), false, "Referrals supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "RTD_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[8] & 0x8), false,
+                       "Revert to defaults supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "HSSRELEF", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[8] & 0x2), false,
+                       "History snapshots release effects");
+        sgj_haj_vi_nex(jsp, jop, 2, "CBCS", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[8] & 0x1), false, "Capability-based command "
+                       "security (obsolete SPC-5)");
+        sgj_haj_vi(jsp, jop, 2, "Multi I_T nexus microcode download",
+                   SGJ_SEP_EQUAL_NO_SPACE, b[9] & 0xf, true);
+        sgj_haj_vi(jsp, jop, 2, "Extended self-test completion minutes",
+                   SGJ_SEP_EQUAL_NO_SPACE,
+                   sg_get_unaligned_be16(b + 10), true);
+        sgj_haj_vi_nex(jsp, jop, 2, "POA_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[12] & 0x80), false,
+                       "Power on activation supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "HRA_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[12] & 0x40), false,
+                       "Hard reset activation supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "VSA_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[12] & 0x20), false,
+                       "Vendor specific activation supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "DMS_VALID", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[12] & 0x10), false,
+                       "Download microcode support byte valid");
+        sgj_haj_vi(jsp, jop, 2, "Maximum supported sense data length",
+                   SGJ_SEP_EQUAL_NO_SPACE, b[13], true);
+        sgj_haj_vi_nex(jsp, jop, 2, "IBS", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[14] & 0x80), false, "Implicit bind supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "IAS", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[14] & 0x40), false,
+                       "Implicit affiliation supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "SAC", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[14] & 0x4), false,
+                       "Set affiliation command supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "NRD1", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[14] & 0x2), false,
+                       "No redirect one supported (BIND)");
+        sgj_haj_vi_nex(jsp, jop, 2, "NRD0", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[14] & 0x1), false,
+                       "No redirect zero supported (BIND)");
+        sgj_haj_vi(jsp, jop, 2, "Maximum inquiry change logs",
+                   SGJ_SEP_EQUAL_NO_SPACE,
+                   sg_get_unaligned_be16(b + 15), true);
+        sgj_haj_vi(jsp, jop, 2, "Maximum mode page change logs",
+                   SGJ_SEP_EQUAL_NO_SPACE,
+                   sg_get_unaligned_be16(b + 17), true);
+        sgj_haj_vi_nex(jsp, jop, 2, "DM_MD_4", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[19] & 0x80), false,
+                       "Download microcode mode 4 supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "DM_MD_5", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[19] & 0x40), false,
+                       "Download microcode mode 5 supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "DM_MD_6", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[19] & 0x20), false,
+                       "Download microcode mode 6 supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "DM_MD_7", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[19] & 0x10), false,
+                       "Download microcode mode 7 supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "DM_MD_D", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[19] & 0x8), false,
+                       "Download microcode mode 0xd supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "DM_MD_E", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[19] & 0x4), false,
+                       "Download microcode mode 0xe supported");
+        sgj_haj_vi_nex(jsp, jop, 2, "DM_MD_F", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(b[19] & 0x2), false,
+                       "Download microcode mode 0xf supported");
         if (do_long_nq || (! jsp->pr_out_hr))
             return;
     }
@@ -538,24 +735,24 @@ decode_power_condition(uint8_t * buff, int len, struct opts_t * op,
         sgj_js_nv_ihex(jsp, jop, "idle_b", !!(buff[5] & 0x2));
         sgj_js_nv_ihex(jsp, jop, "idle_a", !!(buff[5] & 0x1));
     }
-    sgj_hr_js_vi_nex(jsp, jop, 2, "Stopped condition recovery time",
-                     SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 6),
-                     true, "unit: millisecond");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "Standby_z condition recovery time",
-                     SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 8),
-                     true, "unit: millisecond");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "Standby_y condition recovery time",
-                     SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 10),
-                     true, "unit: millisecond");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "Idle_a condition recovery time",
-                     SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 12),
-                     true, "unit: millisecond");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "Idle_b condition recovery time",
-                     SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 14),
-                     true, "unit: millisecond");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "Idle_c condition recovery time",
-                     SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 16),
-                     true, "unit: millisecond");
+    sgj_haj_vi_nex(jsp, jop, 2, "Stopped condition recovery time",
+                   SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 6),
+                   true, "unit: millisecond");
+    sgj_haj_vi_nex(jsp, jop, 2, "Standby_z condition recovery time",
+                   SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 8),
+                   true, "unit: millisecond");
+    sgj_haj_vi_nex(jsp, jop, 2, "Standby_y condition recovery time",
+                   SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 10),
+                   true, "unit: millisecond");
+    sgj_haj_vi_nex(jsp, jop, 2, "Idle_a condition recovery time",
+                   SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 12),
+                   true, "unit: millisecond");
+    sgj_haj_vi_nex(jsp, jop, 2, "Idle_b condition recovery time",
+                   SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 14),
+                   true, "unit: millisecond");
+    sgj_haj_vi_nex(jsp, jop, 2, "Idle_c condition recovery time",
+                   SGJ_SEP_SPACE_1, sg_get_unaligned_be16(buff + 16),
+                   true, "unit: millisecond");
 }
 
 int
@@ -1114,8 +1311,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         sgj_convert_to_snake_name(mcawl, b, blen);
         sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, cni);
     } else
-        sgj_hr_js_vi_nex(jsp, jop, 2, mcawl, SGJ_SEP_COLON_1_SPACE, u,
-                         true, "unit: LB");
+        sgj_haj_vi_nex(jsp, jop, 2, mcawl, SGJ_SEP_COLON_1_SPACE, u,
+                       true, "unit: LB");
 
     u = sg_get_unaligned_be16(buff + 6);
     if (0 == u) {
@@ -1123,8 +1320,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         sgj_convert_to_snake_name(otlg, b, blen);
         sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
-        sgj_hr_js_vi_nex(jsp, jop, 2, otlg, SGJ_SEP_COLON_1_SPACE, u,
-                            true, "unit: LB");
+        sgj_haj_vi_nex(jsp, jop, 2, otlg, SGJ_SEP_COLON_1_SPACE, u,
+                       true, "unit: LB");
 
     u = sg_get_unaligned_be32(buff + 8);
     if (0 == u) {
@@ -1132,8 +1329,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         sgj_convert_to_snake_name(mtl, b, blen);
         sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
-        sgj_hr_js_vi_nex(jsp, jop, 2, mtl, SGJ_SEP_COLON_1_SPACE, u,
-                         true, "unit: LB");
+        sgj_haj_vi_nex(jsp, jop, 2, mtl, SGJ_SEP_COLON_1_SPACE, u,
+                       true, "unit: LB");
 
     u = sg_get_unaligned_be32(buff + 12);
     if (0 == u) {
@@ -1141,8 +1338,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         sgj_convert_to_snake_name(otl, b, blen);
         sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
-        sgj_hr_js_vi_nex(jsp, jop, 2, otl, SGJ_SEP_COLON_1_SPACE, u,
-                         true, "unit: LB");
+        sgj_haj_vi_nex(jsp, jop, 2, otl, SGJ_SEP_COLON_1_SPACE, u,
+                       true, "unit: LB");
     if (len > 19) {     /* added in sbc3r09 */
         u = sg_get_unaligned_be32(buff + 16);
         if (0 == u) {
@@ -1150,8 +1347,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_convert_to_snake_name(mpl, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, mpl, SGJ_SEP_COLON_1_SPACE, u,
-                             true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, mpl, SGJ_SEP_COLON_1_SPACE, u,
+                           true, "unit: LB");
     }
     if (len > 27) {     /* added in sbc3r18 */
         u = sg_get_unaligned_be32(buff + 20);
@@ -1163,8 +1360,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_pr_hr(jsp, "  %s: %s blocks\n", ul, mulc);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, ul);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, mulc, SGJ_SEP_COLON_1_SPACE, u,
-                             true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, mulc, SGJ_SEP_COLON_1_SPACE, u,
+                           true, "unit: LB");
 
         u = sg_get_unaligned_be32(buff + 24);
         sgj_convert_to_snake_name(mulc, b, blen);
@@ -1175,8 +1372,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_pr_hr(jsp, "  %s: %s block descriptors\n", ul, mubdc);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, ul);
         } else
-            sgj_hr_js_vi(jsp, jop, 2, mubdc, SGJ_SEP_COLON_1_SPACE,
-                         u, true);
+            sgj_haj_vi(jsp, jop, 2, mubdc, SGJ_SEP_COLON_1_SPACE,
+                       u, true);
     }
     if (len > 35) {     /* added in sbc3r19 */
         u = sg_get_unaligned_be32(buff + 28);
@@ -1185,16 +1382,16 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_convert_to_snake_name(oug, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, oug, SGJ_SEP_COLON_1_SPACE, u,
-                             true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, oug, SGJ_SEP_COLON_1_SPACE, u,
+                           true, "unit: LB");
 
         ugavalid = !!(buff[32] & 0x80);
         sgj_pr_hr(jsp, "  %s: %s\n", ugav, ugavalid ? "true" : "false");
         sgj_js_nv_i(jsp, jop, ugav, ugavalid);
         if (ugavalid) {
             u = 0x7fffffff & sg_get_unaligned_be32(buff + 32);
-            sgj_hr_js_vi_nex(jsp, jop, 2, uga, SGJ_SEP_COLON_1_SPACE, u,
-                             true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, uga, SGJ_SEP_COLON_1_SPACE, u,
+                           true, "unit: LB");
         }
     }
     if (len > 43) {     /* added in sbc3r26 */
@@ -1204,8 +1401,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_convert_to_snake_name(mwsl, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, ull, NULL, nr_s);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, mwsl, SGJ_SEP_COLON_1_SPACE,
-                             ull, true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, mwsl, SGJ_SEP_COLON_1_SPACE,
+                           ull, true, "unit: LB");
     }
     if (len > 47) {     /* added in sbc4r02 */
         u = sg_get_unaligned_be32(buff + 44);
@@ -1214,8 +1411,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_convert_to_snake_name(matl, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, matl, SGJ_SEP_COLON_1_SPACE,
-                             u, true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, matl, SGJ_SEP_COLON_1_SPACE,
+                           u, true, "unit: LB");
 
         u = sg_get_unaligned_be32(buff + 48);
         if (0 == u) {
@@ -1225,8 +1422,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_convert_to_snake_name(aa, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, uawp);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, aa, SGJ_SEP_COLON_1_SPACE,
-                             u, true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, aa, SGJ_SEP_COLON_1_SPACE,
+                           u, true, "unit: LB");
 
         u = sg_get_unaligned_be32(buff + 52);
         if (0 == u) {
@@ -1236,8 +1433,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_convert_to_snake_name(atlg, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, ngr);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, aa, SGJ_SEP_COLON_1_SPACE,
-                             u, true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, aa, SGJ_SEP_COLON_1_SPACE,
+                           u, true, "unit: LB");
     }
     if (len > 56) {
         u = sg_get_unaligned_be32(buff + 56);
@@ -1246,8 +1443,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_convert_to_snake_name(matlwab, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, matlwab, SGJ_SEP_COLON_1_SPACE,
-                             u, true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, matlwab, SGJ_SEP_COLON_1_SPACE,
+                           u, true, "unit: LB");
 
         u = sg_get_unaligned_be32(buff + 60);
         if (0 == u) {
@@ -1257,8 +1454,8 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_convert_to_snake_name(mabs, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, cowa1b);
         } else
-            sgj_hr_js_vi_nex(jsp, jop, 2, mabs, SGJ_SEP_COLON_1_SPACE,
-                             u, true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jop, 2, mabs, SGJ_SEP_COLON_1_SPACE,
+                           u, true, "unit: LB");
     }
 }
 
@@ -1327,12 +1524,12 @@ decode_block_dev_ch_vpd(const uint8_t * buff, int len, struct opts_t * op,
                   (u < 0xf0) ? rsv_s : vs_s, u);
         sgj_js_nv_ihexstr(jsp, jop, pt_j, u, NULL, (u < 0xf0) ? rsv_s : vs_s);
     }
-    sgj_hr_js_vi_nex(jsp, jop, 2, "WABEREQ", SGJ_SEP_EQUAL_NO_SPACE,
-                     (buff[7] >> 6) & 0x3, false,
-                     "Write After Block Erase REQuired");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "WACEREQ", SGJ_SEP_EQUAL_NO_SPACE,
-                     (buff[7] >> 4) & 0x3, false,
-                     "Write After Cryptographic Erase REQuired");
+    sgj_haj_vi_nex(jsp, jop, 2, "WABEREQ", SGJ_SEP_EQUAL_NO_SPACE,
+                   (buff[7] >> 6) & 0x3, false,
+                   "Write After Block Erase REQuired");
+    sgj_haj_vi_nex(jsp, jop, 2, "WACEREQ", SGJ_SEP_EQUAL_NO_SPACE,
+                   (buff[7] >> 4) & 0x3, false,
+                   "Write After Cryptographic Erase REQuired");
     u = buff[7] & 0xf;
     switch (u) {
     case 0:
@@ -1359,25 +1556,25 @@ decode_block_dev_ch_vpd(const uint8_t * buff, int len, struct opts_t * op,
     }
     sgj_pr_hr(jsp, "  Nominal form factor: %s\n", b);
     sgj_js_nv_ihexstr(jsp, jop, "nominal_forn_factor", u, NULL, b);
-    sgj_hr_js_vi_nex(jsp, jop, 2, "MACT", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(buff[8] & 0x40), false, "Multiple ACTuator");
+    sgj_haj_vi_nex(jsp, jop, 2, "MACT", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(buff[8] & 0x40), false, "Multiple ACTuator");
     zoned = (buff[8] >> 4) & 0x3;   /* added sbc4r04, obsolete sbc5r01 */
     cp = bdc_zoned_strs[zoned];
     sgj_pr_hr(jsp, "  ZONED=%d [%s]\n", zoned, cp);
     sgj_js_nv_ihexstr_nex(jsp, jop, "zoned", zoned, false, NULL,
                           cp, "Added in SBC-4, obsolete in SBC-5");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "RBWZ", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(buff[8] & 0x4), false,
-                     "Background Operation Control Supported");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "FUAB", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(buff[8] & 0x2), false,
-                     "Force Unit Access Behaviour");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "VBULS", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(buff[8] & 0x1), false,
-                     "Verify Byte check Unmapped Lba Supported");
+    sgj_haj_vi_nex(jsp, jop, 2, "RBWZ", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(buff[8] & 0x4), false,
+                   "Background Operation Control Supported");
+    sgj_haj_vi_nex(jsp, jop, 2, "FUAB", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(buff[8] & 0x2), false,
+                   "Force Unit Access Behaviour");
+    sgj_haj_vi_nex(jsp, jop, 2, "VBULS", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(buff[8] & 0x1), false,
+                   "Verify Byte check Unmapped Lba Supported");
     u = sg_get_unaligned_be32(buff + 12);
-    sgj_hr_js_vi_nex(jsp, jop, 2, "DEPOPULATION TIME", SGJ_SEP_COLON_1_SPACE,
-                     u, true, "unit: second");
+    sgj_haj_vi_nex(jsp, jop, 2, "DEPOPULATION TIME", SGJ_SEP_COLON_1_SPACE,
+                   u, true, "unit: second");
 }
 
 static const char * prov_type_arr[8] = {
@@ -1412,25 +1609,24 @@ decode_block_lb_prov_vpd(uint8_t * buff, int len, struct opts_t * op,
     t_exp = buff[4];
     sgj_js_nv_ihexstr(jsp, jop, "threshold_exponent", t_exp, NULL,
                       (0 == t_exp) ? ns_s : NULL);
-    sgj_hr_js_vi_nex(jsp, jop, 2, "LBPU", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(buff[5] & 0x80), false,
-                     "Logical Block Provisioning Unmap command supported");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "LBPWS", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(buff[5] & 0x40), false, "Logical Block Provisioning "
-                     "Write Same (16) command supported");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "LBPWS10", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(buff[5] & 0x20), false,
-                     "Logical Block Provisioning Write Same (10) command "
-                     "supported");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "LBPRZ", SGJ_SEP_EQUAL_NO_SPACE,
-                     (0x7 & (buff[5] >> 2)), true,
-                     "Logical Block Provisioning Read Zero");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "ANC_SUP", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(buff[5] & 0x2), false,
-                     "ANChor SUPported");
+    sgj_haj_vi_nex(jsp, jop, 2, "LBPU", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(buff[5] & 0x80), false,
+                   "Logical Block Provisioning Unmap command supported");
+    sgj_haj_vi_nex(jsp, jop, 2, "LBPWS", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(buff[5] & 0x40), false, "Logical Block Provisioning "
+                   "Write Same (16) command supported");
+    sgj_haj_vi_nex(jsp, jop, 2, "LBPWS10", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(buff[5] & 0x20), false, "Logical Block Provisioning "
+                   "Write Same (10) command supported");
+    sgj_haj_vi_nex(jsp, jop, 2, "LBPRZ", SGJ_SEP_EQUAL_NO_SPACE,
+                   (0x7 & (buff[5] >> 2)), true,
+                   "Logical Block Provisioning Read Zero");
+    sgj_haj_vi_nex(jsp, jop, 2, "ANC_SUP", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(buff[5] & 0x2), false,
+                   "ANChor SUPported");
     dp = !!(buff[5] & 0x1);
-    sgj_hr_js_vi_nex(jsp, jop, 2, "DP", SGJ_SEP_EQUAL_NO_SPACE,
-                     dp, false, "Descriptor Present");
+    sgj_haj_vi_nex(jsp, jop, 2, "DP", SGJ_SEP_EQUAL_NO_SPACE,
+                   dp, false, "Descriptor Present");
     u = 0x1f & (buff[6] >> 3);  /* minimum percentage */
     if (0 == u)
         sgj_pr_hr(jsp, "  %s: 0 [%s]\n", mp, nr_s);
@@ -1501,8 +1697,8 @@ decode_referrals_vpd(uint8_t * buff, int len, struct opts_t * op,
         sgj_pr_hr(jsp, "%s%u\n", b, u);
     sgj_js_nv_ihex(jsp, jop, "user_data_segment_size", u);
     u = sg_get_unaligned_be32(buff + 12);
-    sgj_hr_js_vi(jsp, jop, 2, "User data segment multiplier",
-                 SGJ_SEP_COLON_1_SPACE, u, true);
+    sgj_haj_vi(jsp, jop, 2, "User data segment multiplier",
+               SGJ_SEP_COLON_1_SPACE, u, true);
 }
 
 /* VPD_SUP_BLOCK_LENS  0xb4 ["sbl"] (added sbc4r01) */
@@ -1526,35 +1722,28 @@ decode_sup_block_lens_vpd(uint8_t * buff, int len, struct opts_t * op,
         if (jsp->pr_as_json)
             jo2p = sgj_new_unattached_object_r(jsp);
         u = sg_get_unaligned_be32(bp);
-        sgj_hr_js_vi(jsp, jo2p, 2, "Logical block length",
-                     SGJ_SEP_COLON_1_SPACE, u, true);
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "P_I_I_SUP",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x40), false,
-                         "Protection Information Interval SUPported");
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "NO_PI_CHK",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x8), false,
-                         "NO Protection Information CHecKing");
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "GRD_CHK",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x4), false,
-                         "GuaRD CHecK");
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "APP_CHK",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x2), false,
-                         "APPlication tag CHecK");
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "REF_CHK",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x1), false,
-                         "REFerence tag CHecK");
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "T3PS",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[5] & 0x8), false,
-                         "Type 3 Protection Supported");
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "T2PS",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[5] & 0x4), false,
-                         "Type 2 Protection Supported");
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "T1PS",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[5] & 0x2), false,
-                         "Type 1 Protection Supported");
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "T0PS",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[5] & 0x1), false,
-                         "Type 0 Protection Supported");
+        sgj_haj_vi(jsp, jo2p, 2, "Logical block length",
+                   SGJ_SEP_COLON_1_SPACE, u, true);
+        sgj_haj_vi_nex(jsp, jo2p, 4, "P_I_I_SUP",
+                       SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x40), false,
+                       "Protection Information Interval SUPported");
+        sgj_haj_vi_nex(jsp, jo2p, 4, "NO_PI_CHK",
+                       SGJ_SEP_COLON_1_SPACE, !!(bp[4] & 0x8), false,
+                       "NO Protection Information CHecKing");
+        sgj_haj_vi_nex(jsp, jo2p, 4, "GRD_CHK", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[4] & 0x4), false, "GuaRD CHecK");
+        sgj_haj_vi_nex(jsp, jo2p, 4, "APP_CHK", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[4] & 0x2), false, "APPlication tag CHecK");
+        sgj_haj_vi_nex(jsp, jo2p, 4, "REF_CHK", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[4] & 0x1), false, "REFerence tag CHecK");
+        sgj_haj_vi_nex(jsp, jo2p, 4, "T3PS", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[5] & 0x8), false, "Type 3 Protection Supported");
+        sgj_haj_vi_nex(jsp, jo2p, 4, "T2PS", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[5] & 0x4), false, "Type 2 Protection Supported");
+        sgj_haj_vi_nex(jsp, jo2p, 4, "T1PS", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[5] & 0x2), false, "Type 1 Protection Supported");
+        sgj_haj_vi_nex(jsp, jo2p, 4, "T0PS", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[5] & 0x1), false, "Type 0 Protection Supported");
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
 }
@@ -1595,8 +1784,8 @@ decode_block_dev_char_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
         utp = rsv_s;
         break;
     }
-    sgj_hr_js_vistr(jsp, jop, 2, "Utilization type", SGJ_SEP_COLON_1_SPACE,
-                    buff[5], true, utp);
+    sgj_haj_vistr(jsp, jop, 2, "Utilization type", SGJ_SEP_COLON_1_SPACE,
+                  buff[5], true, utp);
     switch (buff[6]) {
     case 2:
         uup = "megabytes";
@@ -1617,8 +1806,8 @@ decode_block_dev_char_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
         uup = rsv_s;
         break;
     }
-    sgj_hr_js_vistr(jsp, jop, 2, "Utilization units", SGJ_SEP_COLON_1_SPACE,
-                    buff[6], true, uup);
+    sgj_haj_vistr(jsp, jop, 2, "Utilization units", SGJ_SEP_COLON_1_SPACE,
+                  buff[6], true, uup);
     switch (buff[7]) {
     case 0xa:
         uip = "per day";
@@ -1630,16 +1819,16 @@ decode_block_dev_char_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
         uip = rsv_s;
         break;
     }
-    sgj_hr_js_vistr(jsp, jop, 2, "Utilization interval",
-                    SGJ_SEP_COLON_1_SPACE, buff[7], true, uip);
+    sgj_haj_vistr(jsp, jop, 2, "Utilization interval", SGJ_SEP_COLON_1_SPACE,
+                  buff[7], true, uip);
     u = sg_get_unaligned_be32(buff + 8);
-    sgj_hr_js_vistr(jsp, jop, 2, "Utilization B", SGJ_SEP_COLON_1_SPACE,
-                    u, true, (b_active ? NULL : rsv_s));
+    sgj_haj_vistr(jsp, jop, 2, "Utilization B", SGJ_SEP_COLON_1_SPACE,
+                  u, true, (b_active ? NULL : rsv_s));
     n = sg_scnpr(b, blen, "%s: ", "Designed utilization");
     if (b_active)
         n += sg_scnpr(b + n, blen - n, "%u %s for reads and ", u, uup);
     u = sg_get_unaligned_be32(buff + 12);
-    sgj_hr_js_vi(jsp, jop, 2, "Utilization A", SGJ_SEP_COLON_1_SPACE, u, true);
+    sgj_haj_vi(jsp, jop, 2, "Utilization A", SGJ_SEP_COLON_1_SPACE, u, true);
     n += sg_scnpr(b + n, blen - n, "%u %s for %swrites, %s", u, uup,
                   combined ? "reads and " : null_s, uip);
     sgj_pr_hr(jsp, "  %s\n", b);
@@ -1689,27 +1878,27 @@ decode_zbdch_vpd(uint8_t * buff, int len, struct opts_t * op,
         strcpy(b, rsv_s);
         break;
     }
-    sgj_hr_js_vistr(jsp, jop, 2, "Zoned block device extension",
-                    SGJ_SEP_COLON_1_SPACE, u, true, b);
-    sgj_hr_js_vi_nex(jsp, jop, 2, "AAORB", SGJ_SEP_COLON_1_SPACE,
-                     !!(buff[4] & 0x2), false,
-                     "Activation Aligned On Realm Boundaries");
-    sgj_hr_js_vi_nex(jsp, jop, 2, "URSWRZ", SGJ_SEP_COLON_1_SPACE,
-                     !!(buff[4] & 0x1), false,
-                     "Unrestricted Read in Sequential Write Required Zone");
+    sgj_haj_vistr(jsp, jop, 2, "Zoned block device extension",
+                  SGJ_SEP_COLON_1_SPACE, u, true, b);
+    sgj_haj_vi_nex(jsp, jop, 2, "AAORB", SGJ_SEP_COLON_1_SPACE,
+                   !!(buff[4] & 0x2), false,
+                   "Activation Aligned On Realm Boundaries");
+    sgj_haj_vi_nex(jsp, jop, 2, "URSWRZ", SGJ_SEP_COLON_1_SPACE,
+                   !!(buff[4] & 0x1), false,
+                   "Unrestricted Read in Sequential Write Required Zone");
     u = sg_get_unaligned_be32(buff + 8);
-    sgj_hr_js_vistr(jsp, jop, 2, "Optimal number of open sequential write "
-                    "preferred zones", SGJ_SEP_COLON_1_SPACE, u, true,
-                    (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL);
+    sgj_haj_vistr(jsp, jop, 2, "Optimal number of open sequential write "
+                  "preferred zones", SGJ_SEP_COLON_1_SPACE, u, true,
+                  (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL);
     u = sg_get_unaligned_be32(buff + 12);
-    sgj_hr_js_vistr(jsp, jop, 2, "Optimal number of non-sequentially "
-                    "written sequential write preferred zones",
-                    SGJ_SEP_COLON_1_SPACE, u, true,
-                    (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL);
+    sgj_haj_vistr(jsp, jop, 2, "Optimal number of non-sequentially "
+                  "written sequential write preferred zones",
+                  SGJ_SEP_COLON_1_SPACE, u, true,
+                  (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL);
     u = sg_get_unaligned_be32(buff + 16);
-    sgj_hr_js_vistr(jsp, jop, 2, "Maximum number of open sequential write "
-                    "required zones", SGJ_SEP_COLON_1_SPACE, u, true,
-                    (SG_LIB_UNBOUNDED_32BIT == u) ? nl_s : NULL);
+    sgj_haj_vistr(jsp, jop, 2, "Maximum number of open sequential write "
+                  "required zones", SGJ_SEP_COLON_1_SPACE, u, true,
+                  (SG_LIB_UNBOUNDED_32BIT == u) ? nl_s : NULL);
     u = buff[23] & 0xf;
     switch (u) {
     case 0:
@@ -1726,11 +1915,10 @@ decode_zbdch_vpd(uint8_t * buff, int len, struct opts_t * op,
         strcpy(b, rsv_s);
         break;
     }
-    sgj_hr_js_vistr(jsp, jop, 2, "Zoned alignment method",
-                    SGJ_SEP_COLON_1_SPACE, u, true, b);
-    sgj_hr_js_vi(jsp, jop, 2, "Zone starting LBA granularity",
-                 SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be64(buff + 24),
-                 true);
+    sgj_haj_vistr(jsp, jop, 2, "Zoned alignment method",
+                  SGJ_SEP_COLON_1_SPACE, u, true, b);
+    sgj_haj_vi(jsp, jop, 2, "Zone starting LBA granularity",
+               SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be64(buff + 24), true);
 }
 
 /* VPD_BLOCK_LIMITS_EXT  0xb7 ["ble"] SBC */
@@ -1750,32 +1938,32 @@ decode_block_limits_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
         return;
     }
     u = sg_get_unaligned_be16(buff + 6);
-    sgj_hr_js_vistr(jsp, jop, 2, "Maximum number of streams",
-                    SGJ_SEP_COLON_1_SPACE, u, true,
-                    (0 == u) ? "Stream control not supported" : NULL);
+    sgj_haj_vistr(jsp, jop, 2, "Maximum number of streams",
+                  SGJ_SEP_COLON_1_SPACE, u, true,
+                  (0 == u) ? "Stream control not supported" : NULL);
     u = sg_get_unaligned_be16(buff + 8);
-    sgj_hr_js_vi_nex(jsp, jop, 2, "Optimal stream write size",
-                     SGJ_SEP_COLON_1_SPACE, u, true, "unit: LB");
+    sgj_haj_vi_nex(jsp, jop, 2, "Optimal stream write size",
+                   SGJ_SEP_COLON_1_SPACE, u, true, "unit: LB");
     u = sg_get_unaligned_be32(buff + 10);
-    sgj_hr_js_vi_nex(jsp, jop, 2, "Stream granularity size",
-                     SGJ_SEP_COLON_1_SPACE, u, true,
-                     "unit: number of optimal stream write size blocks");
+    sgj_haj_vi_nex(jsp, jop, 2, "Stream granularity size",
+                   SGJ_SEP_COLON_1_SPACE, u, true,
+                   "unit: number of optimal stream write size blocks");
     if (len < 28)
         return;
     u = sg_get_unaligned_be32(buff + 16);
-    sgj_hr_js_vistr_nex(jsp, jop, 2, "Maximum scattered LBA range transfer "
-                        "length", SGJ_SEP_COLON_1_SPACE, u, true,
-                        (0 == u ? nlr_s : NULL),
-                        "unit: LB (in a single LBA range descriptor)");
+    sgj_haj_vistr_nex(jsp, jop, 2, "Maximum scattered LBA range transfer "
+                      "length", SGJ_SEP_COLON_1_SPACE, u, true,
+                      (0 == u ? nlr_s : NULL),
+                      "unit: LB (in a single LBA range descriptor)");
     u = sg_get_unaligned_be16(buff + 22);
-    sgj_hr_js_vistr(jsp, jop, 2, "Maximum scattered LBA range descriptor "
-                    "count", SGJ_SEP_COLON_1_SPACE, u, true,
-                    (0 == u ? nlr_s : NULL));
+    sgj_haj_vistr(jsp, jop, 2, "Maximum scattered LBA range descriptor "
+                  "count", SGJ_SEP_COLON_1_SPACE, u, true,
+                  (0 == u ? nlr_s : NULL));
     u = sg_get_unaligned_be32(buff + 24);
-    sgj_hr_js_vistr_nex(jsp, jop, 2, "Maximum scattered transfer length",
-                        SGJ_SEP_COLON_1_SPACE, u, true,
-                        (0 == u ? nlr_s : NULL),
-                        "unit: LB (per single Write Scattered command)");
+    sgj_haj_vistr_nex(jsp, jop, 2, "Maximum scattered transfer length",
+                      SGJ_SEP_COLON_1_SPACE, u, true,
+                      (0 == u ? nlr_s : NULL),
+                      "unit: LB (per single Write Scattered command)");
 }
 
 static const char * sch_type_arr[8] = {
@@ -1843,8 +2031,8 @@ decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
     bp = buff + 4;
     for (k = 0; k < len; k += 64, bp += 64) {
         jo2p = sgj_new_unattached_object_r(jsp);
-        sgj_hr_js_vi(jsp, jo2p, 2, "Preset identifier", SGJ_SEP_COLON_1_SPACE,
-                     sg_get_unaligned_be64(bp + 0), true);
+        sgj_haj_vi(jsp, jo2p, 2, "Preset identifier", SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be64(bp + 0), true);
         sch_type = bp[4];
         if (sch_type < 8) {
             cp = sch_type_arr[sch_type];
@@ -1854,24 +2042,24 @@ decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
                 snprintf(b, blen, "%s", cp);
         } else
             strcpy(b, rsv_s);
-        sgj_hr_js_vistr(jsp, jo2p, 4, "Schema type", SGJ_SEP_COLON_1_SPACE,
-                        sch_type, true, b);
-        sgj_hr_js_vi(jsp, jo2p, 4, "Logical blocks per physical block "
-                     "exponent", SGJ_SEP_COLON_1_SPACE,
-                     0xf & bp[7], true);
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "Logical block length",
-                         SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 8),
-                         true, "unit: byte");
-        sgj_hr_js_vi(jsp, jo2p, 4, "Designed last Logical Block Address",
-                     SGJ_SEP_COLON_1_SPACE,
-                     sg_get_unaligned_be64(bp + 16), true);
-        sgj_hr_js_vi_nex(jsp, jo2p, 4, "FMTPINFO", SGJ_SEP_COLON_1_SPACE,
-                         (bp[38] >> 6) & 0x3, false,
-                         "ForMaT Protection INFOrmation (see Format Unit)");
-        sgj_hr_js_vi(jsp, jo2p, 4, "Protection field usage",
-                     SGJ_SEP_COLON_1_SPACE, bp[38] & 0x7, false);
-        sgj_hr_js_vi(jsp, jo2p, 4, "Protection interval exponent",
-                     SGJ_SEP_COLON_1_SPACE, bp[39] & 0xf, true);
+        sgj_haj_vistr(jsp, jo2p, 4, "Schema type", SGJ_SEP_COLON_1_SPACE,
+                      sch_type, true, b);
+        sgj_haj_vi(jsp, jo2p, 4, "Logical blocks per physical block "
+                   "exponent", SGJ_SEP_COLON_1_SPACE,
+                   0xf & bp[7], true);
+        sgj_haj_vi_nex(jsp, jo2p, 4, "Logical block length",
+                       SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 8),
+                       true, "unit: byte");
+        sgj_haj_vi(jsp, jo2p, 4, "Designed last Logical Block Address",
+                   SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be64(bp + 16), true);
+        sgj_haj_vi_nex(jsp, jo2p, 4, "FMTPINFO", SGJ_SEP_COLON_1_SPACE,
+                       (bp[38] >> 6) & 0x3, false,
+                       "ForMaT Protection INFOrmation (see Format Unit)");
+        sgj_haj_vi(jsp, jo2p, 4, "Protection field usage",
+                   SGJ_SEP_COLON_1_SPACE, bp[38] & 0x7, false);
+        sgj_haj_vi(jsp, jo2p, 4, "Protection interval exponent",
+                   SGJ_SEP_COLON_1_SPACE, bp[39] & 0xf, true);
         jo3p = sgj_named_subobject_r(jsp, jo2p,
                                      "schema_type_specific_information");
         switch (sch_type) {
@@ -1888,9 +2076,9 @@ decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
             sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
                                "percent");
             u = sg_get_unaligned_be32(bp + 40 + 12);
-            sgj_hr_js_vistr(jsp, jo3p, 6, "Logical blocks per zone",
-                            SGJ_SEP_COLON_1_SPACE, u, true,
-                            (0 == u ? rsv_s : NULL));
+            sgj_haj_vistr(jsp, jo3p, 6, "Logical blocks per zone",
+                          SGJ_SEP_COLON_1_SPACE, u, true,
+                          (0 == u ? rsv_s : NULL));
             break;
         case 3:
             sgj_pr_hr(jsp, "    Defines zones for host managed device:\n");
@@ -1905,17 +2093,17 @@ decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
             sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
                                "percent");
             u = bp[40 + 3] & 0x7;
-            sgj_hr_js_vistr(jsp, jo3p, 6, "Designed zone alignment method",
-                            SGJ_SEP_COLON_1_SPACE, u, true,
-                            get_zone_align_method(u, d, dlen));
+            sgj_haj_vistr(jsp, jo3p, 6, "Designed zone alignment method",
+                           SGJ_SEP_COLON_1_SPACE, u, true,
+                           get_zone_align_method(u, d, dlen));
             ul = sg_get_unaligned_be64(bp + 40 + 4);
-            sgj_hr_js_vi_nex(jsp, jo3p, 6, "Designed zone starting LBA "
-                             "granularity", SGJ_SEP_COLON_1_SPACE, ul, true,
-                             "unit: LB");
+            sgj_haj_vi_nex(jsp, jo3p, 6, "Designed zone starting LBA "
+                           "granularity", SGJ_SEP_COLON_1_SPACE, ul, true,
+                           "unit: LB");
             u = sg_get_unaligned_be32(bp + 40 + 12);
-            sgj_hr_js_vistr(jsp, jo3p, 6, "Logical blocks per zone",
-                            SGJ_SEP_COLON_1_SPACE, u, true,
-                            (0 == u ? rsv_s : NULL));
+            sgj_haj_vistr(jsp, jo3p, 6, "Logical blocks per zone",
+                          SGJ_SEP_COLON_1_SPACE, u, true,
+                          (0 == u ? rsv_s : NULL));
             break;
         case 4:
             sgj_pr_hr(jsp, "    Defines zones for zone domains and realms "
@@ -1923,37 +2111,33 @@ decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
             snprintf(b, blen, "%s 0", ztzd);
             u = bp[40 + 0];
             sg_get_zone_type_str((u >> 4) & 0xf, dlen, d);
-            sgj_hr_js_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true,
-                            d);
+            sgj_haj_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true, d);
             snprintf(b, blen, "%s 1", ztzd);
             sg_get_zone_type_str(u & 0xf, dlen, d);
-            sgj_hr_js_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true,
-                            d);
+            sgj_haj_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true, d);
 
             snprintf(b, blen, "%s 2", ztzd);
             u = bp[40 + 1];
             sg_get_zone_type_str((u >> 4) & 0xf, dlen, d);
-            sgj_hr_js_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true,
-                            d);
+            sgj_haj_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true, d);
             snprintf(b, blen, "%s 3", ztzd);
             sg_get_zone_type_str(u & 0xf, dlen, d);
-            sgj_hr_js_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true,
-                            d);
+            sgj_haj_vistr(jsp, jo3p, 6, b, SGJ_SEP_COLON_1_SPACE, u, true, d);
             u = bp[40 + 3] & 0x7;
-            sgj_hr_js_vistr(jsp, jo3p, 6, "Designed zone alignment method",
-                            SGJ_SEP_COLON_1_SPACE, u, true,
-                            get_zone_align_method(u, d, dlen));
+            sgj_haj_vistr(jsp, jo3p, 6, "Designed zone alignment method",
+                          SGJ_SEP_COLON_1_SPACE, u, true,
+                          get_zone_align_method(u, d, dlen));
             ul = sg_get_unaligned_be64(bp + 40 + 4);
-            sgj_hr_js_vi_nex(jsp, jo3p, 6, "Designed zone starting LBA "
-                             "granularity", SGJ_SEP_COLON_1_SPACE, ul, true,
-                             "unit: LB");
+            sgj_haj_vi_nex(jsp, jo3p, 6, "Designed zone starting LBA "
+                           "granularity", SGJ_SEP_COLON_1_SPACE, ul, true,
+                           "unit: LB");
             u = sg_get_unaligned_be32(bp + 40 + 12);
-            sgj_hr_js_vistr(jsp, jo3p, 6, "Logical blocks per zone",
-                            SGJ_SEP_COLON_1_SPACE, u, true,
-                            (0 == u ? rsv_s : NULL));
+            sgj_haj_vistr(jsp, jo3p, 6, "Logical blocks per zone",
+                          SGJ_SEP_COLON_1_SPACE, u, true,
+                          (0 == u ? rsv_s : NULL));
             ul = sg_get_unaligned_be64(bp + 40 + 16);
-            sgj_hr_js_vi_nex(jsp, jo3p, 6, "Designed zone maximum address",
-                             SGJ_SEP_COLON_1_SPACE, ul, true, "unit: LBA");
+            sgj_haj_vi_nex(jsp, jo3p, 6, "Designed zone maximum address",
+                           SGJ_SEP_COLON_1_SPACE, ul, true, "unit: LBA");
             break;
         default:
             sgj_pr_hr(jsp, "    No schema type specific information\n");
@@ -1986,16 +2170,15 @@ decode_con_pos_range_vpd(uint8_t * buff, int len, struct opts_t * op,
     bp = buff + 64;
     for (k = 0; k < len; k += 32, bp += 32) {
         jo2p = sgj_new_unattached_object_r(jsp);
-        sgj_hr_js_vi(jsp, jo2p, 2, "LBA range number",
-                     SGJ_SEP_COLON_1_SPACE, bp[0], true);
+        sgj_haj_vi(jsp, jo2p, 2, "LBA range number",
+                   SGJ_SEP_COLON_1_SPACE, bp[0], true);
         u = bp[1];
-        sgj_hr_js_vistr(jsp, jo2p, 4, "Number of storage elements",
-                            SGJ_SEP_COLON_1_SPACE, u, true,
-                            (0 == u ? nr_s : NULL));
-        sgj_hr_js_vi(jsp, jo2p, 4, "Starting LBA", SGJ_SEP_COLON_1_SPACE,
-                     sg_get_unaligned_be64(bp + 8), true);
-        sgj_hr_js_vi(jsp, jo2p, 4, "Number of LBAs", SGJ_SEP_COLON_1_SPACE,
-                     sg_get_unaligned_be64(bp + 16), true);
+        sgj_haj_vistr(jsp, jo2p, 4, "Number of storage elements",
+                      SGJ_SEP_COLON_1_SPACE, u, true, (0 == u ? nr_s : NULL));
+        sgj_haj_vi(jsp, jo2p, 4, "Starting LBA", SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be64(bp + 8), true);
+        sgj_haj_vi(jsp, jo2p, 4, "Number of LBAs", SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be64(bp + 16), true);
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
 }
@@ -2033,24 +2216,24 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
             sgj_js_nv_ihexstr_nex(jsp, jo2p, "peripheral_device_type",
                                   pdt, false, NULL, "Block ROD device "
                                   "type specific descriptor", ab_pdt);
-            sgj_hr_js_vi_nex(jsp, jo2p, 4, "Optimal block ROD length "
-                             "granularity", SGJ_SEP_COLON_1_SPACE,
-                             sg_get_unaligned_be16(bp + 6), true, "unit: LB");
+            sgj_haj_vi_nex(jsp, jo2p, 4, "Optimal block ROD length "
+                           "granularity", SGJ_SEP_COLON_1_SPACE,
+                           sg_get_unaligned_be16(bp + 6), true, "unit: LB");
             ull = sg_get_unaligned_be64(bp + 8);
-            sgj_hr_js_vi(jsp, jo2p, 4, "Maximum bytes in block ROD",
-                         SGJ_SEP_COLON_1_SPACE, ull, true);
+            sgj_haj_vi(jsp, jo2p, 4, "Maximum bytes in block ROD",
+                       SGJ_SEP_COLON_1_SPACE, ull, true);
             ull = sg_get_unaligned_be64(bp + 16);
-            sgj_hr_js_vistr(jsp, jo2p, 4, "Optimal Bytes in block ROD "
-                            "transfer", SGJ_SEP_COLON_1_SPACE, ull, true,
-                            (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
+            sgj_haj_vistr(jsp, jo2p, 4, "Optimal Bytes in block ROD "
+                          "transfer", SGJ_SEP_COLON_1_SPACE, ull, true,
+                          (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
             ull = sg_get_unaligned_be64(bp + 24);
-            sgj_hr_js_vistr(jsp, jo2p, 4, "Optimal Bytes to token per "
-                            "segment", SGJ_SEP_COLON_1_SPACE, ull, true,
-                            (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
+            sgj_haj_vistr(jsp, jo2p, 4, "Optimal Bytes to token per "
+                          "segment", SGJ_SEP_COLON_1_SPACE, ull, true,
+                          (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
             ull = sg_get_unaligned_be64(bp + 32);
-            sgj_hr_js_vistr(jsp, jo2p, 4, "Optimal Bytes from token per "
-                            "segment", SGJ_SEP_COLON_1_SPACE, ull, true,
-                            (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
+            sgj_haj_vistr(jsp, jo2p, 4, "Optimal Bytes from token per "
+                          "segment", SGJ_SEP_COLON_1_SPACE, ull, true,
+                          (SG_LIB_UNBOUNDED_64BIT == ull) ? nl_s : NULL);
             break;
         case 1:
             /* Stream ROD device type specific descriptor */
@@ -2058,8 +2241,8 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
                                   pdt, false, NULL, "Stream ROD device "
                                   "type specific descriptor", ab_pdt);
             ull = sg_get_unaligned_be64(bp + 8);
-            sgj_hr_js_vi(jsp, jo2p, 4, "Maximum bytes in stream ROD",
-                         SGJ_SEP_COLON_1_SPACE, ull, true);
+            sgj_haj_vi(jsp, jo2p, 4, "Maximum bytes in stream ROD",
+                       SGJ_SEP_COLON_1_SPACE, ull, true);
             ull = sg_get_unaligned_be64(bp + 16);
             printf("  Optimal Bytes in stream ROD transfer: ");
             if (SG_LIB_UNBOUNDED_64BIT == ull)
@@ -2084,7 +2267,7 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
             break;
         default:
             sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
-                              pdt, false, "unknown");
+                              pdt, NULL, "unknown");
             break;
         }
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
@@ -2302,9 +2485,9 @@ decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
             case 0x0000:    /* Required if POPULATE TOKEN (or friend) used */
                 sgj_pr_hr(jsp, " %s:\n", dtp);
                 u = sg_get_unaligned_be16(bp + 10);
-                sgj_hr_js_vistr(jsp, jo2p, 2, "Maximum range descriptors",
-                                SGJ_SEP_COLON_1_SPACE, u, true,
-                                (0 == u) ? nr_s : NULL);
+                sgj_haj_vistr(jsp, jo2p, 2, "Maximum range descriptors",
+                              SGJ_SEP_COLON_1_SPACE, u, true,
+                              (0 == u) ? nr_s : NULL);
                 u = sg_get_unaligned_be32(bp + 12);
                 if (0 == u)
                     cp = nr_s;
@@ -2312,21 +2495,21 @@ decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
                     cp = "No maximum given";
                 else
                     cp = NULL;
-                sgj_hr_js_vistr_nex(jsp, jo2p, 2, "Maximum inactivity "
-                                    "timeout", SGJ_SEP_COLON_1_SPACE, u, true,
-                                    cp, "unit: second");
+                sgj_haj_vistr_nex(jsp, jo2p, 2, "Maximum inactivity timeout",
+                                  SGJ_SEP_COLON_1_SPACE, u, true, cp,
+                                  "unit: second");
                 u = sg_get_unaligned_be32(bp + 16);
-                sgj_hr_js_vistr_nex(jsp, jo2p, 2, "Default inactivity "
-                                    "timeout", SGJ_SEP_COLON_1_SPACE, u, true,
-                                    (0 == u) ? nr_s : NULL, "unit: second");
+                sgj_haj_vistr_nex(jsp, jo2p, 2, "Default inactivity timeout",
+                                  SGJ_SEP_COLON_1_SPACE, u, true,
+                                  (0 == u) ? nr_s : NULL, "unit: second");
                 ull = sg_get_unaligned_be64(bp + 20);
-                sgj_hr_js_vistr_nex(jsp, jo2p, 2, "Maximum token transfer "
-                                    "size", SGJ_SEP_COLON_1_SPACE, ull, true,
-                                    (0 == ull) ? nr_s : NULL, "unit: LB");
+                sgj_haj_vistr_nex(jsp, jo2p, 2, "Maximum token transfer size",
+                                  SGJ_SEP_COLON_1_SPACE, ull, true,
+                                  (0 == ull) ? nr_s : NULL, "unit: LB");
                 ull = sg_get_unaligned_be64(bp + 28);
-                sgj_hr_js_vistr_nex(jsp, jo2p, 2, "Optimal transfer count",
-                                    SGJ_SEP_COLON_1_SPACE, ull, true,
-                                    (0 == ull) ? nr_s : NULL, "unit: LB");
+                sgj_haj_vistr_nex(jsp, jo2p, 2, "Optimal transfer count",
+                                  SGJ_SEP_COLON_1_SPACE, ull, true,
+                                  (0 == ull) ? nr_s : NULL, "unit: LB");
                 break;
             case 0x0001:    /* Mandatory (SPC-4) */
                 sgj_pr_hr(jsp, " %s:\n", "Commands supported list");
@@ -2373,18 +2556,18 @@ decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
                 break;
             case 0x0004:
                 sgj_pr_hr(jsp, " %s:\n", dtp);
-                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum CSCD descriptor count",
-                             SGJ_SEP_COLON_1_SPACE,
-                             sg_get_unaligned_be16(bp + 8), true);
-                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum segment descriptor count",
-                             SGJ_SEP_COLON_1_SPACE,
-                             sg_get_unaligned_be16(bp + 10), true);
-                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum descriptor list length",
-                             SGJ_SEP_COLON_1_SPACE,
-                             sg_get_unaligned_be32(bp + 12), true);
-                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum inline data length",
-                             SGJ_SEP_COLON_1_SPACE,
-                             sg_get_unaligned_be32(bp + 17), true);
+                sgj_haj_vi(jsp, jo2p, 2, "Maximum CSCD descriptor count",
+                           SGJ_SEP_COLON_1_SPACE,
+                           sg_get_unaligned_be16(bp + 8), true);
+                sgj_haj_vi(jsp, jo2p, 2, "Maximum segment descriptor count",
+                           SGJ_SEP_COLON_1_SPACE,
+                           sg_get_unaligned_be16(bp + 10), true);
+                sgj_haj_vi(jsp, jo2p, 2, "Maximum descriptor list length",
+                           SGJ_SEP_COLON_1_SPACE,
+                           sg_get_unaligned_be32(bp + 12), true);
+                sgj_haj_vi(jsp, jo2p, 2, "Maximum inline data length",
+                           SGJ_SEP_COLON_1_SPACE,
+                           sg_get_unaligned_be32(bp + 17), true);
                 break;
             case 0x0008:
                 sgj_pr_hr(jsp, " Supported descriptors:\n");
@@ -2437,8 +2620,8 @@ decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
                 break;
             case 0x0106:
                 sgj_pr_hr(jsp, " ROD token features:\n");
-                sgj_hr_js_vi(jsp, jo2p, 2, "Remote tokens",
-                             SGJ_SEP_COLON_1_SPACE, bp[4] & 0x0f, true);
+                sgj_haj_vi(jsp, jo2p, 2, "Remote tokens",
+                           SGJ_SEP_COLON_1_SPACE, bp[4] & 0x0f, true);
                 u = sg_get_unaligned_be32(bp + 16);
                 sgj_pr_hr(jsp, "  Minimum token lifetime: %u seconds\n", u);
                 sgj_js_nv_ihex_nex(jsp, jo2p, "minimum_token_lifetime", u,
@@ -2448,9 +2631,9 @@ decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
                 sgj_js_nv_ihex_nex(jsp, jo2p, "maximum_token_lifetime", u,
                                    true, "unit: second");
                 u = sg_get_unaligned_be32(bp + 24);
-                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Maximum token inactivity "
-                                 "timeout", SGJ_SEP_COLON_1_SPACE, u,
-                                 true, "unit: second");
+                sgj_haj_vi_nex(jsp, jo2p, 2, "Maximum token inactivity "
+                               "timeout", SGJ_SEP_COLON_1_SPACE, u,
+                               true, "unit: second");
                 u = sg_get_unaligned_be16(bp + 46);
                 ja2p = sgj_named_subarray_r(jsp, jo2p,
                     "rod_device_type_specific_features_descriptor_list");
@@ -2485,48 +2668,47 @@ decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
                               (u & 0x1) ? y_s : n_s);
                     sgj_js_nv_i(jsp, jo3p, "token_out", !!(0x2 & u));
                     u = sg_get_unaligned_be16(bp + 8 + j + 6);
-                    sgj_hr_js_vi(jsp, jo3p, 4, "Preference indicator",
-                                 SGJ_SEP_COLON_1_SPACE, u, true);
+                    sgj_haj_vi(jsp, jo3p, 4, "Preference indicator",
+                               SGJ_SEP_COLON_1_SPACE, u, true);
                     sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
                 }
                 break;
             case 0x8001:    /* Mandatory (SPC-4) */
                 sgj_pr_hr(jsp, " General copy operations:\n");
                 u = sg_get_unaligned_be32(bp + 4);
-                sgj_hr_js_vi(jsp, jo2p, 2, "Total concurrent copies",
-                             SGJ_SEP_COLON_1_SPACE, u, true);
+                sgj_haj_vi(jsp, jo2p, 2, "Total concurrent copies",
+                           SGJ_SEP_COLON_1_SPACE, u, true);
                 u = sg_get_unaligned_be32(bp + 8);
-                sgj_hr_js_vi(jsp, jo2p, 2, "Maximum identified concurrent "
-                             "copies", SGJ_SEP_COLON_1_SPACE, u, true);
+                sgj_haj_vi(jsp, jo2p, 2, "Maximum identified concurrent "
+                           "copies", SGJ_SEP_COLON_1_SPACE, u, true);
                 u = sg_get_unaligned_be32(bp + 12);
-                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Maximum segment length",
-                                 SGJ_SEP_COLON_1_SPACE, u, true,
-                                 "unit: byte");
+                sgj_haj_vi_nex(jsp, jo2p, 2, "Maximum segment length",
+                               SGJ_SEP_COLON_1_SPACE, u, true, "unit: byte");
                 u = bp[16];     /* field is power of 2 */
-                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Data segment granularity",
-                                 SGJ_SEP_COLON_1_SPACE, u, true,
-                                 "unit: 2^val LB");
+                sgj_haj_vi_nex(jsp, jo2p, 2, "Data segment granularity",
+                               SGJ_SEP_COLON_1_SPACE, u, true,
+                               "unit: 2^val LB");
                 u = bp[17];     /* field is power of 2 */
-                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Inline data granularity",
-                                 SGJ_SEP_COLON_1_SPACE, u, true,
-                                 "unit: 2^val LB");
+                sgj_haj_vi_nex(jsp, jo2p, 2, "Inline data granularity",
+                               SGJ_SEP_COLON_1_SPACE, u, true,
+                               "unit: 2^val LB");
                 break;
             case 0x9101:
                 sgj_pr_hr(jsp, " Stream copy operations:\n");
                 u = sg_get_unaligned_be32(bp + 4);
-                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Maximum stream device "
-                                 "transfer size", SGJ_SEP_COLON_1_SPACE, u,
-                                 true, "unit: byte");
+                sgj_haj_vi_nex(jsp, jo2p, 2, "Maximum stream device transfer "
+                               "size", SGJ_SEP_COLON_1_SPACE, u, true,
+                               "unit: byte");
                 break;
             case 0xC001:
                 sgj_pr_hr(jsp, " Held data:\n");
                 u = sg_get_unaligned_be32(bp + 4);
-                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Held data limit",
-                                 SGJ_SEP_COLON_1_SPACE, u, true,
-                                 "unit: byte; (lower limit: minimum)");
-                sgj_hr_js_vi_nex(jsp, jo2p, 2, "Held data granularity",
-                                 SGJ_SEP_COLON_1_SPACE, bp[8], true,
-                                 "unit: 2^val byte");
+                sgj_haj_vi_nex(jsp, jo2p, 2, "Held data limit",
+                               SGJ_SEP_COLON_1_SPACE, u, true,
+                               "unit: byte; (lower limit: minimum)");
+                sgj_haj_vi_nex(jsp, jo2p, 2, "Held data granularity",
+                               SGJ_SEP_COLON_1_SPACE, bp[8], true,
+                               "unit: 2^val byte");
                 break;
             default:
                 pr2serr("Unexpected type=%d\n", desc_type);
@@ -2567,12 +2749,12 @@ decode_proto_lu_vpd(uint8_t * buff, int len, struct opts_t * op,
     for (k = 0; k < len; k += bump, bp += bump) {
         jo2p = sgj_new_unattached_object_r(jsp);
         rel_port = sg_get_unaligned_be16(bp);
-        sgj_hr_js_vi(jsp, jo2p, 2, "Relative port",
-                     SGJ_SEP_COLON_1_SPACE, rel_port, true);
+        sgj_haj_vi(jsp, jo2p, 2, "Relative port",
+                   SGJ_SEP_COLON_1_SPACE, rel_port, true);
         proto = bp[2] & 0xf;
         sg_get_trans_proto_str(proto, blen, b);
-        sgj_hr_js_vistr(jsp, jo2p, 4, "Protocol identifier",
-                        SGJ_SEP_COLON_1_SPACE, proto, false, b);
+        sgj_haj_vistr(jsp, jo2p, 4, "Protocol identifier",
+                      SGJ_SEP_COLON_1_SPACE, proto, false, b);
         desc_len = sg_get_unaligned_be16(bp + 6);
         bump = 8 + desc_len;
         if ((k + bump) > len) {
@@ -2589,8 +2771,8 @@ decode_proto_lu_vpd(uint8_t * buff, int len, struct opts_t * op,
         }
         switch (proto) {
         case TPROTO_SAS:
-            sgj_hr_js_vi(jsp, jo2p, 2, "TLR control supported",
-                         SGJ_SEP_COLON_1_SPACE, !!(bp[8] & 0x1), false);
+            sgj_haj_vi(jsp, jo2p, 2, "TLR control supported",
+                       SGJ_SEP_COLON_1_SPACE, !!(bp[8] & 0x1), false);
             break;
         default:
             pr2serr("Unexpected proto=%d\n", proto);
@@ -2631,12 +2813,12 @@ decode_proto_port_vpd(uint8_t * buff, int len, struct opts_t * op,
     for (k = 0; k < len; k += bump, bp += bump) {
         jo2p = sgj_new_unattached_object_r(jsp);
         rel_port = sg_get_unaligned_be16(bp);
-        sgj_hr_js_vi(jsp, jo2p, 2, "Relative port",
-                     SGJ_SEP_COLON_1_SPACE, rel_port, true);
+        sgj_haj_vi(jsp, jo2p, 2, "Relative port",
+                   SGJ_SEP_COLON_1_SPACE, rel_port, true);
         proto = bp[2] & 0xf;
         sg_get_trans_proto_str(proto, blen, b);
-        sgj_hr_js_vistr(jsp, jo2p, 4, "Protocol identifier",
-                        SGJ_SEP_COLON_1_SPACE, proto, false, b);
+        sgj_haj_vistr(jsp, jo2p, 4, "Protocol identifier",
+                      SGJ_SEP_COLON_1_SPACE, proto, false, b);
         desc_len = sg_get_unaligned_be16(bp + 6);
         bump = 8 + desc_len;
         if ((k + bump) > len) {

@@ -88,7 +88,7 @@ sg_ll_reset_write_pointer(int sg_fd, uint64_t zid, uint16_t zc, bool all,
     int ret, res, sense_cat;
     uint8_t rwp_cdb[SG_ZONING_OUT_CMDLEN] = {SG_ZONING_OUT,
          RESET_WRITE_POINTER_SA, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     sg_put_unaligned_be64(zid, rwp_cdb + 2);

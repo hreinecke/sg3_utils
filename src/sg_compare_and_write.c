@@ -355,7 +355,7 @@ sg_ll_compare_and_write(int sg_fd, uint8_t * buff, int blocks,
         uint64_t ull = 0;
         struct sg_pt_base * ptvp;
         uint8_t cawCmd[COMPARE_AND_WRITE_CDB_SIZE];
-        uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+        uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
 
         if (sg_build_scsi_cdb(cawCmd, blocks, lba, flags)) {
                 pr2serr(ME "bad cdb build, lba=0x%" PRIx64 ", blocks=%d\n",

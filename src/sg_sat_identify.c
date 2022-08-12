@@ -136,15 +136,15 @@ do_identify_dev(int sg_fd, bool do_packet, int cdb_len, bool ck_cond,
     uint64_t ull;
     struct sg_scsi_sense_hdr ssh;
     uint8_t inBuff[ID_RESPONSE_LEN];
-    uint8_t sense_buffer[64] = {0};
-    uint8_t ata_return_desc[16] = {0};
+    uint8_t sense_buffer[64] SG_C_CPP_ZERO_INIT;
+    uint8_t ata_return_desc[16] SG_C_CPP_ZERO_INIT;
     uint8_t apt_cdb[SAT_ATA_PASS_THROUGH16_LEN] =
                 {SAT_ATA_PASS_THROUGH16, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t apt12_cdb[SAT_ATA_PASS_THROUGH12_LEN] =
                 {SAT_ATA_PASS_THROUGH12, 0, 0, 0, 0, 0, 0, 0,
                  0, 0, 0, 0};
-    uint8_t apt32_cdb[SAT_ATA_PASS_THROUGH32_LEN] = {0};
+    uint8_t apt32_cdb[SAT_ATA_PASS_THROUGH32_LEN] SG_C_CPP_ZERO_INIT;
     const unsigned short * usp;
 
     sb_sz = sizeof(sense_buffer);

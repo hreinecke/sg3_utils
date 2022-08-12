@@ -393,7 +393,7 @@ struct scsi_cmnd_io
 static int
 do_scsi_io(struct scsi_cmnd_io * sio)
 {
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_io_hdr io_hdr;
     struct sg_scsi_sense_hdr ssh;
     int res;

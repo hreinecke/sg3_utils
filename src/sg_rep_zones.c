@@ -40,7 +40,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.41 20220717";
+static const char * version_str = "1.42 20220807";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -264,7 +264,7 @@ sg_ll_report_zzz(int sg_fd, enum zone_report_sa_e serv_act, uint64_t zs_lba,
     uint8_t rz_cdb[SG_ZONING_IN_CMDLEN] =
           {SG_ZONING_IN, REPORT_ZONES_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
     rz_cdb[1] = (uint8_t)serv_act;
@@ -398,12 +398,12 @@ prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op,
     zone_condition_str(zc, b, sizeof(b), op->vb);
     sgj_pr_hr(jsp, "   Zone condition: %s\n", b);
     sgj_js_nv_istr(jsp, jop, "zone_condition", zc, meaning_s, b);
-    sgj_hr_js_vi(jsp, jop, 3, "PUEP", SGJ_SEP_COLON_1_SPACE,
-                 !!(bp[1] & 0x4), false);
-    sgj_hr_js_vi(jsp, jop, 3, "NON_SEQ", SGJ_SEP_COLON_1_SPACE,
-                 !!(bp[1] & 0x2), false);
-    sgj_hr_js_vi(jsp, jop, 3, "RESET", SGJ_SEP_COLON_1_SPACE,
-                 !!(bp[1] & 0x1), false);
+    sgj_haj_vi(jsp, jop, 3, "PUEP", SGJ_SEP_COLON_1_SPACE,
+               !!(bp[1] & 0x4), false);
+    sgj_haj_vi(jsp, jop, 3, "NON_SEQ", SGJ_SEP_COLON_1_SPACE,
+               !!(bp[1] & 0x2), false);
+    sgj_haj_vi(jsp, jop, 3, "RESET", SGJ_SEP_COLON_1_SPACE,
+               !!(bp[1] & 0x1), false);
     len = sg_get_unaligned_be64(bp + 8);
     sgj_pr_hr(jsp, "   Zone Length: 0x%" PRIx64 "\n", len);
     sgj_js_nv_ihex(jsp, jop, "zone_length", (int64_t)len);
@@ -552,10 +552,10 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
         nr_locator = sg_get_unaligned_be64(rzBuff + 12);
     else
         nr_locator = 0;
-    sgj_hr_js_vi(jsp, jop, 0, "Realms_count", SGJ_SEP_EQUAL_NO_SPACE,
-                 realms_count, true);
-    sgj_hr_js_vi(jsp, jop, 0, "Realms_descriptor_length",
-                 SGJ_SEP_EQUAL_NO_SPACE, r_desc_len, true);
+    sgj_haj_vi(jsp, jop, 0, "Realms_count", SGJ_SEP_EQUAL_NO_SPACE,
+               realms_count, true);
+    sgj_haj_vi(jsp, jop, 0, "Realms_descriptor_length",
+               SGJ_SEP_EQUAL_NO_SPACE, r_desc_len, true);
     sgj_pr_hr(jsp, "Next_realm_locator=0x%" PRIx64 "\n", nr_locator);
     sgj_js_nv_ihex(jsp, jop, "Next_realm_locator", nr_locator);
     if ((realms_count < 1) || (act_len < (64 + 16)) || (r_desc_len < 16)) {
@@ -596,8 +596,8 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
         sgj_opaque_p jo2p;
 
         jo2p = sgj_new_unattached_object_r(jsp);
-        sgj_hr_js_vi(jsp, jo2p, 1, "Realms_id", SGJ_SEP_EQUAL_NO_SPACE,
-                     sg_get_unaligned_be32(bp + 0), true);
+        sgj_haj_vi(jsp, jo2p, 1, "Realms_id", SGJ_SEP_EQUAL_NO_SPACE,
+                   sg_get_unaligned_be32(bp + 0), true);
         if (op->do_hex) {
             hex2stdout(bp, r_desc_len, -1);
             continue;
@@ -605,8 +605,8 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
         restrictions = sg_get_unaligned_be16(bp + 4);
         sgj_pr_hr(jsp, "   realm_restrictions=0x%hu\n", restrictions);
         sgj_js_nv_ihex(jsp, jo2p, "realm_restrictions", restrictions);
-        sgj_hr_js_vi(jsp, jo2p, 3, "active_zone_domain_id",
-                     SGJ_SEP_EQUAL_NO_SPACE, bp[7], true);
+        sgj_haj_vi(jsp, jo2p, 3, "active_zone_domain_id",
+                   SGJ_SEP_EQUAL_NO_SPACE, bp[7], true);
 
         ja2p = sgj_named_subarray_r(jsp, jo2p,
                                     "realm_start_end_descriptors_list");
@@ -654,12 +654,12 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
         zd_locator = sg_get_unaligned_be64(rzBuff + 16);
     else
         zd_locator = 0;
-    sgj_hr_js_vi(jsp, jop, 0, "Zone_domains_returned_list_length=",
-                 SGJ_SEP_EQUAL_NO_SPACE, zd_ret_len, true);
-    sgj_hr_js_vi(jsp, jop, 0, "Zone_domains_supported",
-                 SGJ_SEP_EQUAL_NO_SPACE, zdoms_sup, true);
-    sgj_hr_js_vi(jsp, jop, 0, "Zone_domains_reported",
-                 SGJ_SEP_EQUAL_NO_SPACE, zdoms_rep, true);
+    sgj_haj_vi(jsp, jop, 0, "Zone_domains_returned_list_length=",
+               SGJ_SEP_EQUAL_NO_SPACE, zd_ret_len, true);
+    sgj_haj_vi(jsp, jop, 0, "Zone_domains_supported",
+               SGJ_SEP_EQUAL_NO_SPACE, zdoms_sup, true);
+    sgj_haj_vi(jsp, jop, 0, "Zone_domains_reported",
+               SGJ_SEP_EQUAL_NO_SPACE, zdoms_rep, true);
     sgj_pr_hr(jsp, "Reporting_options=0x%x\n", zd_rep_opts);
     sgj_js_nv_ihex(jsp, jop, "Reporting_options", zd_rep_opts);
     sgj_pr_hr(jsp, "Zone_domain_locator=0x%" PRIx64 "\n", zd_locator);
@@ -676,8 +676,8 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
         sgj_opaque_p jo2p;
 
         jo2p = sgj_new_unattached_object_r(jsp);
-        sgj_hr_js_vi(jsp, jo2p, 3, "zone_domain",
-                     SGJ_SEP_EQUAL_NO_SPACE, bp[0], true);
+        sgj_haj_vi(jsp, jo2p, 3, "zone_domain",
+                   SGJ_SEP_EQUAL_NO_SPACE, bp[0], true);
         lba = sg_get_unaligned_be64(bp + 16);
         sgj_pr_hr(jsp, "     zone_count=%" PRIu64 "\n", lba);
         sgj_js_nv_ihex(jsp, jo2p, "zone_count", lba);
@@ -689,10 +689,10 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
         sgj_js_nv_ihex(jsp, jo2p, "ending_lba", lba);
         sgj_pr_hr(jsp, "     zone_domain_zone_type=0x%x\n", bp[40]);
         sgj_js_nv_ihex(jsp, jo2p, "zone_domain_zone_type", bp[40]);
-        sgj_hr_js_vi(jsp, jo2p, 5, "VZDZT", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(0x2 & bp[42]), false);
-        sgj_hr_js_vi(jsp, jo2p, 5, "SRB", SGJ_SEP_EQUAL_NO_SPACE,
-                     !!(0x1 & bp[42]), false);
+        sgj_haj_vi(jsp, jo2p, 5, "VZDZT", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(0x2 & bp[42]), false);
+        sgj_haj_vi(jsp, jo2p, 5, "SRB", SGJ_SEP_EQUAL_NO_SPACE,
+                   !!(0x1 & bp[42]), false);
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     return 0;
@@ -844,7 +844,7 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
     uint64_t mx_lba = 0;
     uint64_t zs_lba, zwp, z_blks;
     const uint8_t * bp = rzBuff;
-    struct statistics_t st = {0};
+    struct statistics_t st SG_C_CPP_ZERO_INIT;
     char b[96];
 
     if (op->serv_act != REPORT_ZONES_SA) {
@@ -1151,7 +1151,7 @@ main(int argc, char * argv[])
     sgj_state * jsp;
     sgj_opaque_p jop = NULL;
     char b[80];
-    struct opts_t opts = {0};
+    struct opts_t opts SG_C_CPP_ZERO_INIT;
     struct opts_t * op = &opts;
 
     op->serv_act = REPORT_ZONES_SA;

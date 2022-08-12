@@ -110,7 +110,7 @@ int main(int argc, char * argv[])
     sg_io_hdr_t rio_hdr;
     char * file_name = 0;
     char ebuff[EBUFF_SZ];
-    uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN] = {0};
+    uint8_t sense_buffer[MAX_Q_LEN][SENSE_BUFFER_LEN] SG_C_CPP_ZERO_INIT;
     int q_len = DEF_Q_LEN;
 
     for (k = 1; k < argc; ++k) {

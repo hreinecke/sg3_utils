@@ -543,7 +543,7 @@ main(int argc, char *argv[])
     uint16_t sct_sc;
     uint32_t result;
     struct sg_pt_base *ptvp = NULL;
-    uint8_t sense_buffer[32] = {0};
+    uint8_t sense_buffer[32] SG_C_CPP_ZERO_INIT;
     uint8_t * dinp = NULL;
     uint8_t * doutp = NULL;
     uint8_t * free_buf_out = NULL;

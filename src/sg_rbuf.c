@@ -368,8 +368,8 @@ main(int argc, char * argv[])
     struct opts_t * op;
     uint8_t * rbBuff = NULL;
     void * rawp = NULL;
-    uint8_t sense_buffer[32] = {0};
-    uint8_t rb_cdb [RB_CMD_LEN] = {0};
+    uint8_t sense_buffer[32] SG_C_CPP_ZERO_INIT;
+    uint8_t rb_cdb [RB_CMD_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_io_hdr io_hdr;
     struct timeval start_tm, end_tm;
     struct opts_t opts;

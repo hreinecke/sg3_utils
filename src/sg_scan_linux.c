@@ -399,10 +399,9 @@ int sg3_inq(int sg_fd, uint8_t * inqBuff, bool do_extra)
 {
     bool ok;
     int err, sg_io;
-    uint8_t sense_buffer[32] = {0};
-    struct sg_io_hdr io_hdr;
+    uint8_t sense_buffer[32] SG_C_CPP_ZERO_INIT;
+    struct sg_io_hdr io_hdr SG_C_CPP_ZERO_INIT;
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     memset(inqBuff, 0, INQ_REPLY_LEN);
     inqBuff[0] = 0x7f;
     io_hdr.interface_id = 'S';

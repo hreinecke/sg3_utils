@@ -473,7 +473,7 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
     bool print_cdb_after = false;
     int res;
     uint8_t rdCmd[MAX_SCSI_CDBSZ];
-    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
+    uint8_t senseBuff[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_io_hdr io_hdr;
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, false, fua,
@@ -570,8 +570,8 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     bool print_cdb_after = false;
     int res;
     uint8_t wrCmd[MAX_SCSI_CDBSZ];
-    uint8_t senseBuff[SENSE_BUFF_LEN] = {0};
-    struct sg_io_hdr io_hdr;
+    uint8_t senseBuff[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
+    struct sg_io_hdr io_hdr SG_C_CPP_ZERO_INIT;
 
     if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, true, fua, dpo)) {
         pr2serr(ME "bad wr cdb build, to_block=%" PRId64 ", blocks=%d\n",
@@ -579,7 +579,6 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
     io_hdr.interface_id = 'S';
     io_hdr.cmd_len = cdbsz;
     io_hdr.cmdp = wrCmd;

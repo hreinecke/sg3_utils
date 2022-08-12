@@ -102,7 +102,7 @@ sg_ll_rem_rest_elem(int sg_fd, int sa, uint64_t req_cap, uint32_t e_id,
     uint8_t sai16_cdb[16] =
           {SG_SERVICE_ACTION_IN_16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
            0, 0, 0, 0};
-    uint8_t sense_b[SENSE_BUFF_LEN] = {0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     const char * cmd_name;
 
     sai16_cdb[1] = 0x1f & sa;
