@@ -170,7 +170,13 @@ favours POSIX system and library calls over OS specific calls.
 
 The C code is written in a C++ friendly way and is checked from time to
 time that it compiles clean with C++. To accommodate C++ certain C99
-constructs such as designated initializers cannot be used.
+constructs such as designated initializers cannot be used. To build
+with C++, C++11 (i.e. the C++ standard from 2011) or later is required.
+Finding a common C and C++ syntax for zeroing stack variables (including
+aggregates) may need to wait until C23 allows this syntax:
+   struct example_t ex1 {};
+which C++ introduced in C++11.  In the meantime the SG_C_CPP_ZERO_INIT
+define (hack) does this.
 
 The author has not seriously attempted to build this code on MSVC (aka
 Visual Studio). There are a few roadblocks (that may be overcome in the
@@ -542,4 +548,4 @@ See https://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert		dgilbert@interlog.com
-10th June 2022
+12th August 2022

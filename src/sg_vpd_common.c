@@ -28,6 +28,7 @@
 #endif
 
 #include "sg_lib.h"
+#include "sg_lib_data.h"
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
@@ -47,9 +48,13 @@ static const char * const y_s = "yes";
 static const char * const n_s = "no";
 static const char * const nl_s = "no limit";
 static const char * const nlr_s = "no limit reported";
-static const char * const nr_s = "not reported";
+/* Earlier gcc compilers (e.g. 6.4) don't accept this first form when it is
+ * used in another array of strings initialization (e.g. bdc_zoned_strs) */
+// static const char * const nr_s = "not reported";
+static char nr_s[] = "not reported";
 static const char * const ns_s = "not supported";
-static const char * const rsv_s = "Reserved";
+// static const char * const rsv_s = "Reserved";
+static char rsv_s[] = "Reserved";
 static const char * const vs_s = "Vendor specific";
 static const char * const null_s = "";
 static const char * const mn_s = "meaning";
@@ -310,13 +315,13 @@ static const char * network_service_type_arr[] =
 
 /* VPD_MAN_NET_ADDR     0x85 ["mna"] */
 void
-decode_net_man_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_net_man_vpd(const uint8_t * buff, int len, struct opts_t * op,
                    sgj_opaque_p jap)
 {
     int k, bump, na_len, assoc, nst;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p;
-    uint8_t * bp;
+    const uint8_t * bp;
     const char * assoc_str;
     const char * nst_str;
 
@@ -366,7 +371,7 @@ decode_net_man_vpd(uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_EXT_INQ    Extended Inquiry VPD ["ei"] */
 void
-decode_x_inq_vpd(uint8_t * b, int len, bool protect, struct opts_t * op,
+decode_x_inq_vpd(const uint8_t * b, int len, bool protect, struct opts_t * op,
                  sgj_opaque_p jop)
 {
     bool do_long_nq = op->do_long && (! op->do_quiet);
@@ -431,6 +436,10 @@ decode_x_inq_vpd(uint8_t * b, int len, bool protect, struct opts_t * op,
                 cp = "protection types 1, 2 and 3 supported";
                 break;
             }
+        } else if (op->protect_not_sure) {
+            cp = "Unsure because unable to read PROTECT bit in standard "
+                 "INQUIRY response";
+            d[0] = '\0';
         } else {
             cp = "none";
             d[0] = '\0';
@@ -620,7 +629,7 @@ decode_x_inq_vpd(uint8_t * b, int len, bool protect, struct opts_t * op,
 
 /* VPD_SOFTW_INF_ID   0x84 */
 void
-decode_softw_inf_id(uint8_t * buff, int len, struct opts_t * op,
+decode_softw_inf_id(const uint8_t * buff, int len, struct opts_t * op,
                     sgj_opaque_p jap)
 {
     sgj_state * jsp = &op->json_st;
@@ -654,13 +663,13 @@ static const char * mode_page_policy_arr[] =
 
 /* VPD_MODE_PG_POLICY  0x87 ["mpp"] */
 void
-decode_mode_policy_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_mode_policy_vpd(const uint8_t * buff, int len, struct opts_t * op,
                        sgj_opaque_p jap)
 {
     int k, n, bump, ppc, pspc;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p;
-    uint8_t * bp;
+    const uint8_t * bp;
     char b[128];
     static const int blen = sizeof(b);
 
@@ -712,7 +721,7 @@ decode_mode_policy_vpd(uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_POWER_CONDITION 0x8a ["pc"] */
 void
-decode_power_condition(uint8_t * buff, int len, struct opts_t * op,
+decode_power_condition(const uint8_t * buff, int len, struct opts_t * op,
                        sgj_opaque_p jop)
 {
     sgj_state * jsp = &op->json_st;
@@ -884,13 +893,13 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_SCSI_FEATURE_SETS  0x92  ["sfs"] */
 void
-decode_feature_sets_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_feature_sets_vpd(const uint8_t * buff, int len, struct opts_t * op,
                         sgj_opaque_p jap)
 {
     int k, bump;
     uint16_t sf_code;
     bool found;
-    uint8_t * bp;
+    const uint8_t * bp;
     sgj_opaque_p jo2p;
     sgj_state * jsp = &op->json_st;
     char b[256];
@@ -1061,6 +1070,38 @@ decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op,
     }   /* end Constituent descriptor loop */
 }
 
+/* VPD_CFA_PROFILE_INFO  0x8c ["cfa"] */
+void
+decode_cga_profile_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                       sgj_opaque_p jap)
+{
+    int k;
+    uint32_t u;
+    sgj_state * jsp = &op->json_st;
+    const uint8_t * bp;
+    sgj_opaque_p jo2p;
+
+    if (op->do_hex) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 4) {
+        pr2serr("VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 4;
+    bp = buff + 4;
+    for (k = 0; k < len; k += 4, bp += 4) {
+        jo2p = sgj_new_unattached_object_r(jsp);
+        sgj_haj_vi(jsp, jo2p, 0, "CGA profile supported",
+                   SGJ_SEP_COLON_1_SPACE, bp[0], true);
+        u = sg_get_unaligned_be16(bp + 2);
+        sgj_haj_vi_nex(jsp, jo2p, 2, "Sequential write data size",
+                       SGJ_SEP_COLON_1_SPACE, u, true, "unit: LB");
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }
+}
+
 /* Assume index is less than 16 */
 static const char * sg_ansi_version_arr[16] =
 {
@@ -1205,14 +1246,14 @@ static const char * power_unit_arr[] =
 
 /* VPD_POWER_CONSUMPTION  0x8d  ["psm"] */
 void
-decode_power_consumption(uint8_t * buff, int len, struct opts_t * op,
+decode_power_consumption(const uint8_t * buff, int len, struct opts_t * op,
                          sgj_opaque_p jap)
 {
     int k, bump, pcmp_id, pcmp_unit;
     unsigned int pcmp_val;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p;
-    uint8_t * bp;
+    const uint8_t * bp;
     char b[128];
     static const int blen = sizeof(b);
     static const char * pcmp = "power_consumption";
@@ -1590,7 +1631,7 @@ static const char * prov_type_arr[8] = {
 
 /* VPD_LB_PROVISIONING   0xb2 ["lbpv"] */
 int
-decode_block_lb_prov_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_block_lb_prov_vpd(const uint8_t * buff, int len, struct opts_t * op,
                          sgj_opaque_p jop)
 {
     unsigned int u, dp, pt, t_exp;
@@ -1678,7 +1719,7 @@ decode_block_lb_prov_vpd(uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_REFERRALS   0xb3 ["ref"] */
 void
-decode_referrals_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_referrals_vpd(const uint8_t * buff, int len, struct opts_t * op,
                      sgj_opaque_p jop)
 {
     uint32_t u;
@@ -1703,12 +1744,12 @@ decode_referrals_vpd(uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_SUP_BLOCK_LENS  0xb4 ["sbl"] (added sbc4r01) */
 void
-decode_sup_block_lens_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_sup_block_lens_vpd(const uint8_t * buff, int len, struct opts_t * op,
                           sgj_opaque_p jap)
 {
     int k;
     unsigned int u;
-    uint8_t * bp;
+    const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
 
@@ -1750,8 +1791,8 @@ decode_sup_block_lens_vpd(uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_BLOCK_DEV_C_EXTENS  0xb5 ["bdce"] (added sbc4r02) */
 void
-decode_block_dev_char_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
-                              sgj_opaque_p jop)
+decode_block_dev_char_ext_vpd(const uint8_t * buff, int len,
+                              struct opts_t * op, sgj_opaque_p jop)
 {
     bool b_active = false;
     bool combined = false;
@@ -1838,8 +1879,8 @@ decode_block_dev_char_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_ZBC_DEV_CHARS 0xb6  ["zdbch"]  sbc or zbc [zbc2r04] */
 void
-decode_zbdch_vpd(uint8_t * buff, int len, struct opts_t * op,
-                              sgj_opaque_p jop)
+decode_zbdch_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                 sgj_opaque_p jop)
 {
     uint32_t u, pdt;
     sgj_state * jsp = &op->json_st;
@@ -1923,7 +1964,7 @@ decode_zbdch_vpd(uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_BLOCK_LIMITS_EXT  0xb7 ["ble"] SBC */
 void
-decode_block_limits_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_block_limits_ext_vpd(const uint8_t * buff, int len, struct opts_t * op,
                             sgj_opaque_p jop)
 {
     uint32_t u;
@@ -2000,7 +2041,7 @@ get_zone_align_method(uint8_t val, char * b, int blen)
 
 /* VPD_FORMAT_PRESETS  0xb8 ["fp"] (added sbc4r18) */
 void
-decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_format_presets_vpd(const uint8_t * buff, int len, struct opts_t * op,
                           sgj_opaque_p jap)
 {
     uint8_t sch_type;
@@ -2008,7 +2049,7 @@ decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
     uint32_t u;
     uint64_t ul;
     sgj_state * jsp = &op->json_st;
-    uint8_t * bp;
+    const uint8_t * bp;
     sgj_opaque_p jo2p, jo3p;
     const char * cp;
     char b[128];
@@ -2149,13 +2190,13 @@ decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
 
 /* VPD_CON_POS_RANGE  0xb9 (added sbc5r01) */
 void
-decode_con_pos_range_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_con_pos_range_vpd(const uint8_t * buff, int len, struct opts_t * op,
                          sgj_opaque_p jap)
 {
     int k;
     uint32_t u;
     sgj_state * jsp = &op->json_st;
-    uint8_t * bp;
+    const uint8_t * bp;
     sgj_opaque_p jo2p;
 
     if (op->do_hex) {
@@ -2426,8 +2467,8 @@ get_tpc_desc_type_s(uint32_t desc_type)
 
 /* VPD_3PARTY_COPY   3PC, third party copy  0x8f ["tpc"] */
 void
-decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
-                       sgj_opaque_p jap)
+decode_3party_copy_vpd(const uint8_t * buff, int len,
+                       struct opts_t * op, sgj_opaque_p jap)
 {
     int j, k, m, bump, desc_type, desc_len, sa_len, pdt;
     uint32_t u, v;
@@ -2726,11 +2767,11 @@ skip:
 
 /* VPD_PROTO_LU  0x90 ["pslu"] */
 void
-decode_proto_lu_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_proto_lu_vpd(const uint8_t * buff, int len, struct opts_t * op,
                     sgj_opaque_p jap)
 {
     int k, bump, rel_port, desc_len, proto;
-    uint8_t * bp;
+    const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     char b[128];
@@ -2764,10 +2805,10 @@ decode_proto_lu_vpd(uint8_t * buff, int len, struct opts_t * op,
             return;
         }
         if (0 == desc_len)
-            goto again;;
+            goto again;
         if (2 == op->do_hex) {
             hex2stdout(bp + 8, desc_len, 1);
-            goto again;;
+            goto again;
         }
         switch (proto) {
         case TPROTO_SAS:
@@ -2786,13 +2827,13 @@ again:
 
 /* VPD_PROTO_PORT  0x91 ["pspo"] */
 void
-decode_proto_port_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_proto_port_vpd(const uint8_t * buff, int len, struct opts_t * op,
                       sgj_opaque_p jap)
 {
     bool pds, ssp_pers;
     int k, j, bump, rel_port, desc_len, proto, phy;
-    uint8_t * bp;
-    uint8_t * pidp;
+    const uint8_t * bp;
+    const uint8_t * pidp;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     sgj_opaque_p ja2p = NULL;
@@ -2861,4 +2902,92 @@ decode_proto_port_vpd(uint8_t * buff, int len, struct opts_t * op,
 again:
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
+}
+
+/* VPD_LB_PROTECTION 0xb5 (SSC)  [added in ssc5r02a] */
+void
+decode_lb_protection_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                         sgj_opaque_p jap)
+{
+    int k, bump;
+    const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        return;
+    }
+    if (len < 8) {
+        pr2serr("VPD page length too short=%d\n", len);
+        return;
+    }
+    len -= 8;
+    bp = buff + 8;
+    for (k = 0; k < len; k += bump, bp += bump) {
+        jo2p = sgj_new_unattached_object_r(jsp);
+        bump = 1 + bp[0];
+        sgj_pr_hr(jsp, "  method: %d, info_len: %d, LBP_W_C=%d, LBP_R_C=%d, "
+                  "RBDP_C=%d\n", bp[1], 0x3f & bp[2], !!(0x80 & bp[3]),
+                  !!(0x40 & bp[3]), !!(0x20 & bp[3]));
+        sgj_js_nv_ihex(jsp, jo2p, "logical_block_protection_method", bp[1]);
+        sgj_js_nv_ihex_nex(jsp, jo2p,
+                           "logical_block_protection_information_length",
+                           0x3f & bp[2], true, "unit: byte");
+        sgj_js_nv_ihex_nex(jsp, jo2p, "lbp_w_c", !!(0x80 & bp[3]), false,
+                           "Logical Blocks Protected during Write supported");
+        sgj_js_nv_ihex_nex(jsp, jo2p, "lbp_r_c", !!(0x40 & bp[3]), false,
+                           "Logical Blocks Protected during Read supported");
+        sgj_js_nv_ihex_nex(jsp, jo2p, "rbdp_c", !!(0x20 & bp[3]), false,
+                           "Recover Buffered Data Protected supported");
+        if ((k + bump) > len) {
+            pr2serr("Logical block protection VPD page, short "
+                    "descriptor length=%d, left=%d\n", bump, (len - k));
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            return;
+        }
+        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }
+}
+
+/* VPD_TA_SUPPORTED  0xb2 ["tas"] */
+void
+decode_tapealert_supported_vpd(const uint8_t * buff, int len,
+                               struct opts_t * op, sgj_opaque_p jop)
+{
+    bool have_ta_strs = !! sg_lib_tapealert_strs[0];
+    int k, mod, div, n;
+    unsigned int supp;
+    sgj_state * jsp = &op->json_st;
+    char b[144];
+    char d[64];
+    static const int blen = sizeof(b);
+
+    if (len < 12) {
+        pr2serr("VPD page length too short=%d\n", len);
+        return;
+    }
+    b[0] ='\0';
+    for (k = 1, n = 0; k < 0x41; ++k) {
+        mod = ((k - 1) % 8);
+        div = (k - 1) / 8;
+        supp = !! (buff[4 + div] & (1 << (7 - mod)));
+        if (jsp->pr_as_json) {
+            snprintf(d, sizeof(d), "flag%02xh", k);
+            if (have_ta_strs)
+                sgj_js_nv_ihex_nex(jsp, jop, d, supp, false,
+                                   sg_lib_tapealert_strs[k]);
+            else
+                sgj_js_nv_i(jsp, jop, d, supp);
+        }
+        if (0 == mod) {
+            if (div > 0) {
+                sgj_pr_hr(jsp, "%s\n", b);
+                n = 0;
+            }
+            n += sg_scnpr(b + n, blen - n, "  Flag%02Xh: %d", k, supp);
+        } else
+            n += sg_scnpr(b + n, blen - n, "  %02Xh: %d", k, supp);
+    }
+    sgj_pr_hr(jsp, "%s\n", b);
 }

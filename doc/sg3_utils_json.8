@@ -14,9 +14,10 @@ returned by SCSI commands (e.g. sg_vpd) can optionally provide JSON
 output, rather than simple, human-readable output. The default remains
 human-readable output.
 .PP
-JSON is an open standard file format that can be used for data exchange
-between systems. See https://en.wikipedia.org/wiki/JSON . JSON comes in many
-flavours and this one uses the json-builder C implementation found at
+JavaScript Object Notation (JSON) is an open standard file format that can be
+used for data exchange between programs including across a network. See
+https://en.wikipedia.org/wiki/JSON . JSON comes in many flavours and this one
+uses the json-builder C implementation found at
 https://github.com/json-parser/json-builder which implements four simple JSON
 data types: string, integer, boolean and null. Its other data types are JSON
 object and JSON array.
@@ -210,11 +211,17 @@ human readable form. Errors are reported to stderr and may cause the early
 termination of a utility (e.g. command line option syntax error).
 .PP
 When the \fI\-\-json\fR option is given and no errors are detected, then
-only JSON is sent to stdout. If the 'o' control character is in the \fIJO\fR
-argument to the \fI\-\-json\fR option, then the former "human readable"
-output is placed in a JSON array named "output" within a JSON object
-named "utility_invoked". Each line of the former "human readable" output
-is placed in its own element of the JSON array named "output".
+only JSON is normally sent to stdout. As the SCSI response is parsed, a JSON
+representation is built as a tree in memory. After all other actions (perhaps
+apart from the final exit status report) that JSON tree is "dumped" to
+stdout. This means if there is any non-JSON output sent to stdout that
+it will appear _before_ the JSON output.
+.PP
+If the 'o' control character is in the \fIJO\fR argument to the
+\fI\-\-json\fR option, then the former "human readable" output is placed in
+a JSON array named "output" within a JSON object named "utility_invoked".
+Each line of the former "human readable" output is placed in its own
+element of the JSON array named "output".
 .PP
 A JSON tree is built in memory as the utility parses the data returned
 from the SCSI device (e.g. sg_vpd parsing a VPD page returned from a
@@ -236,7 +243,7 @@ reason then no JSON output will appear. With the normal, human readable output
 processing, some output may appear before the utility aborts in such bad
 situations.
 .SH ERRORS
-No attempts has been made to translate errors into JSON form, apart from the
+No attempts have been made to translate errors into JSON form, apart from the
 final "exit_status" JSON object where a value of 0 means "no errors". Exit
 status values indicating a problem range from 1 to 255.
 .PP

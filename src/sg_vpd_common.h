@@ -136,8 +136,10 @@ struct opts_t {
     bool do_force;              /* sg_inq + sg_vpd */
     bool do_only; /* sg_inq: --only after stdinq: don't fetch VPD page 0x80 */
     bool do_quiet;              /* sg_vpd */
+    bool examine_given;         /* sg_vpd */
     bool page_given;            /* sg_inq + sg_vpd */
     bool possible_nvme;         /* sg_inq */
+    bool protect_not_sure;      /* sg_vpd */
     bool verbose_given;         /* sg_inq + sg_vpd */
     bool version_given;         /* sg_inq + sg_vpd */
     bool do_vpd;                /* sg_inq */
@@ -189,62 +191,71 @@ typedef int (*recurse_vpd_decodep)(struct opts_t *, sgj_opaque_p jop, int off);
 
 sgj_opaque_p sg_vpd_js_hdr(sgj_state * jsp, sgj_opaque_p jop,
                            const char * name, const uint8_t * vpd_hdrp);
-void decode_net_man_vpd(uint8_t * buff, int len, struct opts_t * op,
+void decode_net_man_vpd(const uint8_t * buff, int len, struct opts_t * op,
                         sgj_opaque_p jap);
-void decode_x_inq_vpd(uint8_t * b, int len, bool protect, struct opts_t * op,
-                      sgj_opaque_p jop);
-void decode_softw_inf_id(uint8_t * buff, int len, struct opts_t * op,
+void decode_x_inq_vpd(const uint8_t * b, int len, bool protect,
+                      struct opts_t * op, sgj_opaque_p jop);
+void decode_softw_inf_id(const uint8_t * buff, int len, struct opts_t * op,
                          sgj_opaque_p jap);
-void decode_mode_policy_vpd(uint8_t * buff, int len, struct opts_t * op,
+void decode_mode_policy_vpd(const uint8_t * buff, int len, struct opts_t * op,
                             sgj_opaque_p jap);
-void decode_power_condition(uint8_t * buff, int len, struct opts_t * op,
+void decode_cga_profile_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                       sgj_opaque_p jap);
+void decode_power_condition(const uint8_t * buff, int len, struct opts_t * op,
                             sgj_opaque_p jop);
 int filter_json_dev_ids(uint8_t * buff, int len, int m_assoc,
                         struct opts_t * op, sgj_opaque_p jap);
 void decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
                         sgj_opaque_p jop);
-void decode_feature_sets_vpd(uint8_t * buff, int len, struct opts_t * op,
+void decode_feature_sets_vpd(const uint8_t * buff, int len, struct opts_t * op,
                              sgj_opaque_p jap);
 void decode_dev_constit_vpd(const uint8_t * buff, int len,
                             struct opts_t * op, sgj_opaque_p jap,
                             recurse_vpd_decodep fp);
 sgj_opaque_p std_inq_decode_js(const uint8_t * b, int len,
                                struct opts_t * op, sgj_opaque_p jop);
-void decode_power_consumption(uint8_t * buff, int len,
+void decode_power_consumption(const uint8_t * buff, int len,
                               struct opts_t * op, sgj_opaque_p jap);
 void decode_block_limits_vpd(const uint8_t * buff, int len,
                              struct opts_t * op, sgj_opaque_p jop);
 void decode_block_dev_ch_vpd(const uint8_t * buff, int len,
                              struct opts_t * op, sgj_opaque_p jop);
-int decode_block_lb_prov_vpd(uint8_t * buff, int len,
+int decode_block_lb_prov_vpd(const uint8_t * buff, int len,
                              struct opts_t * op, sgj_opaque_p jop);
-void decode_referrals_vpd(uint8_t * buff, int len, struct opts_t * op,
+void decode_referrals_vpd(const uint8_t * buff, int len, struct opts_t * op,
                           sgj_opaque_p jop);
-void decode_sup_block_lens_vpd(uint8_t * buff, int len, struct opts_t * op,
-                               sgj_opaque_p jap);
-void decode_block_dev_char_ext_vpd(uint8_t * buff, int len,
+void decode_sup_block_lens_vpd(const uint8_t * buff, int len,
+                               struct opts_t * op, sgj_opaque_p jap);
+void decode_block_dev_char_ext_vpd(const uint8_t * buff, int len,
                                    struct opts_t * op, sgj_opaque_p jop);
-void decode_zbdch_vpd(uint8_t * buff, int len, struct opts_t * op,
+void decode_zbdch_vpd(const uint8_t * buff, int len, struct opts_t * op,
                       sgj_opaque_p jop);
-void decode_block_limits_ext_vpd(uint8_t * buff, int len, struct opts_t * op,
-                                 sgj_opaque_p jop);
-void decode_format_presets_vpd(uint8_t * buff, int len, struct opts_t * op,
-                               sgj_opaque_p jap);
-void decode_con_pos_range_vpd(uint8_t * buff, int len, struct opts_t * op,
-                              sgj_opaque_p jap);
-void decode_3party_copy_vpd(uint8_t * buff, int len, struct opts_t * op,
+void decode_block_limits_ext_vpd(const uint8_t * buff, int len,
+                                 struct opts_t * op, sgj_opaque_p jop);
+void decode_format_presets_vpd(const uint8_t * buff, int len,
+                               struct opts_t * op, sgj_opaque_p jap);
+void decode_con_pos_range_vpd(const uint8_t * buff, int len,
+                              struct opts_t * op, sgj_opaque_p jap);
+void decode_3party_copy_vpd(const uint8_t * buff, int len, struct opts_t * op,
                             sgj_opaque_p jap);
 void
-decode_proto_lu_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_proto_lu_vpd(const uint8_t * buff, int len, struct opts_t * op,
                     sgj_opaque_p jap);
 void
-decode_proto_port_vpd(uint8_t * buff, int len, struct opts_t * op,
+decode_proto_port_vpd(const uint8_t * buff, int len, struct opts_t * op,
                       sgj_opaque_p jap);
+void
+decode_lb_protection_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                         sgj_opaque_p jap);
+void
+decode_tapealert_supported_vpd(const uint8_t * buff, int len,
+                               struct opts_t * op, sgj_opaque_p jop);
 const char * pqual_str(int pqual);
 
 void svpd_enumerate_vendor(int vend_prod_num);
 int svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num);
-int svpd_decode_vendor(int sg_fd, struct opts_t * op, int off);
+int svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
+                       int off);
 const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 int svpd_find_vp_num_by_acron(const char * vp_ap);
 const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,

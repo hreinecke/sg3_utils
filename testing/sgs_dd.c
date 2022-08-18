@@ -84,7 +84,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.22 20220118";
+static const char * version_str = "4.23 20220815";
 static const char * my_name = "sgs_dd";
 
 #ifndef SGV4_FLAG_HIPRI
@@ -1415,7 +1415,7 @@ main(int argc, char * argv[])
         return 1;
     }
     if (clp->iflag.mmap && clp->oflag.mmap)
-        clp->both_mmap = true;;
+        clp->both_mmap = true;
 
     if (clp->debug > 3)
         pr2serr("%s: if=%s skip=%d of=%s seek=%d count=%d\n", my_name,

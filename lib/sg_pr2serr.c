@@ -669,11 +669,12 @@ void
 sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                    int64_t val_i, bool hex_as_well, const char * nex_s)
 {
-    bool as_hex = jsp->pr_hex && hex_as_well;
-    bool as_nex = jsp->pr_name_ex && nex_s;
+    bool as_hex, as_nex;
 
     if ((NULL == jsp) || (! jsp->pr_as_json))
         return;
+    as_hex = jsp->pr_hex && hex_as_well;
+    as_nex = jsp->pr_name_ex && nex_s;
     if (! (as_hex || as_nex))
         sgj_js_nv_i(jsp, jop, name, val_i);
     else {

@@ -320,7 +320,10 @@ void sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop,
                            const char * str_name, const char * val_s,
                            const char * nex_s);
 
-/* Add hex byte strings irrespective of jsp->pr_hex setting. */
+/* Add named field whose value is a (large) JSON string made up of num_bytes
+ * ASCII hexadecimal bytes (each two hex digits seperated by a space) starting
+ * at byte_arr. The heap is used for intermediate storage so num_bytes can
+ * be arbitrarily large. */
 void sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
                          const uint8_t * byte_arr, int num_bytes);
 

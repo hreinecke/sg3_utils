@@ -3580,7 +3580,7 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
     int ret = 0;
     unsigned int h;
     const char * lcp;
-    FILE * fp;
+    FILE * fp = NULL;
     struct stat a_stat;
     char line[512];
     char carry_over[4];
@@ -3791,11 +3791,11 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
         return SG_LIB_LBA_OUT_OF_RANGE;
     }
     *mp_arr_len = off;
-    if (stdin != fp)
+    if (fp && (! has_stdin))
         fclose(fp);
     return 0;
 fini:
-    if (fp && (stdin != fp))
+    if (fp && (! has_stdin))
         fclose(fp);
     return ret;
 }

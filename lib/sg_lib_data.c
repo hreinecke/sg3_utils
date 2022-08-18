@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.92 20220809";
+const char * sg_lib_version_str = "2.93 20220816";
 /* spc6r06, sbc5r03, zbc2r13 */
 
 
@@ -557,6 +557,75 @@ struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
     {0xffff, 0, NULL},
 };
 
+const char * sg_lib_tapealert_strs[] = {
+    "<parameter code 0, unknown>",              /* 0x0 */
+    "Read warning",
+    "Write warning",
+    "Hard error",
+    "Media",
+    "Read failure",
+    "Write failure",
+    "Media life",
+    "Not data grade",                           /* 0x8 */
+    "Write protect",
+    "No removal",
+    "Cleaning media",
+    "Unsupported format",
+    "Recoverable mechanical cartridge failure",
+    "Unrecoverable mechanical cartridge failure",
+    "Memory chip in cartridge failure",
+    "Forced eject",                             /* 0x10 */
+    "Read only format",
+    "Tape directory corrupted on load",
+    "Nearing media life",
+    "Cleaning required",
+    "Cleaning requested",
+    "Expired cleaning media",
+    "Invalid cleaning tape",
+    "Retension requested",                      /* 0x18 */
+    "Dual port interface error",
+    "Cooling fan failing",
+    "Power supply failure",
+    "Power consumption",
+    "Drive maintenance",
+    "Hardware A",
+    "Hardware B",
+    "Interface",                                /* 0x20 */
+    "Eject media",
+    "Microcode update fail",
+    "Drive humidity",
+    "Drive temperature",
+    "Drive voltage",
+    "Predictive failure",
+    "Diagnostics required",
+    "Reserved (28h)",                           /* 0x28 */
+    "Reserved (29h)",
+    "Reserved (2Ah)",
+    "Reserved (2Bh)",
+    "Reserved (2Ch)",
+    "Reserved (2Dh)",
+    "Reserved (2Eh)",
+    "External data encryption control - communications failure",
+    "External data encryption control - key manager returned error",/* 0x30 */
+    "Diminished native capacity",
+    "Lost statistics",
+    "Tape directory invalid at unload",
+    "Tape system area write failure",
+    "Tape system area read failure",
+    "No start of data",
+    "Loading failure",
+    "Unrecoverable unload failure",             /* 0x38 */
+    "Automation interface failure",
+    "Firmware failure",
+    "WORM medium - integrity check failed",
+    "WORM medium - overwrite attempted",
+    "Encryption policy violation",
+    "Reserved (3Eh)",
+    "Reserved (3Fh)",
+    "Reserved (40h)",                           /* 0x40 */
+    NULL,
+};
+
 /* Read attribute [0x8c] service actions */
 struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
     {0x0, PDT_ALL, "attribute values"},
@@ -647,6 +716,10 @@ struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
 
 struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
     {0xffff, 0, NULL},
+};
+
+const char * sg_lib_tapealert_strs[] = {
+    NULL,
 };
 
 #endif  /* SG_SCSI_STRINGS */

@@ -46,9 +46,9 @@ extern "C" {
 #define SG_VARIABLE_LENGTH_CMD 0x7f
 #define SG_WRITE_BUFFER 0x3b
 #define SG_ZONING_OUT 0x94
-#define SG_ZBC_OUT SG_ZONING_OUT	/* as SPC calls them */
+#define SG_ZBC_OUT SG_ZONING_OUT        /* as SPC calls them */
 #define SG_ZONING_IN 0x95
-#define SG_ZBC_IN SG_ZONING_IN		/* as SPC calls them */
+#define SG_ZBC_IN SG_ZONING_IN          /* as SPC calls them */
 
 
 
@@ -128,6 +128,7 @@ extern struct sg_lib_value_name_t sg_lib_scsi_feature_sets[];
 extern const char * sg_lib_sense_key_desc[];
 extern const char * sg_lib_pdt_strs[];
 extern const char * sg_lib_transport_proto_strs[];
+extern const char * sg_lib_tapealert_strs[];
 extern int sg_lib_pdt_decay_arr[];
 
 extern struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[];

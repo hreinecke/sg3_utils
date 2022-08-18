@@ -6,8 +6,9 @@ sg_vpd \- fetch SCSI VPD page and/or decode its response
 [\fI\-\-all\fR] [\fI\-\-enumerate\fR] [\fI\-\-examine\fR] [\fI\-\-force\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-ident\fR] [\fI\-\-inhex=FN\fR]
 [\fI\-\-json[=JO]\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-vendor=VP\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fIDEVICE\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
+[\fI\-\-sinq_inraw=RFN\fR] [\fI\-\-vendor=VP\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -62,20 +63,24 @@ with \fI\-\-vendor=VP\fR to restrict output to known vendor specific pages
 for vendor/product \fIVP\fR.
 .TP
 \fB\-E\fR, \fB\-\-examine\fR
-scan part of all of the VPD space (from 0x0 to 0xff) and output any pages
-found. This option ignores the contents of VPD page 0x0 which should contain
-a list of all supported VPD pages. However some vendors either forget to
-list some standard pages or perhaps purposely don't list vendor specific
-pages which are in the range 0xc0 to 0xff.
+scan part of all of the VPD space (page numbers 0x0 to 0xff) and output any
+pages found. If this option is given once, the scan starts at page 0x80;
+if it is given twice, the scan starts at 0x0; and if given three times the
+scan starts at 0xc0. This option takes no notice of the contents of VPD page
+0x0 which should contain a list of all supported VPD pages. Some vendors
+either forget to list some standard pages or perhaps purposely don't list
+vendor specific pages which are in the range 0xc0 to 0xff.
 .br
-If the \fI\-\-page=PG\fR option is not given and this option is given once
-then the scan is from VPD page number 0x80 to 0xff inclusive. If the
-\fI\-\-page=PG\fR option is given then the scan is from 0x80 to
-\fIPG\fR inclusive. If this option is given twice then the scan starts at
-VPD page 0x0.
+If the \fI\-\-page=PG\fR option is not given then the scan finishes at page
+0xff. if the \fI\-\-page=PG\fR option is given then the scan finishes at
+page \fIPG\fR. A check is made before the scan to make sure the start page
+is less than or equal to the finish page; if not the start and finish page
+numbers are swapped.
 .br
 The sdparm utility which lists mode and VPD pages also has a \fB\-\-examine\fR
-option will similar functionility.
+option will similar functionility. Note that T10 has changed most of the
+pages that list supported pages (e.g. VPD, mode and log pages; supported
+commands) to add the weasel words "may or may not list all ...".
 .TP
 \fB\-f\fR, \fB\-\-force\fR
 As a sanity check, the normal action when fetching VPD pages other than
@@ -119,8 +124,8 @@ including a hash mark to the end of line is ignored. If the \fI\-\-raw\fR
 option is also given then \fIFN\fR is treated as binary.
 .TP
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
-output is in JSON format instead of human readable form. This is an
-EXPERIMENTAL feature; see sg3_utils_json manpage.
+output is in JSON format instead of human readable form. See sg3_utils_json
+manpage or use '?' for \fIJO\fR for a summary.
 .TP
 \fB\-l\fR, \fB\-\-long\fR
 when decoding some VPD pages, give a little more output. For example the ATA
@@ -165,6 +170,23 @@ used. The binary is sent to stdout, and errors are sent to stderr.
 .br
 if used with \fI\-\-inhex=FN\fR then the contents of \fIFN\fR is treated as
 binary.
+.TP
+\fB\-Q\fR, \fB\-\-sinq_inraw\fR=\fIRFN\fR
+where \fIRFN\fR is a filename containing binary standard INQUIRY response
+data that matches either \fIDEVICE\fR or \fIFN\fR. Linux places this
+standard INQUIRY response in its sysfs pseudo filesystem. A typical
+location is at /sys/class/scsi_disk/<hctl>/device/inquiry where <hctl> is
+a four part numeric tuple separated by colons. This tuple distinguishes
+the device from any others on the system. Linux also places some VPD page
+responses in binary in the same directory with names like "vpd_pg83" where
+the last two digits form the hexadecimal VPD page number whose binary
+contents are therein.
+.br
+Some VPD pages (e.g. the Extended Inquiry VPD page) depend on knowing
+the settings in the standard INQUIRY response to interpret the fields
+in that VPD page. This option together with the \fI\-\-all\fR,
+\fI\-\-examine\fR or \fI\-\-page=PG\fR allows this utility to process
+both the standard INQUIRY response and VPD pages in the same invocation. 
 .TP
 \fB\-M\fR, \fB\-\-vendor\fR=\fIVP\fR
 where \fIVP\fR is a vendor (e.g. "sea" for Seagate) or vendor/product

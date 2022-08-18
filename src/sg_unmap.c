@@ -36,7 +36,7 @@
  * logical blocks. Note that DATA MAY BE LOST.
  */
 
-static const char * version_str = "1.18 20220608";
+static const char * version_str = "1.19 20220813";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -253,7 +253,7 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
     int64_t ll;
     char line[1024];
     char * lcp;
-    FILE * fp;
+    FILE * fp = NULL;
 
     have_stdin = ((1 == strlen(file_name)) && ('-' == file_name[0]));
     if (have_stdin)
@@ -336,12 +336,12 @@ build_joint_arr(const char * file_name, uint64_t * lba_arr, uint32_t * num_arr,
         goto bad_exit;
     }
     *arr_len = off >> 1;
-    if (fp && (stdin != fp))
+    if (fp && (! have_stdin))
         fclose(fp);
     return 0;
 
 bad_exit:
-    if (fp && (stdin != fp))
+    if (fp && (! have_stdin))
         fclose(fp);
     return 1;
 }

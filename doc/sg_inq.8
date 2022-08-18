@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "July 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_INQ "8" "August 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -13,8 +13,8 @@ sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR]
-[\fI\-c\fR] [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-f\fR]
-[\fI\-h\fR] [\fI\-H\fR] [\fI\-i\fR] [\fI\-I=FN\fR] [\fI\-l=LEN\fR]
+[\fI\-c\fR] [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-f\fR] [\fI\-h\fR]
+[\fI\-H\fR] [\fI\-i\fR] [\fI\-I=FN\fR] [\fI\-j[=LEN]\fR] [\fI\-l=LEN\fR]
 [\fI\-L\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o\fR] [\fI\-p=VPD_PG\fR]
 [\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
 [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
@@ -166,8 +166,8 @@ including a hash mark to the end of a line is ignored. If the \fI\-\-raw\fR
 option is also given then \fIFN\fR is treated as binary.
 .TP
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
-output is in JSON format instead of human readable form. This is an
-EXPERIMENTAL feature; see sg3_utils_json manpage.
+output is in JSON format instead of human readable form. See sg3_utils_json
+manpage or use '?' for \fIJO\fR for a summary.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
 the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.
@@ -432,6 +432,9 @@ response in hex use '\-p=83 \-h'.
 .TP
 \fB\-I\fR=\fIFN\fR
 equivalent to \fI\-\-inhex=FN\fR in the OPTIONS section.
+.TP
+\fB\-j[\fR=\fIJO]\fR
+equivalent to \fI\-\-json[=JO]\fR in the OPTIONS section.
 .TP
 \fB\-l\fR=\fILEN\fR
 equivalent to \fI\-\-len=LEN\fR in the OPTIONS section.

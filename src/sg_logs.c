@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.99 20220729";    /* spc6r06 + sbc5r01 */
+static const char * version_str = "2.00 20220816";    /* spc6r06 + sbc5r03 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define MX_INLEN_ALLOC_LEN (0x800000)
@@ -6711,70 +6711,6 @@ skip:
     return true;
 }
 
-static const char * tape_alert_strs[] = {
-    "<parameter code 0, unknown>",              /* 0x0 */
-    "Read warning",
-    "Write warning",
-    "Hard error",
-    "Media",
-    "Read failure",
-    "Write failure",
-    "Media life",
-    "Not data grade",                           /* 0x8 */
-    "Write protect",
-    "No removal",
-    "Cleaning media",
-    "Unsupported format",
-    "Recoverable mechanical cartridge failure",
-    "Unrecoverable mechanical cartridge failure",
-    "Memory chip in cartridge failure",
-    "Forced eject",                             /* 0x10 */
-    "Read only format",
-    "Tape directory corrupted on load",
-    "Nearing media life",
-    "Cleaning required",
-    "Cleaning requested",
-    "Expired cleaning media",
-    "Invalid cleaning tape",
-    "Retension requested",                      /* 0x18 */
-    "Dual port interface error",
-    "Cooling fan failing",
-    "Power supply failure",
-    "Power consumption",
-    "Drive maintenance",
-    "Hardware A",
-    "Hardware B",
-    "Interface",                                /* 0x20 */
-    "Eject media",
-    "Microcode update fail",
-    "Drive humidity",
-    "Drive temperature",
-    "Drive voltage",
-    "Predictive failure",
-    "Diagnostics required",
-    "Obsolete (28h)",                           /* 0x28 */
-    "Obsolete (29h)",
-    "Obsolete (2Ah)",
-    "Obsolete (2Bh)",
-    "Obsolete (2Ch)",
-    "Obsolete (2Dh)",
-    "Obsolete (2Eh)",
-    "Reserved (2Fh)",
-    "Reserved (30h)",                           /* 0x30 */
-    "Reserved (31h)",
-    "Lost statistics",
-    "Tape directory invalid at unload",
-    "Tape system area write failure",
-    "Tape system area read failure",
-    "No start of data",
-    "Loading failure",
-    "Unrecoverable unload failure",             /* 0x38 */
-    "Automation interface failure",
-    "Firmware failure",
-    "WORM medium - integrity check failed",
-    "WORM medium - overwrite attempted",
-};
-
 /* TAPE_ALERT_LPAGE [0x2e] <ta> */
 static bool
 show_tape_alert_ssc_page(const uint8_t * resp, int len,
@@ -6807,8 +6743,11 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
         if (op->verbose && (0 == op->do_brief) && flag)
             printf("  >>>> ");
         if ((0 == op->do_brief) || op->verbose || flag) {
-            if (pc < (int)SG_ARRAY_SIZE(tape_alert_strs))
-                printf("  %s: %d\n", tape_alert_strs[pc], flag);
+            if (NULL == sg_lib_tapealert_strs[0])
+                printf("  No string available for code 0x%x, flag: %d\n",
+                       pc, flag);
+            else if (pc <= 0x40)
+                printf("  %s: %d\n", sg_lib_tapealert_strs[pc], flag);
             else
                 printf("  Reserved parameter code 0x%x, flag: %d\n", pc,
                        flag);

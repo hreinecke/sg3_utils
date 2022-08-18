@@ -92,10 +92,6 @@
 #define VPD_V_HIT_PG_D1 0xd1
 #define VPD_V_HIT_PG_D2 0xd2
 
-#ifndef SG_NVME_VPD_NICR
-#define SG_NVME_VPD_NICR 0xde   /* NVME Identify Controller Response */
-#endif
-
 
 #define DEF_ALLOC_LEN 252
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -113,6 +109,17 @@ dup_sanity_chk(int sz_opts_t, int sz_values_name_t)
         pr2serr(">>> struct svpd_values_name_t differs in size from "
                 "sg_vpd.c [%d != %d]\n", (int)my_sz_values_name_t,
                 sz_values_name_t);
+}
+
+static int
+no_ascii_4hex(const struct opts_t * op)
+{
+    if (op->do_hex < 2)
+        return 1;
+    else if (2 == op->do_hex)
+        return 0;
+    else
+        return -1;
 }
 
 static bool
@@ -1227,15 +1234,20 @@ decode_vpd_d2_hit(uint8_t * b, int blen)
 /* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_CAT_OTHER for
    unsupported page */
 int
-svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
+svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
 {
-    int len, res;
-    char name[64];
-    const struct svpd_values_name_t * vnp;
+    bool hex0 = (0 == op->do_hex);
+    int len, pdt, plen, pn;
     int alloc_len = op->maxlen;
+    int res = 0;
+    const struct svpd_values_name_t * vnp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
     uint8_t * rp;
+    char name[80];
 
-    switch (op->vpd_pn) {
+    pn = op->vpd_pn;
+    switch (pn) {       /* VPD codes that we support vendor pages for */
     case 0x3:
     case 0xc0:
     case 0xc1:
@@ -1249,6 +1261,7 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
     case 0xd0:
     case 0xd1:
     case 0xd2:
+    case 0xde:
         break;
     default:    /* not known so return prior to fetching page */
         return SG_LIB_CAT_OTHER;
@@ -1258,135 +1271,195 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, int off)
         if (0 == alloc_len)
             alloc_len = DEF_ALLOC_LEN;
     }
-    res = vpd_fetch_page(sg_fd, rp, op->vpd_pn, alloc_len, op->do_quiet,
-                                  op->verbose, &len);
-    if (0 == res) {
-        vnp = svpd_get_v_detail(op->vpd_pn, op->vend_prod_num, 0xf & rp[0]);
-        if (vnp && vnp->name)
-            snprintf(name, sizeof(name), "%s", vnp->name);
-        else
-            snprintf(name, sizeof(name) - 1, "Vendor VPD page=0x%x",
-                     op->vpd_pn);
-        if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 2))
-            printf("%s VPD Page:\n", name);
-        if (op->do_raw)
-            dStrRaw(rp, len);
-        else if (op->do_hex)
-            hex2stdout(rp, len, ((1 == op->do_hex) ? 0 : -1));
-        else {
-            switch(op->vpd_pn) {
-                case 0x3:
-                    if (VPD_VP_WDC_HITACHI == op->vend_prod_num)
-                        decode_vpd_3_hit(rp, len);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xc0:
-                    if (VPD_VP_SEAGATE == op->vend_prod_num)
-                        decode_firm_vpd_c0_sea(rp, len);
-                    else if (VPD_VP_EMC == op->vend_prod_num)
-                        decode_upr_vpd_c0_emc(rp, len);
-                    else if (VPD_VP_HP3PAR == op->vend_prod_num)
-                        decode_vpd_c0_hp3par(rp, len);
-                    else if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_c0(rp, len);
-                    else if (VPD_VP_DDS == op->vend_prod_num)
-                        decode_dds_vpd_c0(rp, len);
-                    else if (VPD_VP_IBM_LTO == op->vend_prod_num)
-                        decode_ibm_lto_dcrl(rp, len);
-                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xc1:
-                    if (VPD_VP_SEAGATE == op->vend_prod_num)
-                        decode_date_code_vpd_c1_sea(rp, len);
-                    else if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_c1(rp, len);
-                    else if (VPD_VP_IBM_LTO == op->vend_prod_num)
-                        decode_ibm_lto_dsn(rp, len);
-                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xc2:
-                    if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_c2(rp, len);
-                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xc3:
-                    if (VPD_VP_SEAGATE == op->vend_prod_num)
-                        decode_dev_beh_vpd_c3_sea(rp, len);
-                    else if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_c3(rp, len);
-                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xc4:
-                    if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_c4(rp, len);
-                    else if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xc5:
-                    if (VPD_VP_HP_LTO == op->vend_prod_num)
-                        decode_hp_lto_vpd_cx(rp, len, op->vpd_pn);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xc8:
-                    if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_c8(rp, len);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xc9:
-                    if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_c9(rp, len);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xca:
-                    if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_ca(rp, len);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xd0:
-                    if (VPD_VP_RDAC == op->vend_prod_num)
-                        decode_rdac_vpd_d0(rp, len);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xd1:
-                    if (VPD_VP_WDC_HITACHI == op->vend_prod_num)
-                        decode_vpd_d1_hit(rp, len);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                case 0xd2:
-                    if (VPD_VP_WDC_HITACHI == op->vend_prod_num)
-                        decode_vpd_d2_hit(rp, len);
-                    else
-                        hex2stdout(rp, len, 0);
-                    break;
-                default:
-                    pr2serr("%s: logic error, should know can't decode "
-                            "pn=0x%x\n", __func__, op->vpd_pn);
-                    return SG_LIB_CAT_OTHER;
+    res = vpd_fetch_page(sg_fd, rp, pn, alloc_len, op->do_quiet, op->verbose,
+                         &len);
+    if (res) {
+        pr2serr("Vendor VPD page=0x%x  failed to fetch\n", pn);
+        return res;
+    }
+    pdt = rp[0] & PDT_MASK;
+    vnp = svpd_get_v_detail(pn, op->vend_prod_num, pdt);
+    if (vnp && vnp->name)
+        snprintf(name, sizeof(name), "%s", vnp->name);
+    else
+        snprintf(name, sizeof(name) - 1, "Vendor VPD page=0x%x", pn);
+    if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3))
+        sgj_pr_hr(jsp, "%s VPD Page:\n", name);
+    if (op->do_raw)
+        dStrRaw(rp, len);
+    else {
+        switch(pn) {
+        case 0x3:
+            if (hex0 && (VPD_VP_WDC_HITACHI == op->vend_prod_num))
+                decode_vpd_3_hit(rp, len);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xc0:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_SEAGATE == op->vend_prod_num)
+                decode_firm_vpd_c0_sea(rp, len);
+            else if (VPD_VP_EMC == op->vend_prod_num)
+                decode_upr_vpd_c0_emc(rp, len);
+            else if (VPD_VP_HP3PAR == op->vend_prod_num)
+                decode_vpd_c0_hp3par(rp, len);
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_c0(rp, len);
+            else if (VPD_VP_DDS == op->vend_prod_num)
+                decode_dds_vpd_c0(rp, len);
+            else if (VPD_VP_IBM_LTO == op->vend_prod_num)
+                decode_ibm_lto_dcrl(rp, len);
+            else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                decode_hp_lto_vpd_cx(rp, len, pn);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xc1:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_SEAGATE == op->vend_prod_num)
+                decode_date_code_vpd_c1_sea(rp, len);
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_c1(rp, len);
+            else if (VPD_VP_IBM_LTO == op->vend_prod_num)
+                decode_ibm_lto_dsn(rp, len);
+            else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                decode_hp_lto_vpd_cx(rp, len, pn);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xc2:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_c2(rp, len);
+            else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                decode_hp_lto_vpd_cx(rp, len, pn);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xc3:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_SEAGATE == op->vend_prod_num)
+                decode_dev_beh_vpd_c3_sea(rp, len);
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_c3(rp, len);
+            else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                decode_hp_lto_vpd_cx(rp, len, pn);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xc4:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_c4(rp, len);
+            else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                decode_hp_lto_vpd_cx(rp, len, pn);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xc5:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_HP_LTO == op->vend_prod_num)
+                decode_hp_lto_vpd_cx(rp, len, pn);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xc8:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_c8(rp, len);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xc9:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_c9(rp, len);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xca:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_ca(rp, len);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xd0:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_RDAC == op->vend_prod_num)
+                decode_rdac_vpd_d0(rp, len);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xd1:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_WDC_HITACHI == op->vend_prod_num)
+                decode_vpd_d1_hit(rp, len);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case 0xd2:
+            if (! hex0)
+                hex2stdout(rp, len, no_ascii_4hex(op));
+            else if (VPD_VP_WDC_HITACHI == op->vend_prod_num)
+                decode_vpd_d2_hit(rp, len);
+            else
+                res = SG_LIB_CAT_OTHER;
+            break;
+        case SG_NVME_VPD_NICR:          /* 0xde */
+            if (VPD_VP_SG != op->vend_prod_num) {
+                res = SG_LIB_CAT_OTHER;
+                break;
             }
-            return 0;
+            /* NVMe: Identify Controller data structure (CNS 01h) */
+            plen = sg_get_unaligned_be16(rp + 2) + 4;
+            if (plen > len) {   /* fetch the whole page */
+                res = vpd_fetch_page(sg_fd, rp, pn, plen,
+                                     op->do_quiet, op->verbose, &len);
+                if (res) {
+                    pr2serr("Vendor VPD page=0x%x  failed to fetch\n", pn);
+                    return res;
+                }
+            }
+            if (len < 16) {
+                pr2serr("%s expected to be > 15 bytes long (got: %d)\n",
+                        name, len);
+                break;
+            } else {
+                int n = len - 16;
+
+                if (n > 4096) {
+                    pr2serr("NVMe Identify response expected to be "
+                            "<= 4096 bytes (got: %d)\n", n);
+                    break;
+                }
+                if (op->do_hex)
+                    hex2stdout(rp, len, no_ascii_4hex(op));
+                else if (jsp->pr_as_json) {
+                    jo2p = sg_vpd_js_hdr(jsp, jop, name, rp);
+                    sgj_js_nv_hex_bytes(jsp, jo2p, "response_bytes",
+                                        rp + 16, n);
+                } else
+                    hex2stdout(rp + 16, n, 1);
+            }
+            break;
+        default:
+            res = SG_LIB_CAT_OTHER;
         }
-    } else
-        pr2serr("Vendor VPD page=0x%x  failed to fetch\n", op->vpd_pn);
+    }
+    if (res && op->verbose)
+        pr2serr("%s: can't decode pn=0x%x, vend_prod_num=%d\n", __func__,
+                pn, op->vend_prod_num);
     return res;
 }

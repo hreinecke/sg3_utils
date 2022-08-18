@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.57 20220309";    /* ses4r04 */
+static const char * version_str = "2.58 20220813";    /* ses4r04 */
 
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
@@ -1084,6 +1084,8 @@ parse_index(struct opts_t *op)
         }
         element_type_by_code.elem_type_code = n;
         mallcp = (char *)malloc(8);  /* willfully forget about freeing this */
+        if (NULL == mallcp)
+             return sg_convert_errno(ENOMEM);
         mallcp[0] = '_';
         snprintf(mallcp + 1, 6, "%d", n);
         element_type_by_code.abbrev = mallcp;
@@ -5686,12 +5688,13 @@ main(int argc, char * argv[])
                 if (SET_OPT == cgs_clp->cgs_sel)
                     tavp->val = DEF_SET_VAL;
             }
-            if (!strcmp(cgs_clp->cgs_str, "sas_addr") && op->dev_slot_num < 0) {
-                pr2serr("--get=sas_addr requires --dev-slot-num.  For expander "
-                        "SAS address, use exp_sas_addr instead.\n");
+            if (!strcmp(cgs_clp->cgs_str, "sas_addr") &&
+                op->dev_slot_num < 0) {
+                pr2serr("--get=sas_addr requires --dev-slot-num.  For "
+                        "expander SAS address, use exp_sas_addr instead.\n");
                 ret = SG_LIB_SYNTAX_ERROR;
                 goto err_out;
-            } 
+            }
             tavp->cgs_sel = cgs_clp->cgs_sel;
         }
         /* keep this descending for loop directly after ascending for loop */
