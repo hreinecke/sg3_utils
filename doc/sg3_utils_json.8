@@ -1,4 +1,4 @@
-.TH SG3_UTILS_JSON "8" "August 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG3_UTILS_JSON "8" "September 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg3_utils_json \- JSON output for some sg3_utils utilities
 .SH SYNOPSIS
@@ -229,19 +229,35 @@ SCSI INQUIRY command). SCSI "list"s become JSON named arrays (e.g. in
 the Device Identification VPD page there is a "Designation descriptor
 list" that becomes a JSON array named "designation_descriptor_list").
 .PP
-At the completion of the utility that JSON tree is "measured" taking
-into account the form of output (i.e. pretty-printed, single line or
-packed single line). For the pretty-printed JSON output, the size of
-each indentation in spaces is also given (i.e. the tab width). The JSON
-is then output to a single C string, then sent to stdout. If a NULL
-character (ASCII zero and C string terminator) somehow finds its way
-into a field that should (according to the spec) be space padded, then
-the JSON output may appear truncated.
+At the completion of the utility that JSON tree is "measured" taking into
+account the form of output (i.e. pretty-printed, single line or packed single
+line). For the pretty-printed JSON output, the size of each indentation in
+spaces is also given (i.e. the tab width). The JSON is then output to a
+single C string, then sent to stdout. If a NULL character (ASCII zero and C
+string terminator) somehow finds its way into a field that should (according
+to the spec) be space padded, then the JSON output may appear truncated.
 .PP
 Note that this JSON processing means that if a utility is aborted for whatever
 reason then no JSON output will appear. With the normal, human readable output
 processing, some output may appear before the utility aborts in such bad
 situations.
+.SH INTERACTION WITH OTHER OPTIONS
+As stated above, the default output is in human readable form using 7 bit
+ASCII. The \fI\-\-json[=JO]\fR option is designed to be an alternative to that
+human readable form. There are other alternative output formats such as the
+response output as a hexadecimal sequence of bytes or in "raw" binary output;
+both of those take precedence over the \fI\-\-json[=JO]\fR option. Other
+specialized output format (e.g. 'sg_inq \-\-export') will usually take
+precedence over JSON output.
+.PP
+When the \fI\-\-raw\fR option is used together with the \fI\-\-inhex=FN\fR
+option only the data input to the utility is interpreted as binary. So the
+output format defaults to human readable form and thus can be changed to
+JSON if the \fI\-\-json[=JO]\fR option is also used.
+.PP
+There is typically only one form of JSON output so options like
+\fI\-\-brief\fR and \fI\-\-quiet\fR are ignored in the JSON output. In some
+cases (i.e 'sg_inq \-\-descriptors') the JSON output is expanded.
 .SH ERRORS
 No attempts have been made to translate errors into JSON form, apart from the
 final "exit_status" JSON object where a value of 0 means "no errors". Exit
@@ -265,24 +281,6 @@ The summary is that when JSON output is selected and an error occurs each
 utility will process the error the same way as it would if JSON output had
 not been selected. In all cases error messages, in human readable form,
 are sent to stderr.
-.SH INTERACTION WITH OTHER OPTIONS
-As stated above, the default output is in human readable form using 7 bit
-ASCII. The \fI\-\-json[=JO]\fR option is designed to be an alternative
-to that human readable form. There are other alternative output formats
-such as the response output as a hexadecimal sequence of bytes or
-in "raw" binary output; both of those take precedence over the
-\fI\-\-json[=JO]\fR option. Other specialized output
-format (e.g. 'sg_inq \-\-export') will usually take precedence over JSON
-output.
-.PP
-When the \fI\-\-raw\fR option is used together with the \fI\-\-inhex=FN\fR
-option only the data input to the utility is interpreted as binary. So the
-output format defaults to human readable form and thus can be changed to
-JSON if the \fI\-\-json[=JO]\fR option is also used.
-.PP
-There is typically only one form of JSON output so options like
-\fI\-\-brief\fR and \fI\-\-quiet\fR are ignored in the JSON output. In some
-cases (i.e 'sg_inq \-\-descriptors') the JSON output is expanded.
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).

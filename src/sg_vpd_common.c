@@ -1712,7 +1712,7 @@ decode_block_lb_prov_vpd(const uint8_t * buff, int len, struct opts_t * op,
         if (jsp->pr_as_json && jsp->pr_out_hr)
             sgj_js_str_out(jsp, b, strlen(b));
         else
-            printf("%s", b);
+            sgj_pr_hr(jsp, "%s", b);
     }
     return 0;
 }
@@ -2237,6 +2237,8 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
     const uint8_t * bp = buff;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p;
+    char b[80];
+    static const int blen = sizeof(b);
     static const char * ab_pdt = "abnormal use of 'pdt'";
 
     for (k = 0; k < len; k += bump, bp += bump) {
@@ -2285,11 +2287,11 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
             sgj_haj_vi(jsp, jo2p, 4, "Maximum bytes in stream ROD",
                        SGJ_SEP_COLON_1_SPACE, ull, true);
             ull = sg_get_unaligned_be64(bp + 16);
-            printf("  Optimal Bytes in stream ROD transfer: ");
+            snprintf(b, blen, "  Optimal Bytes in stream ROD transfer: ");
             if (SG_LIB_UNBOUNDED_64BIT == ull)
-                printf("-1 [no limit]\n");
+                sgj_pr_hr(jsp, "%s-1 [no limit]\n", b);
             else
-                printf("%" PRIu64 "\n", ull);
+                sgj_pr_hr(jsp, "%s%" PRIu64 "\n", b, ull);
             break;
         case 3:
             /* Copy manager ROD device type specific descriptor */
@@ -2297,14 +2299,14 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
                                   pdt, false, NULL, "Copy manager ROD "
                                   "device type specific descriptor",
                                   ab_pdt);
-            printf("  Maximum Bytes in processor ROD: %" PRIu64 "\n",
-                   sg_get_unaligned_be64(bp + 8));
+            sgj_pr_hr(jsp, "  Maximum Bytes in processor ROD: %" PRIu64 "\n",
+                      sg_get_unaligned_be64(bp + 8));
             ull = sg_get_unaligned_be64(bp + 16);
-            printf("  Optimal Bytes in processor ROD transfer: ");
+            snprintf(b, blen, "  Optimal Bytes in processor ROD transfer: ");
             if (SG_LIB_UNBOUNDED_64BIT == ull)
-                printf("-1 [no limit]\n");
+                sgj_pr_hr(jsp, "%s-1 [no limit]\n", b);
             else
-                printf("%" PRIu64 "\n", ull);
+                sgj_pr_hr(jsp, "%s%" PRIu64 "\n", b, ull);
             break;
         default:
             sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_device_type",

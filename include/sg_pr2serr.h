@@ -227,6 +227,58 @@ sgj_opaque_p sgj_js_nv_b(sgj_state * jsp, sgj_opaque_p jop,
 sgj_opaque_p sgj_js_nv_o(sgj_state * jsp, sgj_opaque_p jop,
                          const char * name, sgj_opaque_p ua_jop);
 
+/* This function only produces JSON output if jsp is non-NULL and
+ * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
+ * if jop is NULL) along with a value. If jsp->pr_hex is true then that
+ * value is two sub-objects, one named 'i' with a 'value' as a JSON integer,
+ * the other one named 'hex' with 'value' rendered as hex in a JSON string.
+ * If jsp->pr_hex is false then there are no sub-objects and the 'value' is
+ * rendered as JSON integer. */
+void sgj_js_nv_ihex(sgj_state * jsp, sgj_opaque_p jop,
+                    const char * name, uint64_t value);
+
+/* This function only produces JSON output if jsp is non-NULL and
+ * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
+ * if jop is NULL) along with a value. If jsp->pr_string is true then that
+ * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
+ * the other one named str_name with val_s rendered as a JSON string. If
+ * str_name is NULL then "meaning" will be used. If jsp->pr_string is false
+ * then there are no sub-objects and the 'val_i' is rendered as a JSON
+ * integer. */
+void sgj_js_nv_istr(sgj_state * jsp, sgj_opaque_p jop,
+                    const char * name, int64_t val_i,
+                    const char * str_name, const char * val_s);
+
+/* Similar to sgj_js_nv_istr(). The hex output is conditional jsp->pr_hex . */
+void sgj_js_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop,
+                       const char * name, int64_t val_i,
+                       const char * str_name, const char * val_s);
+
+/* This function only produces JSON output if jsp is non-NULL and
+ * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
+ * if jop is NULL) along with a value. If jsp->pr_name_ex is true then that
+ * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
+ * the other one named "abbreviated_name_expansion" with value nex_s rendered
+ * as a JSON string. If jsp->pr_hex and 'hex_as_well' are true, then a
+ * sub-object named 'hex' with a value rendered as a hex string equal to
+ * val_i. If jsp->pr_name_ex is false and either jsp->pr_hex or hex_as_well are
+ * false then there are no sub-objects and the 'val_i' is rendered as a JSON
+ * integer. */
+void sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                        int64_t val_i, bool hex_as_well, const char * nex_s);
+
+void sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop,
+                           const char * name, int64_t val_i, bool hex_as_well,
+                           const char * str_name, const char * val_s,
+                           const char * nex_s);
+
+/* Add named field whose value is a (large) JSON string made up of num_bytes
+ * ASCII hexadecimal bytes (each two hex digits seperated by a space) starting
+ * at byte_arr. The heap is used for intermediate storage so num_bytes can
+ * be arbitrarily large. */
+void sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                         const uint8_t * byte_arr, int num_bytes);
+
 /* The '_haj_' refers to generating output both for human readable and/or
  * JSON with a single invocation. If jsp is non-NULL and jsp->pr_out_hr is
  * true then both JSON and human readable output is formed (and the latter is
@@ -275,57 +327,6 @@ sgj_opaque_p sgj_haj_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
  * by 'JSON boolean object'. */
 void sgj_haj_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                 const char * name, enum sgj_separator_t sep, bool value);
-
-/* This function only produces JSON output if jsp is non-NULL and
- * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
- * if jop is NULL) along with a value. If jsp->pr_hex is true then that
- * value is two sub-objects, one named 'i' with a 'value' as a JSON integer,
- * the other one named 'hex' with 'value' rendered as hex in a JSON string.
- * If jsp->pr_hex is false then there are no sub-objects and the 'value' is
- * rendered as JSON integer. */
-void sgj_js_nv_ihex(sgj_state * jsp, sgj_opaque_p jop,
-                    const char * name, uint64_t value);
-
-/* This function only produces JSON output if jsp is non-NULL and
- * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
- * if jop is NULL) along with a value. If jsp->pr_string is true then that
- * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
- * the other one named str_name with val_s rendered as a JSON string. If
- * str_name is NULL then "meaning" will be used. If jsp->pr_string is false
- * then there are no sub-objects and the 'val_i' is rendered as a JSON
- * integer. */
-void sgj_js_nv_istr(sgj_state * jsp, sgj_opaque_p jop,
-                    const char * name, int64_t val_i,
-                    const char * str_name, const char * val_s);
-
-void sgj_js_nv_ihexstr(sgj_state * jsp, sgj_opaque_p jop,
-                       const char * name, int64_t val_i,
-                       const char * str_name, const char * val_s);
-
-/* This function only produces JSON output if jsp is non-NULL and
- * jsp->pr_as_json is true. It adds a named object at 'jop' (or jop->basep
- * if jop is NULL) along with a value. If jsp->pr_name_ex is true then that
- * value is two sub-objects, one named 'i' with a 'val_i' as a JSON integer,
- * the other one named "abbreviated_name_expansion" with value nex_s rendered
- * as a JSON string. If jsp->pr_hex and 'hex_as_well' are true, then a
- * sub-object named 'hex' with a value rendered as a hex string equal to
- * val_i. If jsp->pr_name_ex is false and either jsp->pr_hex or hex_as_well are
- * false then there are no sub-objects and the 'val_i' is rendered as a JSON
- * integer. */
-void sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                        int64_t val_i, bool hex_as_well, const char * nex_s);
-
-void sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop,
-                           const char * name, int64_t val_i, bool hex_as_well,
-                           const char * str_name, const char * val_s,
-                           const char * nex_s);
-
-/* Add named field whose value is a (large) JSON string made up of num_bytes
- * ASCII hexadecimal bytes (each two hex digits seperated by a space) starting
- * at byte_arr. The heap is used for intermediate storage so num_bytes can
- * be arbitrarily large. */
-void sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                         const uint8_t * byte_arr, int num_bytes);
 
 /* Breaks up the string pointed to by 'sp' into lines and adds them to the
  * jsp->out_hrp array. Treat '\n' in sp as line breaks. Consumes characters

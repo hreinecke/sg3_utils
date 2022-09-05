@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.28 20220818";  /* spc6r06, sbc5r03 */
+static const char * version_str = "2.30 20220904";  /* spc6r06, sbc5r03 */
 
 #define MY_NAME "sg_inq"
 
@@ -1071,6 +1071,7 @@ svpd_inhex_decode_all(struct opts_t * op, sgj_opaque_p jop)
     int bump, off;
     int in_len = op->maxlen;
     int prev_pn = -1;
+    sgj_state * jsp = &op->json_st;
     uint8_t vpd0_buff[512];
     uint8_t * rp = vpd0_buff;
 
@@ -1105,12 +1106,17 @@ svpd_inhex_decode_all(struct opts_t * op, sgj_opaque_p jop)
                         "max_pn=0x%x\n", __func__, pn, max_pn);
             continue;
         }
-        if (op->do_long)
-            printf("[0x%x] ", pn);
+        if (op->do_long) {
+            if (jsp->pr_as_json)
+               sgj_pr_hr(jsp, "[0x%x]:\n", pn);
+            else
+               sgj_pr_hr(jsp, "[0x%x] ", pn);
+        }
 
         res = vpd_decode(-1, op, jop, off);
         if (SG_LIB_CAT_OTHER == res) {
-            ; // xxxxx
+            if (op->verbose)
+                pr2serr("Can't decode VPD page=0x%x\n", pn);
         }
     }
     return res;
@@ -1204,6 +1210,7 @@ decode_ascii_inf(uint8_t * buff, int len, struct opts_t * op)
     int al, k, bump;
     uint8_t * bp;
     uint8_t * p;
+    sgj_state * jsp = &op->json_st;
 
     if (op->do_hex) {
         hex2stdout(buff, len, no_ascii_4hex(op));
@@ -1221,15 +1228,15 @@ decode_ascii_inf(uint8_t * buff, int len, struct opts_t * op)
     for (k = 0, bp = buff + 5; k < al; k += bump, bp += bump) {
         p = (uint8_t *)memchr(bp, 0, al - k);
         if (! p) {
-            printf("  %.*s\n", al - k, (const char *)bp);
+            sgj_pr_hr(jsp, "  %.*s\n", al - k, (const char *)bp);
             break;
         }
-        printf("  %s\n", (const char *)bp);
+        sgj_pr_hr(jsp, "  %s\n", (const char *)bp);
         bump = (p - bp) + 1;
     }
     bp = buff + 5 + al;
     if (bp < (buff + len)) {
-        printf("Vendor specific information in hex:\n");
+        sgj_pr_hr(jsp, "Vendor specific information in hex:\n");
         hex2stdout(bp, len - (al + 5), 0);
     }
 }
@@ -1688,6 +1695,8 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
         pr2serr("%s VPD page error: around offset=%d\n", leadin, off);
 }
 
+/* The --export and --json options are assumed to be mutually exclusive.
+ * Here the former takes precedence. */
 static void
 export_dev_ids(uint8_t * buff, int len, int verbose)
 {
@@ -2128,9 +2137,15 @@ static const char * failover_mode_arr[] =
 };
 
 static void
-decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op)
+decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
+                      sgj_opaque_p jop)
 {
-    int k, ip_mgmt, vpp80, lun_z;
+    uint8_t uc;
+    int k, n, ip_mgmt, vpp80, lun_z;
+    sgj_state * jsp = &op->json_st;
+    const char * cp;
+    char b[256];
+    static const int blen = sizeof(b);
 
     if (len < 3) {
         pr2serr("EMC upr VPD page [0xc0]: length too short=%d\n", len);
@@ -2145,50 +2160,64 @@ decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op)
                 buff[9]);
         return;
     }
-    printf("  LUN WWN: ");
-    for (k = 0; k < 16; ++k)
-        printf("%02x", buff[10 + k]);
-    printf("\n");
-    printf("  Array Serial Number: ");
-    dStrRaw((const char *)&buff[50], buff[49]);
-    printf("\n");
+    for (k = 0, n = 0; k < 16; ++k)
+        n += sg_scnpr(b + n, blen - n, "%02x", buff[10 + k]);
+    sgj_haj_vs(jsp, jop, 2, "LUN WWN", SGJ_SEP_COLON_1_SPACE, b);
+    snprintf(b, blen, "%.*s", buff[49], buff + 50);
+    sgj_haj_vs(jsp, jop, 2, "Array Serial Number", SGJ_SEP_COLON_1_SPACE, b);
 
-    printf("  LUN State: ");
     if (buff[4] > 0x02)
-           printf("Unknown (%x)\n", buff[4]);
+       snprintf(b, blen, "Unknown (%x)", buff[4]);
     else
-           printf("%s\n", lun_state_arr[buff[4]]);
+       snprintf(b, blen, "%s", lun_state_arr[buff[4]]);
+    sgj_haj_vistr(jsp, jop, 2, "LUN State", SGJ_SEP_COLON_1_SPACE,
+                  buff[4], true, b);
 
-    printf("  This path connects to: ");
-    if (buff[8] > 0x01)
-           printf("Unknown SP (%x)", buff[8]);
+    uc = buff[8];
+    n = 0;
+    if (uc > 0x01)
+       n += sg_scnpr(b + n, blen - n, "Unknown SP (%x)", uc);
     else
-           printf("%s", sp_arr[buff[8]]);
-    printf(", Port Number: %u\n", buff[7]);
+       n += sg_scnpr(b + n, blen - n, "%s", sp_arr[uc]);
+    sgj_js_nv_ihexstr(jsp, jop, "path_connects_to", uc, NULL, b);
+    n += sg_scnpr(b + n, blen - n, ", Port Number: %u", buff[7]);
+    sgj_pr_hr(jsp, "  This path connects to: %s\n", b);
+    sgj_js_nv_ihex(jsp, jop, "port_number", buff[7]);
 
-    printf("  Default Owner: ");
     if (buff[5] > 0x01)
-           printf("Unknown (%x)\n", buff[5]);
+           snprintf(b, blen, "Unknown (%x)\n", buff[5]);
     else
-           printf("%s\n", sp_arr[buff[5]]);
+           snprintf(b, blen, "%s\n", sp_arr[buff[5]]);
+    sgj_haj_vistr(jsp, jop, 2, "Default owner", SGJ_SEP_COLON_1_SPACE,
+                  buff[5], true, b);
 
-    printf("  NO_ATF: %s, Access Logix: %s\n",
-                   buff[6] & 0x80 ? "set" : "not set",
-                   buff[6] & 0x40 ? "supported" : "not supported");
+    cp = (buff[6] & 0x40) ? "supported" : "not supported";
+    sgj_pr_hr(jsp, "  NO_ATF: %s, Access Logix: %s\n",
+              buff[6] & 0x80 ? "set" : "not set", cp);
+    sgj_js_nv_i(jsp, jop, "no_atf", !! (buff[6] & 0x80));
+    sgj_js_nv_istr(jsp, jop, "access_logix", !! (buff[6] & 0x40),
+                   NULL, cp);
 
     ip_mgmt = (buff[6] >> 4) & 0x3;
-
-    printf("  SP IP Management Mode: %s\n", ip_mgmt_arr[ip_mgmt]);
-    if (ip_mgmt == 2)
-        printf("  SP IPv4 address: %u.%u.%u.%u\n",
-               buff[44], buff[45], buff[46], buff[47]);
-    else {
+    cp = ip_mgmt_arr[ip_mgmt];
+    sgj_pr_hr(jsp, "  SP IP Management Mode: %s\n", cp);
+    sgj_js_nv_istr(jsp, jop, "sp_ip_management_mode", !! ip_mgmt,
+                   NULL, cp);
+    if (ip_mgmt == 2) {
+        snprintf(b, blen, "%u.%u.%u.%u", buff[44], buff[45], buff[46],
+                 buff[47]);
+        sgj_pr_hr(jsp, "  SP IPv4 address: %s\n", b);
+        sgj_js_nv_s(jsp, jop, "sp_ipv4_address", b);
+    } else if (ip_mgmt == 3) {
         printf("  SP IPv6 address: ");
+        n = 0;
         for (k = 0; k < 16; ++k)
-            printf("%02x", buff[32 + k]);
-        printf("\n");
+            n += sg_scnpr(b + n, blen - n, "%02x", buff[32 + k]);
+        sgj_pr_hr(jsp, "  SP IPv6 address: %s\n", b);
+        sgj_js_nv_hex_bytes(jsp, jop, "sp_ipv6_address", buff + 32, 16);
     }
 
+// yyyyyyy more conversion work needed below this point
     vpp80 = buff[30] & 0x08;
     lun_z = buff[30] & 0x04;
 
@@ -3811,15 +3840,20 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         break;
     /* Vendor specific VPD pages (>= 0xc0) */
     case VPD_UPR_EMC:   /* 0xc0 */
+        np = "Block device characteristics VPD page";
+        ep = "(EMC)";
         if (!op->do_raw && (op->do_hex < 3))
-            printf("VPD INQUIRY: Unit Path Report Page (EMC)\n");
+            sgj_pr_hr(jsp, "VPD INQUIRY: %s %s\n", np, ep);
         res = vpd_fetch_page(sg_fd, rp, pn, -1, qt, vb, &len);
         if (res)
             break;
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
-        else
-            decode_upr_vpd_c0_emc(rp, len, op);
+        else {
+            if (as_json)
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+            decode_upr_vpd_c0_emc(rp, len, op, jo2p);
+        }
         break;
     case VPD_RDAC_VERS:         /* 0xc2 */
         if (!op->do_raw && (op->do_hex < 3))

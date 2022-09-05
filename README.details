@@ -542,10 +542,19 @@ replaced by "uint8_t" as the 8 bit (unsigned) byte type; "char" is still
 used for ASCII text.
 
 
+Coding Style
+============
+Everyone has their own C/C++ coding style and the author is no different.
+In terms of the GNU indent command:
+     indent -i4 -il0 -nut -br -npcs -ncs -ce
+is pretty close. That is similar to the Linux kernel coding style but
+with 4 space indentations and no tabs.
+
+
 Other SCSI and storage tools
 ============================
 See https://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert		dgilbert@interlog.com
-12th August 2022
+26th August 2022

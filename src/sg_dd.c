@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.34 20220729";
+static const char * version_str = "6.35 20220826";
 
 
 #define ME "sg_dd: "
@@ -214,16 +214,16 @@ static void calc_duration_throughput(bool contin);
 
 
 static void
-install_handler(int sig_num, void (*sig_handler) (int sig))
+install_handler(int sig_num, void (*sig_handler)(int sig))
 {
     struct sigaction sigact;
-    sigaction (sig_num, NULL, &sigact);
-    if (sigact.sa_handler != SIG_IGN)
-    {
+
+    sigaction(sig_num, NULL, &sigact);
+    if (sigact.sa_handler != SIG_IGN) {
         sigact.sa_handler = sig_handler;
-        sigemptyset (&sigact.sa_mask);
+        sigemptyset(&sigact.sa_mask);
         sigact.sa_flags = 0;
-        sigaction (sig_num, &sigact, NULL);
+        sigaction(sig_num, &sigact, NULL);
     }
 }
 

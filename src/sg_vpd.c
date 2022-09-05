@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.81 20220818";  /* spc6r06 + sbc5r03 */
+static const char * version_str = "1.82 20220826";  /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_vpd"
 
@@ -290,9 +290,9 @@ static int
 count_standard_vpds(int vpd_pn)
 {
     const struct svpd_values_name_t * vnp;
-    int matches;
+    int matches = 0;
 
-    for (vnp = standard_vpd_pg, matches = 0; vnp->acron; ++vnp) {
+    for (vnp = standard_vpd_pg; vnp->acron; ++vnp) {
         if ((vpd_pn == vnp->value) && vnp->name) {
             if (0 == matches)
                 printf("Matching standard VPD pages:\n");
@@ -1374,10 +1374,10 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             else {
                 bool protect = false;
 
-		op->protect_not_sure = false;
-		if (op->std_inq_a_valid)
-		     protect = !! (0x1 & op->std_inq_a[5]);
-		else if ((sg_fd >= 0) && (! op->do_force)) {
+                op->protect_not_sure = false;
+                if (op->std_inq_a_valid)
+                     protect = !! (0x1 & op->std_inq_a[5]);
+                else if ((sg_fd >= 0) && (! op->do_force)) {
                     struct sg_simple_inquiry_resp sir;
 
                     res = sg_simple_inquiry(sg_fd, &sir, false, vb);
@@ -1385,11 +1385,11 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                         if (op->verbose)
                             pr2serr("%s: sg_simple_inquiry() failed, "
                                     "res=%d\n", __func__, res);
-			op->protect_not_sure = true;
+                        op->protect_not_sure = true;
                     } else
                         protect = !!(sir.byte_5 & 0x1); /* SPC-3 and later */
                 } else
-		    op->protect_not_sure = true;
+                    op->protect_not_sure = true;
                 if (vb || long_notquiet)
                     sgj_pr_hr(jsp,"   [PQual=%d  Peripheral device type: "
                               "%s]\n", pqual, pdt_str);
@@ -1650,7 +1650,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
-                printf("%s%s\n", pre, np);
+                sgj_pr_hr(jsp, "%s%s\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
             else {
@@ -1719,7 +1719,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb0\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb0\n", pre);
         break;
     case 0xb1:  /* depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -1770,7 +1770,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb1\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb1\n", pre);
         break;
     case 0xb2:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -1815,7 +1815,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb2\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb2\n", pre);
         break;
     case 0xb3:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -1857,7 +1857,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb3\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb3\n", pre);
         break;
     case 0xb4:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -1902,7 +1902,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb4\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb4\n", pre);
         break;
     case 0xb5:          /* VPD page depends on pdt */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -1951,7 +1951,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb5\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb5\n", pre);
         break;
     case VPD_ZBC_DEV_CHARS:       /* 0xb6 for both pdt=0 and pdt=0x14 */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -1989,7 +1989,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb6\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb6\n", pre);
         break;
     case 0xb7:
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -2027,7 +2027,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb7\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb7\n", pre);
         break;
     case 0xb8:          /* VPD_FORMAT_PRESETS */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -2068,7 +2068,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb8\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb8\n", pre);
         break;
     case 0xb9:          /* VPD_CON_POS_RANGE */
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -2109,7 +2109,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             return 0;
         } else if ((! op->do_raw) && (! op->do_quiet) && (op->do_hex < 3) &&
                    exam_not_given)
-            printf("%sVPD page=0xb8\n", pre);
+            sgj_pr_hr(jsp, "%sVPD page=0xb8\n", pre);
         break;
     default:
         return SG_LIB_CAT_OTHER;
@@ -2123,6 +2123,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
     int k, res, rlen, n, pn;
     int max_pn = 255;
     int any_err = 0;
+    sgj_state * jsp = &op->json_st;
     uint8_t vpd0_buff[512];
     uint8_t * rp = vpd0_buff;
 
@@ -2158,9 +2159,13 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
                 continue;
             op->vpd_pn = pn;
             if (k > 0)
-                printf("\n");
-            if (op->do_long)
-                printf("[0x%x] ", pn);
+                sgj_pr_hr(jsp, "\n");
+            if (op->do_long) {
+                if (jsp->pr_as_json)
+                    sgj_pr_hr(jsp, "[0x%x]:\n", pn);
+                else
+                    printf("[0x%x] ", pn);
+            }
 
             res = svpd_decode_t10(sg_fd, op, jop, 0, 0, NULL);
             if (SG_LIB_CAT_OTHER == res) {
@@ -2215,8 +2220,12 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
                             "max_pn=0x%x\n", __func__, pn, max_pn);
                 continue;
             }
-            if (op->do_long)
-                printf("[0x%x] ", pn);
+            if (op->do_long) {
+                if (jsp->pr_as_json)
+                    sgj_pr_hr(jsp, "[0x%x]:\n", pn);
+                else
+                    printf("[0x%x] ", pn);
+            }
 
             res = svpd_decode_t10(-1, op, jop, 0, off, NULL);
             if (SG_LIB_CAT_OTHER == res) {
@@ -2237,6 +2246,7 @@ svpd_examine_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
     int k, res, start;
     int max_pn;
     int any_err = 0;
+    sgj_state * jsp = &op->json_st;
     char b[80];
 
     max_pn = (op->page_given ? op->vpd_pn : 0xff);
@@ -2261,7 +2271,7 @@ svpd_examine_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
         if (first)
             first = false;
         else if (got_one) {
-            printf("\n");
+            sgj_pr_hr(jsp, "\n");
             got_one = false;
         }
         if (op->do_long)
@@ -2455,6 +2465,7 @@ main(int argc, char * argv[])
         return 0;
     }
 
+    jsp = &op->json_st;
     if (op->do_enum) {
         if (op->device_name)
             pr2serr("Device name %s ignored when --enumerate given\n",
@@ -2498,16 +2509,15 @@ main(int argc, char * argv[])
                 matches = svpd_count_vendor_vpds(op->vpd_pn,
                                                  op->vend_prod_num);
             if (0 == matches)
-                printf("No matches found for VPD page number 0x%x\n",
-                       op->vpd_pn);
+                sgj_pr_hr(jsp, "No matches found for VPD page number 0x%x\n",
+                          op->vpd_pn);
         } else {        /* enumerate standard then vendor VPD pages */
-            printf("Standard VPD pages:\n");
+            sgj_pr_hr(jsp, "Standard VPD pages:\n");
             enumerate_vpds(1, 1);
         }
         return 0;
     }
 
-    jsp = &op->json_st;
     as_json = jsp->pr_as_json;
     if (as_json)
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
@@ -2524,7 +2534,7 @@ main(int argc, char * argv[])
                         vnp = sdp_find_vpd_by_acron("sinq");
                     } else {
                         pr2serr("abbreviation doesn't match a VPD page\n");
-                        printf("Available standard VPD pages:\n");
+                        sgj_pr_hr(jsp, "Available standard VPD pages:\n");
                         enumerate_vpds(1, 1);
                         ret = SG_LIB_SYNTAX_ERROR;
                         goto fini;
@@ -2545,7 +2555,7 @@ main(int argc, char * argv[])
             op->vpd_pn = sg_get_num_nomult(op->page_str);
             if ((op->vpd_pn < 0) || (op->vpd_pn > 255)) {
                 pr2serr("Bad page code value after '-p' option\n");
-                printf("Available standard VPD pages:\n");
+                sgj_pr_hr(jsp, "Available standard VPD pages:\n");
                 enumerate_vpds(1, 1);
                 ret = SG_LIB_SYNTAX_ERROR;
                 goto fini;
