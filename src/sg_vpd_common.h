@@ -250,7 +250,19 @@ decode_lb_protection_vpd(const uint8_t * buff, int len, struct opts_t * op,
 void
 decode_tapealert_supported_vpd(const uint8_t * buff, int len,
                                struct opts_t * op, sgj_opaque_p jop);
+/* Share some vendor specific VPD pages as well */
+void
+decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
+                      sgj_opaque_p jop);
+void
+decode_rdac_vpd_c2(uint8_t * buff, int len, struct opts_t * op,
+                   sgj_opaque_p jop);
+void
+decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
+                   sgj_opaque_p jop);
+
 const char * pqual_str(int pqual);
+int no_ascii_4hex(const struct opts_t * op);
 
 void svpd_enumerate_vendor(int vend_prod_num);
 int svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num);

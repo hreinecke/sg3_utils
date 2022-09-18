@@ -188,7 +188,7 @@ sg_ident_SOURCES = sg_ident.c
 sg_ident_OBJECTS = sg_ident.$(OBJEXT)
 sg_ident_DEPENDENCIES = ../lib/libsgutils2.la
 am_sg_inq_OBJECTS = sg_inq.$(OBJEXT) sg_inq_data.$(OBJEXT) \
-	sg_vpd_vendor.$(OBJEXT) sg_vpd_common.$(OBJEXT)
+	sg_vpd_common.$(OBJEXT)
 sg_inq_OBJECTS = $(am_sg_inq_OBJECTS)
 sg_inq_DEPENDENCIES = ../lib/libsgutils2.la
 sg_logs_SOURCES = sg_logs.c
@@ -682,7 +682,7 @@ sg_get_elem_status_LDADD = ../lib/libsgutils2.la
 sg_get_lba_status_LDADD = ../lib/libsgutils2.la
 sg_ident_LDADD = ../lib/libsgutils2.la
 sginfo_LDADD = ../lib/libsgutils2.la
-sg_inq_SOURCES = sg_inq.c sg_inq_data.c sg_vpd_vendor.c sg_vpd_common.c
+sg_inq_SOURCES = sg_inq.c sg_inq_data.c sg_vpd_common.c
 sg_inq_LDADD = ../lib/libsgutils2.la
 sg_logs_LDADD = ../lib/libsgutils2.la
 sg_luns_LDADD = ../lib/libsgutils2.la

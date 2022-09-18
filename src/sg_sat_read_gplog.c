@@ -54,7 +54,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.22 20220425";
+static const char * version_str = "1.23 20220917";
 
 struct opts_t {
     bool ck_cond;
@@ -124,7 +124,7 @@ usage()
 }
 
 static int
-do_read_gplog(int sg_fd, int ata_cmd, uint8_t *inbuff,
+do_read_gplog(int sg_fd, int ata_cmd, uint8_t * inbuff,
               const struct opts_t * op)
 {
     const bool extend = true;

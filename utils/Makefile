@@ -1,6 +1,6 @@
 SHELL = /bin/sh
 
-PREFIX=/usr
+PREFIX=/usr/local
 INSTDIR=$(DESTDIR)/$(PREFIX)/bin
 MANDIR=$(DESTDIR)/$(PREFIX)/share/man
 

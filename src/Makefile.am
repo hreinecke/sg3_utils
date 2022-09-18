@@ -93,7 +93,7 @@ sg_ident_LDADD = ../lib/libsgutils2.la
 
 sginfo_LDADD = ../lib/libsgutils2.la
 
-sg_inq_SOURCES = sg_inq.c sg_inq_data.c sg_vpd_vendor.c sg_vpd_common.c
+sg_inq_SOURCES = sg_inq.c sg_inq_data.c sg_vpd_common.c
 sg_inq_LDADD = ../lib/libsgutils2.la
 
 sg_logs_LDADD = ../lib/libsgutils2.la

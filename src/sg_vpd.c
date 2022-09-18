@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.82 20220826";  /* spc6r06 + sbc5r03 */
+static const char * version_str = "1.83 20220915";  /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_vpd"
 
@@ -442,17 +442,6 @@ device_id_vpd_variants(uint8_t * buff, int len, int subvalue,
             filter_dev_ids(sg_get_desig_assoc_str(VPD_ASSOC_TDEVICE), 0,
                            b, blen, VPD_ASSOC_TDEVICE, op, jap);
     }
-}
-
-static int
-no_ascii_4hex(const struct opts_t * op)
-{
-    if (op->do_hex < 2)
-        return 1;
-    else if (2 == op->do_hex)
-        return 0;
-    else
-        return -1;
 }
 
 static void             /* VPD_SUPPORTED_VPDS  ["sv"] */
@@ -1100,16 +1089,6 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
                 }
             } else
                 hex2stdout(rp, len, no_ascii_4hex(op));
-#if 0
-            if (op->do_hex > 1)
-                hex2stdout(rp, len, -1);
-            else if (VPD_ASCII_OP_DEF == op->vpd_pn)
-                hex2stdout(rp, len, 0);
-            else if (1 == op->do_hex)
-                hex2stdout(rp, len, (op->do_long ? 0 : 1));
-            else
-                hex2stdout(rp, len, 0);
-#endif
         }
     } else if ((! op->do_quiet) && (! op->examine_given)) {
         if (op->vpd_pn >= 0)

@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.30 20220904";  /* spc6r06, sbc5r03 */
+static const char * version_str = "2.31 20220915";  /* spc6r06, sbc5r03 */
 
 #define MY_NAME "sg_inq"
 
@@ -1122,17 +1122,6 @@ svpd_inhex_decode_all(struct opts_t * op, sgj_opaque_p jop)
     return res;
 }
 
-static int
-no_ascii_4hex(const struct opts_t * op)
-{
-    if (op->do_hex < 2)
-        return 1;
-    else if (2 == op->do_hex)
-        return 0;
-    else
-        return -1;
-}
-
 static void
 decode_supported_vpd_4inq(uint8_t * buff, int len, struct opts_t * op,
                           sgj_opaque_p jap)
@@ -2089,185 +2078,7 @@ decode_b3_vpd(uint8_t * buff, int len, struct opts_t * op, sgj_opaque_p jop)
     }
 }
 
-static const char * lun_state_arr[] =
-{
-    "LUN not bound or LUN_Z report",
-    "LUN bound, but not owned by this SP",
-    "LUN bound and owned by this SP",
-};
-
-static const char * ip_mgmt_arr[] =
-{
-    "No IP access",
-    "Reserved (undefined)",
-    "via IPv4",
-    "via IPv6",
-};
-
-static const char * sp_arr[] =
-{
-    "SP A",
-    "SP B",
-};
-
-static const char * lun_op_arr[] =
-{
-    "Normal operations",
-    "I/O Operations being rejected, SP reboot or NDU in progress",
-};
-
-static const char * failover_mode_arr[] =
-{
-    "Legacy mode 0",
-    "Unknown mode (1)",
-    "Unknown mode (2)",
-    "Unknown mode (3)",
-    "Active/Passive (PNR) mode 1",
-    "Unknown mode (5)",
-    "Active/Active (ALUA) mode 4",
-    "Unknown mode (7)",
-    "Legacy mode 2",
-    "Unknown mode (9)",
-    "Unknown mode (10)",
-    "Unknown mode (11)",
-    "Unknown mode (12)",
-    "Unknown mode (13)",
-    "AIX Active/Passive (PAR) mode 3",
-    "Unknown mode (15)",
-};
-
-static void
-decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
-                      sgj_opaque_p jop)
-{
-    uint8_t uc;
-    int k, n, ip_mgmt, vpp80, lun_z;
-    sgj_state * jsp = &op->json_st;
-    const char * cp;
-    char b[256];
-    static const int blen = sizeof(b);
-
-    if (len < 3) {
-        pr2serr("EMC upr VPD page [0xc0]: length too short=%d\n", len);
-        return;
-    }
-    if (op->do_hex) {
-        hex2stdout(buff, len, no_ascii_4hex(op));
-        return;
-    }
-    if (buff[9] != 0x00) {
-        pr2serr("Unsupported page revision %d, decoding not possible.\n",
-                buff[9]);
-        return;
-    }
-    for (k = 0, n = 0; k < 16; ++k)
-        n += sg_scnpr(b + n, blen - n, "%02x", buff[10 + k]);
-    sgj_haj_vs(jsp, jop, 2, "LUN WWN", SGJ_SEP_COLON_1_SPACE, b);
-    snprintf(b, blen, "%.*s", buff[49], buff + 50);
-    sgj_haj_vs(jsp, jop, 2, "Array Serial Number", SGJ_SEP_COLON_1_SPACE, b);
-
-    if (buff[4] > 0x02)
-       snprintf(b, blen, "Unknown (%x)", buff[4]);
-    else
-       snprintf(b, blen, "%s", lun_state_arr[buff[4]]);
-    sgj_haj_vistr(jsp, jop, 2, "LUN State", SGJ_SEP_COLON_1_SPACE,
-                  buff[4], true, b);
-
-    uc = buff[8];
-    n = 0;
-    if (uc > 0x01)
-       n += sg_scnpr(b + n, blen - n, "Unknown SP (%x)", uc);
-    else
-       n += sg_scnpr(b + n, blen - n, "%s", sp_arr[uc]);
-    sgj_js_nv_ihexstr(jsp, jop, "path_connects_to", uc, NULL, b);
-    n += sg_scnpr(b + n, blen - n, ", Port Number: %u", buff[7]);
-    sgj_pr_hr(jsp, "  This path connects to: %s\n", b);
-    sgj_js_nv_ihex(jsp, jop, "port_number", buff[7]);
-
-    if (buff[5] > 0x01)
-           snprintf(b, blen, "Unknown (%x)\n", buff[5]);
-    else
-           snprintf(b, blen, "%s\n", sp_arr[buff[5]]);
-    sgj_haj_vistr(jsp, jop, 2, "Default owner", SGJ_SEP_COLON_1_SPACE,
-                  buff[5], true, b);
-
-    cp = (buff[6] & 0x40) ? "supported" : "not supported";
-    sgj_pr_hr(jsp, "  NO_ATF: %s, Access Logix: %s\n",
-              buff[6] & 0x80 ? "set" : "not set", cp);
-    sgj_js_nv_i(jsp, jop, "no_atf", !! (buff[6] & 0x80));
-    sgj_js_nv_istr(jsp, jop, "access_logix", !! (buff[6] & 0x40),
-                   NULL, cp);
-
-    ip_mgmt = (buff[6] >> 4) & 0x3;
-    cp = ip_mgmt_arr[ip_mgmt];
-    sgj_pr_hr(jsp, "  SP IP Management Mode: %s\n", cp);
-    sgj_js_nv_istr(jsp, jop, "sp_ip_management_mode", !! ip_mgmt,
-                   NULL, cp);
-    if (ip_mgmt == 2) {
-        snprintf(b, blen, "%u.%u.%u.%u", buff[44], buff[45], buff[46],
-                 buff[47]);
-        sgj_pr_hr(jsp, "  SP IPv4 address: %s\n", b);
-        sgj_js_nv_s(jsp, jop, "sp_ipv4_address", b);
-    } else if (ip_mgmt == 3) {
-        printf("  SP IPv6 address: ");
-        n = 0;
-        for (k = 0; k < 16; ++k)
-            n += sg_scnpr(b + n, blen - n, "%02x", buff[32 + k]);
-        sgj_pr_hr(jsp, "  SP IPv6 address: %s\n", b);
-        sgj_js_nv_hex_bytes(jsp, jop, "sp_ipv6_address", buff + 32, 16);
-    }
-
-// yyyyyyy more conversion work needed below this point
-    vpp80 = buff[30] & 0x08;
-    lun_z = buff[30] & 0x04;
-
-    printf("  System Type: %x, Failover mode: %s\n",
-           buff[27], failover_mode_arr[buff[28] & 0x0f]);
-
-    printf("  Inquiry VPP 0x80 returns: %s, Arraycommpath: %s\n",
-                   vpp80 ? "array serial#" : "LUN serial#",
-                   lun_z ? "Set to 1" : "Unknown");
-
-    printf("  Lun operations: %s\n",
-               buff[48] > 1 ? "undefined" : lun_op_arr[buff[48]]);
-
-    return;
-}
-
-static void
-decode_rdac_vpd_c2(uint8_t * buff, int len, struct opts_t * op)
-{
-    if (len < 3) {
-        pr2serr("Software Version VPD page length too short=%d\n", len);
-        return;
-    }
-    if (op->do_hex) {
-        hex2stdout(buff, len, no_ascii_4hex(op));
-        return;
-    }
-    if (buff[4] != 's' && buff[5] != 'w' && buff[6] != 'r') {
-        pr2serr("Invalid page identifier %c%c%c%c, decoding "
-                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
-        return;
-    }
-    printf("  Software Version: %02x.%02x.%02x\n", buff[8], buff[9], buff[10]);
-    printf("  Software Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
-    printf("  Features:");
-    if (buff[14] & 0x01)
-        printf(" Dual Active,");
-    if (buff[14] & 0x02)
-        printf(" Series 3,");
-    if (buff[14] & 0x04)
-        printf(" Multiple Sub-enclosures,");
-    if (buff[14] & 0x08)
-        printf(" DCE/DRM/DSS/DVE,");
-    if (buff[14] & 0x10)
-        printf(" Asymmetric Logical Unit Access,");
-    printf("\n");
-    printf("  Max. #of LUNS: %d\n", buff[15]);
-    return;
-}
-
+#if 0
 static void
 decode_rdac_vpd_c9_rtpg_data(uint8_t aas, uint8_t vendor)
 {
@@ -2440,6 +2251,7 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op)
 
     return;
 }
+#endif
 
 extern const char * sg_ansi_version_arr[];
 
@@ -3840,7 +3652,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         break;
     /* Vendor specific VPD pages (>= 0xc0) */
     case VPD_UPR_EMC:   /* 0xc0 */
-        np = "Block device characteristics VPD page";
+        np = "Unit path report VPD page";
         ep = "(EMC)";
         if (!op->do_raw && (op->do_hex < 3))
             sgj_pr_hr(jsp, "VPD INQUIRY: %s %s\n", np, ep);
@@ -3856,26 +3668,36 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         }
         break;
     case VPD_RDAC_VERS:         /* 0xc2 */
+        np = "Software Version VPD page";
+        ep = "(RDAC)";
         if (!op->do_raw && (op->do_hex < 3))
-            printf("VPD INQUIRY: Software Version (RDAC)\n");
+            sgj_pr_hr(jsp, "VPD INQUIRY: %s %s\n", np, ep);
         res = vpd_fetch_page(sg_fd, rp, pn, -1, qt, vb, &len);
         if (res)
             break;
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
-        else
-            decode_rdac_vpd_c2(rp, len, op);
+        else {
+            if (as_json)
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+            decode_rdac_vpd_c2(rp, len, op, jo2p);
+        }
         break;
     case VPD_RDAC_VAC:          /* 0xc9 */
+        np = "Volume access control VPD page";
+        ep = "(RDAC)";
         if (!op->do_raw && (op->do_hex < 3))
-            printf("VPD INQUIRY: Volume Access Control (RDAC)\n");
+            sgj_pr_hr(jsp, "VPD INQUIRY: %s %s\n", np, ep);
         res = vpd_fetch_page(sg_fd, rp, pn, -1, qt, vb, &len);
         if (res)
             break;
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
-        else
-            decode_rdac_vpd_c9(rp, len, op);
+        else {
+            if (as_json)
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+            decode_rdac_vpd_c9(rp, len, op, jo2p);
+        }
         break;
     case SG_NVME_VPD_NICR:          /* 0xde */
         np = "NVMe Identify Controller Response VPD page";

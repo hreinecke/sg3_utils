@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.42 20220615";
+static const char * version_str = "1.43 20220910";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -826,7 +826,7 @@ sg_flags_str(int flags, int b_len, char * b)
             goto fini;
     }
     if (SGV4_FLAG_NO_DXFER & flags) {          /* 0x10000 */
-        n += sg_scnpr(b + n, b_len - n, "NDXFER|");
+        n += sg_scnpr(b + n, b_len - n, "NOXFER|");
         if (n >= b_len)
             goto fini;
     }
@@ -1507,7 +1507,9 @@ sig_listen_thread(struct global_collection * clp)
                     } else
                         pr2serr_lk("%s: subsequent stall at pack_id=%d\n",
                                    __func__, pack_id);
-                    system_wrapper("/usr/bin/dmesg\n");
+                    // following command assumes linux bash or similar shell
+                    system_wrapper("cat /proc/scsi/sg/debug >> /dev/stderr\n");
+                    // system_wrapper("/usr/bin/dmesg\n");
                 } else
                     prev_pack_id = pack_id;
             } else if (EAGAIN != err)

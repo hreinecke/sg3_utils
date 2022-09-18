@@ -132,6 +132,17 @@ struct svpd_values_name_t vendor_vpd_pg[] = {
 
 
 int
+no_ascii_4hex(const struct opts_t * op)
+{
+    if (op->do_hex < 2)
+        return 1;
+    else if (2 == op->do_hex)
+        return 0;
+    else
+        return -1;
+}
+
+int
 svpd_find_vp_num_by_acron(const char * vp_ap)
 {
     size_t len;
@@ -696,9 +707,9 @@ decode_mode_policy_vpd(const uint8_t * buff, int len, struct opts_t * op,
             n = 0;
             ppc =  (bp[0] & 0x3f);
             pspc = bp[1];
-            n = snprintf(b + n, blen - n, "  Policy page code: 0x%x", ppc);
+            n = sg_scnpr(b + n, blen - n, "  Policy page code: 0x%x", ppc);
             if (pspc)
-                n += snprintf(b + n, blen - n, ",  subpage code: 0x%x", pspc);
+                n += sg_scnpr(b + n, blen - n, ",  subpage code: 0x%x", pspc);
             sgj_pr_hr(jsp, "%s\n", b);
             if ((0 == k) && (0x3f == (0x3f & bp[0])) && (0xff == bp[1]))
                 sgj_pr_hr(jsp, "  therefore the policy applies to all modes "
@@ -839,7 +850,7 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
                   ata_transp);
     cc = buff[56];      /* 0xec for IDENTIFY DEVICE and 0xa1 for IDENTIFY
                          * PACKET DEVICE (obsolete) */
-    n = snprintf(b, blen, "  Command code: 0x%x\n", cc);
+    n = sg_scnpr(b, blen, "  Command code: 0x%x\n", cc);
     if (len < 60)
         return;
     if (0xec == cc)
@@ -2992,4 +3003,499 @@ decode_tapealert_supported_vpd(const uint8_t * buff, int len,
             n += sg_scnpr(b + n, blen - n, "  %02Xh: %d", k, supp);
     }
     sgj_pr_hr(jsp, "%s\n", b);
+}
+
+/*
+ * Some of the vendor specific VPD pages are common as well. So place them here
+ * to save on code duplication.
+ */
+
+static const char * lun_state_arr[] =
+{
+    "LUN not bound or LUN_Z report",
+    "LUN bound, but not owned by this SP",
+    "LUN bound and owned by this SP",
+};
+
+static const char * ip_mgmt_arr[] =
+{
+    "No IP access",
+    "Reserved (undefined)",
+    "via IPv4",
+    "via IPv6",
+};
+
+static const char * sp_arr[] =
+{
+    "SP A",
+    "SP B",
+};
+
+static const char * lun_op_arr[] =
+{
+    "Normal operations",
+    "I/O Operations being rejected, SP reboot or NDU in progress",
+};
+
+static const char * failover_mode_arr[] =
+{
+    "Legacy mode 0",
+    "Unknown mode (1)",
+    "Unknown mode (2)",
+    "Unknown mode (3)",
+    "Active/Passive (PNR) mode 1",
+    "Unknown mode (5)",
+    "Active/Active (ALUA) mode 4",
+    "Unknown mode (7)",
+    "Legacy mode 2",
+    "Unknown mode (9)",
+    "Unknown mode (10)",
+    "Unknown mode (11)",
+    "Unknown mode (12)",
+    "Unknown mode (13)",
+    "AIX Active/Passive (PAR) mode 3",
+    "Unknown mode (15)",
+};
+
+/* VPD_UPR_EMC,VPD_V_UPR_EMC  0xc0  ["upr","upr"] */
+void
+decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
+                      sgj_opaque_p jop)
+{
+    uint8_t uc;
+    int k, n, ip_mgmt, vpp80, lun_z;
+    sgj_state * jsp = &op->json_st;
+    const char * cp;
+    const char * c2p;
+    char b[256];
+    static const int blen = sizeof(b);
+
+    if (len < 3) {
+        pr2serr("EMC upr VPD page [0xc0]: length too short=%d\n", len);
+        return;
+    }
+    if (op->do_hex) {
+        hex2stdout(buff, len, no_ascii_4hex(op));
+        return;
+    }
+    if (buff[9] != 0x00) {
+        pr2serr("Unsupported page revision %d, decoding not possible.\n",
+                buff[9]);
+        return;
+    }
+    for (k = 0, n = 0; k < 16; ++k)
+        n += sg_scnpr(b + n, blen - n, "%02x", buff[10 + k]);
+    sgj_haj_vs(jsp, jop, 2, "LUN WWN", SGJ_SEP_COLON_1_SPACE, b);
+    snprintf(b, blen, "%.*s", buff[49], buff + 50);
+    sgj_haj_vs(jsp, jop, 2, "Array Serial Number", SGJ_SEP_COLON_1_SPACE, b);
+
+    if (buff[4] > 0x02)
+       snprintf(b, blen, "Unknown (%x)", buff[4]);
+    else
+       snprintf(b, blen, "%s", lun_state_arr[buff[4]]);
+    sgj_haj_vistr(jsp, jop, 2, "LUN State", SGJ_SEP_COLON_1_SPACE,
+                  buff[4], true, b);
+
+    uc = buff[8];
+    n = 0;
+    if (uc > 0x01)
+       n += sg_scnpr(b + n, blen - n, "Unknown SP (%x)", uc);
+    else
+       n += sg_scnpr(b + n, blen - n, "%s", sp_arr[uc]);
+    sgj_js_nv_ihexstr(jsp, jop, "path_connects_to", uc, NULL, b);
+    n += sg_scnpr(b + n, blen - n, ", Port Number: %u", buff[7]);
+    sgj_pr_hr(jsp, "  This path connects to: %s\n", b);
+    sgj_js_nv_ihex(jsp, jop, "port_number", buff[7]);
+
+    if (buff[5] > 0x01)
+           snprintf(b, blen, "Unknown (%x)\n", buff[5]);
+    else
+           snprintf(b, blen, "%s\n", sp_arr[buff[5]]);
+    sgj_haj_vistr(jsp, jop, 2, "Default owner", SGJ_SEP_COLON_1_SPACE,
+                  buff[5], true, b);
+
+    cp = (buff[6] & 0x40) ? "supported" : "not supported";
+    sgj_pr_hr(jsp, "  NO_ATF: %s, Access Logix: %s\n",
+              buff[6] & 0x80 ? "set" : "not set", cp);
+    sgj_js_nv_i(jsp, jop, "no_atf", !! (buff[6] & 0x80));
+    sgj_js_nv_istr(jsp, jop, "access_logix", !! (buff[6] & 0x40),
+                   NULL, cp);
+
+    ip_mgmt = (buff[6] >> 4) & 0x3;
+    cp = ip_mgmt_arr[ip_mgmt];
+    sgj_pr_hr(jsp, "  SP IP Management Mode: %s\n", cp);
+    sgj_js_nv_istr(jsp, jop, "sp_ip_management_mode", !! ip_mgmt,
+                   NULL, cp);
+    if (ip_mgmt == 2) {
+        snprintf(b, blen, "%u.%u.%u.%u", buff[44], buff[45], buff[46],
+                 buff[47]);
+        sgj_pr_hr(jsp, "  SP IPv4 address: %s\n", b);
+        sgj_js_nv_s(jsp, jop, "sp_ipv4_address", b);
+    } else if (ip_mgmt == 3) {
+        printf("  SP IPv6 address: ");
+        n = 0;
+        for (k = 0; k < 16; ++k)
+            n += sg_scnpr(b + n, blen - n, "%02x", buff[32 + k]);
+        sgj_pr_hr(jsp, "  SP IPv6 address: %s\n", b);
+        sgj_js_nv_hex_bytes(jsp, jop, "sp_ipv6_address", buff + 32, 16);
+    }
+
+    k = buff[28] & 0x0f;
+    sgj_pr_hr(jsp, "  System Type: %x, Failover mode: %s\n",
+              buff[27], failover_mode_arr[k]);
+    sgj_js_nv_ihex(jsp, jop, "system_type", buff[27]);
+    sgj_js_nv_ihexstr(jsp, jop, "failover_mode", k, NULL,
+                      failover_mode_arr[k]);
+
+    vpp80 = buff[30] & 0x08;
+    lun_z = buff[30] & 0x04;
+    cp = vpp80 ? "array serial#" : "LUN serial#";
+    c2p = lun_z ? "Set to 1" : "Unknown";
+    sgj_pr_hr(jsp, "  Inquiry VPP 0x80 returns: %s, Arraycommpath: %s\n",
+              cp, c2p);
+    sgj_js_nv_istr(jsp, jop, "inquiry_vpp_0x80_returns", !! vpp80, NULL, cp);
+    sgj_js_nv_istr(jsp, jop, "arraycommpath", !! lun_z, NULL, c2p);
+
+    cp = buff[48] > 1 ? "undefined" : lun_op_arr[buff[48]];
+    sgj_pr_hr(jsp, "  Lun operations: %s\n", cp);
+    sgj_js_nv_istr(jsp, jop, "lun_operations", 0x1 & buff[48], NULL, cp);
+
+    return;
+}
+
+/*  VPD_RDAC_VERS,VPD_V_SVER_RDAC  0xc2 ["rdac_vers", "swr4"] */
+void
+decode_rdac_vpd_c2(uint8_t * buff, int len, struct opts_t * op,
+                   sgj_opaque_p jop)
+{
+    int i, n, v, r, m, p, d, y, num_part;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    // const char * cp;
+    // const char * c2p;
+    char b[256];
+    static const int blen = sizeof(b);
+    char part[5];
+
+    if (len < 3) {
+        pr2serr("Software Version VPD page length too short=%d\n", len);
+        return;
+    }
+    if (op->do_hex) {
+        hex2stdout(buff, len, no_ascii_4hex(op));
+        return;
+    }
+    if (buff[4] != 's' && buff[5] != 'w' && buff[6] != 'r') {
+        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
+                buff[4], buff[5], buff[6], buff[7]);
+        return;
+    }
+    snprintf(b, blen, "%02x.%02x.%02x", buff[8], buff[9], buff[10]);
+    sgj_haj_vs(jsp, jop, 2, "Software Version", SGJ_SEP_COLON_1_SPACE, b);
+    snprintf(b, blen, "%02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
+    sgj_haj_vs(jsp, jop, 2, "Software Date", SGJ_SEP_COLON_1_SPACE, b);
+    n = 0;
+    n += sg_scnpr(b + n, blen - n, "  Features:");
+    if (buff[14] & 0x01)
+        n += sg_scnpr(b + n, blen - n, " Dual Active,");
+    if (buff[14] & 0x02)
+        n += sg_scnpr(b + n, blen - n, " Series 3,");
+    if (buff[14] & 0x04)
+        n += sg_scnpr(b + n, blen - n, " Multiple Sub-enclosures,");
+    if (buff[14] & 0x08)
+        n += sg_scnpr(b + n, blen - n, " DCE/DRM/DSS/DVE,");
+    if (buff[14] & 0x10)
+        n += sg_scnpr(b + n, blen - n, " Asymmetric Logical Unit Access,");
+    sgj_pr_hr(jsp, "%s\n", b);
+    if (jsp->pr_as_json) {
+        jo2p = sgj_snake_named_subobject_r(jsp, jop, "features");
+        sgj_js_nv_i(jsp, jo2p, "dual_active", !! (buff[14] & 0x01));
+        sgj_js_nv_i(jsp, jo2p, "series_3", !! (buff[14] & 0x02));
+        sgj_js_nv_i(jsp, jo2p, "multiple_sub_enclosures",
+                    !! (buff[14] & 0x04));
+        sgj_js_nv_i(jsp, jo2p, "dcm_drm_dss_dve", !! (buff[14] & 0x08));
+        sgj_js_nv_i(jsp, jo2p, "asymmetric_logical_unit_access",
+                    !! (buff[14] & 0x10));
+    }
+    sgj_haj_vi(jsp, jop, 2, "Maximum number of LUNS",
+               SGJ_SEP_COLON_1_SPACE, buff[15], true);
+
+    num_part = (len - 12) / 16;
+    n = 16;
+    printf("  Partitions: %d\n", num_part);
+    sgj_haj_vi(jsp, jop, 2, "Partitions", SGJ_SEP_COLON_1_SPACE, num_part,
+               true);
+    if (num_part > 0)
+        jap = sgj_named_subarray_r(jsp, jop, "partition_list");
+    for (i = 0; i < num_part; i++) {
+        memset(part,0, 5);
+        memcpy(part, &buff[n], 4);
+        sgj_pr_hr(jsp, "    Name: %s\n", part);
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_s(jsp, jo2p, "name", part);
+        }
+        n += 4;
+        v = buff[n++];
+        r = buff[n++];
+        m = buff[n++];
+        p = buff[n++];
+        snprintf(b, blen, "%d.%d.%d.%d", v, r, m, p);
+        sgj_pr_hr(jsp, "    Version: %s\n", b);
+        if (jsp->pr_as_json)
+            sgj_js_nv_s(jsp, jo2p, "version", b);
+        m = buff[n++];
+        d = buff[n++];
+        y = buff[n++];
+        snprintf(b, blen, "%d/%d/%d\n", m, d, y);
+        sgj_pr_hr(jsp, "    Date: %s\n", b);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_s(jsp, jo2p, "date", b);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+        }
+
+        n += 5;
+    }
+    return;
+}
+
+static char *
+decode_rdac_vpd_c9_aas_s(uint8_t aas, char * b, int blen)
+{
+    // snprintf("  Asymmetric Access State:");
+    switch(aas & 0x0F) {
+        case 0x0:
+            snprintf(b, blen, "Active/Optimized");
+            break;
+        case 0x1:
+            snprintf(b, blen, "Active/Non-Optimized");
+            break;
+        case 0x2:
+            snprintf(b, blen, "Standby");
+            break;
+        case 0x3:
+            snprintf(b, blen, "Unavailable");
+            break;
+        case 0xE:
+            snprintf(b, blen, "Offline");
+            break;
+        case 0xF:
+            snprintf(b, blen, "Transitioning");
+            break;
+        default:
+            snprintf(b, blen, "(unknown)");
+            break;
+    }
+    return b;
+}
+
+static char *
+decode_rdac_vpd_c9_vs_s(uint8_t vendor, char * b, int blen)
+{
+    // printf("  Vendor Specific Field:");
+    switch(vendor) {
+        case 0x01:
+            snprintf(b, blen, "Operating normally");
+            break;
+        case 0x02:
+            snprintf(b, blen, "Non-responsive to queries");
+            break;
+        case 0x03:
+            snprintf(b, blen, "Controller being held in reset");
+            break;
+        case 0x04:
+            snprintf(b, blen, "Performing controller firmware download (1st "
+                   "controller)");
+            break;
+        case 0x05:
+            snprintf(b, blen, "Performing controller firmware download (2nd "
+                   "controller)");
+            break;
+        case 0x06:
+            snprintf(b, blen,
+                     "Quiesced as a result of an administrative request");
+            break;
+        case 0x07:
+            snprintf(b, blen,
+                     "Service mode as a result of an administrative request");
+            break;
+        case 0xFF:
+            snprintf(b, blen, "Details are not available");
+            break;
+        default:
+            snprintf(b, blen, "(unknown)");
+            break;
+    }
+    return b;
+}
+
+/*  VPD_RDAC_VAC,VPD_V_VAC_RDAC  0xc9 ["rdac_vac", "vac1"] */
+void
+decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
+                   sgj_opaque_p jop)
+{
+    bool vav;
+    int n, n_hold;
+    sgj_state * jsp = &op->json_st;
+    char b[196];
+    static const int blen = sizeof(b);
+
+    if (len < 3) {
+        pr2serr("Volume Access Control VPD page length too short=%d\n", len);
+        return;
+    }
+    if (op->do_hex) {
+        hex2stdout(buff, len, no_ascii_4hex(op));
+        return;
+    }
+    if (buff[4] != 'v' && buff[5] != 'a' && buff[6] != 'c') {
+        pr2serr("Invalid page identifier %c%c%c%c, decoding "
+                "not possible.\n" , buff[4], buff[5], buff[6], buff[7]);
+        return;
+    }
+    if (buff[7] != '1') {
+        pr2serr("Invalid page version '%c' (should be 1)\n", buff[7]);
+    }
+    n = ((buff[8] & 0xE0) == 0xE0 );
+    if (n) {
+        sgj_pr_hr(jsp, "  IOShipping (ALUA): Enabled\n");
+        sgj_js_nv_ihexstr_nex(jsp, jop, "ioshipping", n, true, NULL,
+                              "Enabled",
+                              "a.k.a. ALUA (Asymmetric Logical Unit Access)");
+    } else {
+        n = 0;
+        n = snprintf(b, blen, "  AVT:");
+        n_hold = n;
+        if (buff[8] & 0x80) {
+            n += sg_scnpr(b + n, blen - n, " Enabled");
+            if (buff[8] & 0x40)
+                n += sg_scnpr(b + n, blen - n, " (Allow reads on sector 0)");
+            sgj_pr_hr(jsp, "%s\n", b);
+            sgj_js_nv_ihexstr(jsp, jop, "avt", buff[8], NULL, b + n_hold);
+
+        } else {
+            sgj_pr_hr(jsp, "%s: Disabled\n", b);
+            sgj_js_nv_ihexstr(jsp, jop, "avt", buff[8], NULL, "Disabled");
+        }
+    }
+    vav = !! (0x1 & buff[8]);
+    sgj_haj_vistr(jsp, jop, 2, "Volume access via", SGJ_SEP_COLON_1_SPACE,
+                  (int)vav, false,
+                  (vav ? "primary controller" : "alternate controller"));
+
+    if (buff[8] & 0x08) {
+        n = buff[15] & 0xf;
+        // printf("  Path priority: %d ", n);
+        switch (n) {
+        case 0x1:
+            snprintf(b, blen, "(preferred path)");
+            break;
+        case 0x2:
+            snprintf(b, blen, "(secondary path)");
+            break;
+        default:
+            snprintf(b, blen, "(unknown)");
+            break;
+        }
+        sgj_haj_vistr(jsp, jop, 2, "Path priority", SGJ_SEP_COLON_1_SPACE, n,
+                      true, b);
+
+        // printf("  Preferred Path Auto Changeable:");
+        n = buff[14] & 0x3C;
+        switch (n) {
+        case 0x14:
+            snprintf(b, blen, "No (User Disabled and Host Type Restricted)");
+            break;
+        case 0x18:
+            snprintf(b, blen, "No (User Disabled)");
+            break;
+        case 0x24:
+            snprintf(b, blen, "No (Host Type Restricted)");
+            break;
+        case 0x28:
+            snprintf(b, blen, "Yes");
+            break;
+        default:
+            snprintf(b, blen, "(Unknown)");
+            break;
+        }
+        sgj_haj_vistr(jsp, jop, 2, "Preferred path auto changeable",
+                      SGJ_SEP_COLON_1_SPACE, n, true, b);
+
+        n = buff[14] & 0x03;
+        // printf("  Implicit Failback:");
+        switch (n) {
+        case 0x1:
+            snprintf(b, blen, "Disabled");
+            break;
+        case 0x2:
+            snprintf(b, blen, "Enabled");
+            break;
+        default:
+            snprintf(b, blen, "(Unknown)");
+            break;
+        }
+        sgj_haj_vistr(jsp, jop, 2, "Implicit failback",
+                      SGJ_SEP_COLON_1_SPACE, n, false, b);
+    } else {
+        n = buff[9] & 0xf;
+        // printf("  Path priority: %d ", buff[9] & 0xf);
+        switch (n) {
+        case 0x1:
+            snprintf(b, blen, "(preferred path)");
+            break;
+        case 0x2:
+            snprintf(b, blen, "(secondary path)");
+            break;
+        default:
+            snprintf(b, blen, "(unknown)");
+            break;
+        }
+        sgj_haj_vistr(jsp, jop, 2, "Path priority",
+                      SGJ_SEP_COLON_1_SPACE, n, false, b);
+    }
+
+    n = !! (buff[8] & 0x80);
+    sgj_haj_vi(jsp, jop, 2, "Target port group present",
+               SGJ_SEP_COLON_1_SPACE, n, false);
+    if (n) {
+        sgj_opaque_p jo2p = NULL;
+        sgj_opaque_p jo3p = NULL;
+        static const char * tpg_s = "Target port group data";
+        static const char * aas_s = "Asymmetric access state";
+        static const char * vs_s = "Vendor specific field";
+        char d1[80];
+        char d2[80];
+
+        sgj_pr_hr(jsp, "  Target Port Group Data (This controller):\n");
+        decode_rdac_vpd_c9_aas_s(buff[10], d1, sizeof(d1));
+        decode_rdac_vpd_c9_vs_s(buff[11], d2, sizeof(d2));
+        sgj_pr_hr(jsp, "    %s: %s\n", aas_s, d1);
+        sgj_pr_hr(jsp, "    %s: %s\n", vs_s, d2);
+        if (jsp->pr_as_json) {
+            jo2p = sgj_snake_named_subobject_r(jsp, jop, tpg_s);
+            jo3p = sgj_snake_named_subobject_r(jsp, jo2p, "this_controller");
+            sgj_convert_to_snake_name(aas_s, b, blen);
+            sgj_js_nv_ihexstr(jsp, jo3p, b, buff[10], NULL, d1);
+            sgj_convert_to_snake_name(vs_s, b, blen);
+            sgj_js_nv_ihexstr(jsp, jo3p, b, buff[11], NULL, d2);
+        }
+        sgj_pr_hr(jsp, " Target Port Group Data (Alternate controller):\n");
+        // decode_rdac_vpd_c9_rtpg_data(buff[12], buff[13]);
+
+        decode_rdac_vpd_c9_aas_s(buff[12], d1, sizeof(d1));
+        decode_rdac_vpd_c9_vs_s(buff[13], d2, sizeof(d2));
+        sgj_pr_hr(jsp, "    %s: %s\n", aas_s, d1);
+        sgj_pr_hr(jsp, "    %s: %s\n", vs_s, d2);
+        if (jsp->pr_as_json) {
+            jo2p = sgj_snake_named_subobject_r(jsp, jop, tpg_s);
+            jo3p = sgj_snake_named_subobject_r(jsp, jo2p,
+                                               "alternate_controller");
+            sgj_convert_to_snake_name(aas_s, b, blen);
+            sgj_js_nv_ihexstr(jsp, jo3p, b, buff[12], NULL, d1);
+            sgj_convert_to_snake_name(vs_s, b, blen);
+            sgj_js_nv_ihexstr(jsp, jo3p, b, buff[13], NULL, d2);
+        }
+    }
 }

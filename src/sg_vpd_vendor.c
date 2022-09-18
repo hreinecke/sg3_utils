@@ -111,17 +111,6 @@ dup_sanity_chk(int sz_opts_t, int sz_values_name_t)
                 sz_values_name_t);
 }
 
-static int
-no_ascii_4hex(const struct opts_t * op)
-{
-    if (op->do_hex < 2)
-        return 1;
-    else if (2 == op->do_hex)
-        return 0;
-    else
-        return -1;
-}
-
 static bool
 is_like_pdt(int actual_pdt, const struct svpd_values_name_t * vnp)
 {
@@ -350,127 +339,6 @@ decode_dev_beh_vpd_c3_sea(uint8_t * buff, int len)
     printf("  Default number of cache segments: %d\n", buff[24]);
 }
 
-static const char * lun_state_arr[] =
-{
-    "LUN not bound or LUN_Z report",
-    "LUN bound, but not owned by this SP",
-    "LUN bound and owned by this SP",
-};
-
-static const char * ip_mgmt_arr[] =
-{
-    "No IP access",
-    "Reserved (undefined)",
-    "via IPv4",
-    "via IPv6",
-};
-
-static const char * sp_arr[] =
-{
-    "SP A",
-    "SP B",
-};
-
-static const char * lun_op_arr[] =
-{
-    "Normal operations",
-    "I/O Operations being rejected, SP reboot or NDU in progress",
-};
-
-static const char * failover_mode_arr[] =
-{
-    "Legacy mode 0",
-    "Unknown mode (1)",
-    "Unknown mode (2)",
-    "Unknown mode (3)",
-    "Active/Passive (PNR) mode 1",
-    "Unknown mode (5)",
-    "Active/Active (ALUA) mode 4",
-    "Unknown mode (7)",
-    "Legacy mode 2",
-    "Unknown mode (9)",
-    "Unknown mode (10)",
-    "Unknown mode (11)",
-    "Unknown mode (12)",
-    "Unknown mode (13)",
-    "AIX Active/Passive (PAR) mode 3",
-    "Unknown mode (15)",
-};
-
-static void
-decode_upr_vpd_c0_emc(uint8_t * buff, int len)
-{
-    int k, ip_mgmt, vpp80, lun_z;
-
-    if (len < 3) {
-        pr2serr("EMC upr VPD page [0xc0]: length too short=%d\n", len);
-        return;
-    }
-    if (buff[9] != 0x00) {
-        pr2serr("Unsupported page revision %d, decoding not possible.\n",
-                buff[9]);
-        return;
-    }
-    printf("  LUN WWN: ");
-    for (k = 0; k < 16; ++k)
-        printf("%02x", buff[10 + k]);
-    printf("\n");
-    printf("  Array Serial Number: ");
-    dStrRaw(&buff[50], buff[49]);
-    printf("\n");
-
-    printf("  LUN State: ");
-    if (buff[4] > 0x02)
-           printf("Unknown (%x)\n", buff[4]);
-    else
-           printf("%s\n", lun_state_arr[buff[4]]);
-
-    printf("  This path connects to: ");
-    if (buff[8] > 0x01)
-           printf("Unknown SP (%x)", buff[8]);
-    else
-           printf("%s", sp_arr[buff[8]]);
-    printf(", Port Number: %u\n", buff[7]);
-
-    printf("  Default Owner: ");
-    if (buff[5] > 0x01)
-           printf("Unknown (%x)\n", buff[5]);
-    else
-           printf("%s\n", sp_arr[buff[5]]);
-
-    printf("  NO_ATF: %s, Access Logix: %s\n",
-                   buff[6] & 0x80 ? "set" : "not set",
-                   buff[6] & 0x40 ? "supported" : "not supported");
-
-    ip_mgmt = (buff[6] >> 4) & 0x3;
-
-    printf("  SP IP Management Mode: %s\n", ip_mgmt_arr[ip_mgmt]);
-    if (ip_mgmt == 2)
-        printf("  SP IPv4 address: %u.%u.%u.%u\n",
-               buff[44], buff[45], buff[46], buff[47]);
-    else {
-        printf("  SP IPv6 address: ");
-        for (k = 0; k < 16; ++k)
-            printf("%02x", buff[32 + k]);
-        printf("\n");
-    }
-
-    vpp80 = buff[30] & 0x08;
-    lun_z = buff[30] & 0x04;
-
-    printf("  System Type: %x, Failover mode: %s\n",
-           buff[27], failover_mode_arr[buff[28] & 0x0f]);
-
-    printf("  Inquiry VPP 0x80 returns: %s, Arraycommpath: %s\n",
-                   vpp80 ? "array serial#" : "LUN serial#",
-                   lun_z ? "Set to 1" : "Unknown");
-
-    printf("  Lun operations: %s\n",
-               buff[48] > 1 ? "undefined" : lun_op_arr[buff[48]]);
-
-    return;
-}
-
 static void
 decode_rdac_vpd_c0(uint8_t * buff, int len)
 {
@@ -534,61 +402,6 @@ decode_rdac_vpd_c1(uint8_t * buff, int len)
     }
     printf("  Firmware Version: %02x.%02x.%02x\n", buff[8], buff[9], buff[10]);
     printf("  Firmware Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
-
-    num_part = (len - 12) / 16;
-    n = 16;
-    printf("  Partitions: %d\n", num_part);
-    for (i = 0; i < num_part; i++) {
-        memset(part,0, 5);
-        memcpy(part, &buff[n], 4);
-        printf("    Name: %s\n", part);
-        n += 4;
-        v = buff[n++];
-        r = buff[n++];
-        m = buff[n++];
-        p = buff[n++];
-        printf("    Version: %d.%d.%d.%d\n", v, r, m, p);
-        m = buff[n++];
-        d = buff[n++];
-        y = buff[n++];
-        printf("    Date: %d/%d/%d\n", m, d, y);
-
-        n += 5;
-    }
-
-    return;
-}
-
-static void
-decode_rdac_vpd_c2(uint8_t * buff, int len)
-{
-    int i, n, v, r, m, p, d, y, num_part;
-    char part[5];
-
-    if (len < 3) {
-        pr2serr("Software Version VPD page length too short=%d\n", len);
-        return;
-    }
-    if (buff[4] != 's' && buff[5] != 'w' && buff[6] != 'r') {
-        pr2serr("Invalid page identifier %c%c%c%c, decoding not possible.\n",
-                buff[4], buff[5], buff[6], buff[7]);
-        return;
-    }
-    printf("  Software Version: %02x.%02x.%02x\n", buff[8], buff[9], buff[10]);
-    printf("  Software Date: %02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
-    printf("  Features:");
-    if (buff[14] & 0x01)
-        printf(" Dual Active,");
-    if (buff[14] & 0x02)
-        printf(" Series 3,");
-    if (buff[14] & 0x04)
-        printf(" Multiple Sub-enclosures,");
-    if (buff[14] & 0x08)
-        printf(" DCE/DRM/DSS/DVE,");
-    if (buff[14] & 0x10)
-        printf(" Asymmetric Logical Unit Access,");
-    printf("\n");
-    printf("  Max. #of LUNS: %d\n", buff[15]);
 
     num_part = (len - 12) / 16;
     n = 16;
@@ -827,6 +640,7 @@ decode_rdac_vpd_c8(uint8_t * buff, int len)
     return;
 }
 
+#if 0
 static void
 decode_rdac_vpd_c9_rtpg_data(uint8_t aas, uint8_t vendor)
 {
@@ -992,6 +806,7 @@ decode_rdac_vpd_c9(uint8_t * buff, int len)
         decode_rdac_vpd_c9_rtpg_data(buff[12], buff[13]);
     }
 }
+#endif
 
 static void
 decode_rdac_vpd_ca(uint8_t * buff, int len)
@@ -1237,15 +1052,17 @@ int
 svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
 {
     bool hex0 = (0 == op->do_hex);
+    bool as_json;
     int len, pdt, plen, pn;
     int alloc_len = op->maxlen;
     int res = 0;
     const struct svpd_values_name_t * vnp;
     sgj_state * jsp = &op->json_st;
-    sgj_opaque_p jo2p;
+    sgj_opaque_p jo2p = NULL;
     uint8_t * rp;
     char name[80];
 
+    as_json = jsp->pr_as_json;
     pn = op->vpd_pn;
     switch (pn) {       /* VPD codes that we support vendor pages for */
     case 0x3:
@@ -1300,9 +1117,12 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
                 hex2stdout(rp, len, no_ascii_4hex(op));
             else if (VPD_VP_SEAGATE == op->vend_prod_num)
                 decode_firm_vpd_c0_sea(rp, len);
-            else if (VPD_VP_EMC == op->vend_prod_num)
-                decode_upr_vpd_c0_emc(rp, len);
-            else if (VPD_VP_HP3PAR == op->vend_prod_num)
+            else if (VPD_VP_EMC == op->vend_prod_num) {
+                if (as_json)
+                    jo2p = sg_vpd_js_hdr(jsp, jop,
+                                         "Unit serial number VPD page", rp);
+                decode_upr_vpd_c0_emc(rp, len, op, jo2p);
+            } else if (VPD_VP_HP3PAR == op->vend_prod_num)
                 decode_vpd_c0_hp3par(rp, len);
             else if (VPD_VP_RDAC == op->vend_prod_num)
                 decode_rdac_vpd_c0(rp, len);
@@ -1332,9 +1152,12 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         case 0xc2:
             if (! hex0)
                 hex2stdout(rp, len, no_ascii_4hex(op));
-            else if (VPD_VP_RDAC == op->vend_prod_num)
-                decode_rdac_vpd_c2(rp, len);
-            else if (VPD_VP_HP_LTO == op->vend_prod_num)
+            else if (VPD_VP_RDAC == op->vend_prod_num) {
+                if (as_json)
+                    jo2p = sg_vpd_js_hdr(jsp, jop,
+                                         "Software version VPD page", rp);
+                decode_rdac_vpd_c2(rp, len, op, jo2p);
+            } else if (VPD_VP_HP_LTO == op->vend_prod_num)
                 decode_hp_lto_vpd_cx(rp, len, pn);
             else
                 res = SG_LIB_CAT_OTHER;
@@ -1380,9 +1203,12 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         case 0xc9:
             if (! hex0)
                 hex2stdout(rp, len, no_ascii_4hex(op));
-            else if (VPD_VP_RDAC == op->vend_prod_num)
-                decode_rdac_vpd_c9(rp, len);
-            else
+            else if (VPD_VP_RDAC == op->vend_prod_num) {
+                if (as_json)
+                    jo2p = sg_vpd_js_hdr(jsp, jop,
+                                         "Volume access control VPD page", rp);
+                decode_rdac_vpd_c9(rp, len, op, jo2p);
+            } else
                 res = SG_LIB_CAT_OTHER;
             break;
         case 0xca:
@@ -1438,16 +1264,21 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
                 break;
             } else {
                 int n = len - 16;
+                const char * np = "NVMe Identify Controller Response VPD page";
+                /* NVMe: Identify Controller data structure (CNS 01h) */
+                const char * ep = "(sg3_utils)";
 
                 if (n > 4096) {
                     pr2serr("NVMe Identify response expected to be "
                             "<= 4096 bytes (got: %d)\n", n);
                     break;
                 }
+                if (op->do_hex < 3)
+                    sgj_pr_hr(jsp, "VPD INQUIRY: %s %s\n", np, ep);
                 if (op->do_hex)
                     hex2stdout(rp, len, no_ascii_4hex(op));
                 else if (jsp->pr_as_json) {
-                    jo2p = sg_vpd_js_hdr(jsp, jop, name, rp);
+                    jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
                     sgj_js_nv_hex_bytes(jsp, jo2p, "response_bytes",
                                         rp + 16, n);
                 } else
