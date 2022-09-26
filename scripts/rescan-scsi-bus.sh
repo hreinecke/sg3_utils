@@ -4,7 +4,7 @@
 # (c) 2006--2022 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20220811"
+VERSION="20220926"
 SCAN_WILD_CARD=4294967295
 
 setcolor ()
@@ -276,7 +276,7 @@ testonline ()
 
   # Handle in progress of becoming ready and unit attention
   while [ $RC = 2 -o $RC = 6 ] && [ $ctr -lt $timeout ] ; do
-    if [ $RC = 2 ] && [ "$RMB" != "1" ] ; then
+    if [ $RC = 2 ] && [ "$RMB" != "1" ] && [ sg_inq /dev/$SGDEV | grep -q -i "PQual=0" ] ; then
       echo -n "."
       let LN+=1
       sleep 1

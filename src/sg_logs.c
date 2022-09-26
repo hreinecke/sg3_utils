@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.00 20220816";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.01 20220923";    /* spc6r06 + sbc5r03 */
 
 #define MX_ALLOC_LEN (0xfffc)
 #define MX_INLEN_ALLOC_LEN (0x800000)
@@ -133,6 +133,7 @@ static struct option long_options[] = {
         {"hex", no_argument, 0, 'H'},
         {"in", required_argument, 0, 'i'},
         {"inhex", required_argument, 0, 'i'},
+        {"json", optional_argument, 0, 'j'},
         {"list", no_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"name", no_argument, 0, 'n'},
@@ -201,6 +202,7 @@ struct opts_t {
     const char * pg_arg;
     const char * vend_prod;
     const struct log_elem * lep;
+    sgj_state json_st;
 };
 
 
@@ -513,15 +515,15 @@ usage(int hval)
            "[--enumerate]\n"
            "               [--exclude] [--filter=FL] [--help] [--hex] "
            "[--in=FN]\n"
-           "               [--list] [--no_inq] [--maxlen=LEN] [--name] "
-           "[--page=PG]\n"
-           "               [--paramp=PP] [--pcb] [--ppc] [--pdt=DT] "
-           "[--raw]\n"
-           "               [--readonly] [--reset] [--select] [--sp] "
-           "[--undefined]\n"
-           "               [--temperature] [--transport] [--vendor=VP] "
-           "[--verbose]\n"
-           "               [--version] DEVICE\n"
+           "               [--json[=JO]] [--list] [--no_inq] [--maxlen=LEN] "
+           "[--name] "
+           "               [--page=PG] [--paramp=PP] [--pcb] [--ppc] "
+           "[--pdt=DT]\n"
+           "               [--raw] [--readonly] [--reset] [--select] "
+           "[--sp]\n"
+           "               [--undefined] [--temperature] [--transport] "
+           "[--vendor=VP]\n"
+           "               [--verbose] [--version] DEVICE\n"
            "  where the main options are:\n"
            "    --ALL|-A        fetch and decode all log pages and "
            "subpages\n"
@@ -549,6 +551,9 @@ usage(int hval)
            "in ASCII hex\n"
            "                     or binary if --raw also given. --inhex=FN "
            "also accepted\n"
+           "    --json[=JO]|-jJO    output in JSON instead of human "
+            "readable\n"
+            "                        test. Use --json=? for JSON help\n"
            "    --list|-l       list supported log pages; twice: list "
            "supported log\n"
            "                    pages and subpages page; thrice: merge of "
@@ -944,8 +949,8 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         int c, n;
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:D:eEf:hHi:lLm:M:nNOp:P:qQrRsStTuvV"
-                        "xX", long_options, &option_index);
+        c = getopt_long(argc, argv, "aAbc:D:eEf:hHi:j::lLm:M:nNOp:P:qQrRsStT"
+                        "uvVxX", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1014,6 +1019,20 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'i':
             op->in_fn = optarg;
+            break;
+        case 'j':
+           if (! sgj_init_state(&op->json_st, optarg)) {
+                int bad_char = op->json_st.first_bad_char;
+                char e[1500];
+
+                if (bad_char) {
+                    pr2serr("bad argument to --json= option, unrecognized "
+                            "character '%c'\n\n", bad_char);
+                }
+                sg_json_usage(0, e, sizeof(e));
+                pr2serr("%s", e);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'l':
             ++op->do_list;

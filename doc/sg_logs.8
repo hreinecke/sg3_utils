@@ -1,20 +1,20 @@
-.TH SG_LOGS "8" "April 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_LOGS "8" "September 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
 [\fI\-\-ALL\fR] [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-exclude\fR]
-[\fI\-\-filter=FL\fR] [\fI\-\-hex\fR] [\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR] [\fI\-\-paramp=PP\fR]
-[\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-sp\fR] [\fI\-\-temperature\fR]
+[\fI\-\-filter=FL\fR] [\fI\-\-hex\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-list\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR]
+[\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-pdt=DT\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-sp\fR] [\fI\-\-temperature\fR]
 [\fI\-\-transport\fR] [\fI\-\-undefined\fR] [\fI\-\-vendor=VP\fR]
 [\fI\-\-verbose\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
 \fI\-\-in=FN\fR  [\fI\-\-brief\fR] [\fI\-\-exclude\fR] [\fI\-\-filter=FL\fR]
-[\fI\-\-hex\fR] [\fI\-\-name\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR]
-[\fI\-\-undefined\fR] [\fI\-\-vendor=VP\fR]
+[\fI\-\-hex\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-name\fR] [\fI\-\-pdt=DT\fR]
+[\fI\-\-raw\fR] [\fI\-\-undefined\fR] [\fI\-\-vendor=VP\fR]
 .PP
 .B sg_logs
 \fI\-\-select\fR  [\fI\-\-control=PC\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
@@ -187,6 +187,10 @@ treated as binary.
 .br
 For compatibility with other utilities in this package "inhex" may also be
 used as this (long) option name.
+.TP
+\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. See sg3_utils_json
+manpage or use '?' for \fIJO\fR for a summary.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 lists the names of the logs sense pages supported by this device. This is
