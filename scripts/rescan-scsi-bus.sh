@@ -4,8 +4,10 @@
 # (c) 2006--2022 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20220926"
+VERSION="20220930"
 SCAN_WILD_CARD=4294967295
+
+TMPLUNINFOFILE="/tmp/rescan-scsi-mpath-info.txt"
 
 setcolor ()
 {
@@ -276,7 +278,7 @@ testonline ()
 
   # Handle in progress of becoming ready and unit attention
   while [ $RC = 2 -o $RC = 6 ] && [ $ctr -lt $timeout ] ; do
-    if [ $RC = 2 ] && [ "$RMB" != "1" ] && [ sg_inq /dev/$SGDEV | grep -q -i "PQual=0" ] ; then
+    if [ $RC = 2 ] && [ "$RMB" != "1" ] && sg_inq /dev/$SGDEV | grep -q -i "PQual=0" ; then
       echo -n "."
       let LN+=1
       sleep 1
@@ -777,6 +779,33 @@ searchexisting()
   done
 }
 
+getallmultipathinfo()
+{
+  local mp=
+  local uuid=
+  local dmtmp=
+  local maj_min=
+  local tmpfile=
+
+  truncate -s 0 $TMPLUNINFOFILE
+  for mp in $($DMSETUP ls --target=multipath | cut -f 1) ; do
+    [ "$mp" = "No" ] && break;
+    maj_min=$($DMSETUP status "$mp" | cut -d  " " -f14)
+    if [ ! -L /dev/mapper/${mp} ]; then
+      echo "softlink /dev/mapper/${mp} not available."
+      continue
+    fi
+    local ret=$(readlink /dev/mapper/$mp 2>/dev/null)
+    if [[ $? -ne 0 || -z "$ret" ]]; then
+      echo "readlink /dev/mapper/$mp failed. check multipath status."
+      continue
+    fi
+    dmtmp=$(basename $ret)
+    uuid=$(cut -f2 -d- "/sys/block/$dmtmp/dm/uuid")
+    echo "$mp $maj_min $dmtmp $uuid" >> $TMPLUNINFOFILE
+  done
+}
+
 # Go through all of the existing devices and figure out any that have been remapped
 findremapped()
 {
@@ -811,6 +840,8 @@ findremapped()
   /sbin/udevadm trigger
   udevadm_settle 2>&1 /dev/null
   echo "Done"
+
+  getallmultipathinfo
 
   # See what changed and reload the respective multipath device if applicable
   while read -r hctl sddev id_serial_old ; do
@@ -937,7 +968,6 @@ findmultipath()
   local dev="$1"
   local find_mismatch="$2"
   local mp=
-  local mp2=
   local found_dup=0
   local maj_min=
 
@@ -947,27 +977,21 @@ findmultipath()
   fi
 
   maj_min=$(cat "/sys/block/$dev/dev")
-  for mp in $($DMSETUP ls --target=multipath | cut -f 1) ; do
-    [ "$mp" = "No" ] && break;
-    if "$DMSETUP" status "$mp" | grep -q " $maj_min "; then
-      # With two arguments, look up current uuid from sysfs
-      # if it doesn't match what was passed, this multipath
-      # device is not updated, so this is a remapped LUN
-      if [ -n "$find_mismatch" ] ; then
-        mp2=$($MULTIPATH -l "$mp" | egrep -o "dm-[0-9]+")
-        mp2=$(cut -f2 -d- "/sys/block/$mp2/dm/uuid")
-        if [ "$find_mismatch" != "$mp2" ] ; then
-          addmpathtolist "$mp"
-          found_dup=1
-        fi
-        continue
+  mp=$(cat $TMPLUNINFOFILE | grep -w "$maj_min" | cut -d " " -f1)
+  if [ -n "$mp" ]; then
+    if [ -n "$find_mismatch" ] ; then
+      uuid=$(cat $TMPLUNINFOFILE | grep -w "$maj_min" | cut -d " " -f4)
+      if [ "$find_mismatch" != "$uuid" ] ; then
+        addmpathtolist "$mp"
+        found_dup=1
       fi
+    else
       # Normal mode: Find the first multipath with the sdev
       # and add it to the list
       addmpathtolist "$mp"
       return
     fi
-  done
+  fi
 
   # Return 1 to signal that a duplicate was found to the calling function
   if [ $found_dup -eq 1 ] ; then
