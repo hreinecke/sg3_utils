@@ -18,7 +18,13 @@
 #include "sg_pr2serr.h"
 #include "sg_json_builder.h"
 
-/* Comment out next line to remove dependency on sg_lib.h */
+/*
+ * Some users of sg_pr2serr may not need fixed and descriptor sense decoded
+ * for JSON output. If the following define is commented out the effective
+ * compile size of this file is reduced by 800 lines plus dependencies on
+ * other large components of the sg3_utils library.
+ * Comment out the next line to remove dependency on sg_lib.h and its code.
+ */
 #define SG_PRSE_SENSE_DECODE 1
 
 #ifdef SG_PRSE_SENSE_DECODE
@@ -64,6 +70,44 @@ pr2serr(const char * fmt, ...)
     va_end(args);
     return n;
 }
+
+#ifndef SG_PRSE_SENSE_DECODE
+
+/* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
+ * functions. Returns number of chars placed in cp excluding the
+ * trailing null char. So for cp_max_len > 0 the return value is always
+ * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars are
+ * written to cp. Note this means that when cp_max_len = 1, this function
+ * assumes that cp[0] is the null character and does nothing (and returns
+ * 0). Linux kernel has a similar function called  scnprintf(). Public
+ * declaration in sg_pr2serr.h header  */
+int
+sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    if (cp_max_len < 2)
+        return 0;
+    va_start(args, fmt);
+    n = vsnprintf(cp, cp_max_len, fmt, args);
+    va_end(args);
+    return (n < cp_max_len) ? n : (cp_max_len - 1);
+}
+
+int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(stderr, fmt, args);
+    va_end(args);
+    return n;
+}
+
+#endif
 
 static bool
 sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
@@ -359,11 +403,18 @@ sgj_js2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
     if ((NULL == jop) && jsp->pr_exit_status) {
         char d[80];
 
+#ifdef SG_PRSE_SENSE_DECODE
         if (sg_exit2str(exit_status, jsp->verbose, sizeof(d), d)) {
             if (0 == strlen(d))
                 strncpy(d, "no errors", sizeof(d) - 1);
         } else
             strncpy(d, "not available", sizeof(d) - 1);
+#else
+        if (0 == exit_status)
+            strncpy(d, "no errors", sizeof(d) - 1);
+        else
+            snprintf(d, sizeof(d), "exit_status=%d", exit_status);
+#endif
         sgj_js_nv_istr(jsp, jop, "exit_status", exit_status, NULL, d);
     }
     memcpy(&out_settings, &def_out_settings, sizeof(out_settings));
@@ -694,6 +745,28 @@ sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     }
 }
 
+#ifndef SG_PRSE_SENSE_DECODE
+static void
+h2str(const uint8_t * byte_arr, int num_bytes, char * bp, int blen)
+{
+    int j, k, n;
+
+    for (k = 0, n = 0; (k < num_bytes) && (n < blen); ) {
+        j = sg_scnpr(bp + n, blen - n, "%02x ", byte_arr[k]);
+        if (j < 2)
+            break;
+        n += j;
+        ++k;
+        if ((0 == (k % 8)) && (k < num_bytes) && (n < blen)) {
+            bp[n++] = ' ';
+        }
+    }
+    j = strlen(bp);
+    if ((j > 0) && (' ' == bp[j - 1]))
+        bp[j - 1] = '\0';    /* chop off trailing space */
+}
+#endif
+
 /* Add hex byte strings irrespective of jsp->pr_hex setting. */
 void
 sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
@@ -706,7 +779,11 @@ sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,
         return;
     bp = (char *)calloc(blen + 4, 1);
     if (bp) {
+#ifdef SG_PRSE_SENSE_DECODE
         hex2str(byte_arr, num_bytes, NULL, 2, blen, bp);
+#else
+        h2str(byte_arr, num_bytes, bp, blen);
+#endif
         sgj_js_nv_s(jsp, jop, name, bp);
         free(bp);
     }
@@ -1892,7 +1969,7 @@ sgj_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
         sgj_js_nv_i(jsp, jop, "extend", !! (0x80 & sbp[8]));
         sgj_js_nv_i(jsp, jop, "count_upper_nonzero", !! (0x40 & sbp[8]));
         sgj_js_nv_i(jsp, jop, "lba_upper_nonzero", !! (0x20 & sbp[8]));
-        sgj_js_nv_i(jsp, jop, "log_index", (0x7 & sbp[8]));
+        sgj_js_nv_i(jsp, jop, "log_index", (0xf & sbp[8]));
         sgj_js_nv_i(jsp, jop, "lba", sg_get_unaligned_le24(sbp + 9));
     } else if (len > 2) {   /* fixed format */
         sgj_js_nv_i(jsp, jop, "valid", valid_info_fld);

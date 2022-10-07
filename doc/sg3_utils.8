@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "September 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG3_UTILS "8" "October 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -97,7 +97,7 @@ only used by the embedded SNTL within the library used by the utilities in
 this library. SNTL is a SCSI to NVMe Translation Layer. This environment
 variable defaults to 0 which will lead to any utility that issues a SCSI
 command that is translated to a NVMe command (by the embedded SNTL) that
-fails at the NVMe dvice, to return SCSI sense in 'fixed' format. If this
+fails at the NVMe device, to return SCSI sense in 'fixed' format. If this
 variable is non\-zero then then the returned SCSI sense will be in 'descriptor'
 format.
 .PP
@@ -579,7 +579,7 @@ output the usage message then exit.
 for SCSI commands that yield a non\-trivial response, print out that response
 in ASCII hexadecimal. When used once, 16 bytes are printed on each line,
 prefixed by an relative address, starting at 0 (hex). When used twice, an
-ASCII rendering of the 16 bytes is appended to each line, with non printeble
+ASCII rendering of the 16 bytes is appended to each line, with non printable
 characters replaced by a '.' . When used three times only the 16 hex bytes
 are printed on each line (hence no address prefix nor ASCII appended). To
 produce hexadecimal that can be parsed by other utilities use this option

@@ -1802,7 +1802,7 @@ sg_get_sense_sat_pt_fixed_str(const char * lip, const uint8_t * sp,
                   sp[5], sp[6], (count_upper_nz ? '+' : ' '));
     n += sg_scnpr(b + n, blen - n, "%s  extend=%d, log_index=0x%x, "
                   "lba_high,mid,low(7:0)=0x%x,0x%x,0x%x%c\n", lip,
-                  (int)extend, (0xf & sp[8]), sp[9], sp[10], sp[11],
+                  (int)extend, (0xf & sp[8]), sp[11], sp[10], sp[9],
                   (lba_upper_nz ? '+' : ' '));
     return n;
 }

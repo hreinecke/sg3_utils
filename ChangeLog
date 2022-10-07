@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20220930] [svn: r973]
+Changelog for pre-release sg3_utils-1.48 [20221007] [svn: r974]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -79,6 +79,9 @@ Changelog for pre-release sg3_utils-1.48 [20220930] [svn: r973]
     - document internal json interface in include/sg_pr2serr.h
     - add SG_C_CPP_ZERO_INIT to better handle aggregate stack
       instance zeroing (C23 adding 'struct T t {};' will help)
+    - correct fixed format sense data command-specific field
+      for ata-passthrough (lba field), see:
+      https://github.com/doug-gilbert/sg3_utils/pull/25
   - initialize all sense buffers to 0
   - linux: replace references to /proc/scsi/sg with
     /sys/module/sg/parameters/
