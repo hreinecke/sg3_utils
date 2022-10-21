@@ -179,7 +179,14 @@ AC_ARG_ENABLE([linux-sgv4],
   [AC_DEFINE_UNQUOTED(IGNORE_LINUX_SGV4, 1, [even if Linux sg v4 available, use v3 instead], )], [])
 
 
-AC_OUTPUT(Makefile include/Makefile lib/Makefile src/Makefile doc/Makefile scripts/Makefile)
+AC_OUTPUT(
+	Makefile
+	include/Makefile
+	lib/Makefile
+	src/Makefile
+	doc/Makefile
+	scripts/Makefile
+)
 
 
 # Borrowed from smartmontools configure.ac

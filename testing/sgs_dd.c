@@ -84,11 +84,11 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "4.23 20220815";
+static const char * version_str = "4.24 20221020";
 static const char * my_name = "sgs_dd";
 
-#ifndef SGV4_FLAG_HIPRI
-#define SGV4_FLAG_HIPRI 0x800
+#ifndef SGV4_FLAG_POLLED
+#define SGV4_FLAG_POLLED 0x800
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -125,11 +125,11 @@ struct flags_t {
     bool dio;
     bool evfd;
     bool excl;
-    bool hipri;
     bool immed;
     bool mmap;
     bool noxfer;
     bool pack;
+    bool polled;
     bool tag;
     bool v3;
     bool v4;
@@ -223,12 +223,12 @@ usage(int pg_num)
            "  bs       must be the logical block size of device (def: 512)\n"
            "  deb      debug: 0->no debug (def); > 0 -> more debug\n"
            "           -v (up to -vvvvv) sets deb value to number of 'v's\n"
-           "  iflag    comma separated list from: dio,evfd,excl,hipri,immed,"
-           "mmap\n"
-           "           noxfer,null,pack,tag,v3,v4 bound to IFILE\n"
+           "  iflag    comma separated list from: dio,evfd,excl,immed,mmap,"
+           "noxfer,\n"
+           "           null,pack,polled,tag,v3,v4 bound to IFILE\n"
            "  no_sig   0-> use signals; 1-> no signals, hard polling "
            "instead;\n"
-           "           default 0, unless hipri flag(s) given then it's 1\n"
+           "           default 0, unless polled flag(s) given then it's 1\n"
            "  oflag    same flags as iflag but bound to OFILE\n"
            "  poll_ms    number of milliseconds to wait on poll (def: 0)\n"
            "  rt_sig   0->use SIGIO (def); 1->use RT sig (SIGRTMIN + 1)\n"
@@ -244,7 +244,7 @@ second_page:
            "  evfd     when poll() gives POLLIN, use eventfd to find "
            "out how many\n"
            "  excl     open IFILE or OFILE with O_EXCL\n"
-           "  hipri    set HIPRI flag and use blk_poll() for completion\n"
+           "  hipri    same as 'polled'; name 'hipri' is deprecated\n"
            "  immed    use SGV4_FLAG_IMMED flag on each request\n"
            "  mmap     use mmap()-ed IO on IFILE or OFILE\n"
            "  noxfer    no transfer between user space and kernel IO "
@@ -252,6 +252,7 @@ second_page:
            "  null      does nothing, placeholder\n"
            "  pack      submit with rising pack_id, complete matching "
            "each pack_id\n"
+           "  polled    set POLLED flag and use blk_poll() for completion\n"
            "  tag       use tag (from block layer) rather than "
            "pack_id\n"
            "  v3        use sg v3 interface (default)\n"
@@ -350,12 +351,12 @@ sg_start_io(Rq_coll * clp, Rq_elem * rep)
     hp->pack_id = rep->blk;
     if (flagp->dio)
         hp->flags |= SG_FLAG_DIRECT_IO;
-    if (flagp->hipri)
-        hp->flags |= SGV4_FLAG_HIPRI;
     if (flagp->noxfer)
         hp->flags |= SG_FLAG_NO_DXFER;
     if (flagp->immed)
         hp->flags |= SGV4_FLAG_IMMED;
+    if (flagp->polled)
+        hp->flags |= SGV4_FLAG_POLLED;
     if (flagp->mmap) {
         hp->flags |= SG_FLAG_MMAP_IO;
         hp->dxferp = is_wr ? clp->out_mmapp : clp->in_mmapp;
@@ -407,10 +408,10 @@ do_v4:
         h4p->flags |= SG_FLAG_DIRECT_IO;
     if (flagp->noxfer)
         h4p->flags |= SG_FLAG_NO_DXFER;
-    if (flagp->hipri)
-        h4p->flags |= SGV4_FLAG_HIPRI;
     if (flagp->immed)
         h4p->flags |= SGV4_FLAG_IMMED;
+    if (flagp->polled)
+        h4p->flags |= SGV4_FLAG_POLLED;
     if (flagp->mmap) {
         h4p->flags |= SG_FLAG_MMAP_IO;
         hp->dxferp = is_wr ? clp->out_mmapp : clp->in_mmapp;
@@ -500,7 +501,7 @@ sg_finish_io(Rq_coll * clp, bool wr, Rq_elem ** repp)
     rep = (Rq_elem *)io_hdr.usr_ptr;
     if (rep) {
         dio = flagsp->dio;
-        if (rep->io_hdr.flags & SGV4_FLAG_HIPRI)
+        if (rep->io_hdr.flags & SGV4_FLAG_POLLED)
             ++clp->blk_poll_count;
     }
     if (res < 0) {
@@ -588,7 +589,7 @@ do_v4:
         return res;
     }
     if (rep) {
-        if (rep->io_v4.flags & SGV4_FLAG_HIPRI)
+        if (rep->io_v4.flags & SGV4_FLAG_POLLED)
             ++clp->blk_poll_count;
     }
     if (! (rep && (SGQ_IO_STARTED == rep->state))) {
@@ -1188,7 +1189,7 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "excl"))
             fp->excl = true;
         else if (0 == strcmp(cp, "hipri"))
-            fp->hipri = true;
+            fp->polled = true;
         else if (0 == strcmp(cp, "immed"))
             fp->immed = true;
         else if (0 == strcmp(cp, "mmap"))
@@ -1199,6 +1200,8 @@ process_flags(const char * arg, struct flags_t * fp)
             ;
         else if (0 == strcmp(cp, "pack"))
             fp->pack = true;
+        else if (0 == strcmp(cp, "polled"))
+            fp->polled = true;
         else if (0 == strcmp(cp, "tag"))
             fp->tag = true;
         else if (0 == strcmp(cp, "v3")) {
@@ -1232,7 +1235,7 @@ main(int argc, char * argv[])
 {
     bool bs_given = false;
     bool no_sig_given = false;
-    bool hipri_present;
+    bool polled_present;
     int skip = 0;
     int seek = 0;
     int ibs = 0;
@@ -1388,12 +1391,12 @@ main(int argc, char * argv[])
         return 0;
     }
 
-    hipri_present = (clp->iflag.hipri || clp->oflag.hipri);
+    polled_present = (clp->iflag.polled || clp->oflag.polled);
     if (no_sig_given) {
-        if ((0 == clp->no_sig) && hipri_present)
-            pr2serr("Warning: signalling doesn't work with hipri\n");
-    } else      /* no_sig default varies: 0 normally and 1 if hipri present */
-        clp->no_sig = hipri_present ? 1 : 0;
+        if ((0 == clp->no_sig) && polled_present)
+            pr2serr("Warning: signalling doesn't work with polled flag\n");
+    } else      /* no_sig default varies: 0 normally and 1 if polled present */
+        clp->no_sig = polled_present ? 1 : 0;
 
     if ((ibs && (ibs != clp->bs)) || (obs && (obs != clp->bs))) {
         pr2serr("If 'ibs' or 'obs' given must be same as 'bs'\n");
@@ -1652,8 +1655,8 @@ main(int argc, char * argv[])
         if (! clp->no_sig)
             pr2serr("SIGIO/SIGPOLL signals received: %d, RT sigs: %d\n",
                     clp->sigs_io_received, clp->sigs_rt_received);
-        if (hipri_present)
-            pr2serr("HIPRI (blk_poll) used to complete %d commands\n",
+        if (polled_present)
+            pr2serr("POLLED (blk_poll) used to complete %d commands\n",
                     clp->blk_poll_count);
     }
     if (clp->pollerr_count > 0)

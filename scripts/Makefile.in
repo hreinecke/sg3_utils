@@ -93,7 +93,8 @@ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
+DIST_COMMON = $(srcdir)/Makefile.am $(dist_bin_SCRIPTS) \
+	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
@@ -126,7 +127,7 @@ am__uninstall_files_from_dir = { \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
 am__installdirs = "$(DESTDIR)$(bindir)"
-SCRIPTS = $(bin_SCRIPTS)
+SCRIPTS = $(dist_bin_SCRIPTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -275,7 +276,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
+dist_bin_SCRIPTS = scsi_logging_level scsi_mandat scsi_readcap scsi_ready \
 	      scsi_satl scsi_start scsi_stop scsi_temperature \
 	      rescan-scsi-bus.sh
 
@@ -311,9 +312,9 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(am__aclocal_m4_deps):
-install-binSCRIPTS: $(bin_SCRIPTS)
+install-dist_binSCRIPTS: $(dist_bin_SCRIPTS)
 	@$(NORMAL_INSTALL)
-	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
+	@list='$(dist_bin_SCRIPTS)'; test -n "$(bindir)" || list=; \
 	if test -n "$$list"; then \
 	  echo " $(MKDIR_P) '$(DESTDIR)$(bindir)'"; \
 	  $(MKDIR_P) "$(DESTDIR)$(bindir)" || exit 1; \
@@ -340,9 +341,9 @@ install-binSCRIPTS: $(bin_SCRIPTS)
 	     } \
 	; done
 
-uninstall-binSCRIPTS:
+uninstall-dist_binSCRIPTS:
 	@$(NORMAL_UNINSTALL)
-	@list='$(bin_SCRIPTS)'; test -n "$(bindir)" || exit 0; \
+	@list='$(dist_bin_SCRIPTS)'; test -n "$(bindir)" || exit 0; \
 	files=`for p in $$list; do echo "$$p"; done | \
 	       sed -e 's,.*/,,;$(transform)'`; \
 	dir='$(DESTDIR)$(bindir)'; $(am__uninstall_files_from_dir)
@@ -454,7 +455,7 @@ install-dvi: install-dvi-am
 
 install-dvi-am:
 
-install-exec-am: install-binSCRIPTS
+install-exec-am: install-dist_binSCRIPTS
 
 install-html: install-html-am
 
@@ -492,22 +493,22 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binSCRIPTS
+uninstall-am: uninstall-dist_binSCRIPTS
 
 .MAKE: install-am install-strip
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	cscopelist-am ctags-am distclean distclean-generic \
 	distclean-libtool distdir dvi dvi-am html html-am info info-am \
-	install install-am install-binSCRIPTS install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+	install install-am install-data install-data-am \
+	install-dist_binSCRIPTS install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-generic \
 	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
-	uninstall-am uninstall-binSCRIPTS
+	uninstall-am uninstall-dist_binSCRIPTS
 
 .PRECIOUS: Makefile
 

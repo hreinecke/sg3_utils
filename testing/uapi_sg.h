@@ -119,7 +119,8 @@ typedef struct sg_io_hdr {
 #define SGV4_FLAG_COMPLETE_B4  0x100	/* mrq: complete this rq before next */
 #define SGV4_FLAG_SIGNAL 0x200	/* v3: ignored; v4 signal on completion */
 #define SGV4_FLAG_IMMED 0x400   /* issue request and return immediately ... */
-#define SGV4_FLAG_HIPRI 0x800 /* request will use blk_poll to complete */
+#define SGV4_FLAG_HIPRI 0x800 /* use blk_poll (deprecated name, use POLLED) */
+#define SGV4_FLAG_POLLED 0x800 /* request will use blk_poll to complete */
 #define SGV4_FLAG_STOP_IF 0x1000	/* Stops sync mrq if error or warning */
 #define SGV4_FLAG_DEV_SCOPE 0x2000 /* permit SG_IOABORT to have wider scope */
 #define SGV4_FLAG_SHARE 0x4000	/* share IO buffer; needs SG_SEIM_SHARE_FD */

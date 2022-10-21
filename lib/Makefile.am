@@ -104,3 +104,6 @@ libsgutils2_la_LDFLAGS = -version-info 2:0:0 -no-undefined -release ${PACKAGE_VE
 libsgutils2_la_LIBADD = @GETOPT_O_FILES@
 libsgutils2_la_DEPENDENCIES = @GETOPT_O_FILES@
 
+EXTRA_DIST = \
+	sg_json_builder.h \
+	BSD_LICENSE

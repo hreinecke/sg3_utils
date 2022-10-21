@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.43 20220910";
+static const char * version_str = "1.44 20221020";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -122,8 +122,8 @@ using namespace std;
 // #endif
 
 
-#ifndef SGV4_FLAG_HIPRI
-#define SGV4_FLAG_HIPRI 0x800
+#ifndef SGV4_FLAG_POLLED
+#define SGV4_FLAG_POLLED 0x800
 #endif
 
 #define MAX_SGL_NUM_VAL (INT32_MAX - 1)  /* should reduce for testing */
@@ -190,7 +190,6 @@ struct flags_t {
     bool excl;
     bool ff;
     bool fua;
-    bool hipri;
     bool masync;        /* more async sg v4 driver fd flag */
     bool mout_if;       /* META_OUT_IF flag at mrq level */
     bool nocreat;
@@ -198,6 +197,7 @@ struct flags_t {
     bool no_thresh;
     bool no_waitq;      /* dummy, no longer supported, just warn */
     bool order_wr;
+    bool polled;        /* was previously 'hipri' */
     bool qhead;
     bool qtail;
     bool random;
@@ -299,7 +299,7 @@ struct global_collection        /* one instance visible to all threads */
     bool count_given;
     bool ese;
     bool flexible;
-    bool mrq_hipri;
+    bool mrq_polled;
     bool ofile_given;
     bool unit_nanosec;          /* default duration unit is millisecond */
     bool verify;                /* don't copy, verify like Unix: cmp */
@@ -477,7 +477,7 @@ usage(int pg_num)
     pr2serr("                  [bpt=BPT] [cdbsz=6|10|12|16] [cdl=CDL] "
             "[dio=0|1]\n"
             "                  [elemsz_kb=EKB] [ese=0|1] [fua=0|1|2|3] "
-            "[hipri=NRQS]\n"
+            "[polled=NRQS]\n"
             "                  [mrq=NRQS] [ofreg=OFREG] [sdt=SDT] "
             "[sync=0|1]\n"
             "                  [thr=THR] [time=0|1|2[,TO]] [verbose=VERB] "
@@ -544,8 +544,7 @@ page2:
             "                3->OFILE+IFILE\n"
             "    ibs         IFILE logical block size, cannot differ from "
             "obs or bs\n"
-            "    hipri       similar to mrq=NRQS operand but also sets "
-            "hipri flag\n"
+            "    hipri       same as polled=NRQS; name 'hipri' is deprecated\n"
             "    mrq         NRQS is number of cmds placed in each sg "
             "ioctl\n"
             "                (def: 16). Does not set mrq hipri flag.\n"
@@ -555,6 +554,8 @@ page2:
             "ibs or bs\n"
             "    ofreg       OFREG is regular file or pipe to send what is "
             "read from\n"
+            "    polled      similar to mrq=NRQS operand but also sets "
+            "polled flag\n"
             "                IFILE in the first half of each shared element\n"
             "    sdt         stall detection times: CRT[,ICT]. CRT: check "
             "repetition\n"
@@ -598,8 +599,7 @@ page3:
             "iflag)\n"
             "    fua         sets the FUA (force unit access) in SCSI READs "
             "and WRITEs\n"
-            "    hipri       set HIPRI flag and use blk_poll() for "
-            "completions\n"
+            "    hipri       same as 'polled'; name 'hipri' is deprecated\n"
             "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE\n"
             "    mmap,mmap    when used twice, doesn't call munmap()\n"
@@ -609,6 +609,8 @@ page3:
             "    no_thresh   skip checking per fd max data xfer size\n"
             "    order       require write ordering on sg->sg copy; only "
             "for oflag\n"
+            "    polled      set POLLED flag and use blk_poll() for "
+            "completions\n"
             "    qhead       queue new request at head of block queue\n"
             "    qtail       queue new request at tail of block queue (def: "
             "q at head)\n"
@@ -800,8 +802,8 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_HIPRI & flags) {             /* 0x800 */
-        n += sg_scnpr(b + n, b_len - n, "HIPRI|");
+    if (SGV4_FLAG_POLLED & flags) {             /* 0x800 */
+        n += sg_scnpr(b + n, b_len - n, "POLLED|");
         if (n >= b_len)
             goto fini;
     }
@@ -2327,8 +2329,8 @@ sg_half_segment_mrq0(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         rflags |= SGV4_FLAG_Q_AT_HEAD;
     if (flagsp->qtail)
         rflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (flagsp->hipri)
-        rflags |= SGV4_FLAG_HIPRI;
+    if (flagsp->polled)
+        rflags |= SGV4_FLAG_POLLED;
 
     for (k = 0, num = 0; seg_blks > 0; ++k, seg_blks -= num) {
         kk = min<int>(seg_blks, clp->bpt);
@@ -2449,8 +2451,8 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
         rflags |= SGV4_FLAG_Q_AT_HEAD;
     if (flagsp->qtail)
         rflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (flagsp->hipri)
-        rflags |= SGV4_FLAG_HIPRI;
+    if (flagsp->polled)
+        rflags |= SGV4_FLAG_POLLED;
 
     for (k = 0, num = 0; seg_blks > 0; ++k, seg_blks -= num) {
         kk = min<int>(seg_blks, clp->bpt);
@@ -2520,8 +2522,8 @@ sg_half_segment(Rq_elem * rep, scat_gath_iter & sg_it, bool is_wr,
     ctl_v4.flags = SGV4_FLAG_MULTIPLE_REQS;
     if (! flagsp->coe)
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
-    if (clp->mrq_hipri)
-        ctl_v4.flags |= SGV4_FLAG_HIPRI;
+    if (clp->mrq_polled)
+        ctl_v4.flags |= SGV4_FLAG_POLLED;
     if (clp->in_flags.mout_if || clp->out_flags.mout_if) {
         ctl_v4.flags |= SGV4_FLAG_META_OUT_IF;
         if (num_mrq > 0)
@@ -2870,8 +2872,8 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         iflags |= SGV4_FLAG_Q_AT_HEAD;
     if (iflagsp->qtail)
         iflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (iflagsp->hipri)
-        iflags |= SGV4_FLAG_HIPRI;
+    if (iflagsp->polled)
+        iflags |= SGV4_FLAG_POLLED;
 
     oflags = SGV4_FLAG_SHARE | SGV4_FLAG_NO_DXFER;
     if (oflagsp->dio)
@@ -2880,8 +2882,8 @@ do_both_sg_segment_mrq0(Rq_elem * rep, scat_gath_iter & i_sg_it,
         oflags |= SGV4_FLAG_Q_AT_HEAD;
     if (oflagsp->qtail)
         oflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (oflagsp->hipri)
-        oflags |= SGV4_FLAG_HIPRI;
+    if (oflagsp->polled)
+        oflags |= SGV4_FLAG_POLLED;
 
     for (k = 0; seg_blks > 0; ++k, seg_blks -= num) {
         kk = min<int>(seg_blks, clp->bpt);
@@ -3053,8 +3055,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         iflags |= SGV4_FLAG_Q_AT_HEAD;
     if (iflagsp->qtail)
         iflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (iflagsp->hipri)
-        iflags |= SGV4_FLAG_HIPRI;
+    if (iflagsp->polled)
+        iflags |= SGV4_FLAG_POLLED;
 
     oflags = SGV4_FLAG_SHARE | SGV4_FLAG_NO_DXFER;
     if (oflagsp->dio)
@@ -3063,8 +3065,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         oflags |= SGV4_FLAG_Q_AT_HEAD;
     if (oflagsp->qtail)
         oflags |= SGV4_FLAG_Q_AT_TAIL;
-    if (oflagsp->hipri)
-        oflags |= SGV4_FLAG_HIPRI;
+    if (oflagsp->polled)
+        oflags |= SGV4_FLAG_POLLED;
     oflags |= SGV4_FLAG_DO_ON_OTHER;
 
     for (k = 0; seg_blks > 0; ++k, seg_blks -= num) {
@@ -3164,8 +3166,8 @@ do_both_sg_segment(Rq_elem * rep, scat_gath_iter & i_sg_it,
         ctl_v4.flags |= SGV4_FLAG_STOP_IF;
     if ((! clp->verify) && clp->out_flags.order_wr)
         ctl_v4.flags |= SGV4_FLAG_ORDERED_WR;
-    if (clp->mrq_hipri)
-        ctl_v4.flags |= SGV4_FLAG_HIPRI;
+    if (clp->mrq_polled)
+        ctl_v4.flags |= SGV4_FLAG_POLLED;
     if (clp->in_flags.mout_if || clp->out_flags.mout_if) {
         ctl_v4.flags |= SGV4_FLAG_META_OUT_IF;
         if (num_mrq > 0)
@@ -3417,7 +3419,7 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "fua"))
             fp->fua = true;
         else if (0 == strcmp(cp, "hipri"))
-            fp->hipri = true;
+            fp->polled = true;
         else if (0 == strcmp(cp, "masync"))
             fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))
@@ -3444,6 +3446,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->order_wr = true;
         else if (0 == strcmp(cp, "order"))
             fp->order_wr = true;
+        else if (0 == strcmp(cp, "polled"))
+            fp->polled = true;
         else if (0 == strcmp(cp, "qhead"))
             fp->qhead = true;
         else if (0 == strcmp(cp, "qtail"))
@@ -3673,11 +3677,12 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 goto syn_err;
             }
         } else if ((0 == strcmp(key, "hipri")) ||
-                   (0 == strcmp(key, "mrq"))) {
+                   (0 == strcmp(key, "mrq")) ||
+                   (0 == strcmp(key, "polled"))) {
             if (isdigit(buf[0]))
                 cp = buf;
             else {
-                pr2serr("%sonly mrq=NRQS or hipri=NRQS which is a number "
+                pr2serr("%sonly mrq=NRQS or polled=NRQS which is a number "
                         "allowed here\n", my_name);
                 goto syn_err;
             }
@@ -3691,8 +3696,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                 clp->mrq_num = 1;
                 pr2serr("note: send single, non-mrq commands\n");
             }
-            if ('h' == key[0])
-                clp->mrq_hipri = true;
+            if ('m' != key[0])
+                clp->mrq_polled = true;
         } else if ((0 == strcmp(key, "no_waitq")) ||
                    (0 == strcmp(key, "no-waitq"))) {
             n = sg_get_num(buf);

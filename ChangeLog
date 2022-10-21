@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20221007] [svn: r974]
+Changelog for pre-release sg3_utils-1.48 [20221020] [svn: r975]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -94,6 +94,9 @@ Changelog for pre-release sg3_utils-1.48 [20221007] [svn: r974]
   - sg_pt_dummy.c: remove problematic include
   - sg3_utils.spec: change tarball extension from .tgz to
     .tar.gz ; fix build issue with Fedora 36
+  - build cleanups for 'make distcheck', see
+    https://github.com/doug-gilbert/sg3_utils/pull/26, 27 and
+    28; need svn:ignore property or maybe global-ignores
   - round of coverity identified issue fixes (and non-issues)
   - autoconf: upgrade version 2.70 to 2.71; automake upgrade
     to version 1.16.5 (from Fedora 36)

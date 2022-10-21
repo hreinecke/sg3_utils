@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.21 20220911";
+static const char * version_str = "2.22 20221020";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -124,8 +124,8 @@ using namespace std;
 /* comment out following line to stop ioctl(SG_CTL_FLAGM_SNAP_DEV) */
 #define SGH_DD_SNAP_DEV 1
 
-#ifndef SGV4_FLAG_HIPRI
-#define SGV4_FLAG_HIPRI 0x800
+#ifndef SGV4_FLAG_POLLED
+#define SGV4_FLAG_POLLED 0x800
 #endif
 
 #define DEF_BLOCK_SIZE 512
@@ -183,7 +183,7 @@ struct flags_t {
     bool excl;
     bool ff;
     bool fua;
-    bool hipri;
+    bool polled;	/* formerly called 'hipri' */
     bool masync;        /* more async sg v4 driver flag */
     bool mrq_immed;     /* mrq submit non-blocking */
     bool mrq_svb;       /* mrq shared_variable_block, for sg->sg copy */
@@ -498,9 +498,9 @@ usage(int pg_num)
             "    if          file or device to read from (def: stdin)\n"
             "    iflag       comma separated list from: [00,coe,defres,dio,"
             "direct,dpo,\n"
-            "                dsync,excl,ff,fua,hipri,masync,mmap,mout_if,"
-            "mrq_immed,\n"
-            "                mrq_svb,nocreat,nodur,noxfer,null,qhead,"
+            "                dsync,excl,ff,fua,masync,mmap,mout_if,"
+            "mrq_immed,mrq_svb,\n"
+            "                nocreat,nodur,noxfer,null,polled,qhead,"
             "qtail,\n"
             "                random,same_fds,v3,v4,wq_excl]\n"
             "    of          file or device to write to (def: /dev/null "
@@ -613,8 +613,7 @@ page3:
             "iflags)\n"
             "    fua         sets the FUA (force unit access) in SCSI READs "
             "and WRITEs\n"
-            "    hipri       set HIPRI flag on command, uses blk_poll() to "
-            "complete\n"
+            "    hipri       same as 'polled'; 'hipri' name is deprecated\n"
             "    masync      set 'more async' flag on this sg device\n"
             "    mmap        setup mmap IO on IFILE or OFILE; OFILE only "
             "with noshare\n"
@@ -630,6 +629,8 @@ page3:
             "    noxfer      no transfer to/from the user space\n"
             "    no_thresh   skip checking per fd max data xfer\n"
             "    null        does nothing, placeholder\n"
+            "    polled      set POLLED flag on command, uses blk_poll() to "
+            "complete\n"
             "    qhead       queue new request at head of block queue\n"
             "    qtail       queue new request at tail of block queue (def: "
             "q at head)\n"
@@ -797,8 +798,8 @@ sg_flags_str(int flags, int b_len, char * b)
         if (n >= b_len)
             goto fini;
     }
-    if (SGV4_FLAG_HIPRI & flags) {             /* 0x800 */
-        n += sg_scnpr(b + n, b_len - n, "HIPRI|");
+    if (SGV4_FLAG_POLLED & flags) {             /* 0x800 */
+        n += sg_scnpr(b + n, b_len - n, "POLLED|");
         if (n >= b_len)
             goto fini;
     }
@@ -2633,9 +2634,9 @@ sgh_do_async_mrq(Rq_elem * rep, mrq_arr_t & def_arr, int fd,
     b_len = sizeof(b);
     a_v4p = def_arr.first.data();
     ctlop->flags = SGV4_FLAG_MULTIPLE_REQS;
-    if (clp->in_flags.hipri || clp->out_flags.hipri) {
-        /* submit of full non-blocking with HIPRI */
-        ctlop->flags |= (SGV4_FLAG_IMMED | SGV4_FLAG_HIPRI);
+    if (clp->in_flags.polled || clp->out_flags.polled) {
+        /* submit of full non-blocking with POLLED */
+        ctlop->flags |= (SGV4_FLAG_IMMED | SGV4_FLAG_POLLED);
         if (!after1 && (clp->verbose > 1)) {
             after1 = true;
             pr2serr_lk("%s: %s\n", __func__, mrq_s_nb_s);
@@ -3143,7 +3144,7 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
     bool v4 = wr ? clp->out_flags.v4 : clp->in_flags.v4;
     bool qhead = wr ? clp->out_flags.qhead : clp->in_flags.qhead;
     bool qtail = wr ? clp->out_flags.qtail : clp->in_flags.qtail;
-    bool hipri = wr ? clp->out_flags.hipri : clp->in_flags.hipri;
+    bool polled = wr ? clp->out_flags.polled : clp->in_flags.polled;
     bool mout_if = wr ? clp->out_flags.mout_if : clp->in_flags.mout_if;
     bool prefetch = xtrp ? xtrp->prefetch : false;
     bool is_wr2 = xtrp ? xtrp->is_wr2 : false;
@@ -3203,8 +3204,8 @@ sg_start_io(Rq_elem * rep, mrq_arr_t & def_arr, int & pack_id,
         flags |= SG_FLAG_NO_DXFER;
     if (dio)
         flags |= SG_FLAG_DIRECT_IO;
-    if (hipri)
-        flags |= SGV4_FLAG_HIPRI;
+    if (polled)
+        flags |= SGV4_FLAG_POLLED;
     if (qhead)
         flags |= SG_FLAG_Q_AT_HEAD;
     if (qtail)
@@ -3802,7 +3803,7 @@ process_flags(const char * arg, struct flags_t * fp)
         else if (0 == strcmp(cp, "fua"))
             fp->fua = true;
         else if (0 == strcmp(cp, "hipri"))
-            fp->hipri = true;
+            fp->polled = true;
         else if (0 == strcmp(cp, "masync"))
             fp->masync = true;
         else if (0 == strcmp(cp, "mmap"))
@@ -3845,6 +3846,8 @@ process_flags(const char * arg, struct flags_t * fp)
             fp->noxfer = true;
         else if (0 == strcmp(cp, "null"))
             ;
+        else if (0 == strcmp(cp, "polled"))
+            fp->polled = true;
         else if (0 == strcmp(cp, "qhead"))
             fp->qhead = true;
         else if (0 == strcmp(cp, "qtail"))

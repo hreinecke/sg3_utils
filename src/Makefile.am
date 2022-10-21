@@ -213,3 +213,7 @@ sg_xcopy_LDADD = ../lib/libsgutils2.la
 sg_zone_LDADD = ../lib/libsgutils2.la
 
 sg_z_act_query_LDADD = ../lib/libsgutils2.la
+
+EXTRA_DIST = \
+	sg_vpd_common.h \
+	BSD_LICENSE

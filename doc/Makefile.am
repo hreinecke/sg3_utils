@@ -1,5 +1,5 @@
 
-man_MANS = \
+dist_man_MANS = \
 	scsi_mandat.8 scsi_readcap.8 scsi_ready.8 scsi_satl.8 scsi_start.8 \
 	scsi_stop.8 scsi_temperature.8 sg3_utils.8 sg3_utils_json.8 \
 	sg_bg_ctl.8 sg_compare_and_write.8 sg_decode_sense.8 sg_format.8 \
@@ -19,7 +19,7 @@ man_MANS = \
 CLEANFILES =
 
 if OS_LINUX
-man_MANS += \
+dist_man_MANS += \
 	rescan-scsi-bus.sh.8 scsi_logging_level.8 sg_copy_results.8 sg_dd.8 \
 	sg_emc_trespass.8 sg_map.8 sg_map26.8 sg_rbuf.8 sg_read.8 sg_reset.8 \
 	sg_scan.8 sg_test_rwbuf.8 sg_xcopy.8 sginfo.8 sgm_dd.8 sgp_dd.8
@@ -29,15 +29,19 @@ sg_scan.8: sg_scan.8.linux
 endif
 
 if OS_WIN32_MINGW
-man_MANS += sg_scan.8
+dist_man_MANS += sg_scan.8
 CLEANFILES += sg_scan.8
 sg_scan.8: sg_scan.8.win32
 	cp -p $< $@
 endif
 
 if OS_WIN32_CYGWIN
-man_MANS += sg_scan.8
+dist_man_MANS += sg_scan.8
 CLEANFILES += sg_scan.8
 sg_scan.8: sg_scan.8.win32
 	cp -p $< $@
 endif
+
+EXTRA_DIST = \
+	sg_scan.8.linux \
+	sg_scan.8.win32
