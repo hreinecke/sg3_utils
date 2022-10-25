@@ -451,7 +451,7 @@ main(int argc, char * argv[])
             printf("Number of open streams: %u\n", num_streams);
         }
         maxlen = ((uint32_t)maxlen < param_dl) ? maxlen : (int)param_dl;
-        for (k = 8; k < (maxlen - 4); k += 8) {
+        for (k = 8; k <= (maxlen - 4); k += 8) {
             stream_id = sg_get_unaligned_be16(arr + k + 2);
             if (do_brief)
                 printf("%u\n", stream_id);
