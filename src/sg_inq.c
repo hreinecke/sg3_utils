@@ -2006,7 +2006,7 @@ decode_b0_vpd(uint8_t * buff, int len, struct opts_t * op, sgj_opaque_p jop)
                        !!(buff[4] & 0x2), false, "Tape Stream Mirror "
                        "Capable");
         sgj_haj_vi_nex(jsp, jop, 2, "WORM", SGJ_SEP_EQUAL_NO_SPACE,
-                       !!(buff[4] & 0x1), false, "Write Once Read Multple "
+                       !!(buff[4] & 0x1), false, "Write Once Read Multiple "
                        "supported");
 
         break;

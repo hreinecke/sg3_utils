@@ -1314,9 +1314,9 @@ main(int argc, char * argv[])
         op->vb = 0;
     } else if (! op->verbose_given) {
         pr2serr("set '-vv'\n");
-        vb = 2;
+        op->vb = 2;
     } else
-        pr2serr("keep verbose=%d\n", vb);
+        pr2serr("keep verbose=%d\n", op->vb);
 #else
     if (op->verbose_given && op->version_given)
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");

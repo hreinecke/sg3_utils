@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2021 Douglas Gilbert.
+ * Copyright (c) 2018-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.11 20211114";
+static const char * version_str = "1.12 20221026";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -433,7 +433,7 @@ main(int argc, char * argv[])
             }
             goto fini;
         }
-        if ((maxlen - resid) < 4) {
+        if ((maxlen - resid) < 8) {
             pr2serr("Response too short (%d bytes) assigned stream id\n",
                         k);
             printf("-1\n");
@@ -441,7 +441,7 @@ main(int argc, char * argv[])
             goto fini;
         } else
             maxlen -= resid;
-        param_dl = sg_get_unaligned_be32(arr + 0) + 4;
+        param_dl = sg_get_unaligned_be32(arr + 0) + 8;
         if (param_dl > (uint32_t)maxlen) {
             pr2serr("Response truncated, need to set --maxlen=%u\n",
                     param_dl);
@@ -457,7 +457,7 @@ main(int argc, char * argv[])
             printf("Number of open streams: %u\n", num_streams);
         }
         maxlen = ((uint32_t)maxlen < param_dl) ? maxlen : (int)param_dl;
-        for (k = 8; k < (maxlen - 4); k += 8) {
+        for (k = 8; k < (maxlen - 8); k += 8) {
             stream_id = sg_get_unaligned_be16(arr + k + 2);
             if (do_brief)
                 printf("%u\n", stream_id);

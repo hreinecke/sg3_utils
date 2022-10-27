@@ -273,7 +273,7 @@ void sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop,
                            const char * nex_s);
 
 /* Add named field whose value is a (large) JSON string made up of num_bytes
- * ASCII hexadecimal bytes (each two hex digits seperated by a space) starting
+ * ASCII hexadecimal bytes (each two hex digits separated by a space) starting
  * at byte_arr. The heap is used for intermediate storage so num_bytes can
  * be arbitrarily large. */
 void sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * name,

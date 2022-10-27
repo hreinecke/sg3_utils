@@ -3464,7 +3464,7 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
         sgj_opaque_p jo3p = NULL;
         static const char * tpg_s = "Target port group data";
         static const char * aas_s = "Asymmetric access state";
-        static const char * vs_s = "Vendor specific field";
+        static const char * vsf_s = "Vendor specific field";
         char d1[80];
         char d2[80];
 
@@ -3472,13 +3472,13 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
         decode_rdac_vpd_c9_aas_s(buff[10], d1, sizeof(d1));
         decode_rdac_vpd_c9_vs_s(buff[11], d2, sizeof(d2));
         sgj_pr_hr(jsp, "    %s: %s\n", aas_s, d1);
-        sgj_pr_hr(jsp, "    %s: %s\n", vs_s, d2);
+        sgj_pr_hr(jsp, "    %s: %s\n", vsf_s, d2);
         if (jsp->pr_as_json) {
             jo2p = sgj_snake_named_subobject_r(jsp, jop, tpg_s);
             jo3p = sgj_snake_named_subobject_r(jsp, jo2p, "this_controller");
             sgj_convert_to_snake_name(aas_s, b, blen);
             sgj_js_nv_ihexstr(jsp, jo3p, b, buff[10], NULL, d1);
-            sgj_convert_to_snake_name(vs_s, b, blen);
+            sgj_convert_to_snake_name(vsf_s, b, blen);
             sgj_js_nv_ihexstr(jsp, jo3p, b, buff[11], NULL, d2);
         }
         sgj_pr_hr(jsp, " Target Port Group Data (Alternate controller):\n");
@@ -3487,14 +3487,14 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
         decode_rdac_vpd_c9_aas_s(buff[12], d1, sizeof(d1));
         decode_rdac_vpd_c9_vs_s(buff[13], d2, sizeof(d2));
         sgj_pr_hr(jsp, "    %s: %s\n", aas_s, d1);
-        sgj_pr_hr(jsp, "    %s: %s\n", vs_s, d2);
+        sgj_pr_hr(jsp, "    %s: %s\n", vsf_s, d2);
         if (jsp->pr_as_json) {
             jo2p = sgj_snake_named_subobject_r(jsp, jop, tpg_s);
             jo3p = sgj_snake_named_subobject_r(jsp, jo2p,
                                                "alternate_controller");
             sgj_convert_to_snake_name(aas_s, b, blen);
             sgj_js_nv_ihexstr(jsp, jo3p, b, buff[12], NULL, d1);
-            sgj_convert_to_snake_name(vs_s, b, blen);
+            sgj_convert_to_snake_name(vsf_s, b, blen);
             sgj_js_nv_ihexstr(jsp, jo3p, b, buff[13], NULL, d2);
         }
     }
