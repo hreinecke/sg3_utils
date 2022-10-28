@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.12 20221026";
+static const char * version_str = "1.13 20221028";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -457,7 +457,7 @@ main(int argc, char * argv[])
             printf("Number of open streams: %u\n", num_streams);
         }
         maxlen = ((uint32_t)maxlen < param_dl) ? maxlen : (int)param_dl;
-        for (k = 8; k < (maxlen - 8); k += 8) {
+        for (k = 8; k < maxlen; k += 8) {
             stream_id = sg_get_unaligned_be16(arr + k + 2);
             if (do_brief)
                 printf("%u\n", stream_id);

@@ -10,10 +10,11 @@ sg_rem_rest_elem \- send SCSI remove or restore element command
 .\" Add any additional description here
 .PP
 Sends a SCSI REMOVE ELEMENT AND TRUNCATE [RMEAT] or RESTORE ELEMENTS AND
-REBUILD [RSEAB] command to the \fIDEVICE\fR. Since both these commands have
+REBUILD [RSEAR] command to the \fIDEVICE\fR. Since both these commands have
 a potentially huge impact on the \fIDEVICE\fR (similar to the FORMAT UNIT
 command: destroying data and taking a long time to complete fully),
-neither is executed by default.
+they first give the user the chance to reconsider (3 times within 15
+seconds) before taking action.
 .PP
 Unlike the FORMAT UNIT command, these commands seem designed to work in
 the background. So they will return quickly (although sbc5r01.pdf does not
@@ -22,7 +23,7 @@ where only a specified number of commands will be executed (e.g. INQUIRY and
 REPORT LUNS) until the operation is complete. Other commands will receive
 sense data with a sense key of NOT READY and an additional sense code
 of 'Depopulation in progress' (for RMEAT) or 'Depopulation restoration in
-progress' (for RSEAB).
+progress' (for RSEAR).
 .PP
 The REMOVE ELEMENT AND TRUNCATE has a close relative in ZBC\-2 called the
 REMOVE ELEMENT AND MODIFY ZONES [RMEMZ] command. See the sg_zone utility
@@ -39,7 +40,7 @@ Arguments to long options are mandatory for short options as well.
 RC stands for Requested Capacity and is the number of logical blocks the
 \fIDEVICE\fR should have after the element is removed with the RMEAT
 command. The default value is 0 which allows the \fIDEVICE\fR to decide
-what the reduced capacity will be after the element removal. The RSEAB
+what the reduced capacity will be after the element removal. The RSEAR
 command ignores this value.
 .TP
 \fB\-e\fR, \fB\-\-element\fR=\fIEID\fR
@@ -75,7 +76,7 @@ Once an element is removed successfully it is termed as "depopulated".
 Depopulated elements that have the 'Restoration Allowed' (RALWD) bit
 set (see sg_get_elem_status) are candidates for future restoration.
 .PP
-A (storage) element of a rotating hard disk is once side of a platter
+A (storage) element of a rotating hard disk is one side of a platter
 typically associated with one head. Such hard disks typically have multiple
 platters with two heads per platter (i.e. one head each side of the platter).
 .SH EXIT STATUS

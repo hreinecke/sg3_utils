@@ -37,7 +37,7 @@
  *   - RESTORE ELEMENTS AND REBUILD
  */
 
-static const char * version_str = "1.00 20220610";
+static const char * version_str = "1.01 20221027";
 
 #define REMOVE_ELEM_SA 0x18
 #define RESTORE_ELEMS_SA 0x19
@@ -68,9 +68,9 @@ usage()
     pr2serr("Usage: "
             "sg_rem_rest_elem  [--capacity=RC] [--element=EID] [--help] "
             "[--quick]\n"
-            "                        [--remove] [--restore] [--verbose] "
+            "                         [--remove] [--restore] [--verbose] "
             "[--version]\n"
-            "                        DEVICE\n");
+            "                         DEVICE\n");
     pr2serr("  where:\n"
             "    --capacity=RC|-c RC    RC is requested capacity (unit: "
             "block; def: 0)\n"
@@ -283,8 +283,22 @@ main(int argc, char * argv[])
         ret = sg_convert_errno(err);
         goto fini;
     }
-    if (! quick)
-        sg_warn_and_wait(cmd_name, device_name, false);
+    if (! quick) {
+        int k;
+        char b[80] SG_C_CPP_ZERO_INIT;
+        char ch;
+
+        for (k = 0; k < (int)sizeof(b) - 1; ++k) {
+            ch = cmd_name[k];
+            if ('\0' == ch)
+                break;
+            else if (islower(ch))
+                b[k] = toupper(ch);
+            else
+                b[k] = ch;
+        }
+        sg_warn_and_wait(b, device_name, false);
+    }
 
     res = sg_ll_rem_rest_elem(sg_fd, sa, req_cap, e_id, true, verbose);
     ret = res;
