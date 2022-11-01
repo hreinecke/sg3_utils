@@ -113,6 +113,9 @@ int sg_ll_persistent_reserve_out(int sg_fd, int rq_servact, int rq_scope,
  * SG_LIB_NOT_READY (shouldn't happen), -1 -> other failure */
 int sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
                             bool noisy, int verbose);
+int sg_ll_read_block_limits_v2(int sg_fd, bool mloi, void * resp,
+                               int mx_resp_len, int * residp, bool noisy,
+                               int verbose);
 
 /* Invokes a SCSI READ BUFFER command (SPC). Return of 0 ->
  * success, SG_LIB_CAT_INVALID_OP -> invalid opcode,

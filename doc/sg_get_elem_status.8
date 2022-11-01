@@ -1,4 +1,4 @@
-.TH SG_GET_ELEM_STATUS "8" "August 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_GET_ELEM_STATUS "8" "November 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_get_elem_status \- send SCSI GET PHYSICAL ELEMENT STATUS command
 .SH SYNOPSIS
@@ -120,7 +120,7 @@ the settings in the Informational Exceptions Control mode page [0xc, 0x0].
 After detecting one or more out\-of\-spec storage elements the disk in
 question should either be decommissioned or have the REMOVE ELEMENT AND
 TRUNCATE (or ... AND MODIFY ZONES) command invoked to repair (and reduce
-the storge capacity) of the disk.
+the storage capacity) of the disk.
 .SH EXIT STATUS
 The exit status of sg_get_elem_status is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.

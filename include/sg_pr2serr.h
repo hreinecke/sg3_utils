@@ -98,6 +98,7 @@ typedef struct sgj_state_t {
  * Note: strlen(in_name) should be <= max_sname_len . */
 char * sgj_convert_to_snake_name(const char * in_name, char * sname,
                                  int max_sname_len);
+bool sgj_is_snake_name(const char * in_name);
 
 /* There are many variants of JSON supporting functions below and some
  * abbreviations are used to shorten their function names:

@@ -1,10 +1,11 @@
-.TH SG_READ_BLOCK_LIMITS "8" "October 2017" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_READ_BLOCK_LIMITS "8" "November 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_read_block_limits \- send SCSI READ BLOCK LIMITS command
 .SH SYNOPSIS
 .B sg_read_block_limits
-[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-raw\fR]  [\fI\-\-readonly\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [--mloi] [\fI\-\-raw\fR]
+[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -19,6 +20,11 @@ output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 output response in hex (rather than decode it).
+.TP
+\fB\-m\fR, \fB\-\-mloi\fR
+sets the MLOI bit in the READ BLOCK LIMITS command and if that
+succeeds, prints out the Maximum Logical Object Identifier (MLOI)
+value. The MLOI bit was introduced in the ssc4r02.pdf draft.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 output response in binary to stdout.
@@ -43,16 +49,18 @@ line following the "#" command prompt) followed by some typical output:
 .br
 Read Block Limits results:
 .br
-        Minimum block size: 1 byte(s)
+    Minimum block size: 1 byte(s)
 .br
-        Maximum block size: 16777215 byte(s), 16383 KB, 15 MB
+    Maximum block size: 16777215 byte(s), 16383 KB, 15 MB
+.br
+    Granularity: 0
 .br
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2009\-2017 Douglas Gilbert
+Copyright \(co 2009\-2022 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

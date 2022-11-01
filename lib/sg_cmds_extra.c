@@ -2236,16 +2236,20 @@ sg_ll_unmap_v2(int sg_fd, bool anchor, int group_num, int timeout_secs,
 /* Invokes a SCSI READ BLOCK LIMITS command. Return of 0 -> success,
  * various SG_LIB_CAT_* positive values or -1 -> other errors */
 int
-sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
-                        bool noisy, int vb)
+sg_ll_read_block_limits_v2(int sg_fd, bool mloi, void * resp,
+                           int mx_resp_len, int * residp, bool noisy,
+                           int vb)
 {
     static const char * const cdb_s = "read block limits";
     int ret, res, s_cat;
+    int resid = 0;
     uint8_t rl_cdb[READ_BLOCK_LIMITS_CMDLEN] =
       {READ_BLOCK_LIMITS_CMD, 0, 0, 0, 0, 0};
     uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
     struct sg_pt_base * ptvp;
 
+    if (mloi)
+        rl_cdb[1] |= 0x1;       /* introduced in ssc4r02 */
     if (vb) {
         char b[128];
 
@@ -2261,6 +2265,9 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
     set_scsi_pt_data_in(ptvp, (uint8_t *)resp, mx_resp_len);
     res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, vb);
     ret = sg_cmds_process_resp(ptvp, cdb_s, res, noisy, vb, &s_cat);
+    resid = get_scsi_pt_resid(ptvp);
+    if (residp)
+        *residp = resid;
     if (-1 == ret) {
         if (get_scsi_pt_transport_err(ptvp))
             ret = SG_LIB_TRANSPORT_ERROR;
@@ -2287,11 +2294,21 @@ sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
                 pr2ws(":\n");
                 hex2stderr((const uint8_t *)resp, ret, 0);
             }
+            if (vb)
+                pr2ws("resid=%d\n", resid);
         }
         ret = 0;
     }
     destruct_scsi_pt_obj(ptvp);
     return ret;
+}
+
+int
+sg_ll_read_block_limits(int sg_fd, void * resp, int mx_resp_len,
+                        bool noisy, int vb)
+{
+    return sg_ll_read_block_limits_v2(sg_fd, false, resp, mx_resp_len, NULL,
+                                      noisy, vb);
 }
 
 /* Invokes a SCSI RECEIVE COPY RESULTS command. Actually cover all current

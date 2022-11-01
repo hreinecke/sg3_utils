@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2018 Douglas Gilbert.
+ * Copyright (c) 2009-2022 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,9 +35,9 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.08 20180219";
+static const char * version_str = "1.09 20221101";
 
-#define MAX_READ_BLOCK_LIMITS_LEN 6
+#define MAX_READ_BLOCK_LIMITS_LEN 20
 
 static uint8_t readBlkLmtBuff[MAX_READ_BLOCK_LIMITS_LEN];
 
@@ -45,6 +45,7 @@ static uint8_t readBlkLmtBuff[MAX_READ_BLOCK_LIMITS_LEN];
 static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"hex", no_argument, 0, 'H'},
+        {"mloi", no_argument, 0, 'm'},  /* added in ssc4r02.pdf */
         {"raw", no_argument, 0, 'r'},
         {"readonly", no_argument, 0, 'R'},
         {"verbose", no_argument, 0, 'v'},
@@ -56,13 +57,16 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    pr2serr("Usage: sg_read_block_limits  [--help] [--hex] [--raw] "
-            "[--readonly]\n"
-            "                             [--verbose] [--version] "
-            "DEVICE\n"
+    pr2serr("Usage: sg_read_block_limits  [--help] [--hex] [--mloi] "
+            "[--raw]\n"
+            "                             [--readonly] [--verbose] "
+            "[--version]\n"
+            "                             DEVICE\n"
             "  where:\n"
             "    --help|-h          print out usage message\n"
             "    --hex|-H           output response in hexadecimal\n"
+            "    --mloi|-m          output maximum logical object "
+            "identifier\n"
             "    --raw|-r           output response in binary to stdout\n"
             "    --readonly|-R      open DEVICE in read-only mode\n"
             "    --verbose|-v       increase verbosity\n"
@@ -84,22 +88,27 @@ dStrRaw(const char * str, int len)
 int
 main(int argc, char * argv[])
 {
+    bool do_mloi = false;
     bool do_raw = false;
     bool readonly = false;
     bool verbose_given = false;
     bool version_given = false;
-    int sg_fd, k, m, res, c;
+    int sg_fd, k, m, res, c, max_resp_len;
+    int resid = 0;
+    int actual_len = 0;
     int do_hex = 0;
     int verbose = 0;
     int ret = 0;
     uint32_t max_block_size;
+    uint64_t mloi;
     uint16_t min_block_size;
+    uint8_t granularity;
     const char * device_name = NULL;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "hHrRvV", long_options,
+        c = getopt_long(argc, argv, "hHmrRvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -111,6 +120,9 @@ main(int argc, char * argv[])
             return 0;
         case 'H':
             ++do_hex;
+            break;
+        case 'm':
+            do_mloi = true;
             break;
         case 'r':
             do_raw = true;
@@ -160,7 +172,7 @@ main(int argc, char * argv[])
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
     if (version_given) {
-        pr2serr("version: %s\n", version_str);
+        printf("version: %s\n", version_str);
         return 0;
     }
 
@@ -179,37 +191,69 @@ main(int argc, char * argv[])
         goto the_end2;
     }
 
-    memset(readBlkLmtBuff, 0x0, 6);
-    res = sg_ll_read_block_limits(sg_fd, readBlkLmtBuff, 6, true, verbose);
+    max_resp_len = do_mloi ? 20 : 6;
+    memset(readBlkLmtBuff, 0x0, sizeof(readBlkLmtBuff));
+    res = sg_ll_read_block_limits_v2(sg_fd, do_mloi, readBlkLmtBuff,
+                                     max_resp_len, &resid, true, verbose);
     ret = res;
     if (0 == res) {
-      if (do_hex) {
-        hex2stdout(readBlkLmtBuff, sizeof(readBlkLmtBuff), 1);
-        goto the_end;
-      } else if (do_raw) {
-        dStrRaw((const char *)readBlkLmtBuff, sizeof(readBlkLmtBuff));
-        goto the_end;
-      }
+        actual_len =  max_resp_len - resid;
+        if (do_hex) {
+            int fl = -1;
 
-      max_block_size = sg_get_unaligned_be32(readBlkLmtBuff + 0);
-      min_block_size = sg_get_unaligned_be16(readBlkLmtBuff + 4);
-      k = min_block_size / 1024;
-      pr2serr("Read Block Limits results:\n");
-      pr2serr("\tMinimum block size: %u byte(s)",
-              (unsigned int)min_block_size);
-      if (k != 0)
-        pr2serr(", %d KB", k);
-      pr2serr("\n");
-      k = max_block_size / 1024;
-      m = max_block_size / 1048576;
-      pr2serr("\tMaximum block size: %u byte(s)",
-              (unsigned int)max_block_size);
-      if (k != 0)
-        pr2serr(", %d KB", k);
-      if (m != 0)
-        pr2serr(", %d MB", m);
-      pr2serr("\n");
-    } else {
+            if (1 == do_hex)
+                fl = 1;
+            else if (2 == do_hex)
+                fl = 0;
+            hex2stdout(readBlkLmtBuff, actual_len, fl);
+            goto the_end;
+        } else if (do_raw) {
+            dStrRaw((const char *)readBlkLmtBuff, actual_len);
+            goto the_end;
+        }
+
+        if (do_mloi) {
+            if (actual_len < 20) {
+                pr2serr("Expected at least 20 bytes in response but only "
+                        "%d bytes\n", actual_len);
+                goto the_end;
+            }
+            printf("Read Block Limits (MLOI=1) results:\n");
+            mloi = sg_get_unaligned_be64(readBlkLmtBuff + 12);
+            printf("    Maximum logical block identifier: %" PRIu64 "\n",
+                   mloi);
+        } else {        /* MLOI=0 (only case before ssc4r02.pdf) */
+            if (actual_len < 6) {
+                pr2serr("Expected at least 6 bytes in response but only "
+                        "%d bytes\n", actual_len);
+                goto the_end;
+            }
+            max_block_size = sg_get_unaligned_be32(readBlkLmtBuff + 0);
+            // first byte contains granularity field
+            granularity = (max_block_size >> 24) & 0x1F;
+            max_block_size = max_block_size & 0xFFFFFF;
+            min_block_size = sg_get_unaligned_be16(readBlkLmtBuff + 4);
+            k = min_block_size / 1024;
+            printf("Read Block Limits results:\n");
+            printf("    Minimum block size: %u byte(s)",
+                   (unsigned int)min_block_size);
+            if (k != 0)
+                printf(", %d KB", k);
+            printf("\n");
+            k = max_block_size / 1024;
+            m = max_block_size / 1048576;
+            printf("    Maximum block size: %u byte(s)",
+                   (unsigned int)max_block_size);
+            if (k != 0)
+                printf(", %d KB", k);
+            if (m != 0)
+                printf(", %d MB", m);
+            printf("\n");
+            printf("    Granularity: %u",
+                   (unsigned int)granularity);
+            printf("\n");
+        }
+    } else {    /* error detected */
         char b[80];
 
         sg_get_category_sense_str(res, sizeof(b), b, verbose);

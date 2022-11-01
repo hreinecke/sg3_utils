@@ -37,7 +37,9 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.01 20220923";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.02 20221101";    /* spc6r06 + sbc5r03 */
+
+#define MY_NAME "sg_logs"
 
 #define MX_ALLOC_LEN (0xfffc)
 #define MX_INLEN_ALLOC_LEN (0x800000)
@@ -119,6 +121,12 @@ static uint8_t * rsp_buff;
 static uint8_t * free_rsp_buff;
 static int rsp_buff_sz = MX_ALLOC_LEN + 4;
 static const int parr_sz = 4096;
+
+static const char * unknown_s = "unknown";
+static const char * not_avail = "not available";
+static const char * param_c = "parameter code";
+static const char * param_c_snake = "parameter_code";
+static const char * as_s_s = "as_string";
 
 static struct option long_options[] = {
         {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
@@ -215,7 +223,7 @@ struct log_elem {
     const char * name;
     const char * acron;
     bool (*show_pagep)(const uint8_t * resp, int len,
-                       const struct opts_t * op);
+                       struct opts_t * op, sgj_opaque_p jop);
                         /* Returns true if done */
 };
 
@@ -230,107 +238,120 @@ struct vp_name_t {
 static const char * ls_s = "log_sense: ";
 
 static bool show_supported_pgs_page(const uint8_t * resp, int len,
-                                    const struct opts_t * op);
+                                    struct opts_t * op, sgj_opaque_p jop);
 static bool show_supported_pgs_sub_page(const uint8_t * resp, int len,
-                                        const struct opts_t * op);
+                                        struct opts_t * op, sgj_opaque_p jop);
 static bool show_buffer_over_under_run_page(const uint8_t * resp, int len,
-                                            const struct opts_t * op);
+                                            struct opts_t * op,
+                                            sgj_opaque_p jop);
 static bool show_error_counter_page(const uint8_t * resp, int len,
-                                    const struct opts_t * op);
+                                    struct opts_t * op, sgj_opaque_p jop);
 static bool show_non_medium_error_page(const uint8_t * resp, int len,
-                                       const struct opts_t * op);
+                                       struct opts_t * op, sgj_opaque_p jop);
 static bool show_last_n_error_page(const uint8_t * resp, int len,
-                                   const struct opts_t * op);
+                                   struct opts_t * op, sgj_opaque_p jop);
 static bool show_format_status_page(const uint8_t * resp, int len,
-                                    const struct opts_t * op);
+                                    struct opts_t * op, sgj_opaque_p jop);
 static bool show_last_n_deferred_error_page(const uint8_t * resp, int len,
-                                            const struct opts_t * op);
+                                            struct opts_t * op,
+                                            sgj_opaque_p jop);
 static bool show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
-                                         const struct opts_t * op);
+                                         struct opts_t * op,
+                                         sgj_opaque_p jop);
 static bool show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
-                                             const struct opts_t * op);
+                                             struct opts_t * op,
+                                             sgj_opaque_p jop);
 static bool show_lb_provisioning_page(const uint8_t * resp, int len,
-                                      const struct opts_t * op);
+                                      struct opts_t * op, sgj_opaque_p jop);
 static bool show_sequential_access_page(const uint8_t * resp, int len,
-                                        const struct opts_t * op);
+                                        struct opts_t * op, sgj_opaque_p jop);
 static bool show_temperature_page(const uint8_t * resp, int len,
-                                  const struct opts_t * op);
+                                  struct opts_t * op, sgj_opaque_p jop);
 static bool show_start_stop_page(const uint8_t * resp, int len,
-                                 const struct opts_t * op);
+                                 struct opts_t * op, sgj_opaque_p jop);
 static bool show_utilization_page(const uint8_t * resp, int len,
-                                  const struct opts_t * op);
+                                  struct opts_t * op, sgj_opaque_p jop);
 static bool show_app_client_page(const uint8_t * resp, int len,
-                                 const struct opts_t * op);
+                                 struct opts_t * op, sgj_opaque_p jop);
 static bool show_self_test_page(const uint8_t * resp, int len,
-                                const struct opts_t * op);
+                                struct opts_t * op, sgj_opaque_p jop);
 static bool show_solid_state_media_page(const uint8_t * resp, int len,
-                                        const struct opts_t * op);
+                                        struct opts_t * op, sgj_opaque_p jop);
 static bool show_device_stats_page(const uint8_t * resp, int len,
-                                   const struct opts_t * op);
+                                   struct opts_t * op, sgj_opaque_p jop);
 static bool show_media_stats_page(const uint8_t * resp, int len,
-                                  const struct opts_t * op);
+                                  struct opts_t * op, sgj_opaque_p jop);
 static bool show_dt_device_status_page(const uint8_t * resp, int len,
-                                       const struct opts_t * op);
+                                       struct opts_t * op, sgj_opaque_p jop);
 static bool show_tapealert_response_page(const uint8_t * resp, int len,
-                                         const struct opts_t * op);
+                                         struct opts_t * op,
+                                         sgj_opaque_p jop);
 static bool show_requested_recovery_page(const uint8_t * resp, int len,
-                                         const struct opts_t * op);
+                                         struct opts_t * op,
+                                         sgj_opaque_p jop);
 static bool show_background_scan_results_page(const uint8_t * resp, int len,
-                                              const struct opts_t * op);
+                                              struct opts_t * op,
+                                              sgj_opaque_p jop);
 static bool show_zoned_block_dev_stats(const uint8_t * resp, int len,
-                                       const struct opts_t * op);
+                                       struct opts_t * op, sgj_opaque_p jop);
 static bool show_pending_defects_page(const uint8_t * resp, int len,
-                                      const struct opts_t * op);
+                                      struct opts_t * op, sgj_opaque_p jop);
 static bool show_background_op_page(const uint8_t * resp, int len,
-                                    const struct opts_t * op);
+                                    struct opts_t * op, sgj_opaque_p jop);
 static bool show_lps_misalignment_page(const uint8_t * resp, int len,
-                                       const struct opts_t * op);
+                                       struct opts_t * op, sgj_opaque_p jop);
 static bool show_element_stats_page(const uint8_t * resp, int len,
-                                    const struct opts_t * op);
+                                    struct opts_t * op, sgj_opaque_p jop);
 static bool show_service_buffer_info_page(const uint8_t * resp, int len,
-                                          const struct opts_t * op);
+                                          struct opts_t * op,
+                                          sgj_opaque_p jop);
 static bool show_ata_pt_results_page(const uint8_t * resp, int len,
-                                     const struct opts_t * op);
+                                     struct opts_t * op, sgj_opaque_p jop);
 static bool show_tape_diag_data_page(const uint8_t * resp, int len,
-                                     const struct opts_t * op);
+                                     struct opts_t * op, sgj_opaque_p jop);
 static bool show_mchanger_diag_data_page(const uint8_t * resp, int len,
-                                         const struct opts_t * op);
+                                         struct opts_t * op,
+                                         sgj_opaque_p jop);
 static bool show_non_volatile_cache_page(const uint8_t * resp, int len,
-                                         const struct opts_t * op);
+                                         struct opts_t * op,
+                                         sgj_opaque_p jop);
 static bool show_volume_stats_pages(const uint8_t * resp, int len,
-                                    const struct opts_t * op);
+                                    struct opts_t * op, sgj_opaque_p jop);
 static bool show_protocol_specific_page(const uint8_t * resp, int len,
-                                        const struct opts_t * op);
+                                        struct opts_t * op, sgj_opaque_p jop);
 static bool show_stats_perform_pages(const uint8_t * resp, int len,
-                                     const struct opts_t * op);
+                                     struct opts_t * op, sgj_opaque_p jop);
 static bool show_cache_stats_page(const uint8_t * resp, int len,
-                                  const struct opts_t * op);
+                                  struct opts_t * op, sgj_opaque_p jop);
 static bool show_power_condition_transitions_page(const uint8_t * resp,
-                                 int len, const struct opts_t * op);
+                                 int len, struct opts_t * op,
+                                                  sgj_opaque_p jop);
 static bool show_environmental_reporting_page(const uint8_t * resp, int len,
-                                              const struct opts_t * op);
+                                              struct opts_t * op,
+                                              sgj_opaque_p jop);
 static bool show_environmental_limits_page(const uint8_t * resp, int len,
-                                           const struct opts_t * op);
+                                           struct opts_t * op,
+                                           sgj_opaque_p jop);
 static bool show_cmd_dur_limits_page(const uint8_t * resp, int len,
-                                     const struct opts_t * op);
+                                     struct opts_t * op, sgj_opaque_p jop);
 static bool show_data_compression_page(const uint8_t * resp, int len,
-                                       const struct opts_t * op);
+                                       struct opts_t * op, sgj_opaque_p jop);
 static bool show_tape_alert_ssc_page(const uint8_t * resp, int len,
-                                     const struct opts_t * op);
+                                     struct opts_t * op, sgj_opaque_p jop);
 static bool show_ie_page(const uint8_t * resp, int len,
-                         const struct opts_t * op);
+                         struct opts_t * op, sgj_opaque_p jop);
 static bool show_tape_usage_page(const uint8_t * resp, int len,
-                                 const struct opts_t * op);
+                                 struct opts_t * op, sgj_opaque_p jop);
 static bool show_tape_capacity_page(const uint8_t * resp, int len,
-                                     const struct opts_t * op);
+                                     struct opts_t * op, sgj_opaque_p jop);
 static bool show_seagate_cache_page(const uint8_t * resp, int len,
-                                    const struct opts_t * op);
+                                    struct opts_t * op, sgj_opaque_p jop);
 static bool show_seagate_factory_page(const uint8_t * resp, int len,
-                                      const struct opts_t * op);
+                                      struct opts_t * op, sgj_opaque_p jop);
 static bool show_hgst_perf_page(const uint8_t * resp, int len,
-                                const struct opts_t * op);
+                                struct opts_t * op, sgj_opaque_p jop);
 static bool show_hgst_misc_page(const uint8_t * resp, int len,
-                                const struct opts_t * op);
+                                struct opts_t * op, sgj_opaque_p jop);
 
 /* elements in page_number/subpage_number order */
 static struct log_elem log_arr[] = {
@@ -515,8 +536,8 @@ usage(int hval)
            "[--enumerate]\n"
            "               [--exclude] [--filter=FL] [--help] [--hex] "
            "[--in=FN]\n"
-           "               [--json[=JO]] [--list] [--no_inq] [--maxlen=LEN] "
-           "[--name] "
+           "               [--json[=JO]] [--list] [--maxlen=LEN] [--name] "
+           "[--no_inq]\n"
            "               [--page=PG] [--paramp=PP] [--pcb] [--ppc] "
            "[--pdt=DT]\n"
            "               [--raw] [--readonly] [--reset] [--select] "
@@ -929,6 +950,24 @@ pg_subpg_pdt_search(int pg_code, int subpg_code, int pdt, int vpn)
         }
     }
     return NULL;
+}
+
+static void
+js_snakenv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+                       int64_t val_i, bool hex_as_well, const char * str_name,
+                       const char * val_s, const char * nex_s)
+{
+
+    if (sgj_is_snake_name(name))
+        sgj_js_nv_ihexstr_nex(jsp, jop, name, val_i, hex_as_well, str_name,
+                              val_s, nex_s);
+    else {
+        char b[128];
+
+        sgj_convert_to_snake_name(name, b, sizeof(b));
+        sgj_js_nv_ihexstr_nex(jsp, jop, b, val_i, hex_as_well, str_name,
+                              val_s, nex_s);
+    }
 }
 
 static void
@@ -1428,7 +1467,7 @@ num_or_unknown(const uint8_t * xp, int num_bytes /* max is 8 */, bool in_hex,
                char * b, int blen)
 {
     if (sg_all_ffs(xp, num_bytes))
-        snprintf(b, blen, "unknown");
+        snprintf(b, blen, "%s", unknown_s);
     else {
         uint64_t num = sg_get_unaligned_be(num_bytes, xp);
 
@@ -1542,6 +1581,34 @@ resid_err:
     return res;
 }
 
+sgj_opaque_p
+sg_log_js_hdr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
+              const uint8_t * log_hdrp)
+{
+    bool ds = !! (log_hdrp[0] & 0x80);
+    bool spf = !! (log_hdrp[0] & 0x40);
+    int pg = log_hdrp[0] & 0x3f;
+    int subpg = log_hdrp[1];
+    size_t nlen = strlen(name);
+    sgj_opaque_p jo2p;
+    char b[80];
+
+    if ((nlen < 4) || (0 != strcmp("age", name + nlen - 3))) {
+        memcpy(b, name, nlen);
+        memcpy(b + nlen, " log page", 10);
+        jo2p = sgj_snake_named_subobject_r(jsp, jop, b);
+    } else
+        jo2p = sgj_snake_named_subobject_r(jsp, jop, name);
+
+    sgj_js_nv_ihex_nex(jsp, jo2p, "ds", (int)ds, false, "Did not Save");
+    sgj_js_nv_ihex_nex(jsp, jo2p, "spf", (int)spf, NULL, "SubPage Format");
+    sgj_js_nv_ihex(jsp, jo2p, "page_code", pg);
+    sgj_js_nv_ihex(jsp, jo2p, "subpage_code", subpg);
+    return jo2p;
+}
+
+
+
 /* DS made obsolete in spc4r03; TMC and ETC made obsolete in spc5r03. */
 static char *
 get_pcb_str(int pcb, char * outp, int maxoutlen)
@@ -1570,17 +1637,41 @@ get_pcb_str(int pcb, char * outp, int maxoutlen)
     return outp;
 }
 
+static void
+js_pcb(sgj_state * jsp, sgj_opaque_p jop, int pcb)
+{
+    sgj_opaque_p jo2p = sgj_snake_named_subobject_r(jsp, jop,
+                                                    "parameter_control_byte");
+
+    sgj_js_nv_ihex_nex(jsp, jo2p, "du", (pcb & 0x80) ? 1 : 0, false,
+                       "Disable Update");
+    sgj_js_nv_ihex_nex(jsp, jo2p, "ds", (pcb & 0x40) ? 1 : 0, false,
+                       "Disable Save [obsolete]");
+    sgj_js_nv_ihex_nex(jsp, jo2p, "tsd", (pcb & 0x20) ? 1 : 0, false,
+                       "Target Save Disable");
+    sgj_js_nv_ihex_nex(jsp, jo2p, "etc", (pcb & 0x10) ? 1 : 0, false,
+                       "Enable Threshold Comparison [obsolete]");
+    sgj_js_nv_ihex_nex(jsp, jo2p, "tmc", (pcb & 0xc) >> 2, false,
+                       "Threshold Met Criteria [obsolete]");
+    sgj_js_nv_ihex_nex(jsp, jo2p, "format_and_linking", pcb & 0x3, false,
+                       NULL);
+}
+
 /* SUPP_PAGES_LPAGE [0x0,0x0] <sp> */
 static bool
 show_supported_pgs_page(const uint8_t * resp, int len,
-                        const struct opts_t * op)
+                        struct opts_t * op, sgj_opaque_p jop)
 {
     int num, k;
     const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p, jo3p;
+    sgj_opaque_p jap = NULL;
     char b[64];
+    static const char * slpgs = "Supported log pages";
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Supported log pages  [0x0]:\n");  /* introduced: SPC-2 */
+        sgj_pr_hr(jsp, "%s  [0x0]:\n", slpgs);  /* introduced in: SPC-2 */
     num = len - 4;
     bp = &resp[0] + 4;
     if ((op->do_hex > 0) || op->do_raw) {
@@ -1590,21 +1681,33 @@ show_supported_pgs_page(const uint8_t * resp, int len,
             hex2stdout(resp, len, op->dstrhex_no_ascii);
         return true;
     }
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, slpgs, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p, "supported_pages_list");
+    }
+
     for (k = 0; k < num; ++k) {
-        int pg_code = bp[k];
+        int pg_code = bp[k] & 0x3f;
         const struct log_elem * lep;
 
         snprintf(b, sizeof(b) - 1, "  0x%02x        ", pg_code);
         lep = pg_subpg_pdt_search(pg_code, 0, op->dev_pdt, -1);
         if (lep) {
             if (op->do_brief > 1)
-                printf("    %s\n", lep->name);
+                sgj_pr_hr(jsp, "    %s\n", lep->name);
             else if (op->do_brief)
-                printf("%s%s\n", b, lep->name);
+                sgj_pr_hr(jsp, "%s%s\n", b, lep->name);
             else
-                printf("%s%s [%s]\n", b, lep->name, lep->acron);
+                sgj_pr_hr(jsp, "%s%s [%s]\n", b, lep->name, lep->acron);
         } else
-            printf("%s\n", b);
+            sgj_pr_hr(jsp, "%s\n", b);
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_ihex(jsp, jo3p, "page_code", pg_code);
+            sgj_js_nv_s(jsp, jo3p, "name", lep ? lep->name : unknown_s);
+            sgj_js_nv_s(jsp, jo3p, "acronym", lep ? lep->acron : unknown_s);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
+        }
     }
     return true;
 }
@@ -1613,18 +1716,23 @@ show_supported_pgs_page(const uint8_t * resp, int len,
  * given page code: [<pg_code>,0xff] where <pg_code> > 0 */
 static bool
 show_supported_pgs_sub_page(const uint8_t * resp, int len,
-                            const struct opts_t * op)
+                            struct opts_t * op, sgj_opaque_p jop)
 {
     int num, k;
     const uint8_t * bp;
-    const struct log_elem * lep;
+    const struct log_elem * lep = NULL;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p, jo3p;
+    sgj_opaque_p jap = NULL;
     char b[64];
+    static const char * slpass = "Supported log pages and subpages";
+    static const char * sss = "Supported subpages";
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (op->pg_code > 0)
-            printf("Supported subpages  [0x%x, 0xff]:\n", op->pg_code);
+            sgj_pr_hr(jsp, "%s  [0x%x, 0xff]:\n", sss, op->pg_code);
         else
-            printf("Supported log pages and subpages  [0x0, 0xff]:\n");
+            sgj_pr_hr(jsp, "%s  [0x0, 0xff]:\n", sss);
     }
     num = len - 4;
     bp = &resp[0] + 4;
@@ -1635,7 +1743,20 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
             hex2stdout(resp, len, op->dstrhex_no_ascii);
         return true;
     }
+    if (jsp->pr_as_json) {
+        if (op->pg_code > 0) {
+            jo2p = sg_log_js_hdr(jsp, jop, sss, resp);
+            jap = sgj_named_subarray_r(jsp, jo2p,
+                                       "supported_subpage_descriptors");
+        } else {
+            jo2p = sg_log_js_hdr(jsp, jop, slpass, resp);
+            jap = sgj_named_subarray_r(jsp, jo2p,
+                               "supported_page_subpage_descriptors");
+        }
+    }
+
     for (k = 0; k < num; k += 2) {
+        bool pr_name = true;
         int pg_code = bp[k];
         int subpg_code = bp[k + 1];
 
@@ -1645,19 +1766,31 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
         else
             snprintf(b, sizeof(b) - 1, "  0x%02x,0x%02x   ", pg_code,
                      subpg_code);
-        if ((pg_code > 0) && (subpg_code == 0xff))
-            printf("%s\n", b);
-        else {
+        if ((pg_code > 0) && (subpg_code == 0xff)) {
+            sgj_pr_hr(jsp, "%s\n", b);
+            pr_name = false;
+        } else {
             lep = pg_subpg_pdt_search(pg_code, subpg_code, op->dev_pdt, -1);
             if (lep) {
                 if (op->do_brief > 1)
-                    printf("    %s\n", lep->name);
+                    sgj_pr_hr(jsp, "    %s\n", lep->name);
                 else if (op->do_brief)
-                    printf("%s%s\n", b, lep->name);
+                    sgj_pr_hr(jsp, "%s%s\n", b, lep->name);
                 else
-                    printf("%s%s [%s]\n", b, lep->name, lep->acron);
+                    sgj_pr_hr(jsp, "%s%s [%s]\n", b, lep->name, lep->acron);
             } else
-                printf("%s\n", b);
+                sgj_pr_hr(jsp, "%s\n", b);
+        }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_ihex(jsp, jo3p, "page_code", pg_code);
+            sgj_js_nv_ihex(jsp, jo3p, "subpage_code", subpg_code);
+            if (pr_name) {
+                sgj_js_nv_s(jsp, jo3p, "name", lep ? lep->name : unknown_s);
+                sgj_js_nv_s(jsp, jo3p, "acronym", lep ? lep->acron :
+                                                        unknown_s);
+            }
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         }
     }
     return true;
@@ -1666,18 +1799,29 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
 /* BUFF_OVER_UNDER_LPAGE [0x1] <bou>  introduced: SPC-2 */
 static bool
 show_buffer_over_under_run_page(const uint8_t * resp, int len,
-                                const struct opts_t * op)
+                                struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     uint64_t count;
     const uint8_t * bp;
     const char * cp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
+    static const char * bourlp = "Buffer over-run/under-run log page";
+    static const char * orurc = "over_run_under_run_counter";
 
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Buffer over-run/under-run page  [0x1]\n");
+        sgj_pr_hr(jsp, "%s  [0x1]\n", bourlp);
     num = len - 4;
     bp = &resp[0] + 4;
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, bourlp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                        "buffer_over_run_under_run_log_parameters");
+    }
     while (num > 3) {
         cp = NULL;
         pl = bp[3] + 4;
@@ -1694,6 +1838,12 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
+
         switch (pc) {
         case 0x0:
             cp = "under-run";
@@ -1768,16 +1918,25 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             cp = "time, transfer too slow, over-run";
             break;
         default:
-            printf("  undefined parameter code [0x%x], count = %" PRIu64 "",
-                   pc, count);
+            pr2serr("  undefined parameter code [0x%x], count = %"
+                    PRIu64 "\n", pc, count);
             break;
         }
-        if (cp)
-            printf("  %s = %" PRIu64 "", cp, count);
+            sgj_js_nv_ihex(jsp, jo3p, param_c_snake, pc);
+        sgj_pr_hr(jsp, "  %s=0x%x\n", param_c, pc);
+        if (cp) {
+            sgj_pr_hr(jsp, "    %s = %" PRIu64 "\n", cp, count);
+            js_snakenv_ihexstr_nex(jsp, jo3p, param_c, pc, true,
+                                   NULL, cp, NULL);
+            sgj_js_nv_ihex(jsp, jo3p, orurc, count);
+        } else
+            sgj_pr_hr(jsp, "    counter = %" PRIu64 "\n", count);
 
-        printf("\n");
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
 skip:
@@ -1791,36 +1950,59 @@ skip:
 /* [0x2, 0x3, 0x4, 0x5] <we, re, rre, ve>  introduced: SPC-3 */
 static bool
 show_error_counter_page(const uint8_t * resp, int len,
-                        const struct opts_t * op)
+                        struct opts_t * op, sgj_opaque_p jop)
 {
     bool skip_out = false;
     bool evsm_output = false;
-    int num, pl, pc, pg_code;
+    int n, num, pl, pc, pg_code;
     uint64_t val;
     const uint8_t * bp;
+    const char * pg_cp = NULL;
+    const char * par_cp = NULL;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
+    char b[128] SG_C_CPP_ZERO_INIT;
+    char d[128];
+    char e[64];
+    static const char * wec = "Write error counter";
+    static const char * rec = "Read error counter";
+    static const char * rrec = "Read reverse error counter";
+    static const char * vec = "Verify error counter";
 
     pg_code = resp[0] & 0x3f;
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
-        switch(pg_code) {
-        case WRITE_ERR_LPAGE:
-            printf("Write error counter page  [0x%x]\n", pg_code);
-            break;
-        case READ_ERR_LPAGE:
-            printf("Read error counter page  [0x%x]\n", pg_code);
-            break;
-        case READ_REV_ERR_LPAGE:
-            printf("Read Reverse error counter page  [0x%x]\n",
-                   pg_code);
-            break;
-        case VERIFY_ERR_LPAGE:
-            printf("Verify error counter page  [0x%x]\n", pg_code);
-            break;
-        default:
-            pr2serr("expecting error counter page, got page = 0x%x\n",
-                    resp[0]);
-            return false;
-        }
+    switch(pg_code) {
+    case WRITE_ERR_LPAGE:
+        pg_cp = wec;
+        break;
+    case READ_ERR_LPAGE:
+        pg_cp = rec;
+        break;
+    case READ_REV_ERR_LPAGE:
+        pg_cp = rrec;
+        break;
+    case VERIFY_ERR_LPAGE:
+        pg_cp = vec;
+        break;
+    default:
+        pr2serr("expecting error counter page, got page = 0x%x\n",
+                pg_code);
+        return false;
+    }
+    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
+        sgj_pr_hr(jsp, "%s log page  [0x%x]\n", pg_cp, pg_code);
+    if (jsp->pr_as_json) {
+        n = strlen(pg_cp);
+        memcpy(b, pg_cp, n);
+        memcpy(b + n, " log", 4);
+        n = strlen(b);
+        memcpy(b + n, " page", 5);
+        jo2p = sg_log_js_hdr(jsp, jop, b, resp);
+        memcpy(b + n, " parameters", 11);
+        sgj_convert_to_snake_name(b, d, sizeof(d) - 1);
+        jap = sgj_named_subarray_r(jsp, jo2p, d);
     }
     num = len - 4;
     bp = &resp[0] + 4;
@@ -1838,44 +2020,84 @@ show_error_counter_page(const uint8_t * resp, int len,
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
+
+        par_cp = NULL;
         switch (pc) {
-        case 0: printf("  Errors corrected without substantial delay"); break;
-        case 1: printf("  Errors corrected with possible delays"); break;
-        case 2: printf("  Total rewrites or rereads"); break;
-        case 3: printf("  Total errors corrected"); break;
-        case 4: printf("  Total times correction algorithm processed"); break;
-        case 5: printf("  Total bytes processed"); break;
-        case 6: printf("  Total uncorrected errors"); break;
+        case 0:
+            par_cp = "Errors corrected without substantial delay";
+            break;
+        case 1:
+            par_cp = "Errors corrected with possible delays";
+            break;
+        case 2:
+            par_cp = "Total rewrites or rereads";
+            break;
+        case 3:
+            par_cp = "Total errors corrected";
+            break;
+        case 4:
+            par_cp = "Total times correction algorithm processed";
+            break;
+        case 5:
+            par_cp = "Total bytes processed";
+            break;
+        case 6:
+            par_cp = "Total uncorrected errors";
+            break;
         default:
             if (op->exclude_vendor) {
                 skip_out = true;
                 if ((op->verbose > 0) && (0 == op->do_brief) &&
                     (! evsm_output)) {
                     evsm_output = true;
-                    printf("  Vendor specific parameter(s) being ignored\n");
+                    pr2serr("  Vendor specific parameter(s) being ignored\n");
                 }
             } else {
                 if (0x8009 == pc)
-                    printf("  Track following errors [Hitachi]");
+                    par_cp = "Track following errors [Hitachi]";
                 else if (0x8015 == pc)
-                    printf("  Positioning errors [Hitachi]");
-                else
-                    printf("  Reserved or vendor specific [0x%x]", pc);
+                    par_cp = "Positioning errors [Hitachi]";
+                else {
+                    snprintf(e, sizeof(e), "Reserved or vendor specific "
+                             "[0x%x]", pc);
+                    par_cp = e;
+                }
             }
+            break;
         }
+
         if (skip_out)
             skip_out = false;
-        else {
+        else if (par_cp) {
             val = sg_get_unaligned_be(pl - 4, bp + 4);
-            printf(" = %" PRIu64 "", val);
             if (val > ((uint64_t)1 << 40))
-                printf(" [%" PRIu64 " TB]\n",
-                       (val / (1000UL * 1000 * 1000 * 1000)));
+                snprintf(d, sizeof(d), "%" PRIu64 " [%" PRIu64 " TB]\n",
+                         val, (val / (1000UL * 1000 * 1000 * 1000)));
+            else if (val > ((uint64_t)1 << 30))
+                snprintf(d, sizeof(d), "%" PRIu64 " [%" PRIu64 " GB]\n",
+                         val, (val / (1000UL * 1000 * 1000)));
             else
-                printf("\n");
+                snprintf(d, sizeof(d), "%" PRIu64, val);
+            sgj_pr_hr(jsp, "  %s = %s\n", par_cp, d);
+            if (jsp->pr_as_json) {
+                js_snakenv_ihexstr_nex(jsp, jo3p, param_c, pc, true,
+                                       NULL, par_cp, NULL);
+                sgj_convert_to_snake_name(pg_cp, e, sizeof(e) - 1);
+                n = strlen(e);
+                memcpy(e + n, "_counter", 9); /* take trailing null */
+                sgj_js_nv_ihexstr(jsp, jo3p, e, val, as_s_s, d);
+            }
         }
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
 skip:
@@ -1888,7 +2110,7 @@ skip:
 /* NON_MEDIUM_LPAGE [0x6] <nm>  introduced: SPC-2 */
 static bool
 show_non_medium_error_page(const uint8_t * resp, int len,
-                           const struct opts_t * op)
+                           struct opts_t * op, sgj_opaque_p jop)
 {
     bool skip_out = false;
     bool evsm_output = false;
@@ -1896,6 +2118,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Non-medium error page  [0x6]\n");
     num = len - 4;
@@ -1955,12 +2178,13 @@ skip:
 /* PCT_LPAGE [0x1a] <pct>  introduced: SPC-4 */
 static bool
 show_power_condition_transitions_page(const uint8_t * resp, int len,
-                                      const struct opts_t * op)
+                                      struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Power condition transitions page  [0x1a]\n");
     num = len - 4;
@@ -2013,7 +2237,7 @@ temperature_str(int8_t t, bool reporting, char * b, int blen)
 {
     if (-128 == t) {
         if (reporting)
-            snprintf(b, blen, "not available");
+            snprintf(b, blen, "%s", not_avail);
         else
             snprintf(b, blen, "no limit");
     } else
@@ -2026,7 +2250,7 @@ humidity_str(uint8_t h, bool reporting, char * b, int blen)
 {
     if (255 == h) {
         if (reporting)
-            snprintf(b, blen, "not available");
+            snprintf(b, blen, "%s", not_avail);
         else
             snprintf(b, blen, "no limit");
     } else if (h <= 100)
@@ -2040,17 +2264,41 @@ humidity_str(uint8_t h, bool reporting, char * b, int blen)
  * changed to "other" in spc5r11 */
 static bool
 show_environmental_reporting_page(const uint8_t * resp, int len,
-                                  const struct opts_t * op)
+                                  struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc, blen;
     bool other_valid;
     const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
     char b[32];
+    static const char * erlp = "Environmental reporting log page";
+    static const char * temp = "Temperature";
+    static const char * lmaxt = "Lifetime maximum temperature";
+    static const char * lmint = "Lifetime minimum temperature";
+    static const char * maxtspo = "Maximum temperature since power on";
+    static const char * mintspo = "Minimum temperature since power on";
+    static const char * maxot = "Maximum other temperature";
+    static const char * minot = "Minimum other temperature";
+    static const char * relhum = "Relative humidity";
+    static const char * lmaxrh = "Lifetime maximum relative humidity";
+    static const char * lminrh = "Lifetime minimum relative humidity";
+    static const char * maxrhspo = "Maximum relative humidity since power on";
+    static const char * minrhspo = "Minimum relative humidity since power on";
+    static const char * maxorh = "Maximum other relative humidity";
+    static const char * minorh = "Minimum other relative humidity";
 
     blen = sizeof(b);
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Environmental reporting page  [0xd,0x1]\n");
+        sgj_pr_hr(jsp, "%s  [0xd,0x1]\n", erlp);
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, erlp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                                   "environmental_reporting_log_parameters");
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
@@ -2067,59 +2315,104 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
         other_valid = !!(bp[4] & 1);
         if (pc < 0x100) {
             if (pl < 12)  {
-                printf("  <<expect parameter 0x%x to be at least 12 bytes "
-                       "long, got %d, skip>>\n", pc, pl);
-                goto skip;
+                pr2serr("  <<expect parameter 0x%x to be at least 12 bytes "
+                        "long, got %d, skip>>\n", pc, pl);
+                goto inner;
             }
-            printf("  parameter code=0x%x\n", pc);
-            printf("    OTV=%d\n", (int)other_valid);
-            printf("    Temperature: %s\n",
-                   temperature_str(bp[5], true, b, blen));
-            printf("    Lifetime maximum temperature: %s\n",
-                   temperature_str(bp[6], true, b, blen));
-            printf("    Lifetime minimum temperature: %s\n",
-                   temperature_str(bp[7], true, b, blen));
-            printf("    Maximum temperature since power on: %s\n",
-                   temperature_str(bp[8], true, b, blen));
-            printf("    Minimum temperature since power on: %s\n",
-                   temperature_str(bp[9], true, b, blen));
+            sgj_pr_hr(jsp, "  %s=0x%x\n", param_c, pc);
+            sgj_js_nv_ihex(jsp, jo3p, param_c_snake, pc);
+            sgj_pr_hr(jsp, "    OTV=%d\n", (int)other_valid);
+            sgj_js_nv_ihex_nex(jsp, jo3p, "otv",  (int)other_valid,
+                               false, "Other Temperature Valid");
+
+            temperature_str(bp[5], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", temp, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, temp, bp[5], false,
+                                   NULL, b, "current [Celsius]");
+            temperature_str(bp[6], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lmaxt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lmaxt, bp[6], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[7], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lmint, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lmint, bp[7], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[8], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", maxtspo, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, maxtspo, bp[8], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[9], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", mintspo, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, mintspo, bp[9], false,
+                                   NULL, b, NULL);
             if (other_valid) {
-                printf("    Maximum other temperature: %s\n",
-                       temperature_str(bp[10], true, b, blen));
-                printf("    Minimum other temperature: %s\n",
-                       temperature_str(bp[11], true, b, blen));
+                temperature_str(bp[10], true, b, blen);
+                sgj_pr_hr(jsp, "    %s: %s\n", maxot, b);
+                js_snakenv_ihexstr_nex(jsp, jo3p, maxot, bp[10], false,
+                                       NULL, b, NULL);
+                temperature_str(bp[11], true, b, blen);
+                sgj_pr_hr(jsp, "    %s: %s\n", minot, b);
+                js_snakenv_ihexstr_nex(jsp, jo3p, minot, bp[11], false,
+                                       NULL, b, NULL);
             }
         } else if (pc < 0x200) {
             if (pl < 12)  {
-                printf("  <<expect parameter 0x%x to be at least 12 bytes "
-                       "long, got %d, skip>>\n", pc, pl);
-                goto skip;
+                pr2serr("  <<expect parameter 0x%x to be at least 12 bytes "
+                        "long, got %d, skip>>\n", pc, pl);
+                goto inner;
             }
-            printf("  parameter code=0x%x\n", pc);
-            printf("    ORHV=%d\n", (int)other_valid);
-            printf("    Relative humidity: %s\n",
-                   humidity_str(bp[5], true, b, blen));
-            printf("    Lifetime maximum relative humidity: %s\n",
-                   humidity_str(bp[6], true, b, blen));
-            printf("    Lifetime minimum relative humidity: %s\n",
-                   humidity_str(bp[7], true, b, blen));
-            printf("    Maximum relative humidity since power on: %s\n",
-                   humidity_str(bp[8], true, b, blen));
-            printf("    Minimum relative humidity since power on: %s\n",
-                   humidity_str(bp[9], true, b, blen));
+            sgj_pr_hr(jsp, "  %s=0x%x\n", param_c, pc);
+            sgj_js_nv_ihex(jsp, jo3p, param_c_snake, pc);
+            sgj_pr_hr(jsp, "    ORHV=%d\n", (int)other_valid);
+            sgj_js_nv_ihex_nex(jsp, jo3p, "orhv",  (int)other_valid,
+                               false, "Other Relative Humidity Valid");
+
+            humidity_str(bp[5], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", relhum, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, relhum, bp[5], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[6], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lmaxrh, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lmaxrh, bp[6], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[7], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lminrh, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lminrh, bp[7], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[8], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", maxrhspo, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, maxrhspo, bp[8], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[9], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", minrhspo, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, minrhspo, bp[9], false,
+                                   NULL, b, NULL);
             if (other_valid) {
-                printf("    Maximum other relative humidity: %s\n",
-                       temperature_str(bp[10], true, b, blen));
-                printf("    Minimum other relative humidity: %s\n",
-                       temperature_str(bp[11], true, b, blen));
+                humidity_str(bp[10], true, b, blen);
+                sgj_pr_hr(jsp, "    %s: %s\n", maxorh, b);
+                js_snakenv_ihexstr_nex(jsp, jo3p, maxorh, bp[10], false,
+                                       NULL, b, NULL);
+                humidity_str(bp[11], true, b, blen);
+                sgj_pr_hr(jsp, "    %s: %s\n", minorh, b);
+                js_snakenv_ihexstr_nex(jsp, jo3p, minorh, bp[11], false,
+                                       NULL, b, NULL);
             }
         } else
-            printf("  <<unexpected parameter code 0x%x\n", pc);
+            sgj_pr_hr(jsp, "  <<unexpected parameter code 0x%x\n", pc);
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2], str,
+                      sizeof(str)));
+inner:
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
 skip:
@@ -2132,16 +2425,50 @@ skip:
 /* ENV_LIMITS_SUBPG [0xd,0x2] <enl> introduced: SPC-5 (rev 02) */
 static bool
 show_environmental_limits_page(const uint8_t * resp, int len,
-                               const struct opts_t * op)
+                               struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc, blen;
     const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
     char b[32];
+    static const char * ellp = "Environmental limits log page";
+    static const char * hctlt = "High critical temperature limit trigger";
+    static const char * hctlr = "High critical temperature limit reset";
+    static const char * lctlr = "High critical temperature limit reset";
+    static const char * lctlt = "High critical temperature limit trigger";
+    static const char * hotlt = "High operating temperature limit trigger";
+    static const char * hotlr = "High operating temperature limit reset";
+    static const char * lotlr = "High operating temperature limit reset";
+    static const char * lotlt = "High operating temperature limit trigger";
+    static const char * hcrhlt =
+                "High critical relative humidity limit trigger";
+    static const char * hcrhlr =
+                "High critical relative humidity limit reset";
+    static const char * lcrhlr =
+                "High critical relative humidity limit reset";
+    static const char * lcrhlt =
+                "High critical relative humidity limit trigger";
+    static const char * horhlt =
+                "High operating relative humidity limit trigger";
+    static const char * horhlr =
+                "High operating relative humidity limit reset";
+    static const char * lorhlr =
+                "High operating relative humidity limit reset";
+    static const char * lorhlt =
+                "High operating relative humidity limit trigger";
 
     blen = sizeof(b);
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Environmental limits page  [0xd,0x2]\n");
+        sgj_pr_hr(jsp, "%s  [0xd,0x2]\n", ellp);
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, ellp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                                   "environmental_limits_log_parameters");
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
@@ -2158,49 +2485,101 @@ show_environmental_limits_page(const uint8_t * resp, int len,
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
         if (pc < 0x100) {
             if (pl < 12)  {
-                printf("  <<expect parameter 0x%x to be at least 12 bytes "
-                       "long, got %d, skip>>\n", pc, pl);
-                goto skip;
+                pr2serr("  <<expect parameter 0x%x to be at least 12 bytes "
+                        "long, got %d, skip>>\n", pc, pl);
+                goto inner;
             }
-            printf("  High critical temperature limit trigger: %s\n",
-                   temperature_str(bp[4], false, b, blen));
-            printf("  High critical temperature limit reset: %s\n",
-                   temperature_str(bp[5], false, b, blen));
-            printf("  Low critical temperature limit reset: %s\n",
-                   temperature_str(bp[6], false, b, blen));
-            printf("  Low critical temperature limit trigger: %s\n",
-                   temperature_str(bp[7], false, b, blen));
-            printf("  High operating temperature limit trigger: %s\n",
-                   temperature_str(bp[8], false, b, blen));
-            printf("  High operating temperature limit reset: %s\n",
-                   temperature_str(bp[9], false, b, blen));
-            printf("  Low operating temperature limit reset: %s\n",
-                   temperature_str(bp[10], false, b, blen));
-            printf("  Low operating temperature limit trigger: %s\n",
-                   temperature_str(bp[11], false, b, blen));
+            sgj_pr_hr(jsp, "  %s=0x%x\n", param_c, pc);
+            sgj_js_nv_ihex(jsp, jo3p, param_c_snake, pc);
+
+            temperature_str(bp[4], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", hctlt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, hctlt, bp[4], false,
+                                   NULL, b, "[Celsius]");
+            temperature_str(bp[5], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", hctlr, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, hctlr, bp[5], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[6], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lctlr, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lctlr, bp[6], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[7], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lctlt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lctlt, bp[7], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[8], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", hotlt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, hotlt, bp[8], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[9], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", hotlr, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, hotlr, bp[9], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[10], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lotlr, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lotlr, bp[10], false,
+                                   NULL, b, NULL);
+            temperature_str(bp[11], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lotlt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lotlt, bp[11], false,
+                                   NULL, b, NULL);
         } else if (pc < 0x200) {
-            printf("  High critical relative humidity limit trigger: %s\n",
-                   humidity_str(bp[4], false, b, blen));
-            printf("  High critical relative humidity limit reset: %s\n",
-                   humidity_str(bp[5], false, b, blen));
-            printf("  Low critical relative humidity limit reset: %s\n",
-                   humidity_str(bp[6], false, b, blen));
-            printf("  Low critical relative humidity limit trigger: %s\n",
-                   humidity_str(bp[7], false, b, blen));
-            printf("  High operating relative humidity limit trigger: %s\n",
-                   humidity_str(bp[8], false, b, blen));
-            printf("  High operating relative humidity limit reset: %s\n",
-                   humidity_str(bp[9], false, b, blen));
-            printf("  Low operating relative humidity limit reset: %s\n",
-                   humidity_str(bp[10], false, b, blen));
-            printf("  Low operating relative humidity limit trigger: %s\n",
-                   humidity_str(bp[11], false, b, blen));
+            if (pl < 12)  {
+                pr2serr("  <<expect parameter 0x%x to be at least 12 bytes "
+                        "long, got %d, skip>>\n", pc, pl);
+                goto inner;
+            }
+            sgj_pr_hr(jsp, "  %s=0x%x\n", param_c, pc);
+            sgj_js_nv_ihex(jsp, jo3p, param_c_snake, pc);
+
+            humidity_str(bp[4], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", hcrhlt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, hcrhlt, bp[4], false,
+                                   NULL, b, "[percentage]");
+            humidity_str(bp[5], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", hcrhlr, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, hcrhlr, bp[5], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[6], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lcrhlr, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lcrhlr, bp[6], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[7], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lcrhlt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lcrhlt, bp[7], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[8], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", horhlt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, horhlt, bp[8], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[9], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", horhlr, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, horhlr, bp[9], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[10], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lorhlr, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lorhlr, bp[10], false,
+                                   NULL, b, NULL);
+            humidity_str(bp[11], true, b, blen);
+            sgj_pr_hr(jsp, "    %s: %s\n", lorhlt, b);
+            js_snakenv_ihexstr_nex(jsp, jo3p, lorhlt, bp[11], false,
+                                   NULL, b, NULL);
         } else
-            printf("  <<unexpected parameter code 0x%x\n", pc);
+             sgj_pr_hr(jsp, "  <<unexpected parameter code 0x%x\n", pc);
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+inner:
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
 skip:
@@ -2213,12 +2592,13 @@ skip:
 /* CMD_DUR_LIMITS_SUBPG [0x19,0x21] <cdl>  introduced: SPC-6 (rev 01) */
 static bool
 show_cmd_dur_limits_page(const uint8_t * resp, int len,
-                         const struct opts_t * op)
+                         struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Command duration limits page  [0x19,0x21]\n");
     num = len - 4;
@@ -2320,7 +2700,8 @@ skip:
 
 /* Tape usage: Vendor specific (LTO-5 and LTO-6): 0x30 */
 static bool
-show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_tape_usage_page(const uint8_t * resp, int len, struct opts_t * op,
+                     sgj_opaque_p jop)
 {
     int k, num, extra;
     unsigned int n;
@@ -2328,6 +2709,7 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -2425,13 +2807,15 @@ show_tape_usage_page(const uint8_t * resp, int len, const struct opts_t * op)
 
 /* 0x30 */
 static bool
-show_hgst_perf_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_hgst_perf_page(const uint8_t * resp, int len, struct opts_t * op,
+                    sgj_opaque_p jop)
 {
     bool valid = false;
     int num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("HGST/WDC performance counters page [0x30]\n");
     num = len - 4;
@@ -2503,13 +2887,14 @@ skip:
 /* Tape capacity: vendor specific (LTO-5 and LTO-6 ?): 0x31 */
 static bool
 show_tape_capacity_page(const uint8_t * resp, int len,
-                        const struct opts_t * op)
+                        struct opts_t * op, sgj_opaque_p jop)
 {
     int k, num, extra;
     unsigned int n;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -2568,13 +2953,14 @@ show_tape_capacity_page(const uint8_t * resp, int len,
  * ssc-4 standardizes it at 0x1b <dc> */
 static bool
 show_data_compression_page(const uint8_t * resp, int len,
-                           const struct opts_t * op)
+                           struct opts_t * op, sgj_opaque_p jop)
 {
     int k, j, pl, num, extra, pc, pg_code;
     uint64_t n;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     pg_code = resp[0] & 0x3f;
     num = len - 4;
     bp = &resp[0] + 4;
@@ -2669,12 +3055,13 @@ skip_para:
 /* LAST_N_ERR_LPAGE [0x7] <lne>  introduced: SPC-2 */
 static bool
 show_last_n_error_page(const uint8_t * resp, int len,
-                       const struct opts_t * op)
+                       struct opts_t * op, sgj_opaque_p jop)
 {
     int k, num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -2726,12 +3113,13 @@ show_last_n_error_page(const uint8_t * resp, int len,
 /* LAST_N_DEFERRED_LPAGE [0xb] <lnd>  introduced: SPC-2 */
 static bool
 show_last_n_deferred_error_page(const uint8_t * resp, int len,
-                                const struct opts_t * op)
+                                struct opts_t * op, sgj_opaque_p jop)
 {
     int k, n, num, pl;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -2781,13 +3169,14 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
 /* LAST_N_INQUIRY_DATA_CH_SUBPG [0xb,0x1] <lnic> introduced: SPC-5 (rev 17) */
 static bool
 show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
-                             const struct opts_t * op)
+                             struct opts_t * op, sgj_opaque_p jop)
 {
     int j, num, pl;
     unsigned int k;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n Inquiry data changed  [0xb,0x1]\n");
     num = len - 4;
@@ -2852,12 +3241,13 @@ skip:
 /* LAST_N_MODE_PG_DATA_CH_SUBPG [0xb,0x2] <lnmc> introduced: SPC-5 (rev 17) */
 static bool
 show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
-                                 const struct opts_t * op)
+                                 struct opts_t * op, sgj_opaque_p jop)
 {
     int j, num, pl, pg_code, spg_code;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n Mode page data changed  [0xb,0x2]\n");
     num = len - 4;
@@ -2940,7 +3330,8 @@ static const char * self_test_result[] = {
 
 /* SELF_TEST_LPAGE [0x10] <str>  introduced: SPC-3 */
 static bool
-show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_self_test_page(const uint8_t * resp, int len, struct opts_t * op,
+                    sgj_opaque_p jop)
 {
     int k, num, n, res;
     unsigned int v;
@@ -2949,6 +3340,7 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
     char str[PCB_STR_LEN];
     char b[80];
 
+if (jop) { };
     num = len - 4;
     if (num < 0x190) {
         pr2serr("short self-test results page [length 0x%x rather than "
@@ -3014,11 +3406,19 @@ show_self_test_page(const uint8_t * resp, int len, const struct opts_t * op)
  * N.B. The ENV_REPORTING_SUBPG [0xd,0x1] and the ENV_LIMITS_SUBPG [0xd,0x2]
  * (both added SPC-5) are a superset of this page. */
 static bool
-show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_temperature_page(const uint8_t * resp, int len, struct opts_t * op,
+                      sgj_opaque_p jop)
 {
     int k, num, extra;
     const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
+    static const char * tlp = "Temperature log page";
+    static const char * ctemp = "Current temperature";
+    static const char * rtemp = "Reference temperature";
 
     num = len - 4;
     bp = &resp[0] + 4;
@@ -3028,8 +3428,13 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
     }
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (! op->do_temperature)
-            printf("Temperature page  [0xd]\n");
+            sgj_pr_hr(jsp, "%s  [0xd]\n", tlp);
     }
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, tlp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p, "temperature_log_parameters");
+    }
+
     for (k = num; k > 0; k -= extra, bp += extra) {
         int pc;
 
@@ -3050,36 +3455,72 @@ show_temperature_page(const uint8_t * resp, int len, const struct opts_t * op)
             hex2stdout(bp, extra, op->dstrhex_no_ascii);
             goto skip;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+            sgj_js_nv_ihex(jsp, jo3p, param_c_snake, pc);
+        }
         switch (pc) {
         case 0:
             if ((extra > 5) && (k > 5)) {
                 if (0 == bp[5])
-                    printf("  Current temperature = 0 C (or less)\n");
+                    sgj_pr_hr(jsp, "  %s = 0 C (or less)\n", ctemp);
                 else if (bp[5] < 0xff)
-                    printf("  Current temperature = %d C\n", bp[5]);
+                    sgj_pr_hr(jsp, "  %s = %d C\n", ctemp, bp[5]);
                 else
-                    printf("  Current temperature = <not available>\n");
+                    sgj_pr_hr(jsp, "  %s = <%s>\n", ctemp, not_avail);
+                if (jsp->pr_as_json) {
+                    const char * cp;
+
+                    if (0 == bp[5])
+                        cp = "current in C (or less)";
+                    else if (0xff == bp[5])
+                        cp = "current temperature not available";
+                    else
+                        cp = "current in C";
+                    sgj_js_nv_ihex_nex(jsp, jo3p, "temperature", bp[5], true,
+                                       cp);
+                }
             }
             break;
         case 1:
             if ((extra > 5) && (k > 5)) {
                 if (bp[5] < 0xff)
-                    printf("  Reference temperature = %d C\n", bp[5]);
+                    sgj_pr_hr(jsp, "  %s = %d C\n", rtemp, bp[5]);
                 else
-                    printf("  Reference temperature = <not available>\n");
+                    sgj_pr_hr(jsp, "  %s = <%s>\n", rtemp, not_avail);
+                if (jsp->pr_as_json) {
+                    const char * cp;
+
+                    if (0 == bp[5])
+                        cp = "in C (or less)";
+                    else if (0xff == bp[5])
+                        cp = "not available";
+                    else
+                        cp = "in C";
+                    sgj_js_nv_ihex_nex(jsp, jo3p, "reference_temperature",
+                                       bp[5], true, cp);
+                }
             }
             break;
         default:
             if (! op->do_temperature) {
-                printf("  unknown parameter code = 0x%x, contents in "
-                       "hex:\n", pc);
+                sgj_pr_hr(jsp, "  unknown parameter code = 0x%x, contents "
+                          "in hex:\n", pc);
                 hex2stdout(bp, extra, op->dstrhex_no_ascii);
-            } else
+            } else {
+                if (jsp->pr_as_json)
+                    sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
                 continue;
+            }
             break;
         }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2], str,
+                      sizeof(str)));
 skip:
         if (op->filter_given)
             break;
@@ -3089,12 +3530,14 @@ skip:
 
 /* START_STOP_LPAGE [0xe] <sscc>  introduced: SPC-3 */
 static bool
-show_start_stop_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_start_stop_page(const uint8_t * resp, int len, struct opts_t * op,
+                     sgj_opaque_p jop)
 {
     int k, num, extra;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -3200,12 +3643,14 @@ skip:
 
 /* APP_CLIENT_LPAGE [0xf] <ac>  introduced: SPC-3 */
 static bool
-show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_app_client_page(const uint8_t * resp, int len, struct opts_t * op,
+                     sgj_opaque_p jop)
 {
     int k, num, extra;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -3252,7 +3697,8 @@ show_app_client_page(const uint8_t * resp, int len, const struct opts_t * op)
 /* IE_LPAGE [0x2f] <ie> "Informational Exceptions"  introduced: SPC-3
  * Previously known as "SMART Status and Temperature Reading" lpage.  */
 static bool
-show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_ie_page(const uint8_t * resp, int len, struct opts_t * op,
+             sgj_opaque_p jop)
 {
     bool skip = false;
     int k, num, param_len;
@@ -3266,6 +3712,7 @@ show_ie_page(const uint8_t * resp, int len, const struct opts_t * op)
     bool is_smstr = op->lep ? (MVP_SMSTR & op->lep->flags) :
                               (VP_SMSTR == op->vend_prod_num);
 
+if (jop) { };
     full = ! op->do_temperature;
     if ('\0' != t10_vendor_str[0]) {
         if (0 != strcmp(vp_arr[VP_SMSTR].t10_vendorp, t10_vendor_str))
@@ -3650,7 +4097,7 @@ sas_negot_link_rate(int lrate, char * b, int blen)
 /* helper for SAS port of PROTO_SPECIFIC_LPAGE [0x18] */
 static void
 show_sas_port_param(const uint8_t * bp, int param_len,
-                    const struct opts_t * op)
+                    struct opts_t * op, sgj_opaque_p jop)
 {
     int j, m, nphys, t, sz, spld_len;
     const uint8_t * vcp;
@@ -3658,6 +4105,7 @@ show_sas_port_param(const uint8_t * bp, int param_len,
     unsigned int ui;
     char s[64];
 
+if (jop) { };
     sz = sizeof(s);
     t = sg_get_unaligned_be16(bp + 0);
     if (op->do_name)
@@ -3727,7 +4175,7 @@ show_sas_port_param(const uint8_t * bp, int param_len,
             printf("    attached SAS device type: %s\n", s);
             t = 0xf & vcp[4];
             switch (t) {
-            case 0: snprintf(s, sz, "unknown"); break;
+            case 0: snprintf(s, sz, "%s", unknown_s); break;
             case 1: snprintf(s, sz, "power on"); break;
             case 2: snprintf(s, sz, "hard reset"); break;
             case 3: snprintf(s, sz, "SMP phy control function"); break;
@@ -3744,7 +4192,7 @@ show_sas_port_param(const uint8_t * bp, int param_len,
             printf("    attached reason: %s\n", s);
             t = (vcp[5] & 0xf0) >> 4;
             switch (t) {
-            case 0: snprintf(s, sz, "unknown"); break;
+            case 0: snprintf(s, sz, "%s", unknown_s); break;
             case 1: snprintf(s, sz, "power on"); break;
             case 2: snprintf(s, sz, "hard reset"); break;
             case 3: snprintf(s, sz, "SMP phy control function"); break;
@@ -3816,11 +4264,12 @@ show_sas_port_param(const uint8_t * bp, int param_len,
 /* PROTO_SPECIFIC_LPAGE [0x18] <psp> */
 static bool
 show_protocol_specific_page(const uint8_t * resp, int len,
-                            const struct opts_t * op)
+                            struct opts_t * op, sgj_opaque_p jop)
 {
     int k, num, pl, pid;
     const uint8_t * bp;
 
+if (jop) { };
     num = len - 4;
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (op->do_name)
@@ -3850,7 +4299,7 @@ show_protocol_specific_page(const uint8_t * resp, int len,
         if ((0 == k) && (! op->do_name))
             printf("Protocol Specific port page for SAS SSP  (sas-2) "
                    "[0x18]\n");
-        show_sas_port_param(bp, pl, op);
+        show_sas_port_param(bp, pl, op, jop);
         if (op->filter_given)
             break;
 skip:
@@ -3864,7 +4313,7 @@ skip:
 /* STATS_LPAGE [0x19], subpages: 0x0 to 0x1f <gsp,grsp>  introduced: SPC-4 */
 static bool
 show_stats_perform_pages(const uint8_t * resp, int len,
-                         const struct opts_t * op)
+                         struct opts_t * op, sgj_opaque_p jop)
 {
     bool nam, spf;
     int k, num, param_len, param_code, subpg_code, extra;
@@ -3873,6 +4322,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
     const char * ccp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     nam = op->do_name;
     num = len - 4;
     bp = resp + 4;
@@ -4152,7 +4602,8 @@ skip2:
 /* Returns true if processed page, false otherwise */
 /* STATS_LPAGE [0x19], CACHE_STATS_SUBPG [0x20] <cms>  introduced: SPC-4 */
 static bool
-show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_cache_stats_page(const uint8_t * resp, int len, struct opts_t * op,
+                      sgj_opaque_p jop)
 {
     int k, num, subpg_code, extra;
     bool nam, spf;
@@ -4162,6 +4613,7 @@ show_cache_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
     uint64_t ull;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     nam = op->do_name;
     num = len - 4;
     bp = resp + 4;
@@ -4287,7 +4739,7 @@ skip:
 /* FORMAT_STATUS_LPAGE [0x8] <fs>  introduced: SBC-2 */
 static bool
 show_format_status_page(const uint8_t * resp, int len,
-                        const struct opts_t * op)
+                        struct opts_t * op, sgj_opaque_p jop)
 {
     int k, num, pl, pc;
     bool is_count;
@@ -4297,6 +4749,7 @@ show_format_status_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
     char b[512];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Format status page  [0x8]\n");
     num = len - 4;
@@ -4378,12 +4831,13 @@ skip:
 /* Non-volatile cache page [0x17] <nvc>  introduced: SBC-2 */
 static bool
 show_non_volatile_cache_page(const uint8_t * resp, int len,
-                             const struct opts_t * op)
+                             struct opts_t * op, sgj_opaque_p jop)
 {
     int j, num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Non-volatile cache page  [0x17]\n");
     num = len - 4;
@@ -4412,7 +4866,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
                     printf("0 (i.e. it is now volatile)\n");
                     break;
                 case 1:
-                    printf("<unknown>\n");
+                    printf("<%s>\n", unknown_s);
                     break;
                 case 0xffffff:
                     printf("<indefinite>\n");
@@ -4465,7 +4919,7 @@ skip:
 /* LB_PROV_LPAGE [0xc] <lbp> introduced: SBC-3 */
 static bool
 show_lb_provisioning_page(const uint8_t * resp, int len,
-                          const struct opts_t * op)
+                          struct opts_t * op, sgj_opaque_p jop)
 {
     bool evsm_output = false;
     int num, pl, pc;
@@ -4473,6 +4927,7 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
     const char * cp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Logical block provisioning page  [0xc]\n");
     num = len - 4;
@@ -4567,12 +5022,14 @@ skip:
 
 /* UTILIZATION_SUBPG [0xe,0x1] <util>  introduced: SBC-4 */
 static bool
-show_utilization_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_utilization_page(const uint8_t * resp, int len, struct opts_t * op,
+                      sgj_opaque_p jop)
 {
     int num, pl, pc, k;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Utilization page  [0xe,0x1]\n");
     num = len - 4;
@@ -4639,12 +5096,13 @@ skip:
 /* SOLID_STATE_MEDIA_LPAGE [0x11] <ssm>  introduced: SBC-3 */
 static bool
 show_solid_state_media_page(const uint8_t * resp, int len,
-                            const struct opts_t * op)
+                            struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Solid state media page  [0x11]\n");
     num = len - 4;
@@ -4717,7 +5175,7 @@ static const char * dt_dev_activity[] = {
 /* DT device status [0x11] <dtds> (ssc, adc) */
 static bool
 show_dt_device_status_page(const uint8_t * resp, int len,
-                           const struct opts_t * op)
+                           struct opts_t * op, sgj_opaque_p jop)
 {
     bool evsm_output = false;
     int num, pl, pc, j;
@@ -4725,6 +5183,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
     char b[512];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("DT device status page (ssc-3, adc-3) [0x11]\n");
     num = len - 4;
@@ -4869,13 +5328,14 @@ skip:
 /* TapeAlert response [0x12] <tar> (adc,ssc) */
 static bool
 show_tapealert_response_page(const uint8_t * resp, int len,
-                             const struct opts_t * op)
+                             struct opts_t * op, sgj_opaque_p jop)
 {
     bool evsm_output = false;
     int num, pl, pc, k, mod, div;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("TapeAlert response page (ssc-3, adc-3) [0x12]\n");
     num = len - 4;
@@ -4971,13 +5431,14 @@ static const char * req_rec_arr[NUM_REQ_REC_ARR_ELEMS] = {
 /* REQ_RECOVERY_LPAGE Requested recovery [0x13] <rr> (ssc) */
 static bool
 show_requested_recovery_page(const uint8_t * resp, int len,
-                             const struct opts_t * op)
+                             struct opts_t * op, sgj_opaque_p jop)
 {
     bool evsm_output = false;
     int num, pl, pc, j, k;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Requested recovery page (ssc-3) [0x13]\n");
     num = len - 4;
@@ -5045,13 +5506,14 @@ skip:
 /* SAT_ATA_RESULTS_LPAGE (SAT-2) [0x16] <aptr> */
 static bool
 show_ata_pt_results_page(const uint8_t * resp, int len,
-                         const struct opts_t * op)
+                         struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     const uint8_t * bp;
     const uint8_t * dp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("ATA pass-through results page (sat-2) [0x16]\n");
     num = len - 4;
@@ -5138,7 +5600,7 @@ static const char * reassign_status[] = {
 /* Background scan results [0x15,0] <bsr> for disk  introduced: SBC-3 */
 static bool
 show_background_scan_results_page(const uint8_t * resp, int len,
-                                  const struct opts_t * op)
+                                  struct opts_t * op, sgj_opaque_p jop)
 {
     bool skip_out = false;
     bool evsm_output = false;
@@ -5146,6 +5608,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Background scan results page  [0x15]\n");
     num = len - 4;
@@ -5282,13 +5745,14 @@ skip:
 /* ZONED_BLOCK_DEV_STATS_SUBPG [0x14,0x1] <zbds>  introduced: zbc2r01 */
 static bool
 show_zoned_block_dev_stats(const uint8_t * resp, int len,
-                           const struct opts_t * op)
+                           struct opts_t * op, sgj_opaque_p jop)
 {
     bool trunc, bad_pl;
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Zoned block device statistics page  [0x14,0x1]\n");
     num = len - 4;
@@ -5458,13 +5922,14 @@ skip:
 /* PENDING_DEFECTS_SUBPG [0x15,0x1] <pd>  introduced: SBC-4 */
 static bool
 show_pending_defects_page(const uint8_t * resp, int len,
-                          const struct opts_t * op)
+                          struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     uint32_t count;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Pending defects page  [0x15,0x1]\n");
     num = len - 4;
@@ -5535,12 +6000,13 @@ skip:
 /* BACKGROUND_OP_SUBPG [0x15,0x2] <bop>  introduced: SBC-4 rev 7 */
 static bool
 show_background_op_page(const uint8_t * resp, int len,
-                        const struct opts_t * op)
+                        struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Background operation page  [0x15,0x2]\n");
     num = len - 4;
@@ -5595,12 +6061,13 @@ skip:
    LPS: "Long Physical Sector" a term from an ATA feature set */
 static bool
 show_lps_misalignment_page(const uint8_t * resp, int len,
-                           const struct opts_t * op)
+                           struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("LPS misalignment page  [0x15,0x3]\n");
     num = len - 4;
@@ -5659,13 +6126,14 @@ skip:
 /* Service buffer information [0x15] <sbi> (adc) */
 static bool
 show_service_buffer_info_page(const uint8_t * resp, int len,
-                              const struct opts_t * op)
+                              struct opts_t * op, sgj_opaque_p jop)
 {
     bool evsm_output = false;
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Service buffer information page (adc-3) [0x15]\n");
     num = len - 4;
@@ -5726,7 +6194,7 @@ skip:
 /* Sequential access device page [0xc] <sad> for tape */
 static bool
 show_sequential_access_page(const uint8_t * resp, int len,
-                            const struct opts_t * op)
+                            struct opts_t * op, sgj_opaque_p jop)
 {
     bool evsm_output = false;
     int num, pl, pc;
@@ -5735,6 +6203,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
     bool all_set;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Sequential access device page (ssc-3)\n");
     num = len - 4;
@@ -5850,13 +6319,14 @@ skip:
 /* Device statistics 0x14 <ds> for tape and ADC */
 static bool
 show_device_stats_page(const uint8_t * resp, int len,
-                       const struct opts_t * op)
+                       struct opts_t * op, sgj_opaque_p jop)
 {
     bool evsm_output = false;
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Device statistics page (ssc-3 and adc)\n");
     num = len - 4;
@@ -6039,13 +6509,15 @@ skip:
 
 /* Media changer statistics 0x14 <mcs> for media changer */
 static bool
-show_media_stats_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_media_stats_page(const uint8_t * resp, int len, struct opts_t * op,
+                      sgj_opaque_p jop)
 {
     int num, pl, pc;
     const uint8_t * bp;
     uint64_t ull;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Media statistics page (smc-3)\n");
     num = len - 4;
@@ -6176,13 +6648,14 @@ skip:
 /* Element statistics page, 0x15 <els> for SMC */
 static bool
 show_element_stats_page(const uint8_t * resp, int len,
-                        const struct opts_t * op)
+                        struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     unsigned int v;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Element statistics page (smc-3) [0x15]\n");
     num = len - 4;
@@ -6229,7 +6702,7 @@ skip:
 /* Tape diagnostic data [0x16] <tdd> for tape */
 static bool
 show_tape_diag_data_page(const uint8_t * resp, int len,
-                         const struct opts_t * op)
+                         struct opts_t * op, sgj_opaque_p jop)
 {
     int k, n, num, pl, pc;
     unsigned int v;
@@ -6237,6 +6710,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
     char b[512];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Tape diagnostics data page (ssc-3) [0x16]\n");
     num = len - 4;
@@ -6318,7 +6792,7 @@ skip:
 /* Media changer diagnostic data [0x16] <mcdd> for media changer */
 static bool
 show_mchanger_diag_data_page(const uint8_t * resp, int len,
-                             const struct opts_t * op)
+                             struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
     unsigned int v;
@@ -6326,6 +6800,7 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
     char b[512];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Media changer diagnostics data page (smc-3) [0x16]\n");
     num = len - 4;
@@ -6482,7 +6957,7 @@ volume_stats_history(const uint8_t * xp, int len)
 /* Volume Statistics log page and subpages (ssc-4) [0x17, 0x0-0xf] <vs> */
 static bool
 show_volume_stats_pages(const uint8_t * resp, int len,
-                       const struct opts_t * op)
+                       struct opts_t * op, sgj_opaque_p jop)
 {
     bool skip_out = false;
     bool evsm_output = false;
@@ -6492,6 +6967,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
     char b[512];
 
+if (jop) { };
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : 0;
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
@@ -6733,12 +7209,13 @@ skip:
 /* TAPE_ALERT_LPAGE [0x2e] <ta> */
 static bool
 show_tape_alert_ssc_page(const uint8_t * resp, int len,
-                         const struct opts_t * op)
+                         struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc, flag;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     /* N.B. the Tape alert log page for smc-3 is different */
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Tape alert page (ssc-3) [0x2e]\n");
@@ -6786,7 +7263,7 @@ skip:
 /* 0x37 */
 static bool
 show_seagate_cache_page(const uint8_t * resp, int len,
-                        const struct opts_t * op)
+                        struct opts_t * op, sgj_opaque_p jop)
 {
     bool skip = false;
     int num, pl, pc;
@@ -6794,6 +7271,7 @@ show_seagate_cache_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
         if (resp[1] > 0) {
             printf("Suspicious page 0x37, SPF=0 but subpage=0x%x\n", resp[1]);
@@ -6862,13 +7340,15 @@ skip:
 
 /* 0x37 */
 static bool
-show_hgst_misc_page(const uint8_t * resp, int len, const struct opts_t * op)
+show_hgst_misc_page(const uint8_t * resp, int len, struct opts_t * op,
+                    sgj_opaque_p jop)
 {
     bool valid = false;
     int num, pl, pc;
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("HGST/WDC miscellaneous page [0x37, 0x%x]\n",
                op->decod_subpg_code);
@@ -6932,7 +7412,7 @@ skip:
 /* 0x3e */
 static bool
 show_seagate_factory_page(const uint8_t * resp, int len,
-                          const struct opts_t * op)
+                          struct opts_t * op, sgj_opaque_p jop)
 {
     bool valid = false;
     int num, pl, pc;
@@ -6940,6 +7420,7 @@ show_seagate_factory_page(const uint8_t * resp, int len,
     uint64_t ull;
     char str[PCB_STR_LEN];
 
+if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Seagate/Hitachi factory page [0x3e]\n");
     num = len - 4;
@@ -6989,7 +7470,8 @@ skip:
 }
 
 static void
-decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
+decode_page_contents(const uint8_t * resp, int len, struct opts_t * op,
+                     sgj_opaque_p jop)
 {
     int pg_code, subpg_code, vpn;
     bool spf;
@@ -7008,7 +7490,7 @@ decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
         subpg_code = spf ? resp[1] : 0;
     op->decod_subpg_code = subpg_code;
     if ((SUPP_SPGS_SUBPG == subpg_code) && (SUPP_PAGES_LPAGE != pg_code)) {
-        done = show_supported_pgs_sub_page(resp, len, op);
+        done = show_supported_pgs_sub_page(resp, len, op, jop);
         if (done)
             return;
     }
@@ -7017,7 +7499,7 @@ decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
 
     /* Below is the indirect function call to all the show_* functions */
     if (lep && lep->show_pagep)
-        done = (*lep->show_pagep)(resp, len, op);
+        done = (*lep->show_pagep)(resp, len, op, jop);
 
     if (! done) {
         if (0 == op->do_hex) {
@@ -7045,7 +7527,8 @@ decode_page_contents(const uint8_t * resp, int len, struct opts_t * op)
 /* Tries to fetch the TEMPERATURE_LPAGE [0xd] page first. If that fails
  * tries to get the Informational Exceptions (IE_LPAGE) page. */
 static int
-fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
+fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op,
+                 sgj_opaque_p jop)
 {
     int len;
     int res = 0;
@@ -7060,7 +7543,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
         else if (op->do_hex)
             hex2stdout(resp, len, op->dstrhex_no_ascii);
         else
-            show_temperature_page(resp, len, op);
+            show_temperature_page(resp, len, op, jop);
     } else if (SG_LIB_CAT_NOT_READY == res)
         pr2serr("Device not ready\n");
     else {
@@ -7073,7 +7556,7 @@ fetchTemperature(int sg_fd, uint8_t * resp, int max_len, struct opts_t * op)
             else if (op->do_hex)
                 hex2stdout(resp, len, op->dstrhex_no_ascii);
             else
-                show_ie_page(resp, len, op);
+                show_ie_page(resp, len, op, jop);
         } else
             pr2serr("Unable to find temperature in either Temperature or "
                     "IE log page\n");
@@ -7201,6 +7684,7 @@ merge_both_supported(const uint8_t * supp_pgs_p, int su_p_pg_len, int pg_len)
 int
 main(int argc, char * argv[])
 {
+    bool as_json;
     int k, pg_len, res, vb;
     int resp_len = 0;
     int su_p_pg_len = 0;
@@ -7210,6 +7694,8 @@ main(int argc, char * argv[])
     uint8_t * parr;
     uint8_t * free_parr = NULL;
     struct opts_t * op;
+    sgj_state * jsp;
+    sgj_opaque_p jop = NULL;
     struct sg_simple_inquiry_resp inq_out;
     struct opts_t opts SG_C_CPP_ZERO_INIT;
     uint8_t supp_pgs_rsp[256];
@@ -7226,6 +7712,11 @@ main(int argc, char * argv[])
     if (op->do_help) {
         usage_for(op->do_help, op);
         return 0;
+    }
+    jsp = &op->json_st;
+    as_json = jsp->pr_as_json;
+    if (as_json) {
+        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
     }
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
@@ -7357,7 +7848,7 @@ main(int argc, char * argv[])
                     /* Below is the indirect function call to all the
                      * show_* functions */
                     if (lep->show_pagep)
-                        (*lep->show_pagep)(bp, n, op);
+                        (*lep->show_pagep)(bp, n, op, jop);
                     else
                         printf("Unable to decode %s [%s]\n", lep->name,
                                lep->acron);
@@ -7479,8 +7970,8 @@ main(int argc, char * argv[])
         op->dev_pdt = inq_out.peripheral_type;
         if ((! op->do_raw) && (0 == op->do_hex) && (! op->do_name) &&
             (0 == op->no_inq) && (0 == op->do_brief))
-            printf("    %.8s  %.16s  %.4s\n", inq_out.vendor,
-                   inq_out.product, inq_out.revision);
+            sgj_pr_hr(jsp, "    %.8s  %.16s  %.4s\n", inq_out.vendor,
+                      inq_out.product, inq_out.revision);
         memcpy(t10_vendor_str, inq_out.vendor, 8);
         memcpy(t10_product_str, inq_out.product, 16);
         if (VP_NONE == op->vend_prod_num)
@@ -7488,7 +7979,7 @@ main(int argc, char * argv[])
     }
 
     if (op->do_temperature) {
-        ret = fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, op);
+        ret = fetchTemperature(sg_fd, rsp_buff, SHORT_RESP_LEN, op, jop);
         goto err_out;
     }
     if (op->do_select) {
@@ -7578,7 +8069,7 @@ good:
             if (op->do_hex > 2)
                 hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
             else
-                decode_page_contents(rsp_buff, pg_len + 4, op);
+                decode_page_contents(rsp_buff, pg_len + 4, op, jop);
         } else if (op->do_raw)
             dStrRaw(rsp_buff, pg_len + 4);
         else if (op->do_hex > 1)
@@ -7595,7 +8086,7 @@ good:
                 hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
             }
             else
-                decode_page_contents(rsp_buff, pg_len + 4, op);
+                decode_page_contents(rsp_buff, pg_len + 4, op, jop);
         }
     }
     ret = res;
@@ -7642,7 +8133,7 @@ good:
                 if (op->do_raw && (! op->filter_given))
                     dStrRaw(rsp_buff, pg_len + 4);
                 else if (op->do_hex > 4)
-                    decode_page_contents(rsp_buff, pg_len + 4, op);
+                    decode_page_contents(rsp_buff, pg_len + 4, op, jop);
                 else if (op->do_hex > 1)
                     hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
                 else if (1 == op->do_hex) {
@@ -7660,7 +8151,7 @@ good:
                     hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
                 }
                 else
-                    decode_page_contents(rsp_buff, pg_len + 4, op);
+                    decode_page_contents(rsp_buff, pg_len + 4, op, jop);
             } else if (SG_LIB_CAT_INVALID_OP == res)
                 pr2serr("%spage=0x%x,0x%x not supported\n", ls_s,
                         op->pg_code, op->subpg_code);
@@ -7688,6 +8179,11 @@ err_out:
         if (! sg_if_can2stderr("sg_logs failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
+    }
+    if (as_json) {
+        if (0 == op->do_hex)
+            sgj_js2file(jsp, NULL, res, stdout);
+        sgj_finish(jsp);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

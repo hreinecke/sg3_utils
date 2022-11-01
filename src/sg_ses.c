@@ -296,7 +296,7 @@ struct data_in_desc_t {
 };
 
 
-/* Join array has four "element index"ing stategies:
+/* Join array has four "element index"ing strategies:
  *   [1] based on all descriptors in the Enclosure Status (ES) dpage
  *   [2] based on the non-overall descriptors in the ES dpage
  *   [3] based on the non-overall descriptors of these element types

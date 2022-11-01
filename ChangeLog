@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20221027] [svn: r977]
+Changelog for pre-release sg3_utils-1.48 [20221101] [svn: r978]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -70,6 +70,8 @@ Changelog for pre-release sg3_utils-1.48 [20221027] [svn: r977]
     SAS address
   - sg_turs: change nanosleep() to Sleep() in MinGW
   - sg_stream_ctl: fix --get indexing
+  - sg_read_block_limits: fix granularity value
+     - add --mloi option
   - inhex/logs_last_n.hex: new, tests for the 4 "Last n ..."
     log (sub)pages
   - sg_lib: add sg_pdt_s_eq() to cope with ZBC disks which may
@@ -83,6 +85,7 @@ Changelog for pre-release sg3_utils-1.48 [20221027] [svn: r977]
     - correct fixed format sense data command-specific field
       for ata-passthrough (lba field), see:
       https://github.com/doug-gilbert/sg3_utils/pull/25
+    - add sg_ll_read_block_limits_v2() for MLOI bit
   - initialize all sense buffers to 0
   - linux: replace references to /proc/scsi/sg with
     /sys/module/sg/parameters/

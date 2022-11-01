@@ -869,6 +869,25 @@ sgj_convert_to_snake_name(const char * in_name, char * sname,
     return sname;
 }
 
+bool
+sgj_is_snake_name(const char * in_name)
+{
+    size_t k;
+    size_t ln = strlen(in_name);
+    char c;
+
+    for (k = 0; k < ln; ++k) {
+        c = in_name[k];
+        if (((c >= '0') && (c <= '9')) ||
+            ((c >= 'a') && (c <= 'z')) ||
+            (c == '_'))
+            continue;
+        else
+            return false;
+    }
+    return true;
+}
+
 /* This function tries to convert the 'in' C string to "snake_case"
  * convention so the output 'out' only contains lower case ASCII letters,
  * numerals and "_" as a separator. Any leading or trailing underscores
