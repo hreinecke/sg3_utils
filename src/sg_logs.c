@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.02 20221101";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.04 20221103";    /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_logs"
 
@@ -124,9 +124,10 @@ static const int parr_sz = 4096;
 
 static const char * unknown_s = "unknown";
 static const char * not_avail = "not available";
-static const char * param_c = "parameter code";
+static const char * param_c = "Parameter code";
 static const char * param_c_snake = "parameter_code";
 static const char * as_s_s = "as_string";
+static const char * restricted_s = "restricted";
 
 static struct option long_options[] = {
         {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
@@ -192,6 +193,7 @@ struct opts_t {
     int do_hex;
     int do_list;
     int dstrhex_no_ascii;       /* value for dStrHex() no_ascii argument */
+    int hex2str_oformat;        /* value for hex2str() oformat argument */
     int vend_prod_num;  /* one of the VP_* constants or -1 (def) */
     int deduced_vpn;    /* deduced vendor_prod_num; from INQUIRY, etc */
     int verbose;
@@ -953,18 +955,21 @@ pg_subpg_pdt_search(int pg_code, int subpg_code, int pdt, int vpn)
 }
 
 static void
-js_snakenv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * name,
-                       int64_t val_i, bool hex_as_well, const char * str_name,
+js_snakenv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop,
+                       const char * conv2sname, int64_t val_i,
+                       bool hex_as_well, const char * str_name,
                        const char * val_s, const char * nex_s)
 {
 
-    if (sgj_is_snake_name(name))
-        sgj_js_nv_ihexstr_nex(jsp, jop, name, val_i, hex_as_well, str_name,
-                              val_s, nex_s);
+    if ((NULL == jsp) || (NULL == jop))
+        return;
+    if (sgj_is_snake_name(conv2sname))
+        sgj_js_nv_ihexstr_nex(jsp, jop, conv2sname, val_i, hex_as_well,
+                              str_name, val_s, nex_s);
     else {
         char b[128];
 
-        sgj_convert_to_snake_name(name, b, sizeof(b));
+        sgj_convert_to_snake_name(conv2sname, b, sizeof(b));
         sgj_js_nv_ihexstr_nex(jsp, jop, b, val_i, hex_as_well, str_name,
                               val_s, nex_s);
     }
@@ -2115,14 +2120,26 @@ show_non_medium_error_page(const uint8_t * resp, int len,
     bool skip_out = false;
     bool evsm_output = false;
     int num, pl, pc;
+    uint64_t count;
     const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
+    char b[128] SG_C_CPP_ZERO_INIT;
+    static const char * nmelp = "Non-medium error log page";
+    static const char * nmec = "Non-medium error count";
 
-if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Non-medium error page  [0x6]\n");
+        sgj_pr_hr(jsp, "%s  [0x6]\n", nmelp);
     num = len - 4;
     bp = &resp[0] + 4;
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, nmelp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                        "non_medium_error_log_parameters");
+    }
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
         pl = bp[3] + 4;
@@ -2137,35 +2154,47 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
+
         switch (pc) {
         case 0:
-            printf("  Non-medium error count");
+            snprintf(b, sizeof(b), "%s", nmec);
             break;
         default:
             if (pc <= 0x7fff)
-                printf("  Reserved [0x%x]", pc);
+                snprintf(b, sizeof(b), "  Reserved [0x%x]", pc);
             else {
                 if (op->exclude_vendor) {
                     skip_out = true;
                     if ((op->verbose > 0) && (0 == op->do_brief) &&
                         (! evsm_output)) {
                         evsm_output = true;
-                        printf("  Vendor specific parameter(s) being "
-                               "ignored\n");
+                        pr2serr("  Vendor specific parameter(s) being "
+                                "ignored\n");
                     }
                 } else
-                    printf("  Vendor specific [0x%x]", pc);
+                    snprintf(b, sizeof(b), "Vendor specific [0x%x]", pc);
             }
             break;
         }
         if (skip_out)
             skip_out = false;
         else {
-            printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-            printf("\n");
+            count = sg_get_unaligned_be(pl - 4, bp + 4);
+            sgj_pr_hr(jsp, "  %s = %" PRIu64 "\n", b, count);
+            js_snakenv_ihexstr_nex(jsp, jo3p, param_c, pc, true,
+                                   NULL, b, NULL);
+            sgj_js_nv_ihex(jsp, jo3p, nmec, count);
         }
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
 skip:
@@ -2181,14 +2210,27 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
                                       struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
+    uint64_t count;
     const uint8_t * bp;
+    const char * cp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
+    char b[80];
+    static const char * pctlp = "Power condition transitions log page";
 
-if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Power condition transitions page  [0x1a]\n");
+        sgj_pr_hr(jsp, "%s  [0x1a]\n", pctlp);
     num = len - 4;
     bp = &resp[0] + 4;
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, pctlp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                        "power_condition_transition_log_parameters");
+    }
+
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
         pl = bp[3] + 4;
@@ -2203,26 +2245,44 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
+
+        cp = NULL;
         switch (pc) {
         case 1:
-            printf("  Accumulated transitions to active"); break;
+            cp = "Accumulated transitions to active";
+            break;
         case 2:
-            printf("  Accumulated transitions to idle_a"); break;
+            cp = "Accumulated transitions to idle_a";
+            break;
         case 3:
-            printf("  Accumulated transitions to idle_b"); break;
+            cp = "Accumulated transitions to idle_b";
+            break;
         case 4:
-            printf("  Accumulated transitions to idle_c"); break;
+            cp = "Accumulated transitions to idle_c";
+            break;
         case 8:
-            printf("  Accumulated transitions to standby_z"); break;
+            cp = "Accumulated transitions to standby_z";
+            break;
         case 9:
-            printf("  Accumulated transitions to standby_y"); break;
+            cp = "Accumulated transitions to standby_y";
+            break;
         default:
-            printf("  Reserved [0x%x]", pc);
+            snprintf(b, sizeof(b), "Reserved [0x%x]", pc);
+            cp = b;
+            break;
         }
-        printf(" = %" PRIu64 "", sg_get_unaligned_be(pl - 4, bp + 4));
-        printf("\n");
+        count = sg_get_unaligned_be(pl - 4, bp + 4);
+        sgj_pr_hr(jsp, "  %s = %" PRIu64 "\n", cp, count);
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
 skip:
@@ -2589,20 +2649,45 @@ skip:
     return true;
 }
 
-/* CMD_DUR_LIMITS_SUBPG [0x19,0x21] <cdl>  introduced: SPC-6 (rev 01) */
+/* CMD_DUR_LIMITS_SUBPG [0x19,0x21] <cdl>
+ * introduced: SPC-6 rev 1, significantly changed rev 6 */
 static bool
 show_cmd_dur_limits_page(const uint8_t * resp, int len,
                          struct opts_t * op, sgj_opaque_p jop)
 {
     int num, pl, pc;
+    uint32_t count, noitmc_v, noatmc_v, noitatmc_v, noc_v;
     const uint8_t * bp;
+    const char * cp;
+    const char * thp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
+    char b[144];
+    static const char * cdllp = "Command duration limits statistics log page";
+    static const char * t2cdld = "T2 command duration limit descriptor";
+    static const char * cdlt2amp = "CDL T2A mode page";
+    static const char * cdlt2bmp = "CDL T2B mode page";
+    static const char * first_7[] = {"First", "Second", "Third", "Fourth",
+                                     "Fifth", "Sixth", "Seventh"};
+    static const char * noitmc = "Number of inactive target miss commands";
+    static const char * noatmc = "Number of active target miss commands";
+    static const char * noitatmc =
+        "Number of inactive target and active target miss commands";
+    static const char * noc = "Number of commands";
 
-if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Command duration limits page  [0x19,0x21]\n");
+        sgj_pr_hr(jsp, "%s  [0x19,0x21]\n", cdllp);
     num = len - 4;
     bp = &resp[0] + 4;
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, cdllp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                        "command_duration_limits_statistcs_log_parameters");
+    }
+
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
         pl = bp[3] + 4;         /* parameter length */
@@ -2617,10 +2702,24 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
+
         switch (pc) {
         case 0x1:
-            printf("  Number of READ commands = %" PRIu64 "\n",
-                   sg_get_unaligned_be64(bp + 4));
+            /* spc6r06: table 349 name "Number of READ commands" seems to
+             * be wrong. Use what surrounding text and table 347 suggest */
+            cp = "Achievable latency target";
+            count =  sg_get_unaligned_be32(bp + 4);
+            sgj_pr_hr(jsp, "  %s = %" PRIu32 "\n", cp, count);
+            if (jsp->pr_as_json) {
+                sgj_js_nv_ihexstr(jsp, jo3p, param_c_snake, pc, NULL, cp);
+                js_snakenv_ihexstr_nex(jsp, jop, cp, count, true, NULL, NULL,
+                                       "unit: microsecond");
+            }
             break;
         case 0x11:
         case 0x12:
@@ -2629,6 +2728,11 @@ if (jop) { };
         case 0x15:
         case 0x16:
         case 0x17:
+            sgj_pr_hr(jsp, "  parameter code 0x%x restricted\n", pc);
+            if (jsp->pr_as_json)
+                sgj_js_nv_ihexstr(jsp, jo3p, param_c_snake, pc, NULL,
+                                  restricted_s);
+            break;
         case 0x21:
         case 0x22:
         case 0x23:
@@ -2636,25 +2740,30 @@ if (jop) { };
         case 0x25:
         case 0x26:
         case 0x27:
-            printf(" Command duration limit T2%s %d [Parameter code 0x%x]:\n",
-                   ((pc > 0x20) ? "B" : "A"),
-                   ((pc > 0x20) ? (pc - 0x20) : (pc - 0x10)), pc);
-            printf("  Number of inactive target miss commands = %u\n",
-                   sg_get_unaligned_be32(bp + 4));
-            printf("  Number of active target miss commands = %u\n",
-                   sg_get_unaligned_be32(bp + 8));
-            printf("  Number of latency miss commands = %u\n",
-                   sg_get_unaligned_be32(bp + 12));
-            printf("  Number of nonconforming miss commands = %u\n",
-                   sg_get_unaligned_be32(bp + 16));
-            printf("  Number of predictive latency miss commands = %u\n",
-                   sg_get_unaligned_be32(bp + 20));
-            printf("  Number of latency misses attributable to errors = %u\n",
-                   sg_get_unaligned_be32(bp + 24));
-            printf("  Number of latency misses attributable to deferred "
-                   "errors = %u\n", sg_get_unaligned_be32(bp + 28));
-            printf("  Number of latency misses attributable to background "
-                   "operations = %u\n", sg_get_unaligned_be32(bp + 32));
+            thp = first_7[pc - 0x21];
+            sgj_pr_hr(jsp, "  %s %s for %s [pc=0x%x]:\n", thp, t2cdld,
+                      cdlt2amp, pc);
+            noitmc_v = sg_get_unaligned_be32(bp + 4);
+            sgj_pr_hr(jsp, "    %s = %u\n", noitmc, noitmc_v);
+            noatmc_v = sg_get_unaligned_be32(bp + 8);
+            sgj_pr_hr(jsp, "    %s = %u\n", noatmc, noatmc_v);
+            noitatmc_v = sg_get_unaligned_be32(bp + 12);
+            sgj_pr_hr(jsp, "    %s = %u\n", noitatmc, noitatmc_v);
+            noc_v = sg_get_unaligned_be32(bp + 16);
+            sgj_pr_hr(jsp, "    %s = %u\n", noc, noc_v);
+            if (jsp->pr_as_json) {
+                snprintf(b, sizeof(b), "%s %s for %s", thp, t2cdld, cdlt2amp);
+                sgj_js_nv_ihexstr(jsp, jo3p, param_c_snake, pc, NULL, b);
+
+                js_snakenv_ihexstr_nex(jsp, jop, noitmc, noitmc_v, true, NULL,
+                                       NULL, NULL);
+                js_snakenv_ihexstr_nex(jsp, jop, noatmc, noatmc_v, true, NULL,
+                                       NULL, NULL);
+                js_snakenv_ihexstr_nex(jsp, jop, noitatmc, noitatmc_v, true,
+                                       NULL, NULL, NULL);
+                js_snakenv_ihexstr_nex(jsp, jop, noc, noc_v, true, NULL,
+                                       NULL, NULL);
+            }
             break;
         case 0x31:
         case 0x32:
@@ -2663,6 +2772,11 @@ if (jop) { };
         case 0x35:
         case 0x36:
         case 0x37:
+            sgj_pr_hr(jsp, "  parameter code 0x%x restricted\n", pc);
+            if (jsp->pr_as_json)
+                sgj_js_nv_ihexstr(jsp, jo3p, param_c_snake, pc, NULL,
+                                  restricted_s);
+            break;
         case 0x41:
         case 0x42:
         case 0x43:
@@ -2671,24 +2785,41 @@ if (jop) { };
         case 0x46:
         case 0x47:
             /* This short form introduced in draft spc6r06 */
-            printf(" Command duration limit T2%s %d [Parameter code 0x%x]:\n",
-                   ((pc > 0x40) ? "B" : "A"),
-                   ((pc > 0x40) ? (pc - 0x40) : (pc - 0x30)), pc);
-            printf("  Number of inactive target miss commands = %u\n",
-                   sg_get_unaligned_be32(bp + 4));
-            printf("  Number of active target miss commands = %u\n",
-                   sg_get_unaligned_be32(bp + 8));
-            printf("  Number of inactive+active target miss commands = %u\n",
-                   sg_get_unaligned_be32(bp + 12));
-            printf("  Number of commands = %u\n",
-                   sg_get_unaligned_be32(bp + 16));
+            thp = first_7[pc - 0x41];
+            sgj_pr_hr(jsp, "  %s %s for %s [pc=0x%x]:\n", thp, t2cdld,
+                      cdlt2bmp, pc);
+            noitmc_v = sg_get_unaligned_be32(bp + 4);
+            sgj_pr_hr(jsp, "    %s = %u\n", noitmc, noitmc_v);
+            noatmc_v = sg_get_unaligned_be32(bp + 8);
+            sgj_pr_hr(jsp, "    %s = %u\n", noatmc, noatmc_v);
+            noitatmc_v = sg_get_unaligned_be32(bp + 12);
+            sgj_pr_hr(jsp, "    %s = %u\n", noitatmc, noitatmc_v);
+            noc_v = sg_get_unaligned_be32(bp + 16);
+            sgj_pr_hr(jsp, "    %s = %u\n", noc, noc_v);
+            if (jsp->pr_as_json) {
+                snprintf(b, sizeof(b), "%s %s for %s", thp, t2cdld, cdlt2amp);
+                sgj_js_nv_ihexstr(jsp, jo3p, param_c_snake, pc, NULL, b);
+
+                js_snakenv_ihexstr_nex(jsp, jop, noitmc, noitmc_v, true, NULL,
+                                       NULL, NULL);
+                js_snakenv_ihexstr_nex(jsp, jop, noatmc, noatmc_v, true, NULL,
+                                       NULL, NULL);
+                js_snakenv_ihexstr_nex(jsp, jop, noitatmc, noitatmc_v, true,
+                                       NULL, NULL, NULL);
+                js_snakenv_ihexstr_nex(jsp, jop, noc, noc_v, true, NULL,
+                                       NULL, NULL);
+            }
+
             break;
         default:
-            printf("  <<unexpected parameter code 0x%x\n", pc);
+             sgj_pr_hr(jsp, "  <<unexpected parameter code 0x%x\n", pc);
             break;
         }
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
 skip:
@@ -3059,22 +3190,33 @@ show_last_n_error_page(const uint8_t * resp, int len,
 {
     int k, num, pl;
     const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
+    char b[256];
+    static const char * lneelp = "Last n error events log page";
+    static const char * eed = "error_event_data";
 
-if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
-        printf("No error events logged\n");
+        sgj_pr_hr(jsp, "No error events logged\n");
         return true;
     }
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Last n error events page  [0x7]\n");
+        sgj_pr_hr(jsp, "%s  [0x7]\n", lneelp);
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, lneelp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p, "error_event_log_parameters");
+    }
+
     for (k = num; k > 0; k -= pl, bp += pl) {
-        int pc;
+        uint16_t pc;
 
         if (k < 3) {
-            printf("short Last n error events page\n");
+            pr2serr("short %s\n", lneelp);
             return false;
         }
         pl = bp[3] + 4;
@@ -3090,20 +3232,42 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
-        printf("  Error event %d:\n", pc);
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+            sgj_js_nv_ihexstr(jsp, jo3p, param_c_snake, pc, NULL, NULL);
+        }
+
+        sgj_pr_hr(jsp, "  Error event %u [0x%x]:\n", pc, pc);
         if (pl > 4) {
             if ((bp[2] & 0x1) && (bp[2] & 0x2)) {
-                printf("    [binary]:\n");
-                hex2stdout(bp + 4, pl - 4, op->dstrhex_no_ascii);
-            } else if (0x01 == (bp[2] & 0x3)    /* ASCII */)
-                printf("    %.*s\n", pl - 4, (const char *)(bp + 4));
-            else {
-                printf("    [data counter?? (LP bit should be set)]:\n");
-                hex2stdout(bp + 4, pl - 4, op->dstrhex_no_ascii);
+                sgj_pr_hr(jsp, "    [binary]:\n");
+                hex2str(bp + 4, pl - 4, "    ", op->hex2str_oformat,
+                        sizeof(b), b);
+                sgj_pr_hr(jsp, "%s\n", b);
+                if (jsp->pr_as_json)
+                    sgj_js_nv_hex_bytes(jsp, jo3p, eed, bp + 4, pl - 4);
+            } else if (0x01 == (bp[2] & 0x3)) {  /* ASCII */
+                sgj_pr_hr(jsp, "    %.*s\n", pl - 4, (const char *)(bp + 4));
+                if (jsp->pr_as_json)
+                    sgj_js_nv_s_len(jsp, jo3p, eed,
+                                    (const char *)(bp + 4), pl - 4);
+            } else {
+                sgj_pr_hr(jsp, "    [data counter?? (LP bit should be "
+                          "set)]:\n");
+                hex2str(bp + 4, pl - 4, "    ", op->hex2str_oformat,
+                        sizeof(b), b);
+                sgj_pr_hr(jsp, "%s\n", b);
+                if (jsp->pr_as_json)
+                    sgj_js_nv_hex_bytes(jsp, jo3p, eed, bp + 4, pl - 4);
             }
         }
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
     }
@@ -3117,23 +3281,37 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
 {
     int k, n, num, pl;
     const uint8_t * bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p, jo4p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char str[PCB_STR_LEN];
+    char b[512];
+    static const char * lndeoaelp =
+                "Last n deferred errors or asynchronous events log page";
+    static const char * deoae = "Deferred error or asynchronous event";
+    static const char * sd = "sense_data";
 
-if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
-        printf("No deferred errors logged\n");
+        pr2serr("No deferred errors logged\n");
         return true;
     }
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Last n deferred errors page  [0xb]\n");
+        sgj_pr_hr(jsp, "%s  [0xb]\n", lndeoaelp);
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, lndeoaelp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                "deferred_error_or_asynchronous_event_log_parameters");
+    }
+
     for (k = num; k > 0; k -= pl, bp += pl) {
         int pc;
 
         if (k < 3) {
-            printf("short Last n deferred errors page\n");
-            return true;
+            pr2serr("short %s\n", lndeoaelp);
+            return false;
         }
         pl = bp[3] + 4;
         pc = sg_get_unaligned_be16(bp + 0);
@@ -3148,18 +3326,35 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
-        printf("  Deferred error [0x%x]:\n", pc);
-        if (op->do_brief > 0)
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+            sgj_js_nv_ihexstr(jsp, jo3p, param_c_snake, pc, NULL, deoae);
+        }
+        sgj_pr_hr(jsp, "  %s [0x%x]:\n", deoae, pc);
+        if (op->do_brief > 0) {
             hex2stdout(bp + 4, pl - 4, op->dstrhex_no_ascii);
-        else {
-            char b[512];
+            hex2str(bp + 4, pl - 4, "    ", op->hex2str_oformat,
+                    sizeof(b), b);
+            sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json)
+                sgj_js_nv_hex_bytes(jsp, jo3p, sd, bp + 4, pl - 4);
+        } else {
 
             n = sg_get_sense_str("    ", bp + 4, pl - 4,  false, sizeof(b),
                                  b);
-            printf("%.*s\n", n, b);
+            sgj_pr_hr(jsp, "%.*s\n", n, b);
+            if (jsp->pr_as_json) {
+                jo4p = sgj_named_subobject_r(jsp, jo3p, sd);
+                sgj_js_sense(jsp, jo4p, bp + 4, pl - 4);
+            }
         }
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
     }
@@ -3171,16 +3366,33 @@ static bool
 show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
                              struct opts_t * op, sgj_opaque_p jop)
 {
-    int j, num, pl;
-    unsigned int k;
+    bool vpd;
+    int j, num, pl, vpd_pg;
+    uint32_t k, n;
     const uint8_t * bp;
+    const char * vpd_pg_name = NULL;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p, jo4p;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p ja2p;
     char str[PCB_STR_LEN];
+    char b[128];
+    static const char * lnidclp = "Last n inquiry data changed log page";
+    static const char * clgc = "Change list generation code";
+    static const char * idci = "Inquiry data changed indicator";
+    static const char * cgn = "Changed generation number";
 
-if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Last n Inquiry data changed  [0xb,0x1]\n");
+        sgj_pr_hr(jsp, "%s  [0xb,0x1]\n", lnidclp);
     num = len - 4;
     bp = &resp[0] + 4;
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, lnidclp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                                   "inquiry_data_changed_log_parameters");
+    }
+
     while (num > 3) {
         int pc = sg_get_unaligned_be16(bp + 0);
 
@@ -3196,42 +3408,75 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+            sgj_js_nv_ihexstr(jsp, jo3p, param_c_snake, pc, NULL,
+                              0 == pc ? clgc : idci);
+        }
         if (0 == pc) {
             if (pl < 8)  {
-                printf("  <<expect parameter 0x%x to be at least 8 bytes "
-                       "long, got %d, skip>>\n", pc, pl);
+                pr2serr("  <<expect parameter 0x%x to be at least 8 bytes "
+                        "long, got %d, skip>>\n", pc, pl);
                 goto skip;
             }
-            printf("  Change list generation code [pc=0x0]:\n");
-            for (j = 4, k = 1; j < pl; j +=4, ++k)
-                printf("    Changed generation number [0x%x]: %u\n", k,
-                       sg_get_unaligned_be32(bp + j));
+            sgj_pr_hr(jsp, "  %s [pc=0x0]:\n", clgc);
+            for (j = 4, k = 1; j < pl; j +=4, ++k) {
+                n = sg_get_unaligned_be32(bp + j);
+                sgj_pr_hr(jsp, "    %s [0x%x]: %u\n", cgn, k, n);
+            }
+            if (jsp->pr_as_json) {
+                ja2p = sgj_named_subarray_r(jsp, jo3p,
+                                            "changed_generation_numbers");
+                for (j = 4, k = 1; j < pl; j +=4, ++k) {
+                    jo4p = sgj_new_unattached_object_r(jsp);
+                    n = sg_get_unaligned_be32(bp + j);
+                    js_snakenv_ihexstr_nex(jsp, jo4p, cgn, n, true, NULL,
+                                           NULL, NULL);
+                    sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
+                }
+            }
         } else {
-            printf("  Parameter code 0x%x, ", pc);
-            if (1 & *(bp + 4)) { /* VPD bit set */
-                int vpd = *(bp + 5);
-                printf("VPD page 0x%x changed\n", vpd);
-                if (0 == op->do_brief) {
-                    int m;
-                    const int nn = sg_lib_names_mode_len;
-                    struct sg_lib_simple_value_name_t * nvp =
-                                                    sg_lib_names_vpd_arr;
+            int m;
+            const int nn = sg_lib_names_mode_len;
+            struct sg_lib_simple_value_name_t * nvp = sg_lib_names_vpd_arr;
 
-                    for (m = 0; m < nn; ++m, ++nvp) {
-                        if (nvp->value == vpd)
-                            break;
-                    }
-                    if (m < nn)
-                        printf("    name: %s\n", nvp->name);
+            snprintf(b, sizeof(b), "  %s 0x%x, ", param_c, pc);
+            vpd = !! (1 & *(bp + 4));
+            vpd_pg = *(bp + 5);
+            if (vpd) {
+                for (m = 0; m < nn; ++m, ++nvp) {
+                    if (nvp->value == vpd_pg)
+                        break;
+                }
+                vpd_pg_name = (m < nn) ? nvp->name : NULL;
+            } else
+                vpd_pg_name = "Standard INQUIRY";
+
+            if (jsp->pr_as_json) {
+                sgj_js_nv_i(jsp, jo3p, "vpd", (int)vpd);
+                sgj_js_nv_ihex(jsp, jo3p, "changed_page_code", vpd_pg);
+                if (vpd_pg_name)
+                    sgj_js_nv_s(jsp, jo3p, "changed_page_name", vpd_pg_name);
+            }
+            if (vpd) {
+                sgj_pr_hr(jsp, "%sVPD page 0x%x changed\n", b, vpd_pg);
+                if (0 == op->do_brief) {
+                    if (vpd_pg_name)
+                        sgj_pr_hr(jsp, "    name: %s\n", vpd_pg_name);
                 }
             } else
-                printf("Standard Inquiry data changed\n");
+                sgj_pr_hr(jsp, "%sStandard INQUIRY data changed\n", b);
         }
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2],
+                      str, sizeof(str)));
+skip:
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->filter_given)
             break;
-skip:
         num -= pl;
         bp += pl;
     }
@@ -3247,6 +3492,7 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
     const uint8_t * bp;
     char str[PCB_STR_LEN];
 
+// yyyyyyyyy
 if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         printf("Last n Mode page data changed  [0xb,0x2]\n");
@@ -7739,18 +7985,26 @@ main(int argc, char * argv[])
         return 0;
     }
     if (op->do_hex > 0) {
-        if (op->do_hex > 2)
+        if (op->do_hex > 2) {
             op->dstrhex_no_ascii = -1;
-        else
+            op->hex2str_oformat = 1;
+        } else {
             op->dstrhex_no_ascii = (1 == op->do_hex);
+            op->hex2str_oformat = (1 == op->do_hex);
+        }
     } else {
         if (op->undefined_hex > 0) {
-            if (op->undefined_hex > 2)
+            if (op->undefined_hex > 2) {
                 op->dstrhex_no_ascii = -1;
-            else
+                op->hex2str_oformat = 1;
+            } else {
                 op->dstrhex_no_ascii = (1 == op->undefined_hex);
-        } else         /* default when no --hex nor --undefined */
+                op->hex2str_oformat = (1 == op->undefined_hex);
+            }
+        } else {       /* default when no --hex nor --undefined */
             op->dstrhex_no_ascii = -1;
+            op->hex2str_oformat = 1;
+        }
     }
     vb = op->verbose;
     if (op->vend_prod) {
@@ -8182,7 +8436,7 @@ err_out:
     }
     if (as_json) {
         if (0 == op->do_hex)
-            sgj_js2file(jsp, NULL, res, stdout);
+            sgj_js2file(jsp, NULL, ret, stdout);
         sgj_finish(jsp);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;

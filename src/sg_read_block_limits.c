@@ -37,7 +37,9 @@
 
 static const char * version_str = "1.09 20221101";
 
-#define MAX_READ_BLOCK_LIMITS_LEN 20
+#define DEF_READ_BLOCK_LIMITS_LEN 6
+#define MLIO_READ_BLOCK_LIMITS_LEN 20
+#define MAX_READ_BLOCK_LIMITS_LEN MLIO_READ_BLOCK_LIMITS_LEN
 
 static uint8_t readBlkLmtBuff[MAX_READ_BLOCK_LIMITS_LEN];
 
@@ -191,7 +193,8 @@ main(int argc, char * argv[])
         goto the_end2;
     }
 
-    max_resp_len = do_mloi ? 20 : 6;
+    max_resp_len = do_mloi ? MLIO_READ_BLOCK_LIMITS_LEN :
+                             DEF_READ_BLOCK_LIMITS_LEN;
     memset(readBlkLmtBuff, 0x0, sizeof(readBlkLmtBuff));
     res = sg_ll_read_block_limits_v2(sg_fd, do_mloi, readBlkLmtBuff,
                                      max_resp_len, &resid, true, verbose);
@@ -213,9 +216,9 @@ main(int argc, char * argv[])
         }
 
         if (do_mloi) {
-            if (actual_len < 20) {
-                pr2serr("Expected at least 20 bytes in response but only "
-                        "%d bytes\n", actual_len);
+            if (actual_len < MLIO_READ_BLOCK_LIMITS_LEN) {
+                pr2serr("Expected at least %d bytes in response but only "
+                        "%d bytes\n", MLIO_READ_BLOCK_LIMITS_LEN, actual_len);
                 goto the_end;
             }
             printf("Read Block Limits (MLOI=1) results:\n");
@@ -223,9 +226,9 @@ main(int argc, char * argv[])
             printf("    Maximum logical block identifier: %" PRIu64 "\n",
                    mloi);
         } else {        /* MLOI=0 (only case before ssc4r02.pdf) */
-            if (actual_len < 6) {
-                pr2serr("Expected at least 6 bytes in response but only "
-                        "%d bytes\n", actual_len);
+            if (actual_len < DEF_READ_BLOCK_LIMITS_LEN) {
+                pr2serr("Expected at least %d bytes in response but only "
+                        "%d bytes\n", DEF_READ_BLOCK_LIMITS_LEN, actual_len);
                 goto the_end;
             }
             max_block_size = sg_get_unaligned_be32(readBlkLmtBuff + 0);
