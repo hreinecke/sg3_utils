@@ -2244,6 +2244,10 @@ sg_err_category_sense(const uint8_t * sbp, int sb_len)
         case SPC_SK_RECOVERED_ERROR:
             return SG_LIB_CAT_RECOVERED;
         case SPC_SK_NOT_READY:
+            if ((0x04 == ssh.asc) && (0x0b == ssh.ascq))
+                return SG_LIB_CAT_STANDBY;
+            if ((0x04 == ssh.asc) && (0x0c == ssh.ascq))
+                return SG_LIB_CAT_UNAVAILABLE;
             return SG_LIB_CAT_NOT_READY;
         case SPC_SK_MEDIUM_ERROR:
         case SPC_SK_HARDWARE_ERROR:

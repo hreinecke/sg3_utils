@@ -318,6 +318,7 @@ the \fIDEVICE\fR reports that it is not ready for the operation requested.
 The \fIDEVICE\fR may be in the process of becoming ready (e.g.  spinning up
 but not at speed) so the utility may work after a wait. In Linux the
 \fIDEVICE\fR may be temporarily blocked while error recovery is taking place.
+See exit status values 12 and 13 below which refine this exit value.
 .TP
 .B 3
 the \fIDEVICE\fR reports a medium or hardware error (or a blank check). For
@@ -355,6 +356,14 @@ commands (including WRITE USING TOKEN) may return this sense key.
 the \fIDEVICE\fR reports an aborted command. In some cases aborted
 commands can be retried immediately (e.g. if the transport aborted
 the command due to congestion).
+.TP
+.B 12
+the \fIDEVICE\fR reports a sense key of not ready together with an
+additional sense code of "target port in standby state".
+.TP
+.B 13
+the \fIDEVICE\fR reports a sense key of not ready together with an
+additional sense code of "target port in unavailable state".
 .TP
 .B 14
 the \fIDEVICE\fR reports a miscompare sense key. VERIFY and COMPARE AND

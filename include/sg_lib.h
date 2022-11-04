@@ -488,8 +488,8 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 #define SG_LIB_CAT_CLEAN 0      /* No errors or other information */
 #define SG_LIB_OK_TRUE SG_LIB_CAT_CLEAN  /* No error, reporting true */
 /* Value 1 left unused for utilities to use SG_LIB_SYNTAX_ERROR */
-#define SG_LIB_CAT_NOT_READY 2  /* sense key, unit stopped?
-                                 *       [sk,asc,ascq: 0x2,*,*] */
+#define SG_LIB_CAT_NOT_READY 2  /* sense key: not ready, see 12 and 13
+                                 *  [sk,asc,ascq: 0x2,<most>,<most>] */
 #define SG_LIB_CAT_MEDIUM_HARD 3 /* medium or hardware error, blank check
                                   *       [sk,asc,ascq: 0x3/0x4/0x8,*,*] */
 #define SG_LIB_CAT_ILLEGAL_REQ 5 /* Illegal request (other than invalid
@@ -505,6 +505,10 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
                                     *       [sk,asc,ascq: 0xa,*,*] */
 #define SG_LIB_CAT_ABORTED_COMMAND 11 /* interpreted from sense buffer
                                        *       [sk,asc,ascq: 0xb,! 0x10,*] */
+#define SG_LIB_CAT_STANDBY 12   /* sense key: not ready, special case
+                                 *      [sk,asc, ascq: 0x2, 0x4, 0xb] */
+#define SG_LIB_CAT_UNAVAILABLE 13 /* sense key: not ready, special case
+                                   *      [sk,asc, ascq: 0x2, 0x4, 0xc] */
 #define SG_LIB_CAT_MISCOMPARE 14 /* sense key, probably verify
                                   *       [sk,asc,ascq: 0xe,*,*] */
 #define SG_LIB_FILE_ERROR 15    /* device or other file problem */

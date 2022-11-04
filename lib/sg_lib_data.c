@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.94 20221007";
+const char * sg_lib_version_str = "2.95 20221104";
 /* spc6r06, sbc5r03, zbc2r13 */
 
 
@@ -1911,6 +1911,8 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
     {10, "Copy aborted", "type: sense key"},
     {11, "Aborted command",
          "type: sense key, other than protection related (asc=0x10)"},
+    {12, "Device not ready, standby", "type: sense key"},
+    {13, "Device not ready, unavailable", "type: sense key"},
     {14, "Miscompare", "type: sense key"},
     {15, "File error", NULL},
     {17, "Illegal request with Info field", NULL},

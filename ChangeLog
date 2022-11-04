@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20221103] [svn: r979]
+Changelog for pre-release sg3_utils-1.48 [20221104] [svn: r980]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -69,6 +69,7 @@ Changelog for pre-release sg3_utils-1.48 [20221103] [svn: r979]
   - sg_ses: add exp_sas_addr acronym for getting expander's
     SAS address
   - sg_turs: change nanosleep() to Sleep() in MinGW
+    - see sg_lib below for two new exit status values
   - sg_stream_ctl: fix --get indexing
   - sg_read_block_limits: fix granularity value
      - add --mloi option
@@ -86,6 +87,10 @@ Changelog for pre-release sg3_utils-1.48 [20221103] [svn: r979]
       for ata-passthrough (lba field), see:
       https://github.com/doug-gilbert/sg3_utils/pull/25
     - add sg_ll_read_block_limits_v2() for MLOI bit
+    - https://github.com/doug-gilbert/sg3_utils/pull/32 added
+      with tweaks; adds SG_LIB_CAT_STANDBY and
+      SG_LIB_CAT_UNAVAILABLE which refine the 'not ready'
+      exit status. Useful for sg_turs
   - initialize all sense buffers to 0
   - linux: replace references to /proc/scsi/sg with
     /sys/module/sg/parameters/

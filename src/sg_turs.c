@@ -430,6 +430,20 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                         resp->reported = true;
                     }
                     break;
+                case SG_LIB_CAT_STANDBY:
+                    ++resp->num_errs;
+                    if (vb) {
+                        pr2serr("Ignoring standby device (sense key)\n");
+                        resp->reported = true;
+                    }
+                    break;
+                case SG_LIB_CAT_UNAVAILABLE:
+                    ++resp->num_errs;
+                    if (vb) {
+                        pr2serr("Ignoring unavailable device (sense key)\n");
+                        resp->reported = true;
+                    }
+                    break;
                 default:
                     ++resp->num_errs;
                     if (1 == op->do_number) {
