@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.07 20221111";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.08 20221112";    /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_logs"
 
@@ -4866,7 +4866,7 @@ show_sas_port_param(const uint8_t * bp, int param_len, struct opts_t * op,
                     } else {
                         cp = strchr(b, '\t');
                         if (cp) {
-                            cp = '\0';
+                            *cp = '\0';
                             sgj_pr_hr(jsp, "      %s\n", b);
                             sgj_pr_hr(jsp, "      %s\n", cp + 1);
                         } else
