@@ -1,20 +1,21 @@
-.TH SG_LOGS "8" "September 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_LOGS "8" "November 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
 .B sg_logs
 [\fI\-\-ALL\fR] [\fI\-\-all\fR] [\fI\-\-brief\fR] [\fI\-\-exclude\fR]
-[\fI\-\-filter=FL\fR] [\fI\-\-hex\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-list\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR] [\fI\-\-ppc\fR] [\fI\-\-pdt=DT\fR]
-[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-sp\fR] [\fI\-\-temperature\fR]
-[\fI\-\-transport\fR] [\fI\-\-undefined\fR] [\fI\-\-vendor=VP\fR]
-[\fI\-\-verbose\fR] \fIDEVICE\fR
+[\fI\-\-filter=FL\fR] [\fI\-\-full\fR] [\fI\-\-hex\fR] [\fI\-\-json[=JO]\fR]
+[\fI\-\-list\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-name\fR] [\fI\-\-no_inq\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-paramp=PP\fR] [\fI\-\-pcb\fR] [\fI\-\-ppc\fR]
+[\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-sp\fR]
+[\fI\-\-temperature\fR] [\fI\-\-transport\fR] [\fI\-\-undefined\fR]
+[\fI\-\-vendor=VP\fR] [\fI\-\-verbose\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
 \fI\-\-in=FN\fR  [\fI\-\-brief\fR] [\fI\-\-exclude\fR] [\fI\-\-filter=FL\fR]
-[\fI\-\-hex\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-name\fR] [\fI\-\-pdt=DT\fR]
-[\fI\-\-raw\fR] [\fI\-\-undefined\fR] [\fI\-\-vendor=VP\fR]
+[\fI\-\-full\fR] [\fI\-\-hex\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-name\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-undefined\fR]
+[\fI\-\-vendor=VP\fR]
 .PP
 .B sg_logs
 \fI\-\-select\fR  [\fI\-\-control=PC\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
@@ -26,11 +27,11 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 .PP
 .B sg_logs
 [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-c=PC\fR] [\fI\-D=DT\fR] [\fI\-e\fR]
-[\fI\-E\fR] [\fI\-f=FL\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-l\fR]
-[\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-M=VP\fR] [\fI\-n\fR] [\fI\-p=PG\fR]
-[\fI\-paramp=PP\fR] [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR] [\fI\-R\fR]
-[\fI\-select\fR] [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-u\fR] [\fI\-v\fR]
-[\fI\-V\fR] [\fI\-?\fR] [\fI\-x\fR] \fIDEVICE\fR
+[\fI\-E\fR] [\fI\-f=FL\fR] [\fI\-F\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-i=FN\fR]
+[\fI\-l\fR] [\fI\-L\fR] [\fI\-m=LEN\fR] [\fI\-M=VP\fR] [\fI\-n\fR]
+[\fI\-p=PG\fR] [\fI\-paramp=PP\fR] [\fI\-pcb\fR] [\fI\-ppc\fR] [\fI\-r\fR]
+[\fI\-R\fR] [\fI\-select\fR] [\fI\-sp\fR] [\fI\-t\fR] [\fI\-T\fR] [\fI\-u\fR]
+[\fI\-v\fR] [\fI\-V\fR] [\fI\-?\fR] [\fI\-x\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 .PP
@@ -151,6 +152,13 @@ then only generic direct access like (e.g. disk) pages are enumerated. If
 \fIFL\fR is \-11 then only generic tape like pages (e.g. includes ADC)
 are enumerated.
 .TP
+\fB\-F\fR, \fB\-\-full\fR
+this option only applies to the Application client log page. Typically that
+log page has more than 16,000 bytes of user supplied data. Rather than
+print it all out, the default is to print out the first 64 bytes of data.
+When this option is given, the application client log pages is fully
+decoded.
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
 .TP
@@ -190,7 +198,7 @@ used as this (long) option name.
 .TP
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
 output is in JSON format instead of human readable form. See sg3_utils_json
-manpage or use '?' for \fIJO\fR for a summary.
+manpage or use '?' for \fIJO\fR in order to have a summary printed to stderr.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 lists the names of the logs sense pages supported by this device. This is
@@ -226,6 +234,9 @@ decode some log pages into 'name=value' entries, one per line. The name
 contains no space and may be abbreviated and the value is decimal unless
 prefixed by '0x'. Nesting is indicated by leading spaces. This form
 is meant to be relatively easy to parse.
+.br
+This option is superseded by the \fI\-\-json[=JO]\fR option. If both are
+given then this option is ignored.
 .TP
 \fB\-x\fR, \fB\-\-no_inq\fR
 suppresses the output of information obtained from an initial call to the
