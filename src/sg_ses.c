@@ -38,8 +38,9 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.58 20220813";    /* ses4r04 */
+static const char * version_str = "2.60 20221202";    /* ses4r04 */
 
+#define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define REQUEST_SENSE_RESP_SZ 252
@@ -76,7 +77,7 @@ static const char * version_str = "2.58 20220813";    /* ses4r04 */
 #define ADD_ELEM_STATUS_DPC 0xa /* Additional Element Status dpage code */
 #define SUBENC_HELP_TEXT_DPC 0xb
 #define SUBENC_STRING_DPC 0xc
-#define SUPPORTED_SES_DPC 0xd   /* should be 0x1 <= dpc <= 0x2f */
+#define SUPPORTED_SES_DPC 0xd   /* should contain 0x1 <= dpc <= 0x2f */
 #define DOWNLOAD_MICROCODE_DPC 0xe
 #define SUBENC_NICKNAME_DPC 0xf
 #define ALL_DPC 0xff
@@ -117,6 +118,8 @@ static const char * version_str = "2.58 20220813";    /* ses4r04 */
 #define DEF_CLEAR_VAL 0
 #define DEF_SET_VAL 1
 
+#define SG_SES_CALL_ENUMERATE 99999
+
 
 struct element_type_t {
     int elem_type_code;
@@ -136,6 +139,7 @@ struct cgs_cl_t {
 };
 
 struct opts_t {
+    bool do_all;        /* one or more --all options */
     bool byte1_given;   /* true if -b B1 or --byte1=B1 given */
     bool do_control;    /* want to write to DEVICE */
     bool do_data;       /* flag if --data= option has been used */
@@ -144,11 +148,11 @@ struct opts_t {
     bool eiioe_auto;    /* Element Index Includes Overall (status) Element */
     bool eiioe_force;
     bool ind_given;     /* '--index=...' or '-I ...' */
-    bool inner_hex;
     bool many_dpages;   /* user supplied data has more than one dpage */
     bool mask_ign;      /* element read-mask-modify-write actions */
     bool o_readonly;
     bool page_code_given;       /* or suitable abbreviation */
+    bool partial_join;  /* --join and --page= given (apart from aes) */
     bool quiet;         /* exit status unaltered by --quiet */
     bool seid_given;
     bool verbose_given;
@@ -163,12 +167,13 @@ struct opts_t {
                            descriptor and Additional element status dpages.
                            Use twice to add Threshold in dpage to join. */
     int do_raw;
-    int enumerate;
+    int enumerate;      /* -e */
     int ind_th;    /* type header index, set by build_type_desc_hdr_arr() */
     int ind_indiv;      /* individual element index; -1 for overall */
     int ind_indiv_last; /* if > ind_indiv then [ind_indiv..ind_indiv_last] */
     int ind_et_inst;    /* ETs can have multiple type header instances */
-    int maxlen;
+    int inner_hex;      /* -i */
+    int maxlen;         /* -m LEN */
     int seid;
     int page_code;      /* recognised abbreviations converted to dpage num */
     int verbose;
@@ -182,6 +187,7 @@ struct opts_t {
     const struct element_type_t * ind_etp;
     const char * index_str;
     const char * nickname_str;
+    sgj_state json_st;
     struct cgs_cl_t cgs_cl_arr[CGS_CL_ARR_MAX_SZ];
     uint8_t sas_addr[8];  /* Big endian byte sequence */
 };
@@ -366,9 +372,40 @@ static int elem_desc_rsp_len;
 static int add_elem_rsp_len;
 static int threshold_rsp_len;
 
+/* The '_sn' suffix is for snake format used in JSON names */
+static const char * const not_avail = "not available";
+static const char * const not_rep = "not reported";
+static const char * const noss_s = "number of secondary subenclosures";
+static const char * const gc_s = "generation code";
+static const char * const et_sn = "element_type";
+static const char * const pc_sn = "page_code";
+static const char * const dp_s = "diagnostic page";
+static const char * const si_s = "subenclosure identifier";
+static const char * const si_sn = "subenclosure_identifier";
+static const char * const es_s = "enclosure status";
+static const char * const peli = "Primary enclosure logical identifier";
+static const char * const soec =
+                 "  <<state of enclosure changed, please try again>>";
+static const char * const vs_s = "Vendor specific";
+static const char * const rsv_s = "reserved";
+static const char * const od_s = "Overall descriptor";
+static const char * const od_sn = "overall_descriptor";
+static const char * const rts_s = "response too short";
+static const char * const hct = "High critical threshold";
+static const char * const hct_sn = "high_critical_threshold";
+static const char * const hwt = "High warning threshold";
+static const char * const hwt_sn = "high_warning_threshold";
+static const char * const lwt = "Low warning threshold";
+static const char * const lwt_sn = "low_warning_threshold";
+static const char * const lct = "Low critical threshold";
+static const char * const lct_sn = "low_critical_threshold";
+static const char * const sdl_s = "Status descriptor list";
+static const char * const sdl_sn = "status_descriptor_list";
+static const char * aesd_sn = "additional_element_status_descriptor";
+
 
 /* Diagnostic page names, control and/or status (in and/or out) */
-static struct diag_page_code dpc_arr[] = {
+static const struct diag_page_code dpc_arr[] = {
     {SUPPORTED_DPC, "Supported Diagnostic Pages"},  /* 0 */
     {CONFIGURATION_DPC, "Configuration (SES)"},
     {ENC_STATUS_DPC, "Enclosure Status/Control (SES)"},
@@ -394,7 +431,7 @@ static struct diag_page_code dpc_arr[] = {
 };
 
 /* Diagnostic page names, for status (or in) pages */
-static struct diag_page_code in_dpc_arr[] = {
+static const struct diag_page_code in_dpc_arr[] = {
     {SUPPORTED_DPC, "Supported Diagnostic Pages"},  /* 0 */
     {CONFIGURATION_DPC, "Configuration (SES)"},
     {ENC_STATUS_DPC, "Enclosure Status (SES)"},
@@ -419,7 +456,7 @@ static struct diag_page_code in_dpc_arr[] = {
 };
 
 /* Diagnostic page names, for control (or out) pages */
-static struct diag_page_code out_dpc_arr[] = {
+static const struct diag_page_code out_dpc_arr[] = {
     {SUPPORTED_DPC, "?? [Supported Diagnostic Pages]"},  /* 0 */
     {CONFIGURATION_DPC, "?? [Configuration (SES)]"},
     {ENC_CONTROL_DPC, "Enclosure Control (SES)"},
@@ -443,7 +480,7 @@ static struct diag_page_code out_dpc_arr[] = {
     {-1, NULL},
 };
 
-static struct diag_page_abbrev dp_abbrev[] = {
+static const struct diag_page_abbrev dp_abbrev[] = {
     {"ac", ARRAY_CONTROL_DPC},
     {"aes", ADD_ELEM_STATUS_DPC},
     {"all", ALL_DPC},
@@ -468,7 +505,7 @@ static struct diag_page_abbrev dp_abbrev[] = {
 
 /* Names of element types used by the Enclosure Control/Status diagnostic
  * page. */
-static struct element_type_t element_type_arr[] = {
+static const struct element_type_t element_type_arr[] = {
     {UNSPECIFIED_ETC, "un", "Unspecified"},
     {DEVICE_ETC, "dev", "Device slot"},
     {POWER_SUPPLY_ETC, "ps", "Power supply"},
@@ -504,7 +541,7 @@ static struct element_type_t element_type_by_code =
 
 /* Many control element names below have "RQST" in front in drafts.
    These are for the Enclosure Control/Status diagnostic page */
-static struct acronym2tuple ecs_a2t_arr[] = {
+static const struct acronym2tuple ecs_a2t_arr[] = {
     /* acron   element_type  start_byte  start_bit  num_bits */
     {"ac_fail", UI_POWER_SUPPLY_ETC, 2, 4, 1, NULL},
     {"ac_hi", UI_POWER_SUPPLY_ETC, 2, 6, 1, NULL},
@@ -697,7 +734,7 @@ static struct acronym2tuple ecs_a2t_arr[] = {
 };
 
 /* These are for the Threshold in/out diagnostic page */
-static struct acronym2tuple th_a2t_arr[] = {
+static const struct acronym2tuple th_a2t_arr[] = {
     {"high_crit", -1, 0, 7, 8, NULL},
     {"high_warn", -1, 1, 7, 8, NULL},
     {"low_crit", -1, 2, 7, 8, NULL},
@@ -707,7 +744,7 @@ static struct acronym2tuple th_a2t_arr[] = {
 
 /* These are for the Additional element status diagnostic page for SAS with
  * the EIP bit set. First phy only. Index from start of AES descriptor */
-static struct acronym2tuple ae_sas_a2t_arr[] = {
+static const struct acronym2tuple ae_sas_a2t_arr[] = {
     {"at_sas_addr", -1, 12, 7, 64, NULL},  /* best viewed with --hex --get= */
         /* typically this is the expander's SAS address */
     {"dev_type", -1, 8, 6, 3, "1: SAS/SATA dev, 2: expander"},
@@ -729,7 +766,7 @@ static struct acronym2tuple ae_sas_a2t_arr[] = {
 
 /* Boolean array of element types of interest to the Additional Element
  * Status page. Indexed by element type (0 <= et < 32). */
-static bool active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
+static const bool active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
     false, true /* dev */, false, false,
     false, false, false, true /* esce */,
     false, false, false, false,
@@ -741,7 +778,7 @@ static bool active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
 };
 
 /* Command line long option names with corresponding short letter. */
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"all", no_argument, 0, 'a'},
     {"ALL", no_argument, 0, 'z'},
     {"byte1", required_argument, 0, 'b'},
@@ -762,6 +799,7 @@ static struct option long_options[] = {
     {"inhex", required_argument, 0, 'X'},
     {"inner-hex", no_argument, 0, 'i'},
     {"inner_hex", no_argument, 0, 'i'},
+    {"json", optional_argument, 0, 'J'},
     {"join", no_argument, 0, 'j'},
     {"list", no_argument, 0, 'l'},
     {"nickid", required_argument, 0, 'N'},
@@ -784,7 +822,7 @@ static struct option long_options[] = {
 
 /* For overzealous SES device servers that don't like some status elements
  * sent back as control elements. This table is as per ses3r06. */
-static uint8_t ses3_element_cmask_arr[NUM_ETC][4] = {
+static const uint8_t ses3_element_cmask_arr[NUM_ETC][4] = {
                                 /* Element type code (ETC) names; comment */
     {0x40, 0xff, 0xff, 0xff},   /* [0] unspecified */
     {0x40, 0, 0x4e, 0x3c},      /* DEVICE */
@@ -833,10 +871,11 @@ usage(int help_num)
             "              [--eiioe=A_F] [--filter] [--get=STR] "
             "[--hex]\n"
             "              [--index=IIA | =TIA,II] [--inner-hex] [--join] "
-            "[--maxlen=LEN]\n"
-            "              [--page=PG] [--quiet] [--raw] [--readonly] "
-            "[--sas-addr=SA]\n"
-            "              [--status] [--verbose] [--warn] DEVICE\n\n"
+            "[--json[=JO]]\n"
+            "              [--maxlen=LEN] [--page=PG] [--quiet] [--raw] "
+            "[--readonly]\n "
+            "              [--sas-addr=SA] [--status] [--verbose] [--warn] "
+            "DEVICE\n\n"
             "       sg_ses --control [--byte1=B1] [--clear=STR] "
             "[--data=H,H...]\n"
             "              [--descriptor=DES] [--dev-slot-num=SN] "
@@ -846,9 +885,9 @@ usage(int help_num)
             "              [--nickname=SEN] [--page=PG] [--sas-addr=SA] "
             "[--set=STR]\n"
             "              [--verbose] DEVICE\n\n"
-            "       sg_ses --data=@FN --status [-rr] [<most options from "
-            "first form>]\n"
             "       sg_ses --inhex=FN --status [-rr] [<most options from "
+            "first form>]\n"
+            "       sg_ses --data=@FN --status [-rr] [<most options from "
             "first form>]\n\n"
             "       sg_ses [--enumerate] [--help] [--index=IIA] [--list] "
             "[--version]\n\n"
@@ -906,11 +945,16 @@ usage(int help_num)
             "for overall)\n"
             );
         pr2serr(
+            "    --inhex=FN|-X FN    read data from file FN, ignore DEVICE "
+            "if given\n"
             "    --join|-j           group Enclosure Status, Element "
             "Descriptor\n"
             "                        and Additional Element Status pages. "
             "Use twice\n"
             "                        to add Threshold In page\n"
+            "    --json[=JO]|-J[JO]    output in JSON instead of human "
+            "readable\n"
+            "                          test. Use --json=? for JSON help\n"
             "    --page=PG|-p PG     diagnostic page code (abbreviation "
             "or number)\n"
             "                        (def: 'ssp' [0x0] (supported diagnostic "
@@ -948,7 +992,6 @@ usage(int help_num)
             "                        DEVICE). Use twice for clear,get,set "
             "acronyms\n"
             "    --hex|-H            print page response (or field) in hex\n"
-            "    --inhex=FN|-X FN    alternate form of --data=@FN\n"
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
             "    --list|-l           same as '--enumerate' option\n"
@@ -967,7 +1010,9 @@ usage(int help_num)
             "    --raw|-r            print status page in ASCII hex suitable "
             "for '-d';\n"
             "                        when used twice outputs page in binary "
-            "to stdout\n"
+            "to stdout;\n"
+            "                        twice with --inhex= reads input in "
+            "binary\n"
             "    --readonly|-R       open DEVICE read-only (def: "
             "read-write)\n"
             "    --verbose|-v        increase verbosity\n"
@@ -1015,14 +1060,14 @@ parse_index(struct opts_t *op)
             if ((n < 0) || (n > 255)) {
                 pr2serr("bad argument to '--index=', after comma expect "
                         "number from -1 to 255\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_SES_CALL_ENUMERATE;
             }
             if ((cc3p = strchr(cp + 1, '-'))) {
                 n2 = sg_get_num_nomult(cc3p + 1);
                 if ((n2 < n) || (n2 > 255)) {
                     pr2serr("bad argument to '--index', after '-' expect "
                             "number from -%d to 255\n", n);
-                    return SG_LIB_SYNTAX_ERROR;
+                    return SG_SES_CALL_ENUMERATE;
                 }
             }
         }
@@ -1033,13 +1078,13 @@ parse_index(struct opts_t *op)
         if (n >= (blen - 1)) {
             pr2serr("bad argument to '--index', string prior to comma too "
                     "long\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_SES_CALL_ENUMERATE;
         }
     } else {    /* no comma found in index_str */
         n = strlen(op->index_str);
         if (n >= (blen - 1)) {
             pr2serr("bad argument to '--index', string too long\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_SES_CALL_ENUMERATE;
         }
     }
     snprintf(b, blen, "%.*s", n, op->index_str);
@@ -1047,7 +1092,7 @@ parse_index(struct opts_t *op)
         if (cp) {
             pr2serr("bad argument to '--index', unexpected '-1' type header "
                     "index\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_SES_CALL_ENUMERATE;
         }
         op->ind_th = 0;
         op->ind_indiv = -1;
@@ -1056,7 +1101,7 @@ parse_index(struct opts_t *op)
         if ((n < 0) || (n > 255)) {
             pr2serr("bad numeric argument to '--index', expect number from 0 "
                     "to 255\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_SES_CALL_ENUMERATE;
         }
         if (cp)         /* argument to left of comma */
             op->ind_th = n;
@@ -1068,7 +1113,7 @@ parse_index(struct opts_t *op)
                 if ((n2 < n) || (n2 > 255)) {
                     pr2serr("bad argument to '--index', after '-' expect "
                             "number from -%d to 255\n", n);
-                    return SG_LIB_SYNTAX_ERROR;
+                    return SG_SES_CALL_ENUMERATE;
                 }
             }
             op->ind_indiv_last = n2;
@@ -1080,7 +1125,7 @@ parse_index(struct opts_t *op)
         if ((n < 0) || (n > 255)) {
             pr2serr("bad element type code for '--index', expect value from "
                     "0 to 255\n");
-            return SG_LIB_SYNTAX_ERROR;
+            return SG_SES_CALL_ENUMERATE;
         }
         element_type_by_code.elem_type_code = n;
         mallcp = (char *)malloc(8);  /* willfully forget about freeing this */
@@ -1094,7 +1139,7 @@ parse_index(struct opts_t *op)
             if ((n < 0) || (n > 255)) {
                 pr2serr("bad element type code <num> for '--index', expect "
                         "<num> from 0 to 255\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_SES_CALL_ENUMERATE;
             }
             op->ind_et_inst = n;
         }
@@ -1111,15 +1156,16 @@ parse_index(struct opts_t *op)
         }
         if (NULL == etp->desc) {
             pr2serr("bad element type abbreviation [%s] for '--index'\n"
-                    "use '--enumerate' to see possibles\n", b);
-            return SG_LIB_SYNTAX_ERROR;
+                    "'--enumerate' output shown to see available "
+                    "abbreviations\n", b);
+            return SG_SES_CALL_ENUMERATE;
         }
         if (b_len > n) {
             n = sg_get_num_nomult(b + n);
             if ((n < 0) || (n > 255)) {
                 pr2serr("bad element type abbreviation <num> for '--index', "
                         "expect <num> from 0 to 255\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return SG_SES_CALL_ENUMERATE;
             }
             op->ind_et_inst = n;
         }
@@ -1144,7 +1190,7 @@ parse_index(struct opts_t *op)
 static int
 parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
-    int c, j, n, d_len, ret;
+    int c, n, d_len, ret;
     const char * data_arg = NULL;
     const char * inhex_arg = NULL;
     uint64_t saddr;
@@ -1153,14 +1199,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fG:hHiI:jln:N:m:Mp:qrRs"
-                        "S:vVwx:z", long_options, &option_index);
+        c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fG:hHiI:jJ::ln:N:m:Mp:q"
+                        "rRsS:vVwx:z", long_options, &option_index);
         if (c == -1)
             break;
 
         switch (c) {
         case 'a':       /* --all is synonym for --join */
             ++op->do_join;
+            op->do_all = true;
             break;
         case 'A':       /* SAS address, assumed to be hex */
             cp = optarg;
@@ -1255,13 +1302,27 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             ++op->do_hex;
             break;
         case 'i':
-            op->inner_hex = true;
+            ++op->inner_hex;
             break;
         case 'I':
             op->index_str = optarg;
             break;
         case 'j':
             ++op->do_join;
+            break;
+        case 'J':
+            if (! sgj_init_state(&op->json_st, optarg)) {
+                int bad_char = op->json_st.first_bad_char;
+                char e[1500];
+
+                if (bad_char) {
+                    pr2serr("bad argument to --json= option, unrecognized "
+                            "character '%c'\n\n", bad_char);
+                }
+                sg_json_usage(0, e, sizeof(e));
+                pr2serr("%s", e);
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'l':
             op->do_list = true;
@@ -1421,6 +1482,16 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
         }
+        if ((! op->do_status) && (! op->do_control)) {
+            if ((op->do_join > 0) || op->partial_join ||
+                (op->inner_hex > 0)) {
+                if (op->verbose > 1)
+                    pr2serr("Since --join, --all or --inner_hex given; "
+                            "assume --status\n");
+                op->dev_name = NULL;    /* quash device name */
+                op->do_status = true;  /* default to receiving status pages */
+            }
+        }
         op->do_raw = 0;
         /* struct data_in_desc_t stuff does not apply when --control */
         if (op->do_status && (op->arr_len > 3)) {
@@ -1457,9 +1528,10 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 
                 for (didp = data_in_desc_arr, k = 0; k < n; ++k, ++didp) {
                     if ((cp = find_in_diag_page_desc(didp->page_code)))
-                        snprintf(b, sizeof(b), "%s dpage", cp);
+                        snprintf(b, sizeof(b), "%s %s", cp, dp_s);
                     else
-                        snprintf(b, sizeof(b), "dpage 0x%x", didp->page_code);
+                        snprintf(b, sizeof(b), "%s 0x%x", dp_s,
+                                 didp->page_code);
                     pr2serr("%s found, offset %d, dp_len=%d\n", b,
                             didp->offset, didp->dp_len);
                 }
@@ -1472,8 +1544,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     }
     if (op->index_str) {
         ret = parse_index(op);
-        if (ret) {
-            pr2serr("  For more information use '--help'\n");
+        if (ret != 0) {
+            if (ret != SG_SES_CALL_ENUMERATE)
+                pr2serr("  For more information use '--help'\n");
             return ret;
         }
     }
@@ -1521,9 +1594,16 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         }
     } else if (! op->do_status) {
         if (op->do_data) {
-            pr2serr("when user data given, require '--control' or "
-                    "'--status' option\n");
-            goto err_help;
+            if ((op->do_join > 0) || op->partial_join ||
+                (op->inner_hex > 0)) {
+                if (op->verbose > 1)
+                    pr2serr("Since --join or --all given; assume --status\n");
+                op->dev_name = NULL;    /* quash device name */
+            } else {
+                pr2serr("when user data given, require '--control' or "
+                        "'--status' option\n");
+                goto err_help;
+            }
         }
         op->do_status = true;  /* default to receiving status pages */
     } else if (op->do_status && op->do_data && op->dev_name) {
@@ -1551,12 +1631,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         goto err_help;
 
     }
-    if ((op->verbose > 4) && saddr_non_zero(op->sas_addr)) {
-        pr2serr("    SAS address (in hex): ");
-        for (j = 0; j < 8; ++j)
-            pr2serr("%02x", op->sas_addr[j]);
-        pr2serr("\n");
-    }
+    if ((op->verbose > 4) && saddr_non_zero(op->sas_addr))
+        pr2serr("    SAS address (in hex): %" PRIx64 "\n",
+                sg_get_unaligned_be64(op->sas_addr + 0));
 
     if ((! (op->do_data && op->do_status)) && (NULL == op->dev_name)) {
         pr2serr("missing DEVICE name!\n\n");
@@ -1698,9 +1775,9 @@ do_senddiag(struct sg_pt_base * ptvp, void * outgoing_pg, int outgoing_len,
         const char * cp = find_out_diag_page_desc(page_num);
 
         if (cp)
-            pr2serr("    Send diagnostic command page name: %s\n", cp);
+            pr2serr("    Send diagnostic page name: %s\n", cp);
         else
-            pr2serr("    Send diagnostic command page number: 0x%x\n",
+            pr2serr("    Send diagnostic page number: 0x%x\n",
                     page_num);
     }
     ret = sg_ll_send_diag_pt(ptvp, 0 /* sf_code */, true /* pf_bit */,
@@ -1767,7 +1844,7 @@ etype_str(int elem_type_code, char * b, int mlen_b)
     if (elem_type_code < 0x80)
         snprintf(b, mlen_b - 1, "[0x%x]", elem_type_code);
     else
-        snprintf(b, mlen_b - 1, "vendor specific [0x%x]", elem_type_code);
+        snprintf(b, mlen_b - 1, "%s [0x%x]", vs_s, elem_type_code);
     b[mlen_b - 1] = '\0';
     return b;
 }
@@ -1894,9 +1971,9 @@ do_rec_diag(struct sg_pt_base * ptvp, int page_code, uint8_t * rsp_buff,
     if (rsp_lenp)
         *rsp_lenp = 0;
     if ((cp = find_in_diag_page_desc(page_code)))
-        snprintf(bb, sizeof(bb), "%s dpage", cp);
+        snprintf(bb, sizeof(bb), "%s %s", cp, dp_s);
     else
-        snprintf(bb, sizeof(bb), "dpage 0x%x", page_code);
+        snprintf(bb, sizeof(bb), "%s 0x%x", dp_s, page_code);
     cp = bb;
 
     if (op->data_arr && op->do_data) {  /* user provided data */
@@ -1971,8 +2048,8 @@ decode:
                 if (op->do_hex)
                     hex2stderr(rsp_buff, rsp_len, 0);
             } else if (0x8 == rsp_buff[0]) {
-                pr2serr("Enclosure only supports Short Enclosure Status: "
-                        "0x%x\n", rsp_buff[1]);
+                pr2serr("Enclosure only supports Short %s: 0x%x\n",
+                        es_s, rsp_buff[1]);
             } else {
                 pr2serr("Invalid response, wanted page code: 0x%x but got "
                         "0x%x\n", page_code, rsp_buff[0]);
@@ -1989,8 +2066,6 @@ decode:
     return res;
 }
 
-#if 1
-
 static void
 dStrRaw(const uint8_t * str, int len)
 {
@@ -2000,95 +2075,154 @@ dStrRaw(const uint8_t * str, int len)
         printf("%c", str[k]);
 }
 
-#else
-
-static void
-dStrRaw(const uint8_t * str, int len)
-{
-    int res, err;
-
-    if (len > 0) {
-        res = write(fileno(stdout), str, len);
-        if (res < 0) {
-            err = errno;
-            pr2serr("%s: write to stdout failed: %s [%d]\n", __func__,
-                    strerror(err), err);
-        }
-    }
-}
-
-#endif
-
-/* CONFIGURATION_DPC [0x1]
+/* CONFIGURATION_DPC  <"cf"> [0x1]
  * Display Configuration diagnostic page. */
 static void
-configuration_sdg(const uint8_t * resp, int resp_len)
+configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
+                  sgj_opaque_p jop)
 {
-    int j, k, el, num_subs, sum_elem_types;
+    int j, k, n, el, num_subs, sum_elem_types;
     uint32_t gen_code;
     const uint8_t * bp;
     const uint8_t * last_bp;
     const uint8_t * text_bp;
-    char b[64];
+    const uint8_t * type_dh_bp;
+    const char * ccp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    char b[256];
+    static const int blen = sizeof(b);
+    static const char * cf_dp = "Configuration diagnostic page";
+    static const char * eli = "enclosure logical identifier";
+    static const char * edl = "enclosure descriptor list";
 
-    printf("Configuration diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", cf_dp);
     if (resp_len < 4)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     sum_elem_types = 0;
     last_bp = resp + resp_len - 1;
-    printf("  number of secondary subenclosures: %d\n",
-            num_subs - 1);
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                                 sgj_convert_to_snake_name(cf_dp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, CONFIGURATION_DPC, NULL, cf_dp);
+    }
+    sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
+               false);
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
     bp = resp + 8;
-    printf("  enclosure descriptor list\n");
+    sgj_pr_hr(jsp, "  %s:\n", edl);
+    if (jsp->pr_as_json)
+        jap = sgj_named_subarray_r(jsp, jop,
+                                   sgj_convert_to_snake_name(edl, b, blen));
+
     for (k = 0; k < num_subs; ++k, bp += el) {
+        bool primary;
+
         if ((bp + 3) > last_bp)
             goto truncated;
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object_r(jsp);
         el = bp[3] + 4;
         sum_elem_types += bp[2];
-        printf("    Subenclosure identifier: %d%s\n", bp[1],
-               (bp[1] ? "" : " [primary]"));
-        printf("      relative ES process id: %d, number of ES processes"
-               ": %d\n", ((bp[0] & 0x70) >> 4), (bp[0] & 0x7));
-        printf("      number of type descriptor headers: %d\n", bp[2]);
+        primary = (0 == bp[1]);
+        sgj_pr_hr(jsp, "    Subenclosure identifier: %d%s\n", bp[1],
+                  (primary ? " [primary]" : ""));
+        sgj_js_nv_ihexstr(jsp, jo2p, si_sn, bp[1], NULL,
+                          primary ? "primary" : NULL);
+        sgj_pr_hr(jsp, "      relative ES process id: %d, number of ES "
+                  "processes: %d\n", ((bp[0] & 0x70) >> 4), (bp[0] & 0x7));
+        sgj_js_nv_ihex(jsp, jo2p,
+                       "relative_enclosure_services_process_identifier",
+                       (bp[0] & 0x70) >> 4);
+        sgj_js_nv_ihex(jsp, jo2p,
+                       "number_of_enclosure_services_processes", 0x7 & bp[0]);
+        sgj_haj_vi(jsp, jo2p, 6, "number of type descriptor headers",
+                   SGJ_SEP_COLON_1_SPACE, bp[2], false);
         if (el < 40) {
             pr2serr("      enc descriptor len=%d ??\n", el);
+            if (jsp->pr_as_json)
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             continue;
         }
-        printf("      enclosure logical identifier (hex): ");
+        n = sg_scnpr(b, blen, "      %s (hex): ", eli);
         for (j = 0; j < 8; ++j)
-            printf("%02x", bp[4 + j]);
-        printf("\n      enclosure vendor: %.8s  product: %.16s  rev: %.4s\n",
-               bp + 12, bp + 20, bp + 36);
+            n += sg_scnpr(b + n, blen - n, "%02x", bp[4 + j]);
+        sgj_pr_hr(jsp, "%s\n", b);
+        sgj_js_nv_ihex(jsp, jo2p, sgj_convert_to_snake_name(eli, b, blen),
+                       sg_get_unaligned_be64(bp + 4));
+        sgj_pr_hr(jsp, "      enclosure vendor: %.8s  product: %.16s  "
+                  "rev: %.4s\n", bp + 12, bp + 20, bp + 36);
+        sgj_js_nv_s_len(jsp, jo2p, "enclosure_vendor_identification",
+                        (const char *)bp + 12, 8);
+        sgj_js_nv_s_len(jsp, jo2p, "product_identification",
+                        (const char *)bp + 20, 16);
+        sgj_js_nv_s_len(jsp, jo2p, "product_revision_level",
+                        (const char *)bp + 36, 4);
         if (el > 40) {
-            char bb[1024];
-
-            printf("      vendor-specific data:\n");
-            hex2str(bp + 40, el - 40, "        ", 0, sizeof(bb), bb);
-            printf("%s\n", bb);
+            sgj_pr_hr(jsp, "      %s data:\n", vs_s);
+            hex2str(bp + 40, el - 40, "        ", 0, blen, b);
+            sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json)
+                sgj_js_nv_hex_bytes(jsp, jo2p,
+                         "vendor_specific_enclosure_information",
+                                    bp + 40, el - 40);
         }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     /* printf("\n"); */
-    printf("  type descriptor header and text list\n");
+    if (jsp->pr_as_json)
+        jap = sgj_named_subarray_r(jsp, jop, "type_descriptor_header_list");
+    sgj_pr_hr(jsp, "  type descriptor header and text list\n");
+    type_dh_bp = bp;
     text_bp = bp + (sum_elem_types * 4);
     for (k = 0; k < sum_elem_types; ++k, bp += 4) {
         if ((bp + 3) > last_bp)
             goto truncated;
-        printf("    Element type: %s, subenclosure id: %d\n",
-               etype_str(bp[0], b, sizeof(b)), bp[2]);
-        printf("      number of possible elements: %d\n", bp[1]);
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object_r(jsp);
+        ccp = etype_str(bp[0], b, blen);
+        sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d\n", ccp,
+                  bp[2]);
+        sgj_js_nv_ihexstr(jsp, jo2p, et_sn, bp[0], NULL, ccp);
+        sgj_pr_hr(jsp, "      number of possible elements: %d\n", bp[1]);
+        sgj_js_nv_ihex(jsp, jo2p, "number_of_possible_elements", bp[1]);
+        sgj_js_nv_ihex(jsp, jo2p, si_sn, bp[2]);
+        sgj_js_nv_ihex(jsp, jo2p, "type_descriptor_text_length", bp[3]);
         if (bp[3] > 0) {
-            if (text_bp > last_bp)
+            if (text_bp > last_bp) {
+                if (jsp->pr_as_json)
+                    sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
                 goto truncated;
-            printf("      text: %.*s\n", bp[3], text_bp);
+            }
+            sgj_pr_hr(jsp, "      text: %.*s\n", bp[3],
+                      (const char *)text_bp);
+            if (op->partial_join)
+                sgj_js_nv_s_len(jsp, jo2p, "text",
+                                (const char *)text_bp, bp[3]);
             text_bp += bp[3];
+        }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }
+    if (jsp->pr_as_json && (! op->partial_join)) {
+        jap = sgj_named_subarray_r(jsp, jop, "type_descriptor_text_list");
+        bp = type_dh_bp;
+        text_bp = bp + (sum_elem_types * 4);
+        for (k = 0; k < sum_elem_types; ++k, bp += 4) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_s_len(jsp, jo2p, "text", (const char *)text_bp, bp[3]);
+            text_bp += bp[3];
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
     }
     return;
 truncated:
-    pr2serr("    <<<ses_configuration_sdg: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
@@ -2272,7 +2406,7 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
                      "[max 16 phys]");
         break;
     case 0xf:
-        snprintf(buff, buff_len, "Vendor specific");
+        snprintf(buff, buff_len, "%s", vs_s);
         break;
     case 0x10:
         if (abridged)
@@ -2446,7 +2580,7 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
         if (abridged)
             snprintf(buff, buff_len, "VS internal connector");
         else
-            snprintf(buff, buff_len, "Vendor specific internal connector");
+            snprintf(buff, buff_len, "%s internal connector", vs_s);
         break;
     case 0x40:
         if (abridged)
@@ -2472,13 +2606,13 @@ find_sas_connector_type(int conn_type, bool abridged, char * buff,
             snprintf(buff, buff_len, "unknown internal wide connector type: "
                      "0x%x", conn_type);
         else if (conn_type < 0x3f)
-            snprintf(buff, buff_len, "reserved for internal connector, "
-                     "type: 0x%x", conn_type);
+            snprintf(buff, buff_len, "%s for internal connector, type: 0x%x",
+                     rsv_s, conn_type);
         else if (conn_type < 0x70)
-            snprintf(buff, buff_len, "reserved connector type: 0x%x",
+            snprintf(buff, buff_len, "%s connector type: 0x%x", rsv_s,
                      conn_type);
         else if (conn_type < 0x80)
-            snprintf(buff, buff_len, "vendor specific connector type: 0x%x",
+            snprintf(buff, buff_len, "%s connector type: 0x%x", vs_s,
                      conn_type);
         else    /* conn_type is a 7 bit field, so this is impossible */
             snprintf(buff, buff_len, "unexpected connector type: 0x%x",
@@ -2507,7 +2641,7 @@ calc_fan_speed(int fan_speed_factor, int actual_fan_speed)
 
 static const char * elem_status_code_desc[] = {
     "Unsupported", "OK", "Critical", "Noncritical",
-    "Unrecoverable", "Not installed", "Unknown", "Not available",
+    "Unrecoverable", "Not installed", "Unknown", not_avail,
     "No access allowed", "reserved [9]", "reserved [10]", "reserved [11]",
     "reserved [12]", "reserved [13]", "reserved [14]", "reserved [15]",
 };
@@ -2527,495 +2661,1041 @@ static const char * invop_type_desc[] = {
     "Reserved", "Vendor specific error"
 };
 
-static void
+static const char * const display_mode_status[] = {
+    "ES process controlling display; display element control of the display "
+    "not supported",
+    "ES process controlling display; display element control of the display "
+    "is supported",
+    "The display is being controlled based on the Display element",
+    rsv_s,
+};
+
+static int
 enc_status_helper(const char * pad, const uint8_t * statp, int etype,
-                  bool abridged, const struct opts_t * op)
+                  bool abridged, struct opts_t * op, sgj_opaque_p jop,
+                  char * a, int alen)
 {
-    int res, a, b, ct, bblen;
     bool nofilter = ! op->do_filter;
-    char bb[128];
+    uint8_t s0, s1, s2, s3;
+    int res, d, m, n, ct, tpc, fsf, afs, dms, ttpc, voltage, amperage;
+    const char * ccp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    char b[144];
+    static const int blen = sizeof(b);
 
-
+    n = 0;
+    if (alen > 0)
+        a[0] = '\0';
+    s0 = statp[0];
+    s1 = statp[1];
+    s2 = statp[2];
+    s3 = statp[3];
     if (op->inner_hex) {
-        printf("%s%02x %02x %02x %02x\n", pad, statp[0], statp[1], statp[2],
-               statp[3]);
-        return;
+        n += sg_scnpr(a + n, alen - n, "%s%02x %02x %02x %02x\n", pad,
+                      s0, s1, s2, s3);
+        return n;
     }
-    if (! abridged)
-        printf("%sPredicted failure=%d, Disabled=%d, Swap=%d, status: %s\n",
-               pad, !!(statp[0] & 0x40), !!(statp[0] & 0x20),
-               !!(statp[0] & 0x10), elem_status_code_desc[statp[0] & 0xf]);
-    switch (etype) { /* element types */
+    if (! abridged) {
+        int status = s0 & 0xf;
+        const char * ccp = elem_status_code_desc[status];
+
+        n += sg_scnpr(a + n, alen - n, "%sPredicted failure=%d, Disabled=%d, "
+                      "Swap=%d, status: %s\n", pad, !!(s0 & 0x40),
+                      !!(s0 & 0x20), !!(s0 & 0x10), ccp);
+        sgj_js_nv_ihexstr_nex(jsp, jop, "prdfail", !!(s0 & 0x40), false,
+                              NULL, NULL, "PReDicted FAILure");
+        sgj_js_nv_i(jsp, jop, "disabled", !!(s0 & 0x20));
+        sgj_js_nv_ihexstr_nex(jsp, jop, "swap", !!(s0 & 0x10), false,
+                              NULL, NULL, "SWAPped: remove and inserted");
+        sgj_js_nv_ihexstr_nex(jsp, jop, "status", status, true, NULL, ccp,
+                              NULL);
+    }
+
+    switch (etype) { /* element type code */
     case UNSPECIFIED_ETC:
         if (op->verbose)
-            printf("%sstatus in hex: %02x %02x %02x %02x\n",
-                   pad, statp[0], statp[1], statp[2], statp[3]);
+            n += sg_scnpr(a + n, alen - n, "%sstatus in hex: %02x %02x %02x "
+                          "%02x\n", pad, s0, s1, s2, s3);
         break;
     case DEVICE_ETC:
         if (ARRAY_STATUS_DPC == op->page_code) {  /* obsolete after SES-1 */
-            if (nofilter || (0xf0 & statp[1]))
-                printf("%sOK=%d, Reserved device=%d, Hot spare=%d, Cons "
-                       "check=%d\n", pad, !!(statp[1] & 0x80),
-                       !!(statp[1] & 0x40), !!(statp[1] & 0x20),
-                       !!(statp[1] & 0x10));
-            if (nofilter || (0xf & statp[1]))
-                printf("%sIn crit array=%d, In failed array=%d, Rebuild/"
-                       "remap=%d, R/R abort=%d\n", pad, !!(statp[1] & 0x8),
-                       !!(statp[1] & 0x4), !!(statp[1] & 0x2),
-                       !!(statp[1] & 0x1));
-            if (nofilter || ((0x46 & statp[2]) || (0x8 & statp[3])))
-                printf("%sDo not remove=%d, RMV=%d, Ident=%d, Enable bypass "
-                       "A=%d\n", pad, !!(statp[2] & 0x40), !!(statp[2] & 0x4),
-                       !!(statp[2] & 0x2), !!(statp[3] & 0x8));
-            if (nofilter || (0x7 & statp[3]))
-                printf("%sEnable bypass B=%d, Bypass A enabled=%d, Bypass B "
-                        "enabled=%d\n", pad, !!(statp[3] & 0x4),
-                       !!(statp[3] & 0x2), !!(statp[3] & 0x1));
+            if (nofilter || (0xf0 & s1))
+                n += sg_scnpr(a + n, alen - n, "%sOK=%d, Reserved device=%d, "
+                              "Hot spare=%d, Cons check=%d\n", pad,
+                              !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x20),
+                              !!(s1 & 0x10));
+            if (nofilter || (0xf & s1))
+                n += sg_scnpr(a + n, alen - n, "%sIn crit array=%d, In "
+                              "failed array=%d, Rebuild/remap=%d, R/R "
+                              "abort=%d\n", pad, !!(s1 & 0x8), !!(s1 & 0x4),
+                              !!(s1 & 0x2), !!(s1 & 0x1));
+            if (nofilter || ((0x46 & s2) || (0x8 & s3)))
+                n += sg_scnpr(a + n, alen - n, "%sDo not remove=%d, RMV=%d, "
+                              "Ident=%d, Enable bypass A=%d\n", pad,
+                              !!(s2 & 0x40), !!(s2 & 0x4), !!(s2 & 0x2),
+                              !!(s3 & 0x8));
+            if (nofilter || (0x7 & s3))
+                n += sg_scnpr(a + n, alen - n, "%sEnable bypass B=%d, "
+                              "Bypass A enabled=%d, Bypass B enabled=%d\n",
+                              pad, !!(s3 & 0x4), !!(s3 & 0x2), !!(s3 & 0x1));
             break;
         }
-        printf("%sSlot address: %d\n", pad, statp[1]);
-        if (nofilter || (0xe0 & statp[2]))
-            printf("%sApp client bypassed A=%d, Do not remove=%d, Enc "
-                   "bypassed A=%d\n", pad, !!(statp[2] & 0x80),
-                   !!(statp[2] & 0x40), !!(statp[2] & 0x20));
-        if (nofilter || (0x1c & statp[2]))
-            printf("%sEnc bypassed B=%d, Ready to insert=%d, RMV=%d, Ident="
-                   "%d\n", pad, !!(statp[2] & 0x10), !!(statp[2] & 0x8),
-                   !!(statp[2] & 0x4), !!(statp[2] & 0x2));
-        if (nofilter || ((1 & statp[2]) || (0xe0 & statp[3])))
-            printf("%sReport=%d, App client bypassed B=%d, Fault sensed=%d, "
-                   "Fault requested=%d\n", pad, !!(statp[2] & 0x1),
-                   !!(statp[3] & 0x80), !!(statp[3] & 0x40),
-                   !!(statp[3] & 0x20));
-        if (nofilter || (0x1e & statp[3]))
-            printf("%sDevice off=%d, Bypassed A=%d, Bypassed B=%d, Device "
-                   "bypassed A=%d\n", pad, !!(statp[3] & 0x10),
-                   !!(statp[3] & 0x8), !!(statp[3] & 0x4), !!(statp[3] & 0x2));
-        if (nofilter || (0x1 & statp[3]))
-            printf("%sDevice bypassed B=%d\n", pad, !!(statp[3] & 0x1));
+        n += sg_scnpr(a + n, alen - n, "%sSlot address: %d\n", pad, s1);
+        if (nofilter || (0xe0 & s2))
+            n += sg_scnpr(a + n, alen - n, "%sApp client bypassed A=%d, Do "
+                          "not remove=%d, Enc bypassed A=%d\n", pad,
+                          !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20));
+        if (nofilter || (0x1c & s2))
+            n += sg_scnpr(a + n, alen - n, "%sEnc bypassed B=%d, Ready to "
+                          "insert=%d, RMV=%d, Ident=%d\n", pad, !!(s2 & 0x10),
+                          !!(s2 & 0x8), !!(s2 & 0x4), !!(s2 & 0x2));
+        if (nofilter || ((1 & s2) || (0xe0 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sReport=%d, App client bypassed "
+                          "B=%d, Fault sensed=%d, Fault requested=%d\n", pad,
+                          !!(s2 & 0x1), !!(s3 & 0x80), !!(s3 & 0x40),
+                          !!(s3 & 0x20));
+        if (nofilter || (0x1e & s3))
+            n += sg_scnpr(a + n, alen - n, "%sDevice off=%d, Bypassed A=%d, "
+                          "Bypassed B=%d, Device bypassed A=%d\n", pad,
+                          !!(s3 & 0x10), !!(s3 & 0x8), !!(s3 & 0x4),
+                          !!(s3 & 0x2));
+        if (nofilter || (0x1 & s3))
+            n += sg_scnpr(a + n, alen - n, "%sDevice bypassed B=%d\n", pad,
+                          !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex(jsp, jop, "slot_address", s1);
+            sgj_js_nv_i(jsp, jop, "app_client_bypassed_a", !!(s2 & 0x80));
+            sgj_js_nv_i(jsp, jop, "do_not_remove", !!(s2 & 0x40));
+            sgj_js_nv_i(jsp, jop, "enclosure_bypassed_a", !!(s2 & 0x20));
+            sgj_js_nv_i(jsp, jop, "enclosure_bypassed_b", !!(s2 & 0x10));
+            sgj_js_nv_i(jsp, jop, "ready_to_insert", !!(s2 & 0x8));
+            sgj_js_nv_ihex_nex(jsp, jop, "rmv", !!(s2 & 0x4), false,
+                               "remove");
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s2 & 0x2), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_ihex_nex(jsp, jop, "report", !!(s2 & 0x1), false,
+                               "es dpage accessed via this device");
+            sgj_js_nv_i(jsp, jop, "app_client_bypassed_b", !!(s3 & 0x80));
+            sgj_js_nv_ihex_nex(jsp, jop, "fault_sensed", !!(s3 & 0x40), false,
+                               "FAULT condition detected (SENSED)");
+            sgj_js_nv_ihex_nex(jsp, jop, "fault_reqstd", !!(s3 & 0x20), false,
+                       "FAULT REQueSTeD (by rqst_fault in control element)");
+            sgj_js_nv_ihex_nex(jsp, jop, "device_off", !!(s3 & 0x10), false,
+                               "(0 --> device is ON)");
+            sgj_js_nv_i(jsp, jop, "bypassed_a", !!(s3 & 0x8));
+            sgj_js_nv_i(jsp, jop, "bypassed_b", !!(s3 & 0x4));
+            sgj_js_nv_i(jsp, jop, "device_bypassed_a", !!(s3 & 0x2));
+            sgj_js_nv_i(jsp, jop, "device_bypassed_b", !!(s3 & 0x1));
+        }
         break;
     case POWER_SUPPLY_ETC:
-        if (nofilter || ((0xc0 & statp[1]) || (0xc & statp[2]))) {
-            printf("%sIdent=%d, Do not remove=%d, DC overvoltage=%d, "
-                   "DC undervoltage=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40), !!(statp[2] & 0x8),
-                   !!(statp[2] & 0x4));
+        if (nofilter || ((0xc0 & s1) || (0xc & s2))) {
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Do not remove=%d, DC "
+                          "overvoltage=%d, DC undervoltage=%d\n", pad,
+                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x8),
+                          !!(s2 & 0x4));
         }
-        if (nofilter || ((0x2 & statp[2]) || (0xf0 & statp[3])))
-            printf("%sDC overcurrent=%d, Hot swap=%d, Fail=%d, Requested "
-                   "on=%d, Off=%d\n", pad, !!(statp[2] & 0x2),
-                   !!(statp[3] & 0x80), !!(statp[3] & 0x40),
-                   !!(statp[3] & 0x20), !!(statp[3] & 0x10));
-        if (nofilter || (0xf & statp[3]))
-            printf("%sOvertmp fail=%d, Temperature warn=%d, AC fail=%d, "
-                   "DC fail=%d\n", pad, !!(statp[3] & 0x8),
-                   !!(statp[3] & 0x4), !!(statp[3] & 0x2),
-                   !!(statp[3] & 0x1));
+        if (nofilter || ((0x2 & s2) || (0xf0 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sDC overcurrent=%d, Hot "
+                          "swap=%d, Fail=%d, Requested on=%d, Off=%d\n", pad,
+                          !!(s2 & 0x2), !!(s3 & 0x80), !!(s3 & 0x40),
+                          !!(s3 & 0x20), !!(s3 & 0x10));
+        if (nofilter || (0xf & s3))
+            n += sg_scnpr(a + n, alen - n, "%sOvertmp fail=%d, Temperature "
+                          "warn=%d, AC fail=%d, DC fail=%d\n", pad,
+                          !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
+                          !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "do_not_remove", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "dc_over_voltage", !!(s2 & 0x8));
+            sgj_js_nv_i(jsp, jop, "dc_under_voltage", !!(s2 & 0x4));
+            sgj_js_nv_i(jsp, jop, "dc_over_current", !!(s2 & 0x2));
+            sgj_js_nv_ihex_nex(jsp, jop, "hot_swap", !!(s3 & 0x80), false,
+                               "whether power supply can be hot swapped "
+                               "without halting subenclosure");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s3 & 0x40));
+            sgj_js_nv_i(jsp, jop, "rqsted_on", !!(s3 & 0x20));
+            sgj_js_nv_i(jsp, jop, "off", !!(s3 & 0x10));
+            sgj_js_nv_i(jsp, jop, "overtmp_fail", !!(s3 & 0x8));
+            sgj_js_nv_i(jsp, jop, "temp_warn", !!(s3 & 0x4));
+            sgj_js_nv_i(jsp, jop, "ac_fail", !!(s3 & 0x2));
+            sgj_js_nv_i(jsp, jop, "dc_fail", !!(s3 & 0x1));
+
+        }
         break;
     case COOLING_ETC:
-        if (nofilter || ((0xc0 & statp[1]) || (0xf0 & statp[3])))
-            printf("%sIdent=%d, Do not remove=%d, Hot swap=%d, Fail=%d, "
-                   "Requested on=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40), !!(statp[3] & 0x80),
-                   !!(statp[3] & 0x40), !!(statp[3] & 0x20));
-        printf("%sOff=%d, Actual speed=%d rpm, Fan %s\n", pad,
-               !!(statp[3] & 0x10),
-               calc_fan_speed((statp[1] >> 3) & 0x3,
-                              ((0x7 & statp[1]) << 8) + statp[2]),
-               actual_speed_desc[7 & statp[3]]);
+        if (nofilter || ((0xc0 & s1) || (0xf0 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Do not remove=%d, "
+                          "Hot swap=%d, Fail=%d, Requested on=%d\n", pad,
+                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s3 & 0x80),
+                          !!(s3 & 0x40), !!(s3 & 0x20));
+        fsf = (s1 >> 3) & 0x3;
+        afs = ((0x7 & s1) << 8) + s2;
+        n += sg_scnpr(a + n, alen - n, "%sOff=%d, Actual speed=%d rpm, Fan "
+                      "%s\n", pad, !!(s3 & 0x10), calc_fan_speed(fsf, afs),
+                      actual_speed_desc[7 & s3]);
         if (op->verbose > 1)    /* show real field values */
-            printf("%s  [Fan_speed_factor=%d, Actual_fan_speed=%d]\n",
-                   pad, (statp[1] >> 3) & 0x3,
-                   ((0x7 & statp[1]) << 8) + statp[2]);
+            n += sg_scnpr(a + n, alen - n, "%s  [Fan_speed_factor=%d, "
+                          "Actual_fan_speed=%d]\n", pad, (s1 >> 3) & 0x3,
+                          ((0x7 & s1) << 8) + s2);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "do_not_remove", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "fan_speed_factor", fsf);
+            sgj_js_nv_ihex_nex(jsp, jop, "actual_fan_speed", afs, false,
+                               "see calculated_fan_speed for actual speed");
+            sgj_js_nv_ihex_nex(jsp, jop, "calculated_fan_speed",
+                               calc_fan_speed(fsf, afs), false,
+                               "[unit: rpm]");
+            sgj_js_nv_ihex_nex(jsp, jop, "hot_swap", !!(s3 & 0x80), false,
+                               "whether fan can be hot swapped without "
+                               "halting subenclosure");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s3 & 0x40));
+            sgj_js_nv_i(jsp, jop, "rqsted_on", !!(s3 & 0x20));
+            sgj_js_nv_i(jsp, jop, "off", !!(s3 & 0x10));
+            sgj_js_nv_ihexstr(jsp, jop, "actual_fan_code", 7 & s3, NULL,
+                              actual_speed_desc[7 & s3]);
+        }
         break;
     case TEMPERATURE_ETC:     /* temperature sensor */
-        if (nofilter || ((0xc0 & statp[1]) || (0xf & statp[3]))) {
-            printf("%sIdent=%d, Fail=%d, OT failure=%d, OT warning=%d, "
-                   "UT failure=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40), !!(statp[3] & 0x8),
-                   !!(statp[3] & 0x4), !!(statp[3] & 0x2));
-            printf("%sUT warning=%d\n", pad, !!(statp[3] & 0x1));
+        if (nofilter || ((0xc0 & s1) || (0xf & s3))) {
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, OT "
+                          "failure=%d, OT warning=%d, UT failure=%d\n", pad,
+                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s3 & 0x8),
+                          !!(s3 & 0x4), !!(s3 & 0x2));
+            n += sg_scnpr(a + n, alen - n, "%sUT warning=%d\n", pad,
+                          !!(s3 & 0x1));
         }
-        if (statp[2])
-            printf("%sTemperature=%d C\n", pad,
-                   (int)statp[2] - TEMPERAT_OFF);
+        if (s2)
+            n += sg_scnpr(a + n, alen - n, "%sTemperature=%d C\n", pad,
+                          (int)s2 - TEMPERAT_OFF);
         else
-            printf("%sTemperature: <reserved>\n", pad);
+            n += sg_scnpr(a + n, alen - n, "%sTemperature: <%s>\n", pad,
+                          rsv_s);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_ihex_nex(jsp, jop, "offset_for_reference_temperature",
+                               s1 & 0x7, false,
+                               "offset below high warning threshold");
+            snprintf(b, blen, "%d C", (int)s2 - 20);
+            sgj_js_nv_ihexstr_nex(jsp, jop, "temperature", s2, false,
+                                  NULL, b, "meaning is (value - 20)");
+            sgj_js_nv_i(jsp, jop, "rqsted_override", !!(s3 & 0x80));
+            sgj_js_nv_i(jsp, jop, "ot_failure", !!(s3 & 0x8));
+            sgj_js_nv_i(jsp, jop, "ot_warning", !!(s3 & 0x4));
+            sgj_js_nv_i(jsp, jop, "ut_failure", !!(s3 & 0x2));
+            sgj_js_nv_i(jsp, jop, "ut_warning", !!(s3 & 0x1));
+        }
         break;
     case DOOR_ETC:      /* OPEN field added in ses3r05 */
-        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[3])))
-            printf("%sIdent=%d, Fail=%d, Open=%d, Unlock=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                   !!(statp[3] & 0x2), !!(statp[3] & 0x1));
+        if (nofilter || ((0xc0 & s1) || (0x1 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Open=%d, "
+                          "Unlock=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
+                          !!(s3 & 0x2), !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "open", !!(s3 & 0x2));
+            sgj_js_nv_i(jsp, jop, "unlocked", !!(s3 & 0x1));
+        }
         break;
     case AUD_ALARM_ETC:     /* audible alarm */
-        if (nofilter || ((0xc0 & statp[1]) || (0xd0 & statp[3])))
-            printf("%sIdent=%d, Fail=%d, Request mute=%d, Mute=%d, "
-                   "Remind=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40), !!(statp[3] & 0x80),
-                   !!(statp[3] & 0x40), !!(statp[3] & 0x10));
-        if (nofilter || (0xf & statp[3]))
-            printf("%sTone indicator: Info=%d, Non-crit=%d, Crit=%d, "
-                   "Unrecov=%d\n", pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
-                   !!(statp[3] & 0x2), !!(statp[3] & 0x1));
+        if (nofilter || ((0xc0 & s1) || (0xd0 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Request "
+                          "mute=%d, Mute=%d, Remind=%d\n", pad, !!(s1 & 0x80),
+                          !!(s1 & 0x40), !!(s3 & 0x80), !!(s3 & 0x40),
+                          !!(s3 & 0x10));
+        if (nofilter || (0xf & s3))
+            n += sg_scnpr(a + n, alen - n, "%sTone indicator: Info=%d, "
+                          "Non-crit=%d, Crit=%d, Unrecov=%d\n", pad,
+                          !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
+                          !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "rqst_mute", !!(s3 & 0x80));
+            sgj_js_nv_i(jsp, jop, "muted", !!(s3 & 0x40));
+            sgj_js_nv_i(jsp, jop, "remind", !!(s3 & 0x10));
+            sgj_js_nv_ihex_nex(jsp, jop, "info", !!(s3 & 0x8), false,
+                               "INFOrmation condition tone urgency");
+            sgj_js_nv_ihex_nex(jsp, jop, "non_crit", !!(s3 & 0x4), false,
+                               "NONCRITical condition tone urgency");
+            sgj_js_nv_ihex_nex(jsp, jop, "crit", !!(s3 & 0x2), false,
+                               "critical condition tone urgency");
+            sgj_js_nv_ihex_nex(jsp, jop, "unrecov", !!(s3 & 0x1), false,
+                               "unrecoverable condition tone urgency");
+        }
         break;
     case ENC_SCELECTR_ETC: /* enclosure services controller electronics */
-        if (nofilter || (0xe0 & statp[1]) || (0x1 & statp[2]) ||
-            (0x80 & statp[3]))
-            printf("%sIdent=%d, Fail=%d, Do not remove=%d, Report=%d, "
-                   "Hot swap=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40), !!(statp[1] & 0x20),
-                   !!(statp[2] & 0x1), !!(statp[3] & 0x80));
+        if (nofilter || (0xe0 & s1) || (0x1 & s2) || (0x80 & s3))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Do not "
+                          "remove=%d, Report=%d, Hot swap=%d\n", pad,
+                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x20),
+                          !!(s2 & 0x1), !!(s3 & 0x80));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "do_not_remove", !!(s2 & 0x20));
+            sgj_js_nv_ihex_nex(jsp, jop, "rmv", !!(s2 & 0x10), false,
+                               "prepared for removal");
+            sgj_js_nv_i(jsp, jop, "report", !!(s2 & 0x1));
+            sgj_js_nv_ihex_nex(jsp, jop, "hot_swap", !!(s3 & 0x80), false,
+                               "whether controller electronics can be hot "
+                               "swapped without halting subenclosure");
+        }
         break;
     case SCC_CELECTR_ETC:     /* SCC controller electronics */
-        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2])))
-            printf("%sIdent=%d, Fail=%d, Report=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                   !!(statp[2] & 0x1));
+        if (nofilter || ((0xc0 & s1) || (0x1 & s2)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Report=%d\n",
+                          pad, !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "report", !!(s2 & 0x1));
+        }
         break;
     case NV_CACHE_ETC:     /* Non volatile cache */
+        ccp = nv_cache_unit[s1 & 0x3];
         res = sg_get_unaligned_be16(statp + 2);
-        printf("%sIdent=%d, Fail=%d, Size multiplier=%d, Non volatile cache "
-               "size=0x%x\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-               (statp[1] & 0x3), res);
-        printf("%sHence non volatile cache size: %d %s\n", pad, res,
-               nv_cache_unit[statp[1] & 0x3]);
+        n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Size "
+                      "multiplier=%d, Non volatile cache size=0x%x\n", pad,
+                      !!(s1 & 0x80), !!(s1 & 0x40), (s1 & 0x3), res);
+        n += sg_scnpr(a + n, alen - n, "%sHence non volatile cache size: %d "
+                      "%s\n", pad, res, ccp);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_ihexstr(jsp, jop, "size_multiplier", 0x3 & s1, NULL,
+                              ccp);
+            snprintf(b, blen, "%d %s", res, ccp);
+            sgj_js_nv_ihexstr(jsp, jop, "nonvolatile_cache_size", res,
+                              NULL, b);
+        }
         break;
     case INV_OP_REASON_ETC:   /* Invalid operation reason */
-        res = ((statp[1] >> 6) & 3);
-        printf("%sInvop type=%d   %s\n", pad, res, invop_type_desc[res]);
+        res = ((s1 >> 6) & 3);
+        ccp = invop_type_desc[res];
+        n += sg_scnpr(a + n, alen - n, "%sInvop type=%d   %s\n", pad, res,
+                      ccp);
+        if (jsp->pr_as_json)
+            sgj_js_nv_ihexstr(jsp, jop, "invop_type", res, NULL, ccp);
+        ccp = vs_s;
+
         switch (res) {
         case 0:
-            printf("%sPage not supported=%d\n", pad, (statp[1] & 1));
+            n += sg_scnpr(a + n, alen - n, "%sPage not supported=%d\n", pad,
+                          (s1 & 1));
+            if (jsp->pr_as_json)
+                sgj_js_nv_i(jsp, jop, "page_not_supported", !!(s1 & 0x1));
             break;
         case 1:
-            printf("%sByte offset=%d, bit number=%d\n", pad,
-                   sg_get_unaligned_be16(statp + 2), (statp[1] & 7));
+            res = sg_get_unaligned_be16(statp + 2);
+            n += sg_scnpr(a + n, alen - n, "%sByte offset=%d, bit "
+                          "number=%d\n", pad, res, (s1 & 7));
+            if (jsp->pr_as_json) {
+                sgj_js_nv_i(jsp, jop, "bit_number", !!(s1 & 0x7));
+                sgj_js_nv_i(jsp, jop, "byte_offset", res);
+            }
             break;
         case 2:
+            ccp = rsv_s;
+            /* fallthrough fall-through */
+            // [[fallthrough]];
+            /* FALLTHRU */
         case 3:
-            printf("%slast 3 bytes (hex): %02x %02x %02x\n", pad, statp[1],
-                   statp[2], statp[3]);
+            n += sg_scnpr(a + n, alen - n, "%slast 3 bytes (hex): %02x %02x "
+                          "%02x\n", pad, s1, s2, s3);
+            if (jsp->pr_as_json)
+                sgj_js_nv_s_len(jsp, jop, "bytes_1_2_3",
+                                (const char *)statp + 1, 3);
             break;
         }
         break;
     case UI_POWER_SUPPLY_ETC:   /* Uninterruptible power supply */
-        if (0 == statp[1])
-            printf("%sBattery status: discharged or unknown\n", pad);
-        else if (255 == statp[1])
-            printf("%sBattery status: 255 or more minutes remaining\n", pad);
+        if (0 == s1)
+            n += sg_scnpr(a + n, alen - n, "%sBattery status: discharged or "
+                          "unknown\n", pad);
+        else if (255 == s1)
+            n += sg_scnpr(a + n, alen - n, "%sBattery status: 255 or more "
+                          "minutes remaining\n", pad);
         else
-            printf("%sBattery status: %d minutes remaining\n", pad, statp[1]);
-        if (nofilter || (0xf8 & statp[2]))
-            printf("%sAC low=%d, AC high=%d, AC qual=%d, AC fail=%d, DC fail="
-                   "%d\n", pad, !!(statp[2] & 0x80), !!(statp[2] & 0x40),
-                   !!(statp[2] & 0x20), !!(statp[2] & 0x10),
-                   !!(statp[2] & 0x8));
-        if (nofilter || ((0x7 & statp[2]) || (0xe3 & statp[3]))) {
-            printf("%sUPS fail=%d, Warn=%d, Intf fail=%d, Ident=%d, Fail=%d, "
-                   "Do not remove=%d\n", pad, !!(statp[2] & 0x4),
-                   !!(statp[2] & 0x2), !!(statp[2] & 0x1),
-                   !!(statp[3] & 0x80), !!(statp[3] & 0x40),
-                   !!(statp[3] & 0x20));
-            printf("%sBatt fail=%d, BPF=%d\n", pad, !!(statp[3] & 0x2),
-                   !!(statp[3] & 0x1));
+            n += sg_scnpr(a + n, alen - n, "%sBattery status: %d minutes "
+                          "remaining\n", pad, s1);
+        if (nofilter || (0xf8 & s2))
+            n += sg_scnpr(a + n, alen - n, "%sAC low=%d, AC high=%d, AC "
+                          "qual=%d, AC fail=%d, DC fail=%d\n", pad,
+                          !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20),
+                          !!(s2 & 0x10), !!(s2 & 0x8));
+        if (nofilter || ((0x7 & s2) || (0xe3 & s3))) {
+            n += sg_scnpr(a + n, alen - n, "%sUPS fail=%d, Warn=%d, Intf "
+                          "fail=%d, Ident=%d, Fail=%d, Do not remove=%d\n",
+                          pad, !!(s2 & 0x4), !!(s2 & 0x2), !!(s2 & 0x1),
+                          !!(s3 & 0x80), !!(s3 & 0x40), !!(s3 & 0x20));
+            n += sg_scnpr(a + n, alen - n, "%sBatt fail=%d, BPF=%d\n", pad,
+                          !!(s3 & 0x2), !!(s3 & 0x1));
+        }
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihexstr(jsp, jop, "battery_status", s1, NULL,
+                              (0 == s1) ? "discharged or unknown" :
+                      "at least this many minutes of capacity remaining");
+            sgj_js_nv_i(jsp, jop, "ac_lo", !!(s2 & 0x80));
+            sgj_js_nv_i(jsp, jop, "ac_hi", !!(s2 & 0x40));
+            sgj_js_nv_i(jsp, jop, "ac_qual", !!(s2 & 0x20));
+            sgj_js_nv_i(jsp, jop, "ac_fail", !!(s2 & 0x10));
+            sgj_js_nv_i(jsp, jop, "dc_fail", !!(s2 & 0x8));
+            sgj_js_nv_i(jsp, jop, "ups_fail", !!(s2 & 0x4));
+            sgj_js_nv_i(jsp, jop, "warn", !!(s2 & 0x2));
+            sgj_js_nv_ihex_nex(jsp, jop, "intf_fail", !!(s2 & 0x1), false,
+                               "interface to UI power supply failure");
         }
         break;
     case DISPLAY_ETC:   /* Display (ses2r15) */
-        if (nofilter || (0xc0 & statp[1])) {
-            int dms = statp[1] & 0x3;
-
-            printf("%sIdent=%d, Fail=%d, Display mode status=%d", pad,
-                   !!(statp[1] & 0x80), !!(statp[1] & 0x40), dms);
+        dms = s1 & 0x3;
+        if (nofilter || (0xc0 & s1)) {
+            m = sg_scnpr(b, blen, "%sIdent=%d, Fail=%d, Display mode "
+                         "status=%d", pad, !!(s1 & 0x80), !!(s1 & 0x40), dms);
             if ((1 == dms) || (2 == dms)) {
                 uint16_t dcs = sg_get_unaligned_be16(statp + 2);
 
-                printf(", Display character status=0x%x", dcs);
-                if (statp[2] && (0 == statp[3]))
-                    printf(" ['%c']", statp[2]);
+                m += sg_scnpr(b + m, blen - m, ", Display character "
+                              "status=0x%x", dcs);
+                if (s2 && (0 == s3))
+                    sg_scnpr(b + m, blen - m, " ['%c']", s2);
             }
-            printf("\n");
+            n += sg_scnpr(a + n, alen - n, "%s\n", b);
+        }
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_ihexstr(jsp, jop, "display_mode_status", dms, NULL,
+                              display_mode_status[dms]);
+            sgj_js_nv_s_len(jsp, jop, "display_character_status",
+                            (const char *)statp + 2, 2);
         }
         break;
     case KEY_PAD_ETC:   /* Key pad entry */
-        if (nofilter || (0xc0 & statp[1]))
-            printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40));
+        if (nofilter || (0xc0 & s1))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d\n", pad,
+                          !!(s1 & 0x80), !!(s1 & 0x40));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+        }
         break;
     case ENCLOSURE_ETC:
-        a = ((statp[2] >> 2) & 0x3f);
-        if (nofilter || ((0x80 & statp[1]) || a || (0x2 & statp[2])))
-            printf("%sIdent=%d, Time until power cycle=%d, "
-                   "Failure indication=%d\n", pad, !!(statp[1] & 0x80),
-                   a, !!(statp[2] & 0x2));
-        b = ((statp[3] >> 2) & 0x3f);
-        if (nofilter || (0x1 & statp[2]) || a || b)
-            printf("%sWarning indication=%d, Requested power off "
-                   "duration=%d\n", pad, !!(statp[2] & 0x1), b);
-        if (nofilter || (0x3 & statp[3]))
-            printf("%sFailure requested=%d, Warning requested=%d\n",
-                   pad, !!(statp[3] & 0x2), !!(statp[3] & 0x1));
+        tpc = ((s2 >> 2) & 0x3f);
+        if (nofilter || ((0x80 & s1) || tpc || (0x2 & s2)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Time until power "
+                          "cycle=%d, Failure indication=%d\n", pad,
+                          !!(s1 & 0x80), tpc, !!(s2 & 0x2));
+        d = ((s3 >> 2) & 0x3f);
+        if (nofilter || (0x1 & s2) || tpc || d)
+            n += sg_scnpr(a + n, alen - n, "%sWarning indication=%d, "
+                          "Requested power off duration=%d\n", pad,
+                          !!(s2 & 0x1), d);
+        if (nofilter || (0x3 & s3))
+            n += sg_scnpr(a + n, alen - n, "%sFailure requested=%d, Warning "
+                          "requested=%d\n", pad, !!(s3 & 0x2), !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            ttpc = s2 >> 2;
+            if (0 == ttpc)
+                ccp = "No power cycle scheduled";
+            else if (0x3f == ttpc)
+                ccp = "Power cycle in zero minutes";
+            else if (ttpc >= 0x3d)
+                ccp = rsv_s;
+            else
+                ccp = "Power cycle in indicated number of minutes";
+            sgj_js_nv_ihexstr(jsp, jop, "time_to_power_cycle", ttpc,
+                              NULL, ccp);
+            sgj_js_nv_i(jsp, jop, "failure_indication", !!(s2 & 0x2));
+            sgj_js_nv_i(jsp, jop, "warning_indication", !!(s2 & 0x1));
+            ttpc = s1 >> 2;     /* should be rpod */
+            if (0 == ttpc)
+                ccp = "No power cycle scheduled";
+            else if (0x3f == ttpc)
+                ccp = "Power scheduled to be off until manually restored";
+            else if (ttpc >= 0x3d)
+                ccp = rsv_s;
+            else
+                ccp = "Power scheduled to be off for indicated number of "
+                      "minutes";
+            sgj_js_nv_ihexstr(jsp, jop, "requested_power_off_duration",
+                              ttpc, NULL, ccp);
+            sgj_js_nv_i(jsp, jop, "failure_requested", !!(s3 & 0x2));
+            sgj_js_nv_i(jsp, jop, "warning_requested", !!(s3 & 0x1));
+        }
         break;
     case SCSI_PORT_TRAN_ETC:   /* SCSI port/transceiver */
-        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
-                           (0x13 & statp[3])))
-            printf("%sIdent=%d, Fail=%d, Report=%d, Disabled=%d, Loss of "
-                   "link=%d, Xmit fail=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40), !!(statp[2] & 0x1),
-                   !!(statp[3] & 0x10), !!(statp[3] & 0x2),
-                   !!(statp[3] & 0x1));
+        if (nofilter || ((0xc0 & s1) || (0x1 & s2) || (0x13 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Report=%d, "
+                          "Disabled=%d, Loss of link=%d, Xmit fail=%d\n",
+                          pad, !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x1),
+                          !!(s3 & 0x10), !!(s3 & 0x2), !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "report", !!(s2 & 0x1));
+            sgj_js_nv_i(jsp, jop, "disabled", !!(s3 & 0x10));
+            sgj_js_nv_ihex_nex(jsp, jop, "lol", !!(s3 & 0x2), false,
+                               "Loss Of Link");
+            sgj_js_nv_ihex_nex(jsp, jop, "xmit_fail", !!(s3 & 0x1), false,
+                               "transmitter failure");
+        }
         break;
     case LANGUAGE_ETC:
-        printf("%sIdent=%d, Language code: %.2s\n", pad, !!(statp[1] & 0x80),
-               statp + 2);
+        m = sg_get_unaligned_be16(statp + 2);
+        snprintf(b, blen, "%sIdent=%d, ", pad, !!(s1 & 0x80));
+        if (0 == m)
+            n += sg_scnpr(a + n, alen - n, "%sLanguage: English\n", b);
+        else
+            n += sg_scnpr(a + n, alen - n, "%sLanguage code: %.2s\n", b,
+                      (const char *)statp + 2);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            if (m > 0) {
+                snprintf(b, blen, "%.2s", (const char *)statp + 2);
+                ccp = b;
+            } else
+                ccp = "English";
+            sgj_js_nv_ihexstr(jsp, jop, "language_code", m, NULL, ccp);
+        }
         break;
     case COMM_PORT_ETC:   /* Communication port */
-        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[3])))
-            printf("%sIdent=%d, Fail=%d, Disabled=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                   !!(statp[3] & 0x1));
+        if (nofilter || ((0xc0 & s1) || (0x1 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, "
+                          "Disabled=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
+                          !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "disabled", !!(s3 & 0x1));
+        }
         break;
     case VOLT_SENSOR_ETC:   /* Voltage sensor */
-        if (nofilter || (0xcf & statp[1])) {
-            printf("%sIdent=%d, Fail=%d,  Warn Over=%d, Warn Under=%d, "
-                   "Crit Over=%d\n", pad, !!(statp[1] & 0x80),
-                   !!(statp[1] & 0x40), !!(statp[1] & 0x8),
-                   !!(statp[1] & 0x4), !!(statp[1] & 0x2));
-            printf("%sCrit Under=%d\n", pad, !!(statp[1] & 0x1));
+        if (nofilter || (0xcf & s1)) {
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d,  Warn "
+                          "Over=%d, Warn Under=%d, Crit Over=%d\n", pad,
+                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x8),
+                          !!(s1 & 0x4), !!(s1 & 0x2));
+            n += sg_scnpr(a + n, alen - n, "%sCrit Under=%d\n", pad,
+                          !!(s1 & 0x1));
         }
-#ifdef SG_LIB_MINGW
-        printf("%sVoltage: %g volts\n", pad,
-               ((int)(short)sg_get_unaligned_be16(statp + 2) / 100.0));
-#else
-        printf("%sVoltage: %.2f volts\n", pad,
-               ((int)(short)sg_get_unaligned_be16(statp + 2) / 100.0));
-#endif
+        voltage = sg_get_unaligned_be16(statp + 2); /* unit: 10 mV */
+        n += sg_scnpr(a + n, alen - n, "%sVoltage: %d.%02d Volts\n", pad,
+                      voltage / 100, voltage % 100);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "warn_over", !!(s1 & 0x8));
+            sgj_js_nv_i(jsp, jop, "warn_under", !!(s1 & 0x4));
+            sgj_js_nv_i(jsp, jop, "crit_over", !!(s1 & 0x2));
+            sgj_js_nv_i(jsp, jop, "crit_under", !!(s1 & 0x1));
+            jo2p = sgj_named_subobject_r(jsp, jop, "voltage");
+            sgj_js_nv_ihex_nex(jsp, jo2p, "raw_value", voltage, false,
+                               "[unit: 10 milliVolts]");
+            snprintf(b, blen, "%d.%02d", voltage / 100, voltage % 100);
+            sgj_js_nv_s(jsp, jo2p, "value_in_volts", b);
+        }
         break;
     case CURR_SENSOR_ETC:   /* Current sensor */
-        if (nofilter || (0xca & statp[1]))
-            printf("%sIdent=%d, Fail=%d, Warn Over=%d, Crit Over=%d\n",
-                    pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                    !!(statp[1] & 0x8), !!(statp[1] & 0x2));
-#ifdef SG_LIB_MINGW
-        printf("%sCurrent: %g amps\n", pad,
-               ((int)(short)sg_get_unaligned_be16(statp + 2) / 100.0));
-#else
-        printf("%sCurrent: %.2f amps\n", pad,
-               ((int)(short)sg_get_unaligned_be16(statp + 2) / 100.0));
-#endif
+        if (nofilter || (0xca & s1))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Warn "
+                          "Over=%d, Crit Over=%d\n", pad, !!(s1 & 0x80),
+                          !!(s1 & 0x40), !!(s1 & 0x8), !!(s1 & 0x2));
+        amperage = sg_get_unaligned_be16(statp + 2); /* unit: 10 mV */
+        n += sg_scnpr(a + n, alen - n, "%sCurrent: %d.%02d Amps\n", pad,
+                      amperage / 100, amperage % 100);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "warn_over", !!(s1 & 0x8));
+            sgj_js_nv_i(jsp, jop, "crit_over", !!(s1 & 0x2));
+            jo2p = sgj_named_subobject_r(jsp, jop, "current");
+            sgj_js_nv_ihex_nex(jsp, jo2p, "raw_value", amperage, false,
+                               "[unit: 10 milliAmps]");
+            snprintf(b, blen, "%d.%02d", amperage / 100, amperage % 100);
+            sgj_js_nv_s(jsp, jo2p, "value_in_amps", b);
+        }
         break;
     case SCSI_TPORT_ETC:   /* SCSI target port */
-        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
-                           (0x1 & statp[3])))
-            printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                   !!(statp[2] & 0x1), !!(statp[3] & 0x1));
+        if (nofilter || ((0xc0 & s1) || (0x1 & s2) || (0x1 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Report=%d, "
+                          "Enabled=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
+                          !!(s2 & 0x1), !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "report", !!(s2 & 0x1));
+            sgj_js_nv_i(jsp, jop, "enabled", !!(s3 & 0x1));
+        }
         break;
     case SCSI_IPORT_ETC:   /* SCSI initiator port */
-        if (nofilter || ((0xc0 & statp[1]) || (0x1 & statp[2]) ||
-                           (0x1 & statp[3])))
-            printf("%sIdent=%d, Fail=%d, Report=%d, Enabled=%d\n", pad,
-                   !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                   !!(statp[2] & 0x1), !!(statp[3] & 0x1));
+        if (nofilter || ((0xc0 & s1) || (0x1 & s2) || (0x1 & s3)))
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Report=%d, "
+                          "Enabled=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
+                          !!(s2 & 0x1), !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "report", !!(s2 & 0x1));
+            sgj_js_nv_i(jsp, jop, "enabled", !!(s3 & 0x1));
+        }
         break;
     case SIMPLE_SUBENC_ETC:   /* Simple subenclosure */
-        printf("%sIdent=%d, Fail=%d, Short enclosure status: 0x%x\n", pad,
-               !!(statp[1] & 0x80), !!(statp[1] & 0x40), statp[3]);
+        n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Short %s: "
+                      "0x%x\n", pad, !!(s1 & 0x80), !!(s1 & 0x40), es_s, s3);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+            sgj_js_nv_i(jsp, jop, "short_enclosure_status", s3);
+        }
         break;
     case ARRAY_DEV_ETC:   /* Array device */
-        if (nofilter || (0xf0 & statp[1]))
-            printf("%sOK=%d, Reserved device=%d, Hot spare=%d, Cons check="
-                   "%d\n", pad, !!(statp[1] & 0x80), !!(statp[1] & 0x40),
-                   !!(statp[1] & 0x20), !!(statp[1] & 0x10));
-        if (nofilter || (0xf & statp[1]))
-            printf("%sIn crit array=%d, In failed array=%d, Rebuild/remap=%d"
-                   ", R/R abort=%d\n", pad, !!(statp[1] & 0x8),
-                   !!(statp[1] & 0x4), !!(statp[1] & 0x2),
-                   !!(statp[1] & 0x1));
-        if (nofilter || (0xf0 & statp[2]))
-            printf("%sApp client bypass A=%d, Do not remove=%d, Enc bypass "
-                   "A=%d, Enc bypass B=%d\n", pad, !!(statp[2] & 0x80),
-                   !!(statp[2] & 0x40), !!(statp[2] & 0x20),
-                   !!(statp[2] & 0x10));
-        if (nofilter || (0xf & statp[2]))
-            printf("%sReady to insert=%d, RMV=%d, Ident=%d, Report=%d\n",
-                   pad, !!(statp[2] & 0x8), !!(statp[2] & 0x4),
-                   !!(statp[2] & 0x2), !!(statp[2] & 0x1));
-        if (nofilter || (0xf0 & statp[3]))
-            printf("%sApp client bypass B=%d, Fault sensed=%d, Fault reqstd="
-                   "%d, Device off=%d\n", pad, !!(statp[3] & 0x80),
-                   !!(statp[3] & 0x40), !!(statp[3] & 0x20),
-                   !!(statp[3] & 0x10));
-        if (nofilter || (0xf & statp[3]))
-            printf("%sBypassed A=%d, Bypassed B=%d, Dev bypassed A=%d, "
-                   "Dev bypassed B=%d\n",
-                   pad, !!(statp[3] & 0x8), !!(statp[3] & 0x4),
-                   !!(statp[3] & 0x2), !!(statp[3] & 0x1));
+        if (nofilter || (0xf0 & s1))
+            n += sg_scnpr(a + n, alen - n, "%sOK=%d, Reserved device=%d, Hot "
+                          "spare=%d, Cons check=%d\n", pad, !!(s1 & 0x80),
+                          !!(s1 & 0x40), !!(s1 & 0x20), !!(s1 & 0x10));
+        if (nofilter || (0xf & s1))
+            n += sg_scnpr(a + n, alen - n, "%sIn crit array=%d, In failed "
+                          "array=%d, Rebuild/remap=%d, R/R abort=%d\n", pad,
+                          !!(s1 & 0x8), !!(s1 & 0x4), !!(s1 & 0x2),
+                          !!(s1 & 0x1));
+        if (nofilter || (0xf0 & s2))
+            n += sg_scnpr(a + n, alen - n, "%sApp client bypass A=%d, Do not "
+                          "remove=%d, Enc bypass A=%d, Enc bypass B=%d\n",
+                          pad, !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20),
+                          !!(s2 & 0x10));
+        if (nofilter || (0xf & s2))
+            n += sg_scnpr(a + n, alen - n, "%sReady to insert=%d, RMV=%d, "
+                          "Ident=%d, Report=%d\n", pad, !!(s2 & 0x8),
+                          !!(s2 & 0x4), !!(s2 & 0x2), !!(s2 & 0x1));
+        if (nofilter || (0xf0 & s3))
+            n += sg_scnpr(a + n, alen - n, "%sApp client bypass B=%d, Fault "
+                          "sensed=%d, Fault reqstd=%d, Device off=%d\n", pad,
+                          !!(s3 & 0x80), !!(s3 & 0x40), !!(s3 & 0x20),
+                          !!(s3 & 0x10));
+        if (nofilter || (0xf & s3))
+            n += sg_scnpr(a + n, alen - n, "%sBypassed A=%d, Bypassed B=%d, "
+                          "Dev bypassed A=%d, Dev bypassed B=%d\n", pad,
+                          !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
+                          !!(s3 & 0x1));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_ok", !!(s1 & 0x80), false,
+                               "ReQueST OKay, device ok indicator");
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_rsvd_device", !!(s1 & 0x40),
+                               false, "ReQueST ReSerVeD device (indicator)");
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_hot_spare", !!(s1 & 0x20),
+                               false, "ReQueST HOT SPARE (indicator)");
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_cons_check", !!(s1 & 0x10),
+                               false,
+                               "ReQueST CONSistency CHECK (in progress)");
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_in_crit_array", !!(s1 & 0x8),
+                               false,
+                               "ReQueST IN CRITical ARRAY (indicator)");
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_in_failed_array", !!(s1 & 0x4),
+                               false, "ReQueST IN FAILED ARRAY (indicator)");
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_rebuild_remap", !!(s1 & 0x2),
+                               false, "ReQueST REBUILD/REMAP (indicator)");
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_r_r_abort", !!(s1 & 2), false,
+                               "ReQueST rebuild/remap aborted (indicator)");
+            sgj_js_nv_ihex_nex(jsp, jop, "rqst_active", !!(s2 & 0x80), false,
+                               "ReQueST rebuild/remap aborted (indicator)");
+            sgj_js_nv_i(jsp, jop, "app_client_bypassed_a", !!(s2 & 0x80));
+            sgj_js_nv_i(jsp, jop, "do_not_remove", !!(s2 & 0x40));
+            sgj_js_nv_i(jsp, jop, "enclosure_bypassed_a", !!(s2 & 0x20));
+            sgj_js_nv_i(jsp, jop, "enclosure_bypassed_b", !!(s2 & 0x10));
+            sgj_js_nv_i(jsp, jop, "ready_to_insert", !!(s2 & 0x8));
+            sgj_js_nv_ihex_nex(jsp, jop, "rmv", !!(s2 & 0x4), false,
+                               "remove");
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s2 & 0x2), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_ihex_nex(jsp, jop, "report", !!(s2 & 0x1), false,
+                               "es dpage accessed via this device");
+            sgj_js_nv_i(jsp, jop, "app_client_bypassed_b", !!(s3 & 0x80));
+            sgj_js_nv_ihex_nex(jsp, jop, "fault_sensed", !!(s3 & 0x40), false,
+                               "FAULT condition detected (SENSED)");
+            sgj_js_nv_ihex_nex(jsp, jop, "fault_reqstd", !!(s3 & 0x20), false,
+                       "FAULT REQueSTeD (by rqst_fault in control element)");
+            sgj_js_nv_ihex_nex(jsp, jop, "device_off", !!(s3 & 0x10), false,
+                               "(0 --> device is ON)");
+            sgj_js_nv_i(jsp, jop, "bypassed_a", !!(s3 & 0x8));
+            sgj_js_nv_i(jsp, jop, "bypassed_b", !!(s3 & 0x4));
+            sgj_js_nv_i(jsp, jop, "device_bypassed_a", !!(s3 & 0x2));
+            sgj_js_nv_i(jsp, jop, "device_bypassed_b", !!(s3 & 0x1));
+        }
         break;
     case SAS_EXPANDER_ETC:
-        printf("%sIdent=%d, Fail=%d\n", pad, !!(statp[1] & 0x80),
-               !!(statp[1] & 0x40));
+        n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d\n", pad,
+                      !!(s1 & 0x80), !!(s1 & 0x40));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
+        }
         break;
     case SAS_CONNECTOR_ETC:     /* OC (overcurrent) added in ses3r07 */
-        ct = (statp[1] & 0x7f);
-        bblen = sizeof(bb);
-        if (abridged)
-            printf("%s%s, pl=%d", pad,
-                   find_sas_connector_type(ct, true, bb, bblen), statp[2]);
-        else {
-            printf("%sIdent=%d, %s\n", pad, !!(statp[1] & 0x80),
-                   find_sas_connector_type(ct, false, bb, bblen));
+        ct = (s1 & 0x7f);
+        if (abridged) {
+            ccp = find_sas_connector_type(ct, true, b, blen);
+            n += sg_scnpr(a + n, alen - n, "%s%s, pl=%u", pad, ccp, s2);
+        } else {
+            ccp = find_sas_connector_type(ct, false, b, blen);
+            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, %s\n", pad,
+                          !!(s1 & 0x80), ccp);
             /* Mated added in ses3r10 */
-            printf("%sConnector physical link=0x%x, Mated=%d, Fail=%d, "
-                   "OC=%d\n", pad, statp[2], !!(statp[3] & 0x80),
-                   !!(statp[3] & 0x40), !!(statp[3] & 0x20));
+            n += sg_scnpr(a + n, alen - n, "%sConnector physical link=0x%x, "
+                          "Mated=%d, Fail=%d, OC=%d\n", pad, s2,
+                          !!(s3 & 0x80), !!(s3 & 0x40), !!(s3 & 0x20));
+        }
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
+                               "identify (visual indicator)");
+            sgj_js_nv_ihexstr(jsp, jop, "connector_type", ct, NULL, ccp);
+            sgj_js_nv_i(jsp, jop, "connector_physical_link", s2);
+            sgj_js_nv_i(jsp, jop, "mated", !!(s3 & 0x80));
+            sgj_js_nv_i(jsp, jop, "fail", !!(s3 & 0x40));
+            sgj_js_nv_ihex_nex(jsp, jop, "oc", !!(s3 & 0x20), false,
+                               "OverCurrent on connector");
         }
         break;
     default:
         if (etype < 0x80)
-            printf("%sUnknown element type, status in hex: %02x %02x %02x "
-                   "%02x\n", pad, statp[0], statp[1], statp[2], statp[3]);
+            n += sg_scnpr(a + n, alen - n, "%sUnknown element type, status "
+                          "in hex: %02x %02x %02x %02x\n", pad, s0, s1, s2,
+                          s3);
         else
-            printf("%sVendor specific element type, status in hex: %02x "
-                   "%02x %02x %02x\n", pad, statp[0], statp[1], statp[2],
-                   statp[3]);
+            n += sg_scnpr(a + n, alen - n, "%s%s element type, status in "
+                          "hex: %02x %02x %02x %02x\n", pad, vs_s, s0, s1,
+                          s2, s3);
+        if (jsp->pr_as_json)
+            sgj_js_nv_hex_bytes(jsp, jop, "unknown_element_type_bytes",
+                                statp, 4);
         break;
     }
+    return n;
 }
 
-/* ENC_STATUS_DPC [0x2]
+/* ENC_STATUS_DPC  <"es"> [0x2]
  * Display enclosure status diagnostic page. */
 static void
-enc_status_dp(const struct th_es_t * tesp, uint32_t ref_gen_code,
-              const uint8_t * resp, int resp_len,
-              const struct opts_t * op)
+enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
+               const uint8_t * resp, int resp_len, struct opts_t * op,
+               sgj_opaque_p jop)
 {
+    bool got1, match_ind_th;
+    uint8_t es1;
     int j, k;
     uint32_t gen_code;
-    bool got1, match_ind_th;
+    // const char * ccp;
     const uint8_t * bp;
     const uint8_t * last_bp;
-    const struct type_desc_hdr_t * tdhp = tesp->th_base;
-    char b[64];
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jo4p = NULL;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p ja2p = NULL;
+    const struct type_desc_hdr_t * tdhp = tesp ? tesp->th_base : NULL;
+    char b[512];
+    static const int blen = sizeof(b);
+    static const char * es_dp = "Enclosure Status diagnostic page";
 
-    printf("Enclosure Status diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s\n", es_dp);
     if (resp_len < 4)
         goto truncated;
-    printf("  INVOP=%d, INFO=%d, NON-CRIT=%d, CRIT=%d, UNRECOV=%d\n",
-           !!(resp[1] & 0x10), !!(resp[1] & 0x8), !!(resp[1] & 0x4),
-           !!(resp[1] & 0x2), !!(resp[1] & 0x1));
+    es1 = resp[1];
+    sgj_pr_hr(jsp, "  INVOP=%d, INFO=%d, NON-CRIT=%d, CRIT=%d, UNRECOV=%d\n",
+              !!(es1 & 0x10), !!(es1 & 0x8), !!(es1 & 0x4), !!(es1 & 0x2),
+              !!(es1 & 0x1));
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                                 sgj_convert_to_snake_name(es_dp, b, blen));
+        sgj_js_nv_ihexstr_nex(jsp, jop, "invop", !!(es1 & 0x10), false,
+                              NULL, NULL, "INvalid Operation requested");
+        sgj_js_nv_ihexstr_nex(jsp, jop, "info", !!(es1 & 0x8), false,
+                              NULL, NULL, NULL);
+        sgj_js_nv_ihexstr_nex(jsp, jop, "non_crit", !!(es1 & 0x4), false,
+                              NULL, NULL, "NON-Critical condition");
+        sgj_js_nv_ihexstr_nex(jsp, jop, "crit", !!(es1 & 0x4), false,
+                              NULL, NULL, "CRITical condition");
+        sgj_js_nv_ihexstr_nex(jsp, jop, "unrecov", !!(es1 & 0x4), false,
+                              NULL, NULL, "UNRECOVerable condition");
+    }
     last_bp = resp + resp_len - 1;
     if (resp_len < 8)
         goto truncated;
+
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%x\n", gen_code);
-    if (ref_gen_code != gen_code) {
-        pr2serr("  <<state of enclosure changed, please try again>>\n");
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (tdhp && (ref_gen_code != gen_code)) {
+        pr2serr("  <<%s>>\n", soec);
         return;
     }
-    printf("  status descriptor list\n");
     bp = resp + 8;
+    sgj_pr_hr(jsp, "  %s:\n", sdl_s);
+    if (jsp->pr_as_json) {
+        jap = sgj_named_subarray_r(jsp, jop, sdl_sn);
+        if ((! op->partial_join) && (op->inner_hex > 0)) {
+            int n = (resp_len - 8) / 4;
+
+            if (op->verbose > 2)
+                pr2serr("%s: decoded _without_ using type descriptor header "
+                        "info\n", __func__);
+            for (j = 0; j < n; ++j, bp += 4) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                sgj_js_nv_hex_bytes(jsp, jo2p, "status_element", bp, 4);
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
+            return;
+        }
+    }
+    if (NULL == tesp) {
+        pr2serr("%s: logic error, resp==NULL\n", __func__);
+        return;
+    }
+
     for (k = 0, got1 = false; k < tesp->num_ths; ++k, ++tdhp) {
         if ((bp + 3) > last_bp)
             goto truncated;
+
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            if (op->partial_join || (op->do_join > 0)) {
+                sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
+                                  NULL, etype_str(tdhp->etype, b, blen));
+                sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
+                                  (0 == tdhp->se_id) ? "primary" : NULL);
+            } else
+                sgj_js_nv_hex_bytes(jsp, jo2p, "overall_status_element",
+                                    bp, 4);
+        }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
-                   etype_str(tdhp->etype, b, sizeof(b)), tdhp->se_id, k);
-            printf("      Overall descriptor:\n");
-            enc_status_helper("        ", bp, tdhp->etype, false, op);
+            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
+                      "[ti=%d]\n", etype_str(tdhp->etype, b, blen),
+                      tdhp->se_id, k);
+            sgj_pr_hr(jsp, "      %s:\n", od_s);
+            if (! jsp->pr_as_json) {
+                enc_status_helper("        ", bp, tdhp->etype, false, op,
+                                  jo2p, b, blen);
+                sgj_pr_hr(jsp, "%s", b);
+            }
             got1 = true;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
+            enc_status_helper("        ", bp, tdhp->etype, false, op, jo3p,
+                              b, blen);
+            ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                        "individual_status_element_list");
+        }
+
         for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (! match_ind_indiv(j, op)))
                     continue;
             }
-            printf("      Element %d descriptor:\n", j);
-            enc_status_helper("        ", bp, tdhp->etype, false, op);
+            sgj_pr_hr(jsp, "      Element %d descriptor:\n", j);
+            if (jsp->pr_as_json) {
+                jo4p = sgj_new_unattached_object_r(jsp);
+                if (! op->partial_join)
+                    sgj_js_nv_hex_bytes(jsp, jo4p,
+                                        "individual_status_element", bp, 4);
+            }
+            enc_status_helper("        ", bp, tdhp->etype, false, op, jo4p,
+                              b, blen);
+            sgj_pr_hr(jsp, "%s", b);
+            if (jsp->pr_as_json)
+                sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             got1 = true;
         }
-    }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }           /* end of outer for loop */
     if (op->ind_given && (! got1)) {
-        printf("      >>> no match on --index=%d,%d", op->ind_th,
-               op->ind_indiv);
+        snprintf(b, blen, "      >>> no match on --index=%d,%d", op->ind_th,
+                 op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            printf("-%d\n", op->ind_indiv_last);
+            sgj_pr_hr(jsp, "%s-%d\n", b, op->ind_indiv_last);
         else
-            printf("\n");
+            sgj_pr_hr(jsp, "%s\n", b);
     }
     return;
 truncated:
-    pr2serr("    <<<enc: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
-/* ARRAY_STATUS_DPC [0x6]
+/* ARRAY_STATUS_DPC  <"as"> [0x6] obsolete
  * Display array status diagnostic page. */
 static void
-array_status_dp(const struct th_es_t * tesp, uint32_t ref_gen_code,
-                const uint8_t * resp, int resp_len,
-                const struct opts_t * op)
+array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
+                 const uint8_t * resp, int resp_len,
+                 struct opts_t * op, sgj_opaque_p jop)
 {
-    int j, k;
-    uint32_t gen_code;
     bool got1, match_ind_th;
+    uint8_t as1;
+    int j, k, n;
+    uint32_t gen_code;
     const uint8_t * bp;
     const uint8_t * last_bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jo4p = NULL;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p ja2p = NULL;
     const struct type_desc_hdr_t * tdhp = tesp->th_base;
-    char b[64];
+    char b[512];
+    static const int blen = sizeof(b);
+    static const char * const as_dp = "Array status diagnostic page";
 
-    printf("Array Status diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", as_dp);
     if (resp_len < 4)
         goto truncated;
-    printf("  INVOP=%d, INFO=%d, NON-CRIT=%d, CRIT=%d, UNRECOV=%d\n",
-           !!(resp[1] & 0x10), !!(resp[1] & 0x8), !!(resp[1] & 0x4),
-           !!(resp[1] & 0x2), !!(resp[1] & 0x1));
+    as1 = resp[1];
+    sgj_pr_hr(jsp, "  INVOP=%d, INFO=%d, NON-CRIT=%d, CRIT=%d, UNRECOV=%d\n",
+              !!(as1 & 0x10), !!(as1 & 0x8), !!(as1 & 0x4), !!(as1 & 0x2),
+              !!(as1 & 0x1));
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                                 sgj_convert_to_snake_name(as_dp, b, blen));
+        sgj_js_nv_ihexstr_nex(jsp, jop, "invop", !!(as1 & 0x10), false,
+                              NULL, NULL, "INvalid Operation requested");
+        sgj_js_nv_ihexstr_nex(jsp, jop, "info", !!(as1 & 0x8), false,
+                              NULL, NULL, NULL);
+        sgj_js_nv_ihexstr_nex(jsp, jop, "non_crit", !!(as1 & 0x4), false,
+                              NULL, NULL, "NON-Critical condition");
+        sgj_js_nv_ihexstr_nex(jsp, jop, "crit", !!(as1 & 0x4), false,
+                              NULL, NULL, "CRITical condition");
+        sgj_js_nv_ihexstr_nex(jsp, jop, "unrecov", !!(as1 & 0x4), false,
+                              NULL, NULL, "UNRECOVerable condition");
+    }
     last_bp = resp + resp_len - 1;
     if (resp_len < 8)
         goto truncated;
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%x\n", gen_code);
-    if (ref_gen_code != gen_code) {
-        pr2serr("  <<state of enclosure changed, please try again>>\n");
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (tesp && (ref_gen_code != gen_code)) {
+        pr2serr("  <<%s>>\n", soec);
         return;
     }
-    printf("  status descriptor list\n");
     bp = resp + 8;
+    sgj_pr_hr(jsp, "  %s:\n", sdl_s);
+    if (jsp->pr_as_json) {
+        jap = sgj_named_subarray_r(jsp, jop, sdl_sn);
+        if ((! op->partial_join) && (op->inner_hex > 0)) {
+            int n = (resp_len - 8) / 4;
+
+            if (op->verbose > 2)
+                pr2serr("%s: decoded _without_ using type descriptor header "
+                        "info\n", __func__);
+            for (j = 0; j < n; ++j, bp += 4) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                sgj_js_nv_hex_bytes(jsp, jo2p, "status_element", bp, 4);
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
+            return;
+        }
+    }
+
     for (k = 0, got1 = false; k < tesp->num_ths; ++k, ++tdhp) {
         if ((bp + 3) > last_bp)
             goto truncated;
+
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            if (op->partial_join || (op->do_join > 0)) {
+                sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
+                                  NULL, etype_str(tdhp->etype, b, blen));
+                sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
+                                  (0 == tdhp->se_id) ? "primary" : NULL);
+            } else
+                sgj_js_nv_hex_bytes(jsp, jo2p, "overall_status_element",
+                                    bp, 4);
+        }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
-                   etype_str(tdhp->etype, b, sizeof(b)), tdhp->se_id, k);
-            printf("      Overall descriptor:\n");
-            enc_status_helper("        ", bp, tdhp->etype, false, op);
+            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
+                      "[ti=%d]\n", etype_str(tdhp->etype, b, blen),
+                      tdhp->se_id, k);
+            sgj_pr_hr(jsp, "      %s:\n", od_s);
+            if (! jsp->pr_as_json) {
+                enc_status_helper("        ", bp, tdhp->etype, false, op,
+                                  jo2p, b, blen);
+                sgj_pr_hr(jsp, "%s", b);
+            }
             got1 = true;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
+            enc_status_helper("        ", bp, tdhp->etype, false, op, jo3p,
+                              b, blen);
+            ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                        "individual_status_element_list");
+        }
+
         for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (! match_ind_indiv(j, op)))
                     continue;
             }
-            printf("      Element %d descriptor:\n", j);
-            enc_status_helper("        ", bp, tdhp->etype, false, op);
+            sgj_pr_hr(jsp, "      Element %d descriptor:\n", j);
+            if (jsp->pr_as_json) {
+                jo4p = sgj_new_unattached_object_r(jsp);
+                if (! op->partial_join)
+                    sgj_js_nv_hex_bytes(jsp, jo4p,
+                                        "individual_status_element", bp, 4);
+            }
+            enc_status_helper("        ", bp, tdhp->etype, false, op, jo4p,
+                              b, blen);
+            sgj_pr_hr(jsp, "%s", b);
+            if (jsp->pr_as_json)
+                sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             got1 = true;
         }
-    }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }           /* end of outer for loop */
     if (op->ind_given && (! got1)) {
-        printf("      >>> no match on --index=%d,%d", op->ind_th,
-               op->ind_indiv);
+        n = sg_scnpr(b, blen, "      >>> no match on --index=%d,%d",
+                     op->ind_th, op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            printf("-%d\n", op->ind_indiv_last);
+            sg_scnpr(b + n, blen - n, "-%d\n", op->ind_indiv_last);
         else
-            printf("\n");
+            sgj_pr_hr(jsp, "%s\n", b);
     }
     return;
 truncated:
-    pr2serr("    <<<arr: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
@@ -3023,7 +3703,7 @@ static char *
 reserved_or_num(char * buff, int buff_len, int num, int reserve_num)
 {
     if (num == reserve_num)
-        strncpy(buff, "<res>", buff_len);
+        snprintf(buff, buff_len, "<%s>", rsv_s);
     else
         snprintf(buff, buff_len, "%d", num);
     if (buff_len > 0)
@@ -3031,158 +3711,313 @@ reserved_or_num(char * buff, int buff_len, int num, int reserve_num)
     return buff;
 }
 
-static void
-threshold_helper(const char * header, const char * pad,
-                 const uint8_t *tp, int etype,
-                 const struct opts_t * op)
+static bool
+threshold_used(int etype)
 {
-    char b[128];
-    char b2[128];
+    switch (etype) {
+    case 0x4:  /*temperature */
+    case 0xb:  /* UPS */
+    case 0x12: /* voltage */
+    case 0x13: /* current */
+        return true;
+    default:
+        return false;
+    }
+}
 
-    if (op->inner_hex) {
+static void
+threshold_helper(const char * header, const char * pad, const uint8_t *tp,
+                 int etype, struct opts_t * op, sgj_opaque_p jop)
+{
+    uint8_t t0, t1, t2, t3;
+    const char * cct0p;
+    const char * cct1p;
+    const char * cct2p;
+    const char * cct3p;
+    sgj_state * jsp = &op->json_st;
+    char b[168];
+    char b0[40];
+    char b1[40];
+    char b2[40];
+    char b3[40];
+    static const int blen = sizeof(b);
+    static const int b0len = sizeof(b0);
+    static const int b1len = sizeof(b1);
+    static const int b2len = sizeof(b2);
+    static const int b3len = sizeof(b3);
+    static const char * const an_s = "above nominal";
+    static const char * const bn_s = "below nominal";
+    static const char * const ru_s = "[raw unit: 0.5%]";
+    static const char * const v_s = "voltage";
+    static const char * const c_s = "current";
+    static const char * const tr_s = "time remaining [unit: minute]";
+
+    t0 = tp[0];
+    t1 = tp[1];
+    t2 = tp[2];
+    t3 = tp[3];
+    if (op->inner_hex > 0) {
         if (header)
-            printf("%s", header);
-        printf("%s%02x %02x %02x %02x\n", pad, tp[0], tp[1], tp[2], tp[3]);
+            sgj_pr_hr(jsp, "%s", header);
+        sgj_pr_hr(jsp, "%s%02x %02x %02x %02x\n", pad, t0, t1, t2, t3);
         return;
     }
     switch (etype) {
     case 0x4:  /*temperature */
         if (header)
-            printf("%s", header);
-        printf("%shigh critical=%s, high warning=%s", pad,
-               reserved_or_num(b, 128, tp[0] - TEMPERAT_OFF, -TEMPERAT_OFF),
-               reserved_or_num(b2, 128, tp[1] - TEMPERAT_OFF, -TEMPERAT_OFF));
-        if (op->do_filter && (0 == tp[2]) && (0 == tp[3])) {
-            printf(" (in Celsius)\n");
-            break;
+            sgj_pr_hr(jsp, "%s", header);
+        cct0p = reserved_or_num(b0, b0len, (int)t0 - TEMPERAT_OFF,
+                                -TEMPERAT_OFF);
+        cct1p = reserved_or_num(b1, b1len, (int)t1 - TEMPERAT_OFF,
+                                -TEMPERAT_OFF);
+        cct2p = reserved_or_num(b2, b2len, (int)t2 - TEMPERAT_OFF,
+                                -TEMPERAT_OFF);
+        cct3p = reserved_or_num(b3, b3len, (int)t3 - TEMPERAT_OFF,
+                                -TEMPERAT_OFF);
+        snprintf(b, blen, "%shigh critical=%s, high warning=%s", pad, cct0p,
+                 cct1p);
+        if (op->do_filter && (0 == t2) && (0 == t3))
+            sgj_pr_hr(jsp, "%s (in Celsius)\n", b);
+        else {
+            sgj_pr_hr(jsp, "%s\n", b);
+            sgj_pr_hr(jsp, "%slow warning=%s, low critical=%s (in Celsius)\n",
+                      pad, cct2p, cct3p);
         }
-        printf("\n%slow warning=%s, low critical=%s (in Celsius)\n", pad,
-               reserved_or_num(b, 128, tp[2] - TEMPERAT_OFF, -TEMPERAT_OFF),
-               reserved_or_num(b2, 128, tp[3] - TEMPERAT_OFF, -TEMPERAT_OFF));
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihexstr(jsp, jop, hct_sn, t0, NULL, cct0p);
+            sgj_js_nv_ihexstr(jsp, jop, hwt_sn, t1, NULL, cct1p);
+            sgj_js_nv_ihexstr(jsp, jop, lwt_sn, t2, NULL, cct2p);
+            sgj_js_nv_ihexstr(jsp, jop, lct_sn, t3, NULL, cct3p);
+        }
         break;
     case 0xb:  /* UPS */
         if (header)
-            printf("%s", header);
-        if (0 == tp[2])
-            strcpy(b, "<vendor>");
+            sgj_pr_hr(jsp, "%s", header);
+        if (0 == t2)
+            strcpy(b2, "<vendor>");
         else
-            snprintf(b, sizeof(b), "%d", tp[2]);
-        printf("%slow warning=%s, ", pad, b);
-        if (0 == tp[3])
-            strcpy(b, "<vendor>");
+            snprintf(b2, b2len, "%d", t2);
+        snprintf(b, blen, "%slow warning=%s, ", pad, b2);
+        if (0 == t3)
+            strcpy(b3, "<vendor>");
         else
-            snprintf(b, sizeof(b), "%d", tp[3]);
-        printf("low critical=%s (in minutes)\n", b);
+            snprintf(b3, b3len, "%d", t3);
+        sgj_pr_hr(jsp, "%slow critical=%s (in minutes)\n", b, b3);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihexstr_nex(jsp, jop, lwt_sn, t2, true, NULL, b2, tr_s);
+            sgj_js_nv_ihexstr_nex(jsp, jop, lct_sn, t3, true, NULL, b3, tr_s);
+        }
         break;
     case 0x12: /* voltage */
         if (header)
-            printf("%s", header);
-#ifdef SG_LIB_MINGW
-        printf("%shigh critical=%g %%, high warning=%g %% (above nominal "
-               "voltage)\n", pad, 0.5 * tp[0], 0.5 * tp[1]);
-        printf("%slow warning=%g %%, low critical=%g %% (below nominal "
-               "voltage)\n", pad, 0.5 * tp[2], 0.5 * tp[3]);
-#else
-        printf("%shigh critical=%.1f %%, high warning=%.1f %% (above nominal "
-               "voltage)\n", pad, 0.5 * tp[0], 0.5 * tp[1]);
-        printf("%slow warning=%.1f %%, low critical=%.1f %% (below nominal "
-               "voltage)\n", pad, 0.5 * tp[2], 0.5 * tp[3]);
-#endif
+            sgj_pr_hr(jsp, "%s", header);
+        sgj_pr_hr(jsp, "%shigh critical=%d.%d %%, high warning=%d.%d %% "
+                  "(above nominal voltage)\n", pad, t0 / 2,
+                  (t0 % 2) ? 5 : 0, t1 / 2, (t1 % 2) ? 5 : 0);
+        sgj_pr_hr(jsp, "%slow warning=%d.%d %%, low critical=%d.%d %% "
+                  "(below nominal voltage)\n", pad, t2 / 2,
+                  (t2 % 2) ? 5 : 0, t3 / 2, (t3 % 2) ? 5 : 0);
+        if (jsp->pr_as_json) {
+            snprintf(b0, b0len, "%d.%d %%", t0 / 2, (t0 % 2) ? 5 : 0);
+            snprintf(b, blen, "%s %s %s", an_s, v_s, ru_s);
+            sgj_js_nv_ihexstr_nex(jsp, jop, hct_sn, t0, true, NULL, b0, b);
+            snprintf(b1, b1len, "%d.%d %%", t1 / 2, (t1 % 2) ? 5 : 0);
+            sgj_js_nv_ihexstr_nex(jsp, jop, hwt_sn, t1, true, NULL, b1, b);
+            snprintf(b2, b2len, "%d.%d %%", t2 / 2, (t2 % 2) ? 5 : 0);
+            snprintf(b, blen, "%s %s %s", bn_s, v_s, ru_s);
+            sgj_js_nv_ihexstr_nex(jsp, jop, lwt_sn, t2, true, NULL, b2, b);
+            snprintf(b3, b3len, "%d.%d %%", t3 / 2, (t3 % 2) ? 5 : 0);
+            sgj_js_nv_ihexstr_nex(jsp, jop, lct_sn, t3, true, NULL, b3, b);
+        }
         break;
     case 0x13: /* current */
         if (header)
-            printf("%s", header);
-#ifdef SG_LIB_MINGW
-        printf("%shigh critical=%g %%, high warning=%g %%", pad,
-               0.5 * tp[0], 0.5 * tp[1]);
-#else
-        printf("%shigh critical=%.1f %%, high warning=%.1f %%", pad,
-               0.5 * tp[0], 0.5 * tp[1]);
-#endif
-        printf(" (above nominal current)\n");
+            sgj_pr_hr(jsp, "%s", header);
+        sgj_pr_hr(jsp, "%shigh critical=%d.%d %%, high warning=%d.%d %% "
+                  "(above nominal current)\n", pad, t0 / 2,
+                  (t0 % 2) ? 5 : 0, t1 / 2, (t1 % 2) ? 5 : 0);
+        if (jsp->pr_as_json) {
+            snprintf(b0, b0len, "%d.%d %%", t0 / 2, (t0 % 2) ? 5 : 0);
+            snprintf(b, blen, "%s %s %s", an_s, c_s, ru_s);
+            sgj_js_nv_ihexstr_nex(jsp, jop, hct_sn, t0, true, NULL, b0, b);
+            snprintf(b1, b1len, "%d.%d %%", t1 / 2, (t1 % 2) ? 5 : 0);
+            sgj_js_nv_ihexstr_nex(jsp, jop, hwt_sn, t1, true, NULL, b1, b);
+        }
         break;
     default:
         if (op->verbose) {
             if (header)
-                printf("%s", header);
-            printf("%s<< no thresholds for this element type >>\n", pad);
+                sgj_pr_hr(jsp, "%s", header);
+            sgj_pr_hr(jsp, "%s<< no thresholds for this element type >>\n",
+                      pad);
         }
         break;
     }
 }
 
-/* THRESHOLD_DPC [0x5] */
+/* THRESHOLD_DPC  <"th"> [0x5] */
 static void
-threshold_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
-              const uint8_t * resp, int resp_len,
-              const struct opts_t * op)
+threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
+              const uint8_t * resp, int resp_len, struct opts_t * op,
+              sgj_opaque_p jop)
 {
+    bool got1, match_ind_th, thresh_in_use;
     int j, k;
     uint32_t gen_code;
-    bool got1, match_ind_th;
     const uint8_t * bp;
     const uint8_t * last_bp;
-    const struct type_desc_hdr_t * tdhp = tesp->th_base;
-    char b[64];
+    const struct type_desc_hdr_t * tdhp = tesp ? tesp->th_base : NULL;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jo4p = NULL;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p ja2p = NULL;
+    char e[64];
+    char b[144];
+    static const int blen = sizeof(b);
+    static const char * const ti_dp = "Threshold in diagnostic page";
+    static const char * const tsdl = "Threshold status descriptor list";
+    static const char * const otse = "Overall threshold status element";
+    static const char * const itse = "Individual threshold status element";
 
-    printf("Threshold In diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", ti_dp);
     if (resp_len < 4)
         goto truncated;
-    printf("  INVOP=%d\n", !!(resp[1] & 0x10));
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                                 sgj_convert_to_snake_name(ti_dp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, THRESHOLD_DPC, NULL, ti_dp);
+    }
+    sgj_haj_vi(jsp, jop, 2, "INVOP", SGJ_SEP_EQUAL_NO_SPACE,
+               !!(resp[1] & 0x10), false);
     last_bp = resp + resp_len - 1;
     if (resp_len < 8)
         goto truncated;
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
-    if (ref_gen_code != gen_code) {
-        pr2serr("  <<state of enclosure changed, please try again>>\n");
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (tesp && (ref_gen_code != gen_code)) {
+        pr2serr("  <<%s>>\n", soec);
         return;
     }
-    printf("  Threshold status descriptor list\n");
     bp = resp + 8;
+    sgj_pr_hr(jsp, "  %s\n", tsdl);
+    if (jsp->pr_as_json) {
+        if ((NULL == tesp) || (tesp->num_ths > 0))
+            jap = sgj_named_subarray_r(jsp, jop,
+                                sgj_convert_to_snake_name(tsdl, b, blen));
+        if ((! op->partial_join) && (op->inner_hex > 0)) {
+            int n = (resp_len - 8) / 4;
+
+            if (op->verbose > 2)
+                pr2serr("%s: decoded _without_ using type descriptor header "
+                        "info\n", __func__);
+            for (j = 0; j < n; ++j, bp += 4) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                if (op->inner_hex > 1)
+                    sgj_js_nv_hex_bytes(jsp, jo2p, "threshold_status_element",
+                                        bp, 4);
+                else {
+                    sgj_convert_to_snake_name(hct, b, blen);
+                    sgj_js_nv_ihex(jsp, jo2p, b, bp[0]);
+                    sgj_convert_to_snake_name(hwt, b, blen);
+                    sgj_js_nv_ihex(jsp, jo2p, b, bp[1]);
+                    sgj_convert_to_snake_name(lwt, b, blen);
+                    sgj_js_nv_ihex(jsp, jo2p, b, bp[2]);
+                    sgj_convert_to_snake_name(lct, b, blen);
+                    sgj_js_nv_ihex(jsp, jo2p, b, bp[3]);
+                }
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
+            return;
+        }
+    }
+    if (NULL == tesp) {
+        pr2serr("%s: logic error, resp==NULL\n", __func__);
+        return;
+    }
+
     for (k = 0, got1 = false; k < tesp->num_ths; ++k, ++tdhp) {
+        if (bp == (last_bp + 1)) {
+            if (op->verbose > 3)
+                pr2serr("%s: element types exhausted, k=%d, finished\n",
+                        __func__, k);
+            return;
+
+        }
         if ((bp + 3) > last_bp)
             goto truncated;
+        thresh_in_use = threshold_used(tdhp->etype);
+        if (jsp->pr_as_json && thresh_in_use) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            if (op->partial_join || (op->do_join > 0)) {
+                sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
+                                  NULL, etype_str(tdhp->etype, b, blen));
+                sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
+                                  (0 == tdhp->se_id) ? "primary" : NULL);
+            }
+        }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
-                   etype_str(tdhp->etype, b, sizeof(b)), tdhp->se_id, k);
-            threshold_helper("      Overall descriptor:\n", "        ", bp,
-                             tdhp->etype, op);
+            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
+                      "[ti=%d]\n", etype_str(tdhp->etype, b, blen),
+                      tdhp->se_id, k);
+            if (! jsp->pr_as_json)
+                threshold_helper("      Overall descriptor:\n", "        ",
+                                 bp, tdhp->etype, op, NULL);
             got1 = true;
         }
+        if (jsp->pr_as_json && thresh_in_use) {
+            sgj_convert_to_snake_name(otse, b, blen);
+            jo3p = sgj_named_subobject_r(jsp, jo2p, b);
+            threshold_helper(otse, "        ", bp, tdhp->etype, op, jo3p);
+            if (tdhp->num_elements > 0) {
+                sgj_convert_to_snake_name(itse, e, sizeof(e));
+                snprintf(b, blen, "%s_list", e);
+                ja2p = sgj_named_subarray_r(jsp, jo2p, b);
+            }
+        }
+
         for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (! match_ind_indiv(j, op)))
                     continue;
             }
-            snprintf(b, sizeof(b), "      Element %d descriptor:\n", j);
-            threshold_helper(b, "        ", bp, tdhp->etype, op);
+            snprintf(b, blen, "      Element %d descriptor:\n", j);
+            if (! jsp->pr_as_json)
+                threshold_helper(b, "        ", bp, tdhp->etype, op, NULL);
             got1 = true;
+            if (jsp->pr_as_json && thresh_in_use) {
+                jo4p = sgj_new_unattached_object_r(jsp);
+                threshold_helper(itse, "        ", bp, tdhp->etype, op, jo4p);
+                sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
+            }
         }
-    }
+        if (jsp->pr_as_json && thresh_in_use)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }                                   /* end of outer for loop */
     if (op->ind_given && (! got1)) {
-        printf("      >>> no match on --index=%d,%d", op->ind_th,
-               op->ind_indiv);
+        snprintf(b, blen, "      >>> no match on --index=%d,%d", op->ind_th,
+                 op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            printf("-%d\n", op->ind_indiv_last);
+            sgj_pr_hr(jsp, "%s-%d\n", b, op->ind_indiv_last);
         else
-            printf("\n");
+            sgj_pr_hr(jsp, "%s\n", b);
     }
     return;
 truncated:
-    pr2serr("    <<<thresh: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
-/* ELEM_DESC_DPC [0x7]
- * This page essentially contains names of overall and individual
- * elements. */
+/* ELEM_DESC_DPC  <"ed"> [0x7]
+ * This page contains names of overall and individual elements. */
 static void
-element_desc_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
+element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                  const uint8_t * resp, int resp_len,
-                 const struct opts_t * op)
+                 struct opts_t * op, sgj_opaque_p jop)
 {
     int j, k, desc_len;
     uint32_t gen_code;
@@ -3190,38 +4025,93 @@ element_desc_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
     const uint8_t * bp;
     const uint8_t * last_bp;
     const struct type_desc_hdr_t * tp;
-    char b[64];
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jo4p = NULL;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p ja2p = NULL;
+    char b[128];
+    static const int blen = sizeof(b);
+    static const char * const ed_dp = "Element descriptor diagnostic page";
+    static const char * const edbtl = "Element descriptor by type list";
 
-    printf("Element Descriptor In diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", ed_dp);
     if (resp_len < 4)
         goto truncated;
     last_bp = resp + resp_len - 1;
     if (resp_len < 8)
         goto truncated;
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                         sgj_convert_to_snake_name(ed_dp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, ELEM_DESC_DPC, NULL, ed_dp);
+    }
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
-    if (ref_gen_code != gen_code) {
-        pr2serr("  <<state of enclosure changed, please try again>>\n");
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (tesp && (ref_gen_code != gen_code)) {
+        pr2serr("  <<%s>>\n", soec);
         return;
     }
-    printf("  element descriptor list (grouped by type):\n");
+    sgj_pr_hr(jsp, "  %s:\n", edbtl);
     bp = resp + 8;
+    if (jsp->pr_as_json) {
+        jap = sgj_named_subarray_r(jsp, jop,
+                                   sgj_convert_to_snake_name(edbtl, b, blen));
+        if ((! op->partial_join) && (op->inner_hex > 0)) {
+            int n;
+
+            if (op->verbose > 2)
+                pr2serr("%s: decoded _without_ using type descriptor header "
+                        "info\n", __func__);
+            for ( ; bp < last_bp; bp += (n + 4)) {
+                n = sg_get_unaligned_be16(bp + 2);
+                jo2p = sgj_new_unattached_object_r(jsp);
+                sgj_js_nv_s_len(jsp, jo2p, "descriptor",
+                                (const char *)bp + 4, n);
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
+            return;
+        }
+    }
     got1 = false;
+    if (NULL == tesp) {
+        pr2serr("%s: logic error, resp==NULL\n", __func__);
+        return;
+    }
+
     for (k = 0, tp = tesp->th_base; k < tesp->num_ths; ++k, ++tp) {
         if ((bp + 3) > last_bp)
             goto truncated;
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            if (op->partial_join || (op->do_join > 0)) {
+                sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tp->etype,
+                                  NULL, etype_str(tp->etype, b, blen));
+                sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
+                                  (0 == tp->se_id) ? "primary" : NULL);
+            }
+        }
         desc_len = sg_get_unaligned_be16(bp + 2) + 4;
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
-                   etype_str(tp->etype, b, sizeof(b)), tp->se_id, k);
+            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
+                      "[ti=%d]\n", etype_str(tp->etype, b, blen), tp->se_id,
+                      k);
             if (desc_len > 4)
-                printf("      Overall descriptor: %.*s\n", desc_len - 4,
-                       bp + 4);
+                sgj_pr_hr(jsp, "      %s: %.*s\n", od_s, desc_len - 4, bp + 4);
             else
-                printf("      Overall descriptor: <empty>\n");
+                sgj_pr_hr(jsp, "      %s: <empty>\n", od_s);
             got1 = true;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
+            sgj_js_nv_s_len(jsp, jo3p, "descriptor", (const char *)bp + 4,
+                            desc_len - 4);
+            ja2p = sgj_named_subarray_r(jsp, jo2p, "element_descriptor");
+        }
+
         for (bp += desc_len, j = 0; j < tp->num_elements;
              ++j, bp += desc_len) {
             desc_len = sg_get_unaligned_be16(bp + 2) + 4;
@@ -3231,24 +4121,32 @@ element_desc_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     continue;
             }
             if (desc_len > 4)
-                printf("      Element %d descriptor: %.*s\n", j,
-                       desc_len - 4, bp + 4);
+                sgj_pr_hr(jsp, "      Element %d descriptor: %.*s\n", j,
+                          desc_len - 4, bp + 4);
             else
-                printf("      Element %d descriptor: <empty>\n", j);
+                sgj_pr_hr(jsp, "      Element %d descriptor: <empty>\n", j);
             got1 = true;
+            if (jsp->pr_as_json) {
+                jo4p = sgj_new_unattached_object_r(jsp);
+                sgj_js_nv_s_len(jsp, jo4p, "descriptor",
+                                (const char *)bp + 4, desc_len - 4);
+                sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
+            }
         }
-    }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }                                   /* end of outer for loop */
     if (op->ind_given && (! got1)) {
-        printf("      >>> no match on --index=%d,%d", op->ind_th,
-               op->ind_indiv);
+        snprintf(b, blen, "      >>> no match on --index=%d,%d", op->ind_th,
+                 op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            printf("-%d\n", op->ind_indiv_last);
+            sgj_pr_hr(jsp, "%s-%d\n", b, op->ind_indiv_last);
         else
-            printf("\n");
+            sgj_pr_hr(jsp, "%s\n", b);
     }
     return;
 truncated:
-    pr2serr("    <<<element: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
@@ -3268,357 +4166,548 @@ static const char * sas_device_type[] = {
 
 static void
 additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
-                    const struct th_es_t * tesp, const struct opts_t * op)
+                    const struct th_es_t * tesp, struct opts_t * op,
+                    sgj_opaque_p jop)
 {
-    int phys, j, m, n, desc_type, eiioe, eip_offset;
     bool nofilter = ! op->do_filter;
     bool eip;
+    uint8_t cei, oei;
+    int phys, j, n, q, desc_type, eiioe, eip_offset;
+    uint64_t sa, asa;
     const struct join_row_t * jrp;
     const uint8_t * aep;
     const uint8_t * ed_bp;
-    const char * cp;
-    char b[64];
+    const char * ccp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    char b[512];
+    char e[64];
+    static const int blen = sizeof(b);
+    static const int elen = sizeof(e);
 
     eip = !!(0x10 & ae_bp[0]);
     eiioe = eip ? (0x3 & ae_bp[2]) : 0;
     eip_offset = eip ? 2 : 0;
     desc_type = (ae_bp[3 + eip_offset] >> 6) & 0x3;
+    if (jsp->pr_as_json)
+        sgj_js_nv_ihex(jsp, jop, "descriptor_type", desc_type);
     if (op->verbose > 1)
-        printf("%sdescriptor_type: %d\n", pad, desc_type);
+        sgj_pr_hr(jsp, "%sdescriptor_type: %d\n", pad, desc_type);
+
     if (0 == desc_type) {
         phys = ae_bp[2 + eip_offset];
-        printf("%snumber of phys: %d, not all phys: %d", pad, phys,
-               ae_bp[3 + eip_offset] & 1);
+        n = sg_scnpr(b, blen, "%snumber of phys: %d, not all phys: %d", pad,
+                     phys, ae_bp[3 + eip_offset] & 1);
         if (eip_offset)
-            printf(", device slot number: %d", ae_bp[5 + eip_offset]);
-        printf("\n");
+            sg_scnpr(b + n, blen - n, ", device slot number: %d",
+                     ae_bp[5 + eip_offset]);
+        sgj_pr_hr(jsp, "%s\n", b);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex(jsp, jop, "number_of_phy_descriptors", phys);
+            sgj_js_nv_i(jsp, jop, "not_all_phys",
+                           ae_bp[3 + eip_offset] & 1);
+            if (eip_offset)
+                sgj_js_nv_ihex(jsp, jop, "device_slot_number",
+                               ae_bp[5 + eip_offset]);
+        }
         aep = ae_bp + 4 + eip_offset + eip_offset;
+        if (jsp->pr_as_json)
+            jap = sgj_named_subarray_r(jsp, jop, "phy_descriptor_list");
+
         for (j = 0; j < phys; ++j, aep += 28) {
             bool print_sas_addr = false;
             bool saddr_nz;
+            uint8_t ae2 = aep[2];
+            uint8_t ae3 = aep[3];
+            uint8_t dt = (0x70 & aep[0]) >> 4;
 
-            printf("%sphy index: %d\n", pad, j);
-            printf("%s  SAS device type: %s\n", pad,
-                   sas_device_type[(0x70 & aep[0]) >> 4]);
-            if (nofilter || (0xe & aep[2]))
-                printf("%s  initiator port for:%s%s%s\n", pad,
-                       ((aep[2] & 8) ? " SSP" : ""),
-                       ((aep[2] & 4) ? " STP" : ""),
-                       ((aep[2] & 2) ? " SMP" : ""));
-            if (nofilter || (0x8f & aep[3]))
-                printf("%s  target port for:%s%s%s%s%s\n", pad,
-                       ((aep[3] & 0x80) ? " SATA_port_selector" : ""),
-                       ((aep[3] & 8) ? " SSP" : ""),
-                       ((aep[3] & 4) ? " STP" : ""),
-                       ((aep[3] & 2) ? " SMP" : ""),
-                       ((aep[3] & 1) ? " SATA_device" : ""));
+            asa = sg_get_unaligned_be64(aep + 4);
+            sa = sg_get_unaligned_be64(aep + 12);
+            sgj_pr_hr(jsp, "%sphy index: %d\n", pad, j);
+            sgj_pr_hr(jsp, "%s  SAS device type: %s\n", pad,
+                      sas_device_type[dt]);
+            if (nofilter || (0xe & ae2))
+                sgj_pr_hr(jsp, "%s  initiator port for:%s%s%s\n", pad,
+                          ((ae2 & 8) ? " SSP" : ""),
+                          ((ae2 & 4) ? " STP" : ""),
+                          ((ae2 & 2) ? " SMP" : ""));
+            if (nofilter || (0x8f & ae3))
+                sgj_pr_hr(jsp, "%s  target port for:%s%s%s%s%s\n", pad,
+                          ((ae3 & 0x80) ? " SATA_port_selector" : ""),
+                          ((ae3 & 8) ? " SSP" : ""),
+                          ((ae3 & 4) ? " STP" : ""),
+                          ((ae3 & 2) ? " SMP" : ""),
+                          ((ae3 & 1) ? " SATA_device" : ""));
             saddr_nz = saddr_non_zero(aep + 4);
             if (nofilter || saddr_nz) {
                 print_sas_addr = true;
-                printf("%s  attached SAS address: 0x", pad);
-                if (saddr_nz) {
-                    for (m = 0; m < 8; ++m)
-                        printf("%02x", aep[4 + m]);
-                } else
-                    printf("0");
+                sgj_pr_hr(jsp, "%s  attached SAS address: 0x%" PRIx64 "\n",
+                          pad, asa);
             }
             saddr_nz = saddr_non_zero(aep + 12);
             if (nofilter || saddr_nz) {
                 print_sas_addr = true;
-                printf("\n%s  SAS address: 0x", pad);
-                if (saddr_nz) {
-                    for (m = 0; m < 8; ++m)
-                        printf("%02x", aep[12 + m]);
-                } else
-                    printf("0");
+                sgj_pr_hr(jsp, "%s  SAS address: 0x%" PRIx64 "\n", pad, sa);
             }
             if (print_sas_addr)
-                printf("\n%s  phy identifier: 0x%x\n", pad, aep[20]);
+                sgj_pr_hr(jsp, "%s  phy identifier: 0x%x\n", pad, aep[20]);
+            if (jsp->pr_as_json) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                sgj_js_nv_ihexstr(jsp, jo2p, "device_type", dt, NULL,
+                                  sas_device_type[(0x70 & aep[0]) >> 4]);
+                sgj_js_nv_i(jsp, jo2p, "ssp_initiator_port", !!(8 & ae2));
+                sgj_js_nv_i(jsp, jo2p, "stp_initiator_port", !!(4 & ae2));
+                sgj_js_nv_i(jsp, jo2p, "smp_initiator_port", !!(2 & ae2));
+                sgj_js_nv_i(jsp, jo2p, "sata_port_selector", !!(0x80 & ae3));
+                sgj_js_nv_i(jsp, jo2p, "ssp_target_port", !!(8 & ae3));
+                sgj_js_nv_i(jsp, jo2p, "stp_target_port", !!(4 & ae3));
+                sgj_js_nv_i(jsp, jo2p, "smp_target_port", !!(2 & ae3));
+                sgj_js_nv_i(jsp, jo2p, "sata_device", !!(1 & ae3));
+                sgj_js_nv_ihex(jsp, jo2p, "attached_sas_address", asa);
+                sgj_js_nv_ihex(jsp, jo2p, "sas_address", sa);
+                sgj_js_nv_ihex(jsp, jo2p, "phy_index", aep[20]);
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
         }
     } else if (1 == desc_type) {
         phys = ae_bp[2 + eip_offset];
         if (SAS_EXPANDER_ETC == etype) {
-            printf("%snumber of phys: %d\n", pad, phys);
-            printf("%sSAS address: 0x", pad);
-            for (m = 0; m < 8; ++m)
-                printf("%02x", ae_bp[6 + eip_offset + m]);
-            printf("\n%sAttached connector; other_element pairs:\n", pad);
+            sgj_pr_hr(jsp, "%snumber of phys: %d\n", pad, phys);
+            sa = sg_get_unaligned_be64(ae_bp + 6 + eip_offset);
+            sgj_pr_hr(jsp, "%sSAS address: 0x%" PRIx64 "\n", pad, sa);
+            sgj_pr_hr(jsp, "%sAttached connector; other_element pairs:\n",
+                      pad);
+            if (jsp->pr_as_json) {
+                sgj_js_nv_ihex(jsp, jop,
+                               "number_of_expander_phy_descriptors", phys);
+                sgj_js_nv_ihex(jsp, jop, "sas_address", sa);
+                jap = sgj_named_subarray_r(jsp, jop,
+                                           "expander_phy_descriptor_list");
+            }
             aep = ae_bp + 14 + eip_offset;
+
             for (j = 0; j < phys; ++j, aep += 2) {
-                printf("%s  [%d] ", pad, j);
-                m = aep[0];     /* connector element index */
-                if (0xff == m)
-                    printf("no connector");
+                cei = aep[0];   /* connector element index */
+                oei = aep[1];   /* other element index */
+                if (jsp->pr_as_json) {
+                    jo2p = sgj_new_unattached_object_r(jsp);
+                    sgj_js_nv_ihex(jsp, jo2p, "connector_element_index", cei);
+                    sgj_js_nv_ihex(jsp, jo2p, "other_element_index", oei);
+                }
+                n = sg_scnpr(b, blen, "%s  [%d] ", pad, j);
+                if (0xff == cei)
+                    n += sg_scnpr(b + n, blen - n, "no connector");
                 else {
                     if (tesp->j_base) {
                         if (0 == eiioe)
-                            jrp = find_join_row_cnst(tesp, m, FJ_SAS_CON);
+                            jrp = find_join_row_cnst(tesp, cei, FJ_SAS_CON);
                         else if ((1 == eiioe) || (3 == eiioe))
-                            jrp = find_join_row_cnst(tesp, m, FJ_IOE);
+                            jrp = find_join_row_cnst(tesp, cei, FJ_IOE);
                         else
-                            jrp = find_join_row_cnst(tesp, m, FJ_EOE);
+                            jrp = find_join_row_cnst(tesp, cei, FJ_EOE);
                         if ((NULL == jrp) || (NULL == jrp->enc_statp) ||
                             (SAS_CONNECTOR_ETC != jrp->etype))
-                            printf("broken [conn_idx=%d]", m);
+                            n += sg_scnpr(b + n, blen - n,
+                                          "broken [conn_idx=%d]", cei);
                         else {
-                            enc_status_helper("", jrp->enc_statp, jrp->etype,
-                                              true, op);
-                            printf(" [%d]", jrp->indiv_i);
+                            n += enc_status_helper("", jrp->enc_statp,
+                                                   jrp->etype, true, op,
+                                                   jo2p, b + n, blen - n);
+                            n += sg_scnpr(b + n, blen - n, " [%d]",
+                                          jrp->indiv_i);
                         }
                     } else
-                        printf("connector ei: %d", m);
+                        n += sg_scnpr(b + n, blen - n, "connector ei: %d",
+                                      cei);
                 }
-                m = aep[1];     /* other element index */
-                if (0xff != m) {
-                    printf("; ");
+                if (0xff != oei) {
+                    n += sg_scnpr(b + n, blen - n, "; ");
                     if (tesp->j_base) {
-
                         if (0 == eiioe)
-                            jrp = find_join_row_cnst(tesp, m, FJ_AESS);
+                            jrp = find_join_row_cnst(tesp, oei, FJ_AESS);
                         else if ((1 == eiioe) || (3 == eiioe))
-                            jrp = find_join_row_cnst(tesp, m, FJ_IOE);
+                            jrp = find_join_row_cnst(tesp, oei, FJ_IOE);
                         else
-                            jrp = find_join_row_cnst(tesp, m, FJ_EOE);
+                            jrp = find_join_row_cnst(tesp, oei, FJ_EOE);
                         if (NULL == jrp)
-                            printf("broken [oth_elem_idx=%d]", m);
+                            n += sg_scnpr(b + n, blen - n,
+                                          "broken [oth_elem_idx=%d]", oei);
                         else if (jrp->elem_descp) {
-                            cp = etype_str(jrp->etype, b, sizeof(b));
+                            ccp = etype_str(jrp->etype, e, elen);
                             ed_bp = jrp->elem_descp;
-                            n = sg_get_unaligned_be16(ed_bp + 2);
-                            if (n > 0)
-                                printf("%.*s [%d,%d] etype: %s", n,
-                                       (const char *)(ed_bp + 4),
-                                       jrp->th_i, jrp->indiv_i, cp);
+                            q = sg_get_unaligned_be16(ed_bp + 2);
+                            if (q > 0)
+                                n += sg_scnpr(b + n, blen - n,
+                                              "%.*s [%d,%d] etype: %s", q,
+                                              (const char *)(ed_bp + 4),
+                                              jrp->th_i, jrp->indiv_i, ccp);
                             else
-                                printf("[%d,%d] etype: %s", jrp->th_i,
-                                       jrp->indiv_i, cp);
+                                n += sg_scnpr(b + n, blen - n,
+                                              "[%d,%d] etype: %s", jrp->th_i,
+                                              jrp->indiv_i, ccp);
                         } else {
-                            cp = etype_str(jrp->etype, b, sizeof(b));
-                            printf("[%d,%d] etype: %s", jrp->th_i,
-                                   jrp->indiv_i, cp);
+                            ccp = etype_str(jrp->etype, e, elen);
+                            n += sg_scnpr(b + n, blen - n,
+                                          "[%d,%d] etype: %s", jrp->th_i,
+                                          jrp->indiv_i, ccp);
                         }
                     } else
-                        printf("other ei: %d", m);
+                        n += sg_scnpr(b + n, blen - n, "other ei: %d", oei);
                 }
-                printf("\n");
+                sgj_pr_hr(jsp, "%s\n", b);
+                if (jsp->pr_as_json)
+                    sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             }
         } else if ((SCSI_TPORT_ETC == etype) ||
                    (SCSI_IPORT_ETC == etype) ||
                    (ENC_SCELECTR_ETC == etype)) {
-            printf("%snumber of phys: %d\n", pad, phys);
+            sgj_pr_hr(jsp, "%snumber of phys: %d\n", pad, phys);
             aep = ae_bp + 6 + eip_offset;
             for (j = 0; j < phys; ++j, aep += 12) {
-                printf("%sphy index: %d\n", pad, j);
-                printf("%s  phy_id: 0x%x\n", pad, aep[0]);
-                printf("%s  ", pad);
-                m = aep[2];     /* connector element index */
-                if (0xff == m)
-                    printf("no connector");
+                cei = aep[2];   /* connector element index */
+                oei = aep[3];   /* other element index */
+                if (jsp->pr_as_json)
+                    jo2p = sgj_new_unattached_object_r(jsp);
+                sa = sg_get_unaligned_be64(aep + 4);
+                sgj_pr_hr(jsp, "%sphy index: %d\n", pad, j);
+                sgj_pr_hr(jsp, "%s  phy_id: 0x%x\n", pad, aep[0]);
+                n = sg_scnpr(b, blen, "%s  ", pad);
+                if (0xff == cei)
+                    n += sg_scnpr(b + n, blen - n, "no connector");
                 else {
                     if (tesp->j_base) {
                         if (0 == eiioe)
-                            jrp = find_join_row_cnst(tesp, m, FJ_SAS_CON);
+                            jrp = find_join_row_cnst(tesp, cei, FJ_SAS_CON);
                         else if ((1 == eiioe) || (3 == eiioe))
-                            jrp = find_join_row_cnst(tesp, m, FJ_IOE);
+                            jrp = find_join_row_cnst(tesp, cei, FJ_IOE);
                         else
-                            jrp = find_join_row_cnst(tesp, m, FJ_EOE);
+                            jrp = find_join_row_cnst(tesp, cei, FJ_EOE);
                         if ((NULL == jrp) || (NULL == jrp->enc_statp) ||
                             (SAS_CONNECTOR_ETC != jrp->etype))
-                            printf("broken [conn_idx=%d]", m);
+                            n += sg_scnpr(b + n, blen - n,
+                                          "broken [conn_idx=%d]", cei);
                         else {
-                            enc_status_helper("", jrp->enc_statp, jrp->etype,
-                                              true, op);
-                            printf(" [%d]", jrp->indiv_i);
+                            n += enc_status_helper("", jrp->enc_statp,
+                                                   jrp->etype, true, op,
+                                                   jo2p, b + n, blen - n);
+                            n += sg_scnpr(b + n, blen - n, " [%d]",
+                                          jrp->indiv_i);
                         }
                     } else
-                        printf("connector ei: %d", m);
+                        n += sg_scnpr(b + n, blen - n, "connector ei: %d",
+                                      cei);
                 }
-                m = aep[3];     /* other element index */
-                if (0xff != m) {
-                    printf("; ");
+                if (0xff != oei) {
+                    n += sg_scnpr(b + n, blen - n, "; ");
                     if (tesp->j_base) {
                         if (0 == eiioe)
-                            jrp = find_join_row_cnst(tesp, m, FJ_AESS);
+                            jrp = find_join_row_cnst(tesp, oei, FJ_AESS);
                         else if ((1 == eiioe) || (3 == eiioe))
-                            jrp = find_join_row_cnst(tesp, m, FJ_IOE);
+                            jrp = find_join_row_cnst(tesp, oei, FJ_IOE);
                         else
-                            jrp = find_join_row_cnst(tesp, m, FJ_EOE);
+                            jrp = find_join_row_cnst(tesp, oei, FJ_EOE);
                         if (NULL == jrp)
-                            printf("broken [oth_elem_idx=%d]", m);
+                            n += sg_scnpr(b + n, blen - n,
+                                          "broken [oth_elem_idx=%d]", oei);
                         else if (jrp->elem_descp) {
-                            cp = etype_str(jrp->etype, b, sizeof(b));
+                            ccp = etype_str(jrp->etype, e, elen);
                             ed_bp = jrp->elem_descp;
-                            n = sg_get_unaligned_be16(ed_bp + 2);
-                            if (n > 0)
-                                printf("%.*s [%d,%d] etype: %s", n,
-                                       (const char *)(ed_bp + 4),
-                                       jrp->th_i, jrp->indiv_i, cp);
+                            q = sg_get_unaligned_be16(ed_bp + 2);
+                            if (q > 0)
+                                n += sg_scnpr(b + n, blen - n,
+                                              "%.*s [%d,%d] etype: %s", q,
+                                              (const char *)(ed_bp + 4),
+                                              jrp->th_i, jrp->indiv_i, ccp);
                             else
-                                printf("[%d,%d] etype: %s", jrp->th_i,
-                                       jrp->indiv_i, cp);
+                                n += sg_scnpr(b + n, blen - n,
+                                              "[%d,%d] etype: %s", jrp->th_i,
+                                              jrp->indiv_i, ccp);
                         } else {
-                            cp = etype_str(jrp->etype, b, sizeof(b));
-                            printf("[%d,%d] etype: %s", jrp->th_i,
-                                   jrp->indiv_i, cp);
+                            ccp = etype_str(jrp->etype, e, elen);
+                            n += sg_scnpr(b + n, blen - n,
+                                          "[%d,%d] etype: %s", jrp->th_i,
+                                          jrp->indiv_i, ccp);
                         }
                     } else
-                        printf("other ei: %d", m);
+                        n += sg_scnpr(b + n, blen - n, "other ei: %d", oei);
                 }
-                printf("\n");
-                printf("%s  SAS address: 0x", pad);
-                for (m = 0; m < 8; ++m)
-                    printf("%02x", aep[4 + m]);
-                printf("\n");
+                sgj_pr_hr(jsp, "%s\n", b);
+                sgj_pr_hr(jsp, "%s  SAS address: 0x%" PRIx64 "\n", pad, sa);
+                if (jsp->pr_as_json) {
+                    sgj_js_nv_ihex(jsp, jo2p, "connector_element_index", cei);
+                    sgj_js_nv_ihex(jsp, jo2p, "other_element_index", oei);
+                    sgj_js_nv_ihex(jsp, jo2p, "sas_address", sa);
+                    sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+                }
             }   /* end_for: loop over phys in SCSI initiator, target */
         } else
-            printf("%sunrecognised element type [%d] for desc_type "
-                   "1\n", pad, etype);
+            sgj_pr_hr(jsp, "%sunrecognised element type [%d] for desc_type "
+                      "1\n", pad, etype);
     } else
-        printf("%sunrecognised descriptor type [%d]\n", pad, desc_type);
+        sgj_pr_hr(jsp, "%sunrecognised descriptor type [%d]\n", pad,
+                  desc_type);
 }
 
 static void
 additional_elem_helper(const char * pad, const uint8_t * ae_bp,
                        int len, int etype, const struct th_es_t * tesp,
-                       const struct opts_t * op)
+                       struct opts_t * op, sgj_opaque_p jop)
 {
-    int ports, phys, j, m, eip_offset, pcie_pt;
     bool eip;
     uint16_t pcie_vid;
+    int ports, j, m, n, eip_offset, pcie_pt, proto;
     const uint8_t * aep;
-    char b[64];
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    char b[128];
+    static const int blen = sizeof(b);
 
-    if (op->inner_hex) {
-        for (j = 0; j < len; ++j) {
+    if (op->inner_hex > 0) {
+        for (n = 0, j = 0; j < len; ++j) {
             if (0 == (j % 16))
-                printf("%s%s", ((0 == j) ? "" : "\n"), pad);
-            printf("%02x ", ae_bp[j]);
+                n += sg_scnpr(b + n, blen - n,
+                              "%s%s", ((0 == j) ? "" : "\n"), pad);
+            n += sg_scnpr(b + n, blen - n, "%02x ", ae_bp[j]);
         }
-        printf("\n");
+        sgj_pr_hr(jsp, "%s\n", b);
         return;
     }
     eip = !!(0x10 & ae_bp[0]);
     eip_offset = eip ? 2 : 0;
-    switch (0xf & ae_bp[0]) {     /* switch on protocol identifier */
+    proto = 0xf & ae_bp[0];
+
+    switch (proto) {     /* switch on protocol identifier */
     case TPROTO_FCP:
-        printf("%sTransport protocol: FCP\n", pad);
+        sgj_pr_hr(jsp, "%sTransport protocol: FCP\n", pad);
         if (len < (12 + eip_offset))
             break;
         ports = ae_bp[2 + eip_offset];
-        printf("%snumber of ports: %d\n", pad, ports);
-        printf("%snode_name: ", pad);
+        sgj_pr_hr(jsp, "%snumber of ports: %d\n", pad, ports);
+        n = sg_scnpr(b, blen, "%snode_name: ", pad);
         for (m = 0; m < 8; ++m)
-            printf("%02x", ae_bp[6 + eip_offset + m]);
+            n += sg_scnpr(b + n, blen - n, "%02x", ae_bp[6 + eip_offset + m]);
         if (eip_offset)
-            printf(", device slot number: %d", ae_bp[5 + eip_offset]);
-        printf("\n");
+            n += sg_scnpr(b + n, blen - n, ", device slot number: %d",
+                          ae_bp[5 + eip_offset]);
+        sgj_pr_hr(jsp, "%s\n", b);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex(jsp, jop, "number_of_ports", ports);
+            if (eip_offset)
+                sgj_js_nv_ihex(jsp, jop, "device_slot_number",
+                               ae_bp[5 + eip_offset]);
+            sgj_js_nv_ihex(jsp, jop, "node_name",
+                           sg_get_unaligned_be64(ae_bp + eip_offset + 6));
+            jap = sgj_named_subarray_r(jsp, jop, "port_descriptor_list");
+        }
         aep = ae_bp + 14 + eip_offset;
         for (j = 0; j < ports; ++j, aep += 16) {
-            printf("%s  port index: %d, port loop position: %d, port "
-                   "bypass reason: 0x%x\n", pad, j, aep[0], aep[1]);
-            printf("%srequested hard address: %d, n_port identifier: "
-                   "%02x%02x%02x\n", pad, aep[4], aep[5],
-                   aep[6], aep[7]);
-            printf("%s  n_port name: ", pad);
+            sgj_pr_hr(jsp, "%s  port index: %d, port loop position: %d, port "
+                      "bypass reason: 0x%x\n", pad, j, aep[0], aep[1]);
+            sgj_pr_hr(jsp, "%srequested hard address: %d, n_port identifier: "
+                      "%02x%02x%02x\n", pad, aep[4], aep[5], aep[6], aep[7]);
+            n = sg_scnpr(b, blen, "%s  n_port name: ", pad);
             for (m = 0; m < 8; ++m)
-                printf("%02x", aep[8 + m]);
-            printf("\n");
+                n += sg_scnpr(b + n, blen - n, "%02x", aep[8 + m]);
+            sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                sgj_js_nv_ihex(jsp, jo2p, "port_loop_position", aep[0]);
+                sgj_js_nv_ihex(jsp, jo2p, "bypass_reason", aep[1]);
+                sgj_js_nv_ihex(jsp, jo2p, "port_requested_hard_address",
+                               aep[4]);
+                sgj_js_nv_ihex(jsp, jo2p, "n_port_identifier",
+                               sg_get_unaligned_be24(aep + 5));
+                sgj_js_nv_ihex(jsp, jo2p, "n_port_name",
+                               sg_get_unaligned_be64(aep + 8));
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
         }
         break;
     case TPROTO_SAS:
-        printf("%sTransport protocol: SAS\n", pad);
+        sgj_pr_hr(jsp, "%sTransport protocol: SAS\n", pad);
         if (len < (4 + eip_offset))
             break;
-        additional_elem_sas(pad, ae_bp, etype, tesp, op);
+        additional_elem_sas(pad, ae_bp, etype, tesp, op, jop);
         break;
     case TPROTO_PCIE: /* added in ses3r08; contains little endian fields */
-        printf("%sTransport protocol: PCIe\n", pad);
+        sgj_pr_hr(jsp, "%sTransport protocol: PCIe\n", pad);
         if (0 == eip_offset) {
-            printf("%sfor this protocol EIP must be set (it isn't)\n", pad);
+            sgj_pr_hr(jsp, "%sfor this protocol EIP must be set (it isn't)\n",
+                      pad);
             break;
         }
         if (len < 6)
             break;
         pcie_pt = (ae_bp[5] >> 5) & 0x7;
         if (TPROTO_PCIE_PS_NVME == pcie_pt)
-            printf("%sPCIe protocol type: NVMe\n", pad);
+            sgj_pr_hr(jsp, "%sPCIe protocol type: NVMe\n", pad);
         else {  /* no others currently defined */
-            printf("%sTransport protocol: PCIe subprotocol=0x%x not "
-                   "decoded\n", pad, pcie_pt);
+            sgj_pr_hr(jsp, "%sTransport protocol: PCIe subprotocol=0x%x not "
+                      "decoded\n", pad, pcie_pt);
             if (op->verbose)
                 hex2stdout(ae_bp, len, 0);
             break;
         }
-        phys = ae_bp[4];
-        printf("%snumber of ports: %d, not all ports: %d", pad, phys,
-               ae_bp[5] & 1);
-        printf(", device slot number: %d\n", ae_bp[7]);
+        ports = ae_bp[4];
+        snprintf(b, blen, "%snumber of ports: %d, not all ports: %d", pad,
+                 ports, ae_bp[5] & 1);
+        sgj_pr_hr(jsp, "%s, device slot number: %d\n", b, ae_bp[7]);
 
         pcie_vid = sg_get_unaligned_le16(ae_bp + 10);   /* N.B. LE */
-        printf("%sPCIe vendor id: 0x%" PRIx16 "%s\n", pad, pcie_vid,
-               (0xffff == pcie_vid) ? " (not reported)" : "");
-        printf("%sserial number: %.20s\n", pad, ae_bp + 12);
-        printf("%smodel number: %.40s\n", pad, ae_bp + 32);
+        sgj_pr_hr(jsp, "%sPCIe vendor id: 0x%" PRIx16 "%s\n", pad, pcie_vid,
+                  (0xffff == pcie_vid) ? not_rep : "");
+        sgj_pr_hr(jsp, "%sserial number: %.20s\n", pad, ae_bp + 12);
+        sgj_pr_hr(jsp, "%smodel number: %.40s\n", pad, ae_bp + 32);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihexstr(jsp, jop, "pcie_protocol_type", pcie_pt, NULL,
+                              (TPROTO_PCIE_PS_NVME == pcie_pt) ?
+                                 "NVMe" : "unexpected value");
+            sgj_js_nv_ihex(jsp, jop, "number_of_ports", ports);
+            sgj_js_nv_i(jsp, jop, "not_all_ports", ae_bp[5] & 1);
+            sgj_js_nv_ihex(jsp, jop, "device_slot_number", ae_bp[7]);
+            sgj_js_nv_ihexstr(jsp, jop, "pcie_vendor_id", pcie_vid, NULL,
+                              (0xffff == pcie_vid) ? not_rep : NULL);
+            sgj_js_nv_s_len(jsp, jop, "serial_number",
+                            (const char *)ae_bp + 12, 20);
+            sgj_js_nv_s_len(jsp, jop, "model_number",
+                            (const char *)ae_bp + 32, 40);
+            jap = sgj_named_subarray_r(jsp, jop,
+                                       "physical_port_descriptor_list");
+        }
         aep = ae_bp + 72;
-        for (j = 0; j < phys; ++j, aep += 8) {
+        for (j = 0; j < ports; ++j, aep += 8) {
             bool psn_valid = !!(0x4 & aep[0]);
             bool bdf_valid = !!(0x2 & aep[0]);
             bool cid_valid = !!(0x1 & aep[0]);
+            uint16_t ctrl_id = sg_get_unaligned_le16(aep + 1); /* LEndian */
 
-            printf("%sport index: %d\n", pad, j);
-            printf("%s  PSN_VALID=%d, BDF_VALID=%d, CID_VALID=%d\n", pad,
-                   (int)psn_valid, (int)bdf_valid, (int)cid_valid);
+            sgj_pr_hr(jsp, "%sport index: %d\n", pad, j);
+            sgj_pr_hr(jsp, "%s  PSN_VALID=%d, BDF_VALID=%d, CID_VALID=%d\n",
+                      pad, (int)psn_valid, (int)bdf_valid, (int)cid_valid);
             if (cid_valid)      /* N.B. little endian */
-                printf("%s  controller id: 0x%" PRIx16 "\n", pad,
-                       sg_get_unaligned_le16(aep + 1)); /* N.B. LEndian */
+                sgj_pr_hr(jsp, "%s  controller id: 0x%" PRIx16 "\n", pad,
+                          sg_get_unaligned_le16(aep + 1)); /* N.B. LEndian */
             if (bdf_valid)
-                printf("%s  bus number: 0x%x, device number: 0x%x, "
-                       "function number: 0x%x\n", pad, aep[4],
-                       (aep[5] >> 3) & 0x1f, 0x7 & aep[5]);
+                sgj_pr_hr(jsp, "%s  bus number: 0x%x, device number: 0x%x, "
+                          "function number: 0x%x\n", pad, aep[4],
+                          (aep[5] >> 3) & 0x1f, 0x7 & aep[5]);
             if (psn_valid)      /* little endian, top 3 bits assumed zero */
-                printf("%s  physical slot number: 0x%" PRIx16 "\n", pad,
-                       0x1fff & sg_get_unaligned_le16(aep + 6)); /* N.B. LE */
+                sgj_pr_hr(jsp, "%s  physical slot number: 0x%" PRIx16 "\n",
+                          pad, 0x1fff & sg_get_unaligned_le16(aep + 6));
+            if (jsp->pr_as_json) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                sgj_js_nv_ihex(jsp, jo2p, "psn_valid", (int)psn_valid);
+                snprintf(b, blen, "bus number, device number and function "
+                         "number field are %svalid", bdf_valid ? "" : "in");
+                sgj_js_nv_ihexstr(jsp, jo2p, "bdf_valid", (int)bdf_valid,
+                                  NULL,  b);
+                sgj_js_nv_ihex(jsp, jo2p, "cid_valid", (int)bdf_valid);
+                sgj_js_nv_ihex(jsp, jo2p, "controller_id", ctrl_id);
+                sgj_js_nv_ihex(jsp, jo2p, "bus_number", aep[4]);
+                sgj_js_nv_ihex(jsp, jo2p, "device_number",
+                               (aep[5] >> 3) & 0x1f);
+                sgj_js_nv_ihex(jsp, jo2p, "function_number", 0x7 & aep[5]);
+                sgj_js_nv_ihex(jsp, jo2p, "physical_slot_number",
+                               0x1fff & sg_get_unaligned_le16(aep + 6));
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
         }
         break;
     default:
-        printf("%sTransport protocol: %s not decoded\n", pad,
-               sg_get_trans_proto_str((0xf & ae_bp[0]), sizeof(b), b));
+        sgj_pr_hr(jsp, "%sTransport protocol: %s not decoded\n", pad,
+                  sg_get_trans_proto_str((0xf & ae_bp[0]), blen, b));
         if (op->verbose)
             hex2stdout(ae_bp, len, 0);
         break;
     }
 }
 
-/* ADD_ELEM_STATUS_DPC [0xa] Additional Element Status dpage
+/* ADD_ELEM_STATUS_DPC  <"aes"> [0xa] Additional Element Status dpage
  * Previously called "Device element status descriptor". Changed "device"
  * to "additional" to allow for SAS expander and SATA devices */
 static void
-additional_elem_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
-                    const uint8_t * resp, int resp_len,
-                    const struct opts_t * op)
+additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
+                    const uint8_t * resp, int resp_len, struct opts_t * op,
+                    sgj_opaque_p jop)
 {
     int j, k, desc_len, etype, el_num, ind, elem_count, ei, eiioe, num_elems;
-    int fake_ei;
+    int fake_ei, proto;
     uint32_t gen_code;
     bool eip, invalid, match_ind_th, my_eiioe_force, skip;
     const uint8_t * bp;
     const uint8_t * last_bp;
-    const struct type_desc_hdr_t * tp = tesp->th_base;
-    char b[64];
+    const struct type_desc_hdr_t * tp = tesp ? tesp->th_base : NULL;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jo4p = NULL;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p ja2p = NULL;
+    char b[128];
+    static const int blen = sizeof(b);
+    static const char * aes_dp = "Additional element status diagnostic page";
+    static const char * aesdl = "Additional element status descriptor list";
+    static const char * psi_sn = "protocol_specific_information";
 
-    printf("Additional element status diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", aes_dp);
     if (resp_len < 4)
         goto truncated;
     last_bp = resp + resp_len - 1;
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                         sgj_convert_to_snake_name(aes_dp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, ADD_ELEM_STATUS_DPC, NULL, aes_dp);
+    }
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
-    if (ref_gen_code != gen_code) {
-        pr2serr("  <<state of enclosure changed, please try again>>\n");
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (tesp && (ref_gen_code != gen_code)) {
+        pr2serr("  <<%s>>\n", soec);
         return;
     }
-    printf("  additional element status descriptor list\n");
+    sgj_pr_hr(jsp, "  %s:\n", aesdl);
     bp = resp + 8;
+    if (jsp->pr_as_json) {
+        jap = sgj_named_subarray_r(jsp, jop,
+                                   sgj_convert_to_snake_name(aesdl, b, blen));
+        if ((! op->partial_join) && (op->inner_hex > 0)) {
+            int n;
+
+            if (op->verbose > 2)
+                pr2serr("%s: decoded _without_ using type descriptor header "
+                        "info\n", __func__);
+            for ( ; bp < last_bp; bp += n) {
+                n = bp[1] + 2;
+                jo2p = sgj_new_unattached_object_r(jsp);
+                if (op->inner_hex > 1)
+                    sgj_js_nv_hex_bytes(jsp, jo2p, aesd_sn, bp, n);
+                else {
+                    jo3p = sgj_named_subobject_r(jsp, jo2p, aesd_sn);
+                    sgj_js_nv_ihex(jsp, jo3p, "invalid", !!(0x80 & bp[0]));
+                    eip = !!(0x10 & bp[0]);
+                    sgj_js_nv_ihex(jsp, jo3p, "eip", eip);
+                    proto = (0xf & bp[0]);
+                    sgj_js_nv_ihexstr(jsp, jo3p, "protocol_identifier", proto,
+                                      NULL, sg_get_trans_proto_str(proto,
+                                                                   blen, b));
+                    if ((0 == eip) || (n < 4))
+                        sgj_js_nv_hex_bytes(jsp, jo3p, psi_sn, bp + 2, n - 2);
+                    else {
+                        sgj_js_nv_ihex(jsp, jo3p, "eiioe", 0x3 & bp[2]);
+                        sgj_js_nv_ihex(jsp, jo3p, "element_index", bp[3]);
+                        sgj_js_nv_hex_bytes(jsp, jo3p, psi_sn, bp + 4, n - 4);
+
+                    }
+                }
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
+            return;
+        }
+    }
     my_eiioe_force = op->eiioe_force;
+
     for (k = 0, elem_count = 0; k < tesp->num_ths; ++k, ++tp) {
         fake_ei = -1;
         etype = tp->etype;
@@ -3676,10 +4765,18 @@ additional_elem_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
         }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            printf("    Element type: %s, subenclosure id: %d [ti=%d]\n",
-                   etype_str(etype, b, sizeof(b)), tp->se_id, k);
+            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
+                      "[ti=%d]\n", etype_str(etype, b, blen), tp->se_id, k);
+        }
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_ihexstr(jsp, jo2p, et_sn, etype, NULL,
+                              etype_str(etype, b, blen));
+            sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
+                              (0 == tp->se_id) ? "primary" : NULL);
         }
         el_num = 0;
+
         for (j = 0; j < num_elems; ++j, bp += desc_len, ++el_num) {
             invalid = !!(bp[0] & 0x80);
             desc_len = bp[1] + 2;
@@ -3689,165 +4786,278 @@ additional_elem_sdg(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 ind = fake_ei;
             else
                 ind = eip ? bp[3] : el_num;
+            proto = (0xf & bp[0]);
             if (op->ind_given) {
                 if ((! match_ind_th) || (-1 == op->ind_indiv) ||
                     (! match_ind_indiv(el_num, op)))
                     continue;
             }
+            if (jsp->pr_as_json) {
+                ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                            "same_element_type_list");
+                jo3p = sgj_new_unattached_object_r(jsp);
+                jo4p = sgj_named_subobject_r(jsp, jo3p, aesd_sn);
+                sgj_js_nv_ihex(jsp, jo4p, "invalid", invalid);
+                sgj_js_nv_ihex_nex(jsp, jo4p, "eip", eip, false,
+                                   "element index present");
+                sgj_js_nv_ihexstr(jsp, jo4p, "protocol_identifier", proto,
+                          NULL, sg_get_trans_proto_str(proto, blen, b));
+                if (eip)
+                    sgj_js_nv_ihex(jsp, jo4p, "element_index", bp[3]);
+            }
             if (eip)
-                printf("      Element index: %d  eiioe=%d%s\n", ind, eiioe,
-                       (((0 != eiioe) && my_eiioe_force) ?
-                        " but overridden" : ""));
+                sgj_pr_hr(jsp, "      Element index: %d  eiioe=%d%s\n", ind,
+                          eiioe, (((0 != eiioe) && my_eiioe_force) ?
+                                                " but overridden" : ""));
             else
-                printf("      Element %d descriptor\n", ind);
-            if (invalid && (! op->inner_hex))
-                printf("        flagged as invalid (no further "
-                       "information)\n");
+                sgj_pr_hr(jsp, "      Element %d descriptor\n", ind);
+            if (invalid && (0 == op->inner_hex))
+                sgj_pr_hr(jsp, "        flagged as invalid (no further "
+                          "information)\n");
             else
                 additional_elem_helper("        ", bp, desc_len, etype,
-                                       tesp, op);
+                                       tesp, op, jo2p);
+            if (jsp->pr_as_json)
+                sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
         }
         elem_count += tp->num_elements;
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }           /* end_for: loop over type descriptor headers */
     return;
 truncated:
-    pr2serr("    <<<additional: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
-/* SUBENC_HELP_TEXT_DPC [0xb] */
+/* SUBENC_HELP_TEXT_DPC  <sht> [0xb] */
 static void
-subenc_help_sdg(const uint8_t * resp, int resp_len)
+subenc_help_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
+                sgj_opaque_p jop)
 {
     int k, el, num_subs;
     uint32_t gen_code;
     const uint8_t * bp;
     const uint8_t * last_bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    static const char * sht_dp = "Subenclosure help text diagnostic page";
 
-    printf("Subenclosure help text diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", sht_dp);
     if (resp_len < 4)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_bp = resp + resp_len - 1;
-    printf("  number of secondary subenclosures: %d\n", num_subs - 1);
+    sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
+               false);
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (jsp->pr_as_json) {
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, sht_dp);
+        jap = sgj_named_subarray_r(jsp, jop, "subenclosure_help_text_list");
+    }
     bp = resp + 8;
+
     for (k = 0; k < num_subs; ++k, bp += el) {
         if ((bp + 3) > last_bp)
             goto truncated;
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object_r(jsp);
         el = sg_get_unaligned_be16(bp + 2) + 4;
-        printf("   subenclosure identifier: %d\n", bp[1]);
+        sgj_haj_vistr(jsp, jo2p, 4, si_s, SGJ_SEP_COLON_1_SPACE, bp[1], true,
+                      (0 == bp[1] ? "primary" : NULL));
         if (el > 4)
-            printf("    %.*s\n", el - 4, bp + 4);
+            sgj_pr_hr(jsp, "    %.*s\n", el - 4, bp + 4);
         else
-            printf("    <empty>\n");
+            sgj_pr_hr(jsp, "    <empty>\n");
+        if (jsp->pr_as_json) {
+            if (el > 4)
+                sgj_js_nv_s_len(jsp, jo2p, "subenclosure_help_text",
+                                (const char *)bp + 4, el - 4);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+        }
     }
     return;
 truncated:
-    pr2serr("    <<<subenc: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
-/* SUBENC_STRING_DPC [0xc] */
+/* SUBENC_STRING_DPC  <"sstr"> [0xc] */
 static void
-subenc_string_sdg(const uint8_t * resp, int resp_len)
+subenc_string_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
+                  sgj_opaque_p jop)
 {
     int k, el, num_subs;
     uint32_t gen_code;
     const uint8_t * bp;
     const uint8_t * last_bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    char b[512];
+    static const int blen = sizeof(b);
+    static const char * ssi_dp = "Subenclosure string in diagnostic page";
 
-    printf("Subenclosure string in diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", ssi_dp);
     if (resp_len < 4)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_bp = resp + resp_len - 1;
-    printf("  number of secondary subenclosures: %d\n", num_subs - 1);
+    sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
+               false);
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (jsp->pr_as_json) {
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, ssi_dp);
+        jap = sgj_named_subarray_r(jsp, jop,
+                                   "subenclosure_string_in_data_list");
+    }
     bp = resp + 8;
+
     for (k = 0; k < num_subs; ++k, bp += el) {
         if ((bp + 3) > last_bp)
             goto truncated;
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object_r(jsp);
+        sgj_haj_vistr(jsp, jo2p, 4, si_s, SGJ_SEP_COLON_1_SPACE, bp[1], true,
+                      (0 == bp[1] ? "primary" : NULL));
         el = sg_get_unaligned_be16(bp + 2) + 4;
-        printf("   subenclosure identifier: %d\n", bp[1]);
         if (el > 4) {
-            char bb[1024];
-
-            hex2str(bp + 40, el - 40, "    ", 0, sizeof(bb), bb);
-            printf("%s\n", bb);
+            hex2str(bp + 40, el - 40, "    ", 0, blen, b);
+            sgj_pr_hr(jsp, "%s\n", b);
         } else
-            printf("    <empty>\n");
+            sgj_pr_hr(jsp, "    <empty>\n");
+        if (jsp->pr_as_json) {
+            sgj_js_nv_hex_bytes(jsp, jo2p, "subenclosure_string_in_data",
+                                bp + 40, el - 40);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+        }
     }
     return;
 truncated:
-    pr2serr("    <<<subence str: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
-/* SUBENC_NICKNAME_DPC [0xf] */
+/* SUBENC_NICKNAME_DPC <"snic"> [0xf] */
 static void
-subenc_nickname_sdg(const uint8_t * resp, int resp_len)
+subenc_nickname_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
+                    sgj_opaque_p jop)
 {
     int k, el, num_subs;
     uint32_t gen_code;
     const uint8_t * bp;
     const uint8_t * last_bp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    char b[256];
+    static const int blen = sizeof(b);
+    static const char * sns_dp =
+                "Subenclosure nickname status diagnostic page";
+    static const char * snlc = "subenclosure nickname language code";
+    static const char * sn_s = "subenclosure nickname";
 
-    printf("Subenclosure nickname status diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", sns_dp);
     if (resp_len < 4)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_bp = resp + resp_len - 1;
-    printf("  number of secondary subenclosures: %d\n", num_subs - 1);
+    sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
+               false);
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (jsp->pr_as_json) {
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, sns_dp);
+        jap = sgj_named_subarray_r(jsp, jop,
+                        "subenclosure_nickname_status_descriptor_list");
+    }
     bp = resp + 8;
     el = 40;
     for (k = 0; k < num_subs; ++k, bp += el) {
         if ((bp + el - 1) > last_bp)
             goto truncated;
-        printf("   subenclosure identifier: %d\n", bp[1]);
-        printf("   nickname status: 0x%x\n", bp[2]);
-        printf("   nickname additional status: 0x%x\n", bp[3]);
-        printf("   nickname language code: %.2s\n", bp + 6);
-        printf("   nickname: %.*s\n", 32, bp + 8);
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object_r(jsp);
+        sgj_haj_vistr(jsp, jo2p, 4, si_s, SGJ_SEP_COLON_1_SPACE, bp[1], true,
+                      (0 == bp[1] ? "primary" : NULL));
+        sgj_haj_vi(jsp, jo2p, 4, "subenclosure nickname status",
+                   SGJ_SEP_COLON_1_SPACE, bp[2], true);
+        sgj_haj_vi(jsp, jo2p, 4, "subenclosure nickname additional status",
+                   SGJ_SEP_COLON_1_SPACE, bp[3], true);
+
+        sgj_pr_hr(jsp, "    %s: %.2s\n", snlc, bp + 6);
+        sgj_pr_hr(jsp, "    %s: %.*s\n", sn_s, 32, bp + 8);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_s_len(jsp, jo2p,
+                            sgj_convert_to_snake_name(snlc, b, blen),
+                            (const char *)bp + 6, 2);
+            sgj_js_nv_s_len(jsp, jo2p,
+                            sgj_convert_to_snake_name(sn_s, b, blen),
+                            (const char *)bp + 8, 32);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+        }
     }
     return;
 truncated:
-    pr2serr("    <<<subence str: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
-/* SUPPORTED_SES_DPC [0xd] */
+/* SUPPORTED_DPC or SUPPORTED_SES_DPC,  <"sdp" or "ssp">, [0x0 or 0xd] */
 static void
-supported_pages_sdg(const char * leadin, const uint8_t * resp,
-                    int resp_len)
+supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
+                         struct opts_t * op, sgj_opaque_p jop)
 {
-    int k, code, prev;
     bool got1;
+    int k, n, code, prev;
     const struct diag_page_abbrev * ap;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    char b[128];
+    static const int blen = sizeof(b);
+    static const char * ssp =
+                "Supported SES diagnostic pages diagnostic page";
+    static const char * sdp = "Supported diagnostic pages diagnostic page";
 
-    printf("%s:\n", leadin);
+    sgj_pr_hr(jsp, "%s:\n", is_ssp ? ssp : sdp);
+    if (jsp->pr_as_json) {
+        if (is_ssp)
+            sgj_js_nv_ihexstr(jsp, jop, pc_sn, 0xd, NULL, ssp);
+        else
+            sgj_js_nv_ihexstr(jsp, jop, pc_sn, 0x0, NULL, sdp);
+        jap = sgj_named_subarray_r(jsp, jop, "supported_page_list");
+
+    }
     for (k = 0, prev = 0; k < (resp_len - 4); ++k, prev = code) {
         const char * cp;
 
         code = resp[k + 4];
         if (code < prev)
             break;      /* assume to be padding at end */
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object_r(jsp);
+
         cp = find_diag_page_desc(code);
         if (cp) {
-            printf("  %s [", cp);
+            n = sg_scnpr(b, blen, "  %s [", cp);
             for (ap = dp_abbrev, got1 = false; ap->abbrev; ++ap) {
                 if (ap->page_code == code) {
-                    printf("%s%s", (got1 ? "," : ""), ap->abbrev);
+                    n += sg_scnpr(b + n, blen - n, "%s%s", (got1 ? "," : ""),
+                                  ap->abbrev);
                     got1 = true;
                 }
             }
-            printf("] [0x%x]\n", code);
+            sgj_pr_hr(jsp, "%s] [0x%x]\n", b, code);
         } else
-            printf("  <unknown> [0x%x]\n", code);
+            sgj_pr_hr(jsp, "  <unknown> [0x%x]\n", code);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihexstr(jsp, jo2p, pc_sn, code, NULL, cp);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+        }
     }
 }
 
@@ -3883,47 +5093,86 @@ get_mc_status(uint8_t status_val)
     return "";
 }
 
-/* DOWNLOAD_MICROCODE_DPC [0xe] */
+/* DOWNLOAD_MICROCODE_DPC  <"dm"> [0xe] */
 static void
-download_code_sdg(const uint8_t * resp, int resp_len)
+download_code_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
+                  sgj_opaque_p jop)
 {
     int k, num_subs;
-    uint32_t gen_code;
+    uint32_t gen_code, mx_sz, ebo;
     const uint8_t * bp;
     const uint8_t * last_bp;
     const char * cp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+    char b[128];
+    static const int blen = sizeof(b);
+    static const char * dm_dp = "Download microcode status diagnostic page";
+    static const char * dmsdl = "Download microcode status descriptor list";
+    static const char * sdm_sn = "subenclosure_download_microcode";
 
-    printf("Download microcode status diagnostic page:\n");
+    sgj_pr_hr(jsp, "%s:\n", dm_dp);
     if (resp_len < 4)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_bp = resp + resp_len - 1;
-    printf("  number of secondary subenclosures: %d\n", num_subs - 1);
+    sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
+               false);
     gen_code = sg_get_unaligned_be32(resp + 4);
-    printf("  generation code: 0x%" PRIx32 "\n", gen_code);
+    sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
+    if (jsp->pr_as_json) {
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, DOWNLOAD_MICROCODE_DPC, NULL,
+                          dm_dp);
+        jap = sgj_named_subarray_r(jsp, jop,
+                                   sgj_convert_to_snake_name(dmsdl, b, blen));
+    }
+    sgj_pr_hr(jsp, "  %s:\n", dmsdl);
     bp = resp + 8;
+
     for (k = 0; k < num_subs; ++k, bp += 16) {
         if ((bp + 3) > last_bp)
             goto truncated;
+        if (jsp->pr_as_json)
+            jo2p = sgj_new_unattached_object_r(jsp);
         cp = (0 == bp[1]) ? " [primary]" : "";
-        printf("   subenclosure identifier: %d%s\n", bp[1], cp);
+        sgj_pr_hr(jsp, "   %s: %d%s\n", si_s, bp[1], cp);
         cp = get_mc_status(bp[2]);
         if (strlen(cp) > 0) {
-            printf("     download microcode status: %s [0x%x]\n", cp, bp[2]);
-            printf("     download microcode additional status: 0x%x\n",
-                   bp[3]);
+            sgj_pr_hr(jsp, "     download microcode status: %s [0x%x]\n",
+                      cp, bp[2]);
+            sgj_pr_hr(jsp, "     download microcode additional status: "
+                      "0x%x\n", bp[3]);
         } else
-            printf("     download microcode status: 0x%x [additional "
-                   "status: 0x%x]\n", bp[2], bp[3]);
-        printf("     download microcode maximum size: %d bytes\n",
-               sg_get_unaligned_be32(bp + 4));
-        printf("     download microcode expected buffer id: 0x%x\n", bp[11]);
-        printf("     download microcode expected buffer id offset: %d\n",
-               sg_get_unaligned_be32(bp + 12));
+            sgj_pr_hr(jsp, "     download microcode status: 0x%x [additional "
+                      "status: 0x%x]\n", bp[2], bp[3]);
+        mx_sz = sg_get_unaligned_be32(bp + 4);
+        sgj_pr_hr(jsp, "     download microcode maximum size: %d bytes\n",
+                  mx_sz);
+        sgj_pr_hr(jsp, "     download microcode expected buffer id: 0x%x\n",
+                   bp[11]);
+        ebo = sg_get_unaligned_be32(bp + 12);
+        sgj_pr_hr(jsp, "     download microcode expected buffer offset: "
+                  "%d\n", ebo);
+        if (jsp->pr_as_json) {
+            sgj_js_nv_ihex(jsp, jo2p, si_sn, bp[1]);
+            snprintf(b, blen, "%s_status", sdm_sn);
+            sgj_js_nv_ihexstr(jsp, jo2p, b, bp[2], NULL,
+                              get_mc_status(bp[2]));
+            snprintf(b, blen, "%s_additional_status", sdm_sn);
+            sgj_js_nv_ihex(jsp, jo2p, b, bp[3]);
+            snprintf(b, blen, "%s_maximum_size", sdm_sn);
+            sgj_js_nv_ihex(jsp, jo2p, b, mx_sz);
+            snprintf(b, blen, "%s_expected_buffer_id", sdm_sn);
+            sgj_js_nv_ihex(jsp, jo2p, b, bp[11]);
+            snprintf(b, blen, "%s_expected_buffer_offset", sdm_sn);
+            sgj_js_nv_ihex(jsp, jo2p, b, ebo);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+        }
     }
     return;
 truncated:
-    pr2serr("    <<<download: response too short>>>\n");
+    pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
     return;
 }
 
@@ -4144,26 +5393,30 @@ err_with_fp:
     return 1;
 }
 
+/* Process all status/in diagnostic pages. */
 static int
 process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
-                     int resp_len, struct opts_t * op)
+                     int resp_len, struct opts_t * op, sgj_opaque_p jop)
 {
-    int j, num_ths;
+    int num_ths;
     int ret = 0;
     uint32_t ref_gen_code;
     const char * cp;
+    sgj_state * jsp = &op->json_st;
     struct enclosure_info primary_info;
     struct th_es_t tes;
     struct th_es_t * tesp;
-    char bb[120];
+    char b[128];
+    static const int blen = sizeof(b);
+    static const char * const ht_dp = "Help text diagnostic page";
 
     tesp = &tes;
     memset(tesp, 0, sizeof(tes));
     if ((cp = find_in_diag_page_desc(page_code)))
-        snprintf(bb, sizeof(bb), "%s dpage", cp);
+        snprintf(b, blen, "%s %s", cp, dp_s);
     else
-        snprintf(bb, sizeof(bb), "dpage 0x%x", page_code);
-    cp = bb;
+        snprintf(b, blen, "%s 0x%x", dp_s, page_code);
+    cp = b;
     if (op->do_raw) {
         if (1 == op->do_raw)
             hex2stdout(resp + 4, resp_len - 4, -1);
@@ -4192,12 +5445,16 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
     memset(&primary_info, 0, sizeof(primary_info));
     switch (page_code) {
     case SUPPORTED_DPC:
-        supported_pages_sdg("Supported diagnostic pages", resp, resp_len);
+        supported_pages_both_sdp(false, resp, resp_len, op, jop);
         break;
     case CONFIGURATION_DPC:
-        configuration_sdg(resp, resp_len);
+        configuration_sdp(resp, resp_len, op, jop);
         break;
     case ENC_STATUS_DPC:
+        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+            enc_status_sdp(NULL, 0, resp, resp_len, op, jop);
+            break;
+        }
         num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                           MX_ELEM_HDR, &ref_gen_code,
                                           &primary_info, op);
@@ -4205,17 +5462,18 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
             ret = num_ths;
             goto fini;
         }
-        if ((1 == type_desc_hdr_count) && primary_info.have_info) {
-            printf("  Primary enclosure logical identifier (hex): ");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", primary_info.enc_log_id[j]);
-            printf("\n");
-        }
+        if ((1 == type_desc_hdr_count) && primary_info.have_info)
+            sgj_pr_hr(jsp, "  %s (hex): %" PRIx64 "\n", peli,
+                      sg_get_unaligned_be64(primary_info.enc_log_id));
         tesp->th_base = type_desc_hdr_arr;
         tesp->num_ths = num_ths;
-        enc_status_dp(tesp, ref_gen_code, resp, resp_len, op);
+        enc_status_sdp(tesp, ref_gen_code, resp, resp_len, op, jop);
         break;
     case ARRAY_STATUS_DPC:
+        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+            array_status_sdp(NULL, 0, resp, resp_len, op, jop);
+            break;
+        }
         num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                           MX_ELEM_HDR, &ref_gen_code,
                                           &primary_info, op);
@@ -4223,33 +5481,51 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
             ret = num_ths;
             goto fini;
         }
-        if ((1 == type_desc_hdr_count) && primary_info.have_info) {
-            printf("  Primary enclosure logical identifier (hex): ");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", primary_info.enc_log_id[j]);
-            printf("\n");
-        }
+        if ((1 == type_desc_hdr_count) && primary_info.have_info)
+            sgj_pr_hr(jsp, "  %s (hex): %" PRIx64 "\n", peli,
+                      sg_get_unaligned_be64(primary_info.enc_log_id));
         tesp->th_base = type_desc_hdr_arr;
         tesp->num_ths = num_ths;
-        array_status_dp(tesp, ref_gen_code, resp, resp_len, op);
+        array_status_sdp(tesp, ref_gen_code, resp, resp_len, op, jop);
         break;
-    case HELP_TEXT_DPC:
-        printf("Help text diagnostic page (for primary "
-               "subenclosure):\n");
+    case HELP_TEXT_DPC:         /* <"ht"> */
+        sgj_pr_hr(jsp, "%s (for primary subenclosure):\n", ht_dp);
+        if (jsp->pr_as_json)
+            sgj_js_nv_ihexstr(jsp, jop, pc_sn, HELP_TEXT_DPC, NULL, ht_dp);
         if (resp_len > 4)
-            printf("  %.*s\n", resp_len - 4, resp + 4);
+            sgj_pr_hr(jsp, "  %.*s\n", resp_len - 4, resp + 4);
         else
-            printf("  <empty>\n");
+            sgj_pr_hr(jsp, "  <empty>\n");
+        if (jsp->pr_as_json)
+            sgj_js_nv_s_len(jsp, jop, "primary_subenclosure_help_text",
+                            (const char *)resp + 4, resp_len - 4);
         break;
-    case STRING_DPC:
-        printf("String In diagnostic page (for primary "
-               "subenclosure):\n");
-        if (resp_len > 4)
-            hex2stdout(resp + 4, resp_len - 4, 0);
-        else
-            printf("  <empty>\n");
+    case STRING_DPC:    /* <"str"> */
+        sgj_pr_hr(jsp, "String In %s (for primary subenclosure):\n", dp_s);
+        if (jsp->pr_as_json)
+            sgj_js_nv_ihexstr(jsp, jop, pc_sn, STRING_DPC, NULL,
+                              "string_in_diagnostic_page");
+        if (resp_len > 4) {
+            int n = 6 * (resp_len - 4);
+            char * p = (char *)malloc(n);
+
+            if (p) {
+                hex2str(resp + 4, resp_len - 4, "", 0, n, p);
+                sgj_pr_hr(jsp, "%s\n", p);
+                free(p);
+            }
+        } else
+            sgj_pr_hr(jsp, "  <empty>\n");
+        if (jsp->pr_as_json)
+            sgj_js_nv_hex_bytes(jsp, jop,
+                                "primary_subenclosure_string_in_data",
+                                resp + 4, resp_len - 4);
         break;
     case THRESHOLD_DPC:
+        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+            threshold_sdp(NULL, 0, resp, resp_len, op, jop);
+            break;
+        }
         num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                           MX_ELEM_HDR, &ref_gen_code,
                                           &primary_info, op);
@@ -4257,17 +5533,18 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
             ret = num_ths;
             goto fini;
         }
-        if ((1 == type_desc_hdr_count) && primary_info.have_info) {
-            printf("  Primary enclosure logical identifier (hex): ");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", primary_info.enc_log_id[j]);
-            printf("\n");
-        }
+        if ((1 == type_desc_hdr_count) && primary_info.have_info)
+            sgj_pr_hr(jsp, "  %s (hex): %" PRIx64 "\n", peli,
+                      sg_get_unaligned_be64(primary_info.enc_log_id));
         tesp->th_base = type_desc_hdr_arr;
         tesp->num_ths = num_ths;
-        threshold_sdg(tesp, ref_gen_code, resp, resp_len, op);
+        threshold_sdp(tesp, ref_gen_code, resp, resp_len, op, jop);
         break;
     case ELEM_DESC_DPC:
+        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+            element_desc_sdp(NULL, 0, resp, resp_len, op, jop);
+            break;
+        }
         num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                               MX_ELEM_HDR, &ref_gen_code,
                                               &primary_info, op);
@@ -4275,26 +5552,25 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
             ret = num_ths;
             goto fini;
         }
-        if ((1 == type_desc_hdr_count) && primary_info.have_info) {
-            printf("  Primary enclosure logical identifier (hex): ");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", primary_info.enc_log_id[j]);
-            printf("\n");
-        }
+        if ((1 == type_desc_hdr_count) && primary_info.have_info)
+            sgj_pr_hr(jsp, "  %s (hex): %" PRIx64 "\n", peli,
+                      sg_get_unaligned_be64(primary_info.enc_log_id));
         tesp->th_base = type_desc_hdr_arr;
         tesp->num_ths = num_ths;
-        element_desc_sdg(tesp, ref_gen_code, resp, resp_len, op);
+        element_desc_sdp(tesp, ref_gen_code, resp, resp_len, op, jop);
         break;
-    case SHORT_ENC_STATUS_DPC:
-        printf("Short enclosure status diagnostic page, "
-               "status=0x%x\n", resp[1]);
+    case SHORT_ENC_STATUS_DPC:  /* <"ses"> */
+        sgj_pr_hr(jsp, "Short %s %s, status=0x%x\n", es_s, dp_s, resp[1]);
         break;
     case ENC_BUSY_DPC:
-        printf("Enclosure Busy diagnostic page, "
-               "busy=%d [vendor specific=0x%x]\n",
-               resp[1] & 1, (resp[1] >> 1) & 0xff);
+        sgj_pr_hr(jsp, "Enclosure Busy %s, busy=%d [%s=0x%x]\n", dp_s,
+                  resp[1] & 1, vs_s, (resp[1] >> 1) & 0xff);
         break;
     case ADD_ELEM_STATUS_DPC:
+        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+            additional_elem_sdp(NULL, 0, resp, resp_len, op, jop);
+            break;
+        }
         num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr,
                                           MX_ELEM_HDR, &ref_gen_code,
                                           &primary_info, op);
@@ -4302,35 +5578,41 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
             ret = num_ths;
             goto fini;
         }
-        if (primary_info.have_info) {
-            printf("  Primary enclosure logical identifier (hex): ");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", primary_info.enc_log_id[j]);
-            printf("\n");
-        }
+        if (primary_info.have_info)
+            sgj_pr_hr(jsp, "  %s (hex): %" PRIx64 "\n", peli,
+                      sg_get_unaligned_be64(primary_info.enc_log_id));
         tesp->th_base = type_desc_hdr_arr;
         tesp->num_ths = num_ths;
-        additional_elem_sdg(tesp, ref_gen_code, resp, resp_len, op);
+        additional_elem_sdp(tesp, ref_gen_code, resp, resp_len, op, jop);
         break;
     case SUBENC_HELP_TEXT_DPC:
-        subenc_help_sdg(resp, resp_len);
+        subenc_help_sdp(resp, resp_len, op, jop);
         break;
     case SUBENC_STRING_DPC:
-        subenc_string_sdg(resp, resp_len);
+        subenc_string_sdp(resp, resp_len, op, jop);
         break;
     case SUPPORTED_SES_DPC:
-        supported_pages_sdg("Supported SES diagnostic pages", resp,
-                            resp_len);
+        supported_pages_both_sdp(true, resp, resp_len, op, jop);
         break;
     case DOWNLOAD_MICROCODE_DPC:
-        download_code_sdg(resp, resp_len);
+        download_code_sdp(resp, resp_len, op, jop);
         break;
     case SUBENC_NICKNAME_DPC:
-        subenc_nickname_sdg(resp, resp_len);
+        subenc_nickname_sdp(resp, resp_len, op, jop);
         break;
     default:
-        printf("Cannot decode response from diagnostic page: %s\n", cp);
-        hex2stdout(resp, resp_len, 0);
+        sgj_pr_hr(jsp, "Cannot decode response from %s: %s\n",
+                  dp_s, cp);
+        if (resp_len > 0) {
+            int n = resp_len * 4;
+            char * p = (char *)malloc(n);
+
+            if (p) {
+                hex2str(resp, resp_len, "", 0, n, p);
+                sgj_pr_hr(jsp, "%s\n", p);
+                free(p);
+            }
+        }
     }
 
 fini:
@@ -4340,7 +5622,8 @@ fini:
 /* Display "status" page or pages (if op->page_code==0xff) . data-in from
  * SES device or user provided (with --data= option). Return 0 for success */
 static int
-process_status_page_s(struct sg_pt_base * ptvp, struct opts_t * op)
+process_status_page_s(struct sg_pt_base * ptvp, struct opts_t * op,
+                      sgj_opaque_p jop)
 {
     int page_code, ret, resp_len;
     uint8_t * resp = NULL;
@@ -4354,7 +5637,7 @@ process_status_page_s(struct sg_pt_base * ptvp, struct opts_t * op)
         goto fini;
     }
     page_code = op->page_code;
-    if (ALL_DPC == page_code) {
+    if (ALL_DPC == page_code) {         /* <"all"> */
         int k, n;
         uint8_t pc, prev;
         uint8_t supp_dpg_arr[256];
@@ -4390,13 +5673,15 @@ process_status_page_s(struct sg_pt_base * ptvp, struct opts_t * op)
                               &resp_len);
             if (ret)
                 goto fini;
-            ret = process_status_dpage(ptvp, page_code, resp, resp_len, op);
+            ret = process_status_dpage(ptvp, page_code, resp, resp_len,
+                                       op, jop);
         }
     } else {    /* asking for a specific page code */
         ret = do_rec_diag(ptvp, page_code, resp, op->maxlen, op, &resp_len);
         if (ret)
             goto fini;
-        ret = process_status_dpage(ptvp, page_code, resp, resp_len, op);
+        ret = process_status_dpage(ptvp, page_code, resp, resp_len,
+                                   op, jop);
     }
 
 fini:
@@ -4579,7 +5864,7 @@ try_again:
                     }
                     if (! is_et_used_by_aes(jr2p->etype)) {
                         pr2serr("warning: %s: oi=%d, ei=%d, unexpected "
-                                "element_type=0x%x\n", __func__, k, ei,
+                                "%s=0x%x\n", __func__, k, ei, et_sn,
                                 jr2p->etype);
                         return broken_ei;
                     }
@@ -4631,18 +5916,34 @@ try_again:
 
 /* User output of join array */
 static void
-join_array_display(struct th_es_t * tesp, struct opts_t * op)
+join_array_display(struct th_es_t * tesp, struct opts_t * op,
+                   sgj_opaque_p jop)
 {
     bool got1, need_aes;
-    int k, j, blen, desc_len, dn_len;
+    int k, j, n, desc_len, dn_len;
     const uint8_t * ae_bp;
     const char * cp;
     const uint8_t * ed_bp;
     struct join_row_t * jrp;
     uint8_t * t_bp;
-    char b[64];
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
+    char * b;
+    static const int blen = 2048;
 
-    blen = sizeof(b);
+    b = (char *)malloc(blen);
+    if (NULL == b) {
+        pr2serr("%s: heap allocation problem\n", __func__);
+        return;
+    }
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop, "join_of_diagnostic_pages");
+        jap = sgj_named_subarray_r(jsp, jop, "element_list");
+    }
+// zzzzzzzzzzzzzzzz
     need_aes = (op->page_code_given &&
                 (ADD_ELEM_STATUS_DPC == op->page_code));
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
@@ -4688,57 +5989,78 @@ join_array_display(struct th_es_t * tesp, struct opts_t * op)
         if (ed_bp) {
             desc_len = sg_get_unaligned_be16(ed_bp + 2) + 4;
             if (desc_len > 4)
-                printf("%.*s [%d,%d]  Element type: %s\n", desc_len - 4,
-                       (const char *)(ed_bp + 4), jrp->th_i,
-                       jrp->indiv_i, cp);
+                sgj_pr_hr(jsp, "%.*s [%d,%d]  Element type: %s\n",
+                          desc_len - 4, (const char *)(ed_bp + 4),
+                          jrp->th_i, jrp->indiv_i, cp);
             else
-                printf("[%d,%d]  Element type: %s\n", jrp->th_i,
-                       jrp->indiv_i, cp);
+                sgj_pr_hr(jsp, "[%d,%d]  Element type: %s\n", jrp->th_i,
+                          jrp->indiv_i, cp);
         } else
-            printf("[%d,%d]  Element type: %s\n", jrp->th_i,
-                   jrp->indiv_i, cp);
-        printf("  Enclosure Status:\n");
-        enc_status_helper("    ", jrp->enc_statp, jrp->etype, false, op);
+            sgj_pr_hr(jsp, "[%d,%d]  Element type: %s\n", jrp->th_i,
+                      jrp->indiv_i, cp);
+        sgj_pr_hr(jsp, "  Enclosure Status:\n");
+        if (jsp->pr_as_json) {
+            jo2p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_ihexstr(jsp, jo2p, et_sn, jrp->etype, NULL, cp);
+            sgj_js_nv_s(jsp, jo2p, "descriptor", (const char *)(ed_bp + 4));
+            sgj_js_nv_i(jsp, jo2p, "element_number", jrp->indiv_i);
+            sgj_js_nv_i(jsp, jo2p, "overall", (int)(-1 == jrp->indiv_i));
+            sgj_js_nv_b(jsp, jo2p, "individual", (-1 != jrp->indiv_i));
+            jo3p = sgj_named_subobject_r(jsp, jo2p, "status_descriptor");
+        }
+        enc_status_helper("    ", jrp->enc_statp, jrp->etype, false, op, jo3p,
+                          b, blen);
+        sgj_pr_hr(jsp, "%s", b);
         if (jrp->ae_statp) {
-            printf("  Additional Element Status:\n");
+            sgj_pr_hr(jsp, "  Additional Element Status:\n");
             ae_bp = jrp->ae_statp;
             desc_len = ae_bp[1] + 2;
+            if (jsp->pr_as_json)
+                jo3p = sgj_named_subobject_r(jsp, jo2p, aesd_sn);
             additional_elem_helper("    ",  ae_bp, desc_len, jrp->etype,
-                                   tesp, op);
+                                   tesp, op, jo3p);
         }
         if (jrp->thresh_inp) {
             t_bp = jrp->thresh_inp;
-            threshold_helper("  Threshold In:\n", "    ", t_bp, jrp->etype,
-                             op);
+            if (! jsp->pr_as_json)
+                threshold_helper("  Threshold In:\n", "    ", t_bp,
+                                 jrp->etype, op, NULL);
+            else if (threshold_used(jrp->etype)) {
+                jo3p = sgj_named_subobject_r(jsp, jo2p,
+                                             "threshold_status_descriptor");
+                threshold_helper("  Threshold In:\n", "    ", t_bp,
+                                 jrp->etype, op, jo3p);
+            }
         }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     if (! got1) {
         if (op->ind_given) {
-            printf("      >>> no match on --index=%d,%d", op->ind_th,
-                   op->ind_indiv);
+            n = sg_scnpr(b, blen, "      >>> no match on --index=%d,%d",
+                         op->ind_th, op->ind_indiv);
             if (op->ind_indiv_last > op->ind_indiv)
-                printf("-%d\n", op->ind_indiv_last);
+                sg_scnpr(b + n, blen - n, "-%d\n", op->ind_indiv_last);
             else
-                printf("\n");
+                sgj_pr_hr(jsp, "%s\n", b);
         } else if (op->desc_name)
-            printf("      >>> no match on --descriptor=%s\n", op->desc_name);
+            sgj_pr_hr(jsp, "      >>> no match on --descriptor=%s\n",
+                      op->desc_name);
         else if (op->dev_slot_num >= 0)
-            printf("      >>> no match on --dev-slot-name=%d\n",
-                   op->dev_slot_num);
-        else if (saddr_non_zero(op->sas_addr)) {
-            printf("      >>> no match on --sas-addr=0x");
-            for (j = 0; j < 8; ++j)
-                printf("%02x", op->sas_addr[j]);
-            printf("\n");
-        }
+            sgj_pr_hr(jsp, "      >>> no match on --dev-slot-name=%d\n",
+                      op->dev_slot_num);
+        else if (saddr_non_zero(op->sas_addr))
+            sgj_pr_hr(jsp, "      >>> no match on --sas-addr=0x%" PRIx64 "\n",
+                      sg_get_unaligned_be64(op->sas_addr + 0));
     }
+    free(b);
 }
 
 /* This is for debugging, output to stderr */
 static void
 join_array_dump(struct th_es_t * tesp, int broken_ei, struct opts_t * op)
 {
-    int k, j, blen, hex;
+    int k, blen, hex;
     int eiioe_count = 0;
     int eip_count = 0;
     struct join_row_t * jrp;
@@ -4758,14 +6080,9 @@ join_array_dump(struct th_es_t * tesp, int broken_ei, struct opts_t * op)
         pr2serr(",%s", offset_str(jrp->ei_eoe, hex, b, blen));
         pr2serr(",%s", offset_str(jrp->ei_aess, hex, b, blen));
         pr2serr(" dsn=%s", offset_str(jrp->dev_slot_num, hex, b, blen));
-        if (op->do_join > 2) {
-            pr2serr(" sa=0x");
-            if (saddr_non_zero(jrp->sas_addr)) {
-                for (j = 0; j < 8; ++j)
-                    pr2serr("%02x", jrp->sas_addr[j]);
-            } else
-                pr2serr("0");
-        }
+        if (op->do_join > 2)
+            pr2serr(" sa=0x%" PRIx64 "\n",
+                    sg_get_unaligned_be64(jrp->sas_addr + 0));
         if (jrp->enc_statp)
             pr2serr(" ES+%s", offset_str(jrp->enc_statp - enc_stat_rsp,
                                          hex, b, blen));
@@ -4871,21 +6188,26 @@ join_juggle_aes(struct th_es_t * tesp, uint8_t * es_bp, const uint8_t * ed_bp,
  * stderr when op->verbose > 3. Returns 0 for success, any other return value
  * is an error. */
 static int
-join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
+join_work(struct sg_pt_base * ptvp, bool display, struct opts_t * op,
+          sgj_opaque_p jop)
 {
     bool broken_ei;
-    int res, num_ths, mlen;
+    int res, n, num_ths, mlen;
     uint32_t ref_gen_code, gen_code;
     const uint8_t * ae_bp;
     const uint8_t * ae_last_bp;
-    const char * enc_state_changed = "  <<state of enclosure changed, "
-                                     "please try again>>\n";
     uint8_t * es_bp;
     const uint8_t * ed_bp;
     uint8_t * t_bp;
     struct th_es_t * tesp;
+    sgj_state * jsp = &op->json_st;
+    // sgj_opaque_p jo2p;
+    // sgj_opaque_p jo3p = NULL;
+    // sgj_opaque_p jap = NULL;
+    char b[144];
     struct enclosure_info primary_info;
     struct th_es_t tes;
+    static const int blen = sizeof(b);
 
     memset(&primary_info, 0, sizeof(primary_info));
     num_ths = build_type_desc_hdr_arr(ptvp, type_desc_hdr_arr, MX_ELEM_HDR,
@@ -4899,11 +6221,13 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
     if (display && primary_info.have_info) {
         int j;
 
-        printf("  Primary enclosure logical identifier (hex): ");
+        n = sg_scnpr(b, blen, "%s (hex): ", peli);
         for (j = 0; j < 8; ++j)
-            printf("%02x", primary_info.enc_log_id[j]);
-        printf("\n");
+            n += sg_scnpr(b + n, blen - n, "%02x",
+                          primary_info.enc_log_id[j]);
+        sgj_pr_hr(jsp, "  %s\n", b);
     }
+// xxxxxxxxxxxx  yyyyyyyyyyyyyyyy
     mlen = enc_stat_rsp_sz;
     if (mlen > op->maxlen)
         mlen = op->maxlen;
@@ -4912,12 +6236,12 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
     if (res)
         return res;
     if (enc_stat_rsp_len < 8) {
-        pr2serr("Enclosure Status response too short\n");
+        pr2serr("Enclosure Status %s\n", rts_s);
         return -1;
     }
     gen_code = sg_get_unaligned_be32(enc_stat_rsp + 4);
     if (ref_gen_code != gen_code) {
-        pr2serr("%s", enc_state_changed);
+        pr2serr("%s", soec);
         return -1;
     }
     es_bp = enc_stat_rsp + 8;
@@ -4930,12 +6254,12 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
                       &elem_desc_rsp_len);
     if (0 == res) {
         if (elem_desc_rsp_len < 8) {
-            pr2serr("Element Descriptor response too short\n");
+            pr2serr("Element Descriptor %s\n", rts_s);
             return -1;
         }
         gen_code = sg_get_unaligned_be32(elem_desc_rsp + 4);
         if (ref_gen_code != gen_code) {
-            pr2serr("%s", enc_state_changed);
+            pr2serr("%s", soec);
             return -1;
         }
         ed_bp = elem_desc_rsp + 8;
@@ -4945,7 +6269,7 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
         ed_bp = NULL;
         res = 0;
         if (op->verbose)
-            pr2serr("  Element Descriptor page not available\n");
+            pr2serr("  Element Descriptor page %s\n", not_avail);
     }
 
     /* check if we want to add the AES page to the join */
@@ -4958,12 +6282,12 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
                           &add_elem_rsp_len);
         if (0 == res) {
             if (add_elem_rsp_len < 8) {
-                pr2serr("Additional Element Status response too short\n");
+                pr2serr("Additional Element Status %s\n", rts_s);
                 return -1;
             }
             gen_code = sg_get_unaligned_be32(add_elem_rsp + 4);
             if (ref_gen_code != gen_code) {
-                pr2serr("%s", enc_state_changed);
+                pr2serr("%s", soec);
                 return -1;
             }
             ae_bp = add_elem_rsp + 8;
@@ -4980,7 +6304,7 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
             ae_last_bp = NULL;
             res = 0;
             if (op->verbose)
-                pr2serr("  Additional Element Status page not available\n");
+                pr2serr("  Additional Element Status page %s\n", not_avail);
         }
     } else {
         ae_bp = NULL;
@@ -4996,12 +6320,12 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
                           &threshold_rsp_len);
         if (0 == res) {
             if (threshold_rsp_len < 8) {
-                pr2serr("Threshold In response too short\n");
+                pr2serr("Threshold In %s\n", rts_s);
                 return -1;
             }
             gen_code = sg_get_unaligned_be32(threshold_rsp + 4);
             if (ref_gen_code != gen_code) {
-                pr2serr("%s", enc_state_changed);
+                pr2serr("%s", soec);
                 return -1;
             }
             t_bp = threshold_rsp + 8;
@@ -5011,13 +6335,12 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
             t_bp = NULL;
             res = 0;
             if (op->verbose)
-                pr2serr("  Threshold In page not available\n");
+                pr2serr("  Threshold In page %s\n", not_avail);
         }
     } else {
         threshold_rsp_len = 0;
         t_bp = NULL;
     }
-
 
     tesp->j_base = join_arr;
     join_juggle_aes(tesp, es_bp, ed_bp, t_bp);
@@ -5031,7 +6354,7 @@ join_work(struct sg_pt_base * ptvp, struct opts_t * op, bool display)
 
     join_done = true;
     if (display)      /* probably wanted join_arr[] built only */
-        join_array_display(tesp, op);
+        join_array_display(tesp, op, jop);
 
     return res;
 
@@ -5285,8 +6608,8 @@ cgs_additional_el(const struct join_row_t * jrp,
         else
             printf("%" PRId64 "\n", (int64_t)ui);
     } else {
-        pr2serr("--clear and --set not available for Additional Element "
-                "Status page\n");
+        pr2serr("--clear and --set %s for Additional Element Status page\n",
+                not_avail);
         return -1;
     }
     return 0;
@@ -5296,7 +6619,7 @@ cgs_additional_el(const struct join_row_t * jrp,
  * Returns 0 for success, any other return value is an error. */
 static int
 ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
-        struct opts_t * op, bool last)
+        bool last, struct opts_t * op, sgj_opaque_p jop)
 {
     int ret, k, j, desc_len, dn_len;
     bool found;
@@ -5341,7 +6664,7 @@ ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
         return -1;
     }
     if (false == join_done) {
-        ret = join_work(ptvp, op, false);
+        ret = join_work(ptvp, false, op, jop);
         if (ret)
             return ret;
     }
@@ -5451,8 +6774,7 @@ ses_set_nickname(struct sg_pt_base * ptvp, struct opts_t * op)
         uint32_t gc;
 
         gc = sg_get_unaligned_be32(b + 4);
-        pr2serr("%s: generation code from status page: %" PRIu32 "\n",
-                __func__, gc);
+        pr2serr("%s: %s from status page: %" PRIu32 "\n", __func__, gc_s, gc);
     }
     b[0] = (uint8_t)SUBENC_NICKNAME_DPC;  /* just in case */
     b[1] = (uint8_t)op->seid;
@@ -5472,7 +6794,8 @@ enumerate_diag_pages(void)
     const struct diag_page_code * pcdp;
     const struct diag_page_abbrev * ap;
 
-    printf("Diagnostic pages, followed by abbreviation(s) then page code:\n");
+    printf("D%s names, followed by abbreviation(s) then page code:\n",
+           dp_s + 1);
     for (pcdp = dpc_arr; pcdp->desc; ++pcdp) {
         printf("    %s  [", pcdp->desc);
         for (ap = dp_abbrev, got1 = false; ap->abbrev; ++ap) {
@@ -5568,6 +6891,7 @@ int
 main(int argc, char * argv[])
 {
     bool have_cgs = false;
+    bool as_json;
     int k, n, d_len, res, resid, vb;
     int sg_fd = -1;
     int pd_type = 0;
@@ -5582,6 +6906,8 @@ main(int argc, char * argv[])
     uint8_t * free_add_elem_rsp = NULL;
     uint8_t * free_threshold_rsp = NULL;
     struct sg_pt_base * ptvp = NULL;
+    sgj_state * jsp;
+    sgj_opaque_p jop = NULL;
     struct tuple_acronym_val tav_arr[CGS_CL_ARR_MAX_SZ];
     char buff[128];
     char b[128];
@@ -5591,10 +6917,19 @@ main(int argc, char * argv[])
     op->dev_slot_num = -1;
     op->ind_indiv_last = -1;
     op->maxlen = MX_ALLOC_LEN;
+
     res = parse_cmd_line(op, argc, argv);
     vb = op->verbose;
+    jsp = &op->json_st;
+    as_json = jsp->pr_as_json;
     if (res) {
-        ret = SG_LIB_SYNTAX_ERROR;
+        if (SG_SES_CALL_ENUMERATE == res) {
+            pr2serr("\n");
+            enumerate_work(op);
+            res = SG_LIB_SYNTAX_ERROR;
+            goto early_out;
+        }
+        ret = res;
         goto early_out;
     }
     if (op->do_help) {
@@ -5627,6 +6962,15 @@ main(int argc, char * argv[])
         enumerate_work(op);
         goto early_out;
     }
+    if (op->page_code_given && (op->do_join > 0) &&
+        (ADD_ELEM_STATUS_DPC != op->page_code) &&
+        ((as_json || (ENC_STATUS_DPC != op->page_code)))) {
+        op->partial_join = true;
+        op->do_join = 0;
+    }
+    if (as_json)
+        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+
     enc_stat_rsp = sg_memalign(op->maxlen, 0, &free_enc_stat_rsp, false);
     if (NULL == enc_stat_rsp) {
         pr2serr("Unable to get heap for enc_stat_rsp\n");
@@ -5717,20 +7061,6 @@ main(int argc, char * argv[])
 #endif
 #endif
 
-#if 0
-    pr2serr("Debug dump of input parameters:\n");
-    pr2serr("  index option given: %d, ind_th=%d, ind_indiv=%d, "
-            "ind_indiv_last=%d\n", op->ind_given, op->ind_th,
-            op->ind_indiv, op->ind_indiv_last);
-    pr2serr("  num_cgs=%d, contents:\n", op->num_cgs);
-    for (k = 0, tavp = tav_arr, cgs_clp = op->cgs_cl_arr;
-         k < op->num_cgs; ++k, ++tavp, ++cgs_clp) {
-        pr2serr("  k=%d, cgs_sel=%d, last_cs=%d, tavp=%p str: %s\n",
-                k, (int)cgs_clp->cgs_sel, (int)cgs_clp->last_cs, tavp,
-                cgs_clp->cgs_str);
-    }
-#endif
-
     if (op->dev_name) {
         sg_fd = sg_cmds_open_device(op->dev_name, op->o_readonly, vb);
         if (sg_fd < 0) {
@@ -5758,25 +7088,26 @@ main(int argc, char * argv[])
             } else {
                 if (resid > 0)
                     pr2serr("Short INQUIRY response, not looking good\n");
-                printf("  %.8s  %.16s  %.4s\n", inq_rsp + 8, inq_rsp + 16,
-                       inq_rsp + 32);
+                 sgj_pr_hr(jsp, "  %.8s  %.16s  %.4s\n", inq_rsp + 8,
+                           inq_rsp + 16, inq_rsp + 32);
                 pd_type = PDT_MASK & inq_rsp[0];
                 cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
                 if (0xd == pd_type) {
                     if (vb)
-                        printf("    enclosure services device\n");
+                        sgj_pr_hr(jsp, "    enclosure services device\n");
                 } else if (0x40 & inq_rsp[6])
-                    printf("    %s device has EncServ bit set\n", cp);
+                    sgj_pr_hr(jsp, "    %s device has EncServ bit set\n", cp);
                 else {
                     if (0 != memcmp("NVMe", inq_rsp + 8, 4))
-                        printf("    %s device (not an enclosure)\n", cp);
+                        sgj_pr_hr(jsp, "    %s device (not an enclosure)\n",
+                                  cp);
                 }
             }
             clear_scsi_pt_obj(ptvp);
         }
     } else if (op->do_control) {
         pr2serr("Cannot do SCSI Send diagnostic command without a DEVICE\n");
-        return SG_LIB_SYNTAX_ERROR;
+        goto err_out;
     }
 
 #if (HAVE_NVME && (! IGNORE_NVME))
@@ -5857,14 +7188,14 @@ main(int argc, char * argv[])
     else if (have_cgs) {
         for (k = 0, tavp = tav_arr, cgs_clp = op->cgs_cl_arr;
              k < op->num_cgs; ++k, ++tavp, ++cgs_clp) {
-            ret = ses_cgs(ptvp, tavp, op,  cgs_clp->last_cs);
+            ret = ses_cgs(ptvp, tavp, cgs_clp->last_cs, op, jop);
             if (ret)
                 break;
         }
     } else if (op->do_join)
-        ret = join_work(ptvp, op, true);
+        ret = join_work(ptvp, true, op, jop);
     else if (op->do_status)
-        ret = process_status_page_s(ptvp, op);
+        ret = process_status_page_s(ptvp, op, jop);
     else { /* control page requested */
         op->data_arr[0] = op->page_code;
         op->data_arr[1] = op->byte1;
@@ -5872,8 +7203,8 @@ main(int argc, char * argv[])
         sg_put_unaligned_be16((uint16_t)op->arr_len, op->data_arr + 2);
         switch (op->page_code) {
         case ENC_CONTROL_DPC:  /* Enclosure Control diagnostic page [0x2] */
-            printf("Sending Enclosure Control [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
+            sgj_pr_hr(jsp, "Sending Enclosure Control [0x%x] page, with page "
+                      "length=%d bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Enclosure Control page\n");
@@ -5881,8 +7212,8 @@ main(int argc, char * argv[])
             }
             break;
         case STRING_DPC:       /* String Out diagnostic page [0x4] */
-            printf("Sending String Out [0x%x] page, with page length=%d "
-                   "bytes\n", op->page_code, op->arr_len);
+            sgj_pr_hr(jsp, "Sending String Out [0x%x] page, with page "
+                      "length=%d bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send String Out page\n");
@@ -5890,8 +7221,8 @@ main(int argc, char * argv[])
             }
             break;
         case THRESHOLD_DPC:       /* Threshold Out diagnostic page [0x5] */
-            printf("Sending Threshold Out [0x%x] page, with page length=%d "
-                   "bytes\n", op->page_code, op->arr_len);
+            sgj_pr_hr(jsp, "Sending Threshold Out [0x%x] page, with page "
+                      "length=%d bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Threshold Out page\n");
@@ -5899,8 +7230,8 @@ main(int argc, char * argv[])
             }
             break;
         case ARRAY_CONTROL_DPC:   /* Array control diagnostic page [0x6] */
-            printf("Sending Array Control [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
+            sgj_pr_hr(jsp, "Sending Array Control [0x%x] page, with page "
+                      "length=%d bytes\n", op->page_code, op->arr_len);
             ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Array Control page\n");
@@ -5908,8 +7239,9 @@ main(int argc, char * argv[])
             }
             break;
         case SUBENC_STRING_DPC: /* Subenclosure String Out page [0xc] */
-            printf("Sending Subenclosure String Out [0x%x] page, with page "
-                   "length=%d bytes\n", op->page_code, op->arr_len);
+            sgj_pr_hr(jsp, "Sending Subenclosure String Out [0x%x] page, "
+                      "with page length=%d bytes\n", op->page_code,
+                      op->arr_len);
             ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Subenclosure String Out page\n");
@@ -5917,10 +7249,10 @@ main(int argc, char * argv[])
             }
             break;
         case DOWNLOAD_MICROCODE_DPC: /* Download Microcode Control [0xe] */
-            printf("Sending Download Microcode Control [0x%x] page, with "
-                   "page length=%d bytes\n", op->page_code, d_len);
-            printf("  Perhaps it would be better to use the sg_ses_microcode "
-                   "utility\n");
+            sgj_pr_hr(jsp, "Sending Download Microcode Control [0x%x] page, "
+                      "with page length=%d bytes\n", op->page_code, d_len);
+            sgj_pr_hr(jsp, "  Perhaps it would be better to use the "
+                      "sg_ses_microcode utility\n");
             ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Download Microcode Control page\n");
@@ -5928,8 +7260,9 @@ main(int argc, char * argv[])
             }
             break;
         case SUBENC_NICKNAME_DPC: /* Subenclosure Nickname Control [0xf] */
-            printf("Sending Subenclosure Nickname Control [0x%x] page, with "
-                   "page length=%d bytes\n", op->page_code, d_len);
+            sgj_pr_hr(jsp, "Sending Subenclosure Nickname Control [0x%x] "
+                      "page, with page length=%d bytes\n", op->page_code,
+                      d_len);
             ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
                 pr2serr("couldn't send Subenclosure Nickname Control page\n");
@@ -5982,5 +7315,10 @@ early_out:
         free(op->free_data_arr);
     if (free_config_dp_resp)
         free(free_config_dp_resp);
+    if (as_json && jop) {
+        if (0 == op->do_hex)
+            sgj_js2file(jsp, NULL, ret, stdout);
+        sgj_finish(jsp);
+    }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

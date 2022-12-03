@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20221112] [svn: r983]
+Changelog for pre-release sg3_utils-1.48 [20221202] [svn: r984]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -69,6 +69,7 @@ Changelog for pre-release sg3_utils-1.48 [20221112] [svn: r983]
   - sg_read_buffer: add --eh_code= and --no_output options
   - sg_ses: add exp_sas_addr acronym for getting expander's
     SAS address
+    - add json support
   - sg_turs: change nanosleep() to Sleep() in MinGW
     - see sg_lib below for two new exit status values
   - sg_stream_ctl: fix --get indexing

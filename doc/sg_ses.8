@@ -1,4 +1,4 @@
-.TH SG_SES "8" "October 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_SES "8" "December 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -7,9 +7,10 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-filter\fR]
 [\fI\-\-get=STR\fR] [\fI\-\-hex\fR] [\fI\-\-index=IIA\fR |
 \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR] [\fI\-\-join\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR]
-[\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
+[\fI\-\-json[=JO]\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
+[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR]
+[\fI\-\-warn\fR] \fIDEVICE\fR
 .PP
 .B sg_ses
 \fI\-\-control\fR [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR]
@@ -36,11 +37,10 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 .PP
 Fetches management information from a SCSI Enclosure Service (SES) device.
 This utility can also modify the state of a SES device. The \fIDEVICE\fR
-should be a SES device which may be a dedicated enclosure services
-processor in which case an INQUIRY response's Peripheral Device Type is
-13 [0xd]. Alternatively it may be attached to another type of SCSI
-device (e.g. a disk) in which case the EncServ bit is set in its INQUIRY
-response.
+should be a SES device which may be a dedicated enclosure services processor
+in which case an INQUIRY response's Peripheral Device Type is 13 [0xd].
+Alternatively it may be attached to another type of SCSI device (e.g. a
+disk) in which case the EncServ bit is set in its INQUIRY response.
 .PP
 If the \fIDEVICE\fR argument is given with no options then the names of all
 diagnostic pages (dpages) supported are listed. Most, but not necessarily
@@ -89,7 +89,7 @@ a SES device has been placed in a separate utility called sg_ses_microcode.
 In the following sections "dpage" refers to a diagnostic page, either fetched
 with a SCSI RECEIVE DIAGNOSTIC RESULTS command, sent to the \fIDEVICE\fR with
 a SCSI SEND DIAGNOSTIC command, or fetched from data supplied by the
-\fI\-\-data=\fR option.
+\fI\-\-data=\fR or the \fI\-\-inhex=FN\fR option.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
@@ -102,13 +102,16 @@ of nesting. This option is actually the same as \fI\-\-join\fR, see its
 description for more information.
 .br
 If used twice, adds threshold elements to output (if they are available).
-So it is the same as using \fI\-\-join\fRtwice.
+So it is the same as using \fI\-\-join\fR twice.
+.br
+This option implies the \fI\-\-status\fR option as long as the
+\fI\-\-control\fR option has not been given.
 .TP
 \fB\-z\fR, \fB\-\-ALL\fR
 shows (almost) all status dpages, following references and presenting
 the information as a long list whose indentation indicates the level
 of nesting. Also shows the threshold elements if they are available.
-This option is the same as using  \fI\-\-join\fR rwice.
+This option is the same as using  \fI\-\-join\fR twice.
 .TP
 \fB\-b\fR, \fB\-\-byte1\fR=\fIB1\fR
 some modifiable dpages may need byte 1 (i.e. the second byte) set. In the
@@ -276,6 +279,10 @@ the outer levels of a status dpage are decoded and printed out but the
 innermost level (e.g. the Element Status Descriptor) is output in hex. Also
 active with the Additional Element Status and Threshold In dpages. Can be
 used with an indexing option and/or \fI\-\-join\fR options.
+.br
+This option may also be used the \fI\-\-json[=JO]\fR option to lessen the
+decoding dependency on other dpages. This option may be used twice in this
+context. See the JSON INFORMATION section below.
 .TP
 \fB\-j\fR, \fB\-\-join\fR
 group elements from the Element Descriptor, Enclosure Status and Additional
@@ -291,6 +298,16 @@ option (see its description) can be added to reduce the amount of output.
 Also "\-\-page=aes" (or "\-p 0xa") can be added to suppress the output of
 rows that don't have a "aes" dpage component. See the INDEXES and DESCRIPTOR
 NAME, DEVICE SLOT NUMBER AND SAS ADDRESS sections below.
+.br
+This option implies the \fI\-\-status\fR option. Giving the \fI\-\-control\fR
+option with this option is an error.
+.TP
+\fB\-J\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. For general
+information about JSON usage in this package ee the sg3_utils_json manpage
+or use '?' for \fIJO\fR in order to have a summary printed to stderr.
+For more specific information about JSON output with this utility, see the
+JSON INFORMATION section below.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 This option is equivalent to \fI\-\-enumerate\fR. See that option.
@@ -642,6 +659,48 @@ This support is based on a decision by NVME\-MI (Management Interface)
 developers to support the SES\-3 standard. This was facilitated by adding
 NVME\-MI SES Send and SES Receive commands that tunnel dpage contents as
 used by SES.
+.SH JSON INFORMATION
+The approach taken with JSON output (i.e. when the \fI\-\-json[=JO]\fR option
+is given) is to output diagnostic page information unless the \fI\-\-join\fR
+option is given. A problem specific to SES is that many diagnostic pages
+depend on other diagnostic pages (e.g. decoding the Enclosure Status and the
+Element Descriptor dpages both depend on the Configuration dpage).
+.PP
+When the \fI\-\-json[=JO]\fR and \fI\-\-page=PG\fR options are used in the
+same invocation, then if \fIPG\fR has any dependencies on other diagnostic
+pages, then those other pages are fetched. For example the Element Descriptor
+dpage depends on the Configuration dpage. In some cases (e.g. dpages
+misconfigured or in the process of being changed) it may be useful to decode
+whatever is possible, without fetching other dpages. The \fI\-\-inner\-hex\fR
+option may be used for this. Some dpages (e.g.  Enclosure Status dpage)
+cannot be decoded at all, without fetching the Configuration dpage, so each 4
+byte element will be output in hex. In the case of the Element Descriptor
+dpage, the descriptors may be output in ASCII and are when the
+\fI\-\-inner\-hex\fR option is given once. If the \fI\-\-inner\-hex\fR
+option is given twice, then each descriptor will be output in hex.
+.PP
+When the \fI\-\-json[=JO]\fR and \fI\-\-page=PG\fR options are used in the
+same invocation, then the top level object name is the name of \fIPG\fR in
+snake notation. This includes the "_diagnostic_name" suffix.
+.PP
+When the \fI\-\-json[=JO]\fR and \fI\-\-join\fR options are used in the same
+invocation (and the \fI\-\-page=PG\fR option is _not_ given), then the top
+level object name is "join_of_diagnostic_pages" which contain a (JSON) array
+named "element_list". Each element in that array starts with an "element_type"
+field followed by "descriptor" and "element_number" fields. The "descriptor"
+field's value is a string. All elements with the same "element_type" are
+grouped together starting with the "overall_element" first.
+The "overall_element" has an "element_number" value of -1. Individual
+elements of the same "element_type" are in the following "element_list" array
+elements start with an "element_number" value of 0. After
+the "element_number" field there is a "overall" field with an integer value
+of 0 (for an "individual" element) or a value of 1 (for "overall" element).
+To reinforce that point there is a "individual" field with a boolean value
+of true (for an "individual" element) or false. Next there is an object
+named "status_descriptor" that contains the corresponding "Enclosure
+Status" dpage's Enclosure status element. As required, the corresponding
+Additional element status, Element descriptor by type element, and
+Threshold status descriptors may also appear.
 .SH NOTES
 This utility can be used to fetch arbitrary (i.e. non SES) dpages (using
 the SCSI READ DIAGNOSTIC command). To this end the \fI\-\-page=PG\fR and
@@ -792,7 +851,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2021 Douglas Gilbert
+Copyright \(co 2004\-2022 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

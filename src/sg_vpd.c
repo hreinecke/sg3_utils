@@ -1082,7 +1082,7 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
                 char * p;
 
                 n = len * 4;
-                p = malloc(n);
+                p = (char *)malloc(n);
                 if (p) {
                     n = hex2str(rp, len, NULL, 1, n - 1, p);
                     sgj_js_str_out(jsp, p, n);

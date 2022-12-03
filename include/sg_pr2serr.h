@@ -57,6 +57,7 @@ enum sgj_separator_t {
     SGJ_SEP_SPACE_4,
     SGJ_SEP_EQUAL_NO_SPACE,
     SGJ_SEP_EQUAL_1_SPACE,
+    SGJ_SEP_SPACE_EQUAL_SPACE,
     SGJ_SEP_COLON_NO_SPACE,
     SGJ_SEP_COLON_1_SPACE,
 };
@@ -296,13 +297,16 @@ void sgj_haj_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                 const char * value);
 
 /* Similar to sgj_haj_vs()'s description with 'JSON string object'
- * replaced by 'JSON integer object'. */
+ * replaced by 'JSON integer object'. hex_haj when set will cause the value
+ * to be output in <0x%x> form (default is a signed decimal 64 bit integer)
+ * in the human readable rendering. For JSON output hex_haj has the same
+ * effect as hex_as_well.  */
 void sgj_haj_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                 const char * name, enum sgj_separator_t sep,
-                int64_t value, bool hex_as_well);
+                int64_t value, bool hex_haj);
 void sgj_haj_vistr(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                    const char * name, enum sgj_separator_t sep,
-                   int64_t value, bool hex_as_well, const char * val_s);
+                   int64_t value, bool hex_haj, const char * val_s);
 
 /* The '_nex' refers to a "name_extra" (information) sub-object (a JSON
  * string) which explains a bit more about the 'name' entry. This is useful
@@ -311,10 +315,10 @@ void sgj_haj_vistr(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
  * character. */
 void sgj_haj_vi_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                     const char * name, enum sgj_separator_t sep,
-                    int64_t value, bool hex_as_well, const char * nex_s);
+                    int64_t value, bool hex_haj, const char * nex_s);
 void sgj_haj_vistr_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                        const char * name, enum sgj_separator_t sep,
-                       int64_t value, bool hex_as_well,
+                       int64_t value, bool hex_haj,
                        const char * val_s, const char * nex_s);
 
 /* Similar to above '_haj_' calls but a named sub-object is always formed
@@ -322,7 +326,7 @@ void sgj_haj_vistr_nex(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
  * returned pointer is to that sub-object. */
 sgj_opaque_p sgj_haj_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                             const char * name, enum sgj_separator_t sep,
-                            int64_t value, bool hex_as_well);
+                            int64_t value, bool hex_haj);
 
 /* Similar to sgj_haj_vs()'s description with 'JSON string object' replaced
  * by 'JSON boolean object'. */
@@ -366,8 +370,11 @@ void sgj_free_unattached(sgj_opaque_p jop);
  * jsp->userp will all be set to NULL.  */
 void sgj_finish(sgj_state * jsp);
 
+/* Forms a string of the JSON command line options help and assumes,
+ * if char_if_not_j is zero, that '-j' is the short form of the of
+ * the --json[=JO] command line option.
+ */
 char * sg_json_usage(int char_if_not_j, char * b, int blen);
-
 
 #ifdef __cplusplus
 }

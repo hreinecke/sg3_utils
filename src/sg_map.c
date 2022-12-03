@@ -1,6 +1,6 @@
 /*
  * Utility program for the Linux OS SCSI generic ("sg") device driver.
- *     Copyright (C) 2000-2017 D. Gilbert
+ *     Copyright (C) 2000-2022 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -47,7 +47,7 @@
 #include "sg_io_linux.h"
 
 
-static const char * version_str = "1.12 20171010";
+static const char * version_str = "1.13 20221123";
 
 static const char * devfs_id = "/dev/.devfsd";
 
@@ -317,6 +317,8 @@ int main(int argc, char * argv[])
     }
     if ((num_errors >= MAX_ERRORS) && (num_silent < num_errors)) {
         printf("Stopping because there are too many error\n");
+        printf("[number silent: %d, number of errors: %d]\n",
+               num_silent, num_errors);
         if (eacces_err)
             printf("    root access may be required\n");
         return SG_LIB_FILE_ERROR;
@@ -500,9 +502,11 @@ static void scan_dev_type(const char * leadin, int max_dev, bool do_numeric,
         if (ind >= 0) {
             map_arr[ind].oth_dev_num = k;
             map_arr[ind].lin_dev_type = lin_dev_type;
-        }
-        else
+        } else {
             printf("Strange, could not find device %s mapped to sg device??\n",
                    fname);
+            printf("[number silent: %d, number of errors: %d]\n",
+                   num_silent, num_errors);
+        }
     }
 }

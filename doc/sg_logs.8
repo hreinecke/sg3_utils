@@ -285,8 +285,10 @@ available from the \fIDEVICE\fR. There are two main cases of this: with
 the \fI\-\-pdt=DT\fR without a \fIDEVICE\fR (e.g. when \fI\-\-in=FN\fR
 is used) and when \fI\-\-no_inq\fR is used with a \fIDEVICE\fR.
 .br
-\fIDT\fR may be -1 which is the default value. This value may select any
-device type but favours the lower numbers (e.g. the PDT of disks is 0).
+\fIDT\fR may be -1 . This value may select any device type but favours the
+lower numbers (e.g. the PDT of disks is 0).
+.br
+The default value of \fIDT\fR is zero which is the device type of disks.
 .TP
 \fB\-Q\fR, \fB\-\-ppc\fR
 sets the Parameter Pointer Control (PPC) bit in the LOG SENSE cdb. Default

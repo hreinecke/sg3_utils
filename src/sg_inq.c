@@ -1066,7 +1066,7 @@ get_vpd_page_info(int vpd_page_num, int dev_pdt)
 static int
 svpd_inhex_decode_all(struct opts_t * op, sgj_opaque_p jop)
 {
-    int k, res, pn;
+    int res, pn;
     int max_pn = 255;
     int bump, off;
     int in_len = op->maxlen;
@@ -1082,7 +1082,7 @@ svpd_inhex_decode_all(struct opts_t * op, sgj_opaque_p jop)
     if (op->page_given && (VPD_NOPE_WANT_STD_INQ == op->vpd_pn))
         return vpd_decode(-1, op, jop, 0);
 
-    for (k = 0, off = 0; off < in_len; ++k, off += bump) {
+    for (off = 0; off < in_len; off += bump) {
         rp = rsp_buff + off;
         pn = rp[1];
         bump = sg_get_unaligned_be16(rp + 2) + 4;
@@ -1689,7 +1689,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
 static void
 export_dev_ids(uint8_t * buff, int len, int verbose)
 {
-    int u, j, m, id_len, c_set, assoc, desig_type, i_len;
+    int u, m, id_len, c_set, assoc, desig_type, i_len;
     int off, d_id, naa, k, p_id;
     uint8_t * bp;
     uint8_t * ip;
@@ -1706,14 +1706,12 @@ export_dev_ids(uint8_t * buff, int len, int verbose)
         assoc = 0;
         p_id = 0xf;
         desig_type = 3;
-        j = 1;
         off = 16;
         goto decode;
     }
 
-    for (j = 1, off = -1;
-         (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0;
-         ++j) {
+    for (off = -1;
+         (u = sg_vpd_dev_id_iter(buff, len, &off, -1, -1, -1)) == 0; ) {
         bp = buff + off;
         i_len = bp[3];
         id_len = i_len + 4;
@@ -2805,7 +2803,7 @@ vpd_mainly_hex(int sg_fd, struct opts_t * op, sgj_opaque_p jap, int off)
                     char * p;
 
                     n = len * 4;
-                    p = malloc(n);
+                    p = (char *)malloc(n);
                     if (p) {
                         n = hex2str(rp, len, NULL, 1, n - 1, p);
                         sgj_js_str_out(jsp, p, n);

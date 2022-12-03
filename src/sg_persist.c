@@ -35,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.69 20220118";
+static const char * version_str = "0.70 20221123";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -1235,17 +1235,21 @@ main(int argc, char * argv[])
         (0 == op->prout_type)) {
         pr2serr("warning>>> --prout-type probably needs to be given\n");
     }
-    if ((op->verbose > 2) && op->num_transportids) {
-        char b[1024];
-        uint8_t * bp;
+    if (op->verbose > 2) {
+        pr2serr("Number of PROUT parameters: %d\n", num_prout_param);
+        if (op->num_transportids) {
+            char b[1024];
+            uint8_t * bp;
 
-        pr2serr("number of tranport-ids decoded from command line (or "
-                "stdin): %d\n", op->num_transportids);
-        pr2serr("  Decode given transport-ids:\n");
-        for (k = 0; k < op->num_transportids; ++k) {
-            bp = op->transportid_arr + (MX_TID_LEN * k);
-            printf("%s", sg_decode_transportid_str("      ", bp, MX_TID_LEN,
-                                                   true, sizeof(b), b));
+            pr2serr("number of tranport-ids decoded from command line (or "
+                    "stdin): %d\n", op->num_transportids);
+            pr2serr("  Decode given transport-ids:\n");
+            for (k = 0; k < op->num_transportids; ++k) {
+                bp = op->transportid_arr + (MX_TID_LEN * k);
+                printf("%s",
+                       sg_decode_transportid_str("      ", bp, MX_TID_LEN,
+                                                 true, sizeof(b), b));
+            }
         }
     }
 
