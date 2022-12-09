@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.62 20221208";    /* ses4r04 */
+static const char * version_str = "2.63 20221208";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -2640,7 +2640,7 @@ calc_fan_speed(int fan_speed_factor, int actual_fan_speed)
 
 static const char * elem_status_code_desc[] = {
     "Unsupported", "OK", "Critical", "Noncritical",
-    "Unrecoverable", "Not installed", "Unknown", not_avail,
+    "Unrecoverable", "Not installed", "Unknown", "Not available",
     "No access allowed", "reserved [9]", "reserved [10]", "reserved [11]",
     "reserved [12]", "reserved [13]", "reserved [14]", "reserved [15]",
 };
@@ -2666,7 +2666,7 @@ static const char * const display_mode_status[] = {
     "ES process controlling display; display element control of the display "
     "is supported",
     "The display is being controlled based on the Display element",
-    rsv_s,
+    "reserved",
 };
 
 static int
