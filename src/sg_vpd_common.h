@@ -276,6 +276,9 @@ int vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen,
                    bool qt, int vb, int * rlenp);
 void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 
+void named_hhh_output(const char * pname, const uint8_t * buff, int len,
+		      const struct opts_t * op);
+
 extern uint8_t * rsp_buff;
 extern const char * t10_vendor_id_hr;
 extern const char * t10_vendor_id_js;

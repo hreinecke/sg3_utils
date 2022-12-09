@@ -456,21 +456,24 @@ decode_supported_vpd_4vpd(uint8_t * buff, int len, struct opts_t * op,
     uint8_t * bp;
     char b[144];
     static const int blen = sizeof(b);
-    static const char * svps = "Supported VPD pages";
+    static const char * svp_vpdp = "Supported VPD pages VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, no_ascii_4hex(op));
+        if (op->do_hex > 2)
+            named_hhh_output(svp_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, no_ascii_4hex(op));
         return;
     }
     pdt = PDT_MASK & buff[0];
     rlen = buff[3] + 4;
     if (rlen > len)
-        pr2serr("%s VPD page truncated, indicates %d, got %d\n", svps, rlen,
+        pr2serr("%s truncated, indicates %d, got %d\n", svp_vpdp, rlen,
                 len);
     else
         len = rlen;
     if (len < 4) {
-        pr2serr("%s VPD page length too short=%d\n", svps, len);
+        pr2serr("%s length too short=%d\n", svp_vpdp, len);
         return;
     }
     len -= 4;
@@ -523,13 +526,17 @@ decode_scsi_ports_vpd_4vpd(uint8_t * buff, int len, struct opts_t * op,
     sgj_opaque_p jo2p = NULL;
     sgj_opaque_p ja2p = NULL;
     uint8_t * bp;
+    static const char * sp_vpdp = "SCSI ports VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, no_ascii_4hex(op));
+        if (op->do_hex > 2)
+            named_hhh_output(sp_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, no_ascii_4hex(op));
         return;
     }
     if (len < 4) {
-        pr2serr("SCSI Ports VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", sp_vpdp, len);
         return;
     }
     len -= 4;
@@ -1186,6 +1193,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
 
     switch(pn) {
     case VPD_NOPE_WANT_STD_INQ:    /* -2 (want standard inquiry response) */
+	np = "Standard Inquiry data format";
         if (!inhex_active) {
             if (op->maxlen > 0)
                 alloc_len = op->maxlen;
@@ -1206,8 +1214,11 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 dStrRaw(rp, alloc_len);
             else if (op->do_hex) {
                 if (! op->do_quiet && (op->do_hex < 3))
-                    sgj_pr_hr(jsp, "Standard Inquiry data format:\n");
-                hex2stdout(rp, alloc_len, (1 == op->do_hex) ? 0 : -1);
+                    sgj_pr_hr(jsp, "%s:\n", np);
+                if (op->do_hex > 2)
+                    named_hhh_output(np, rp, len, op);
+                else
+                    hex2stdout(rp, alloc_len, (1 == op->do_hex) ? 0 : -1);
             } else
                 std_inq_decode(rp, alloc_len, op, jop);
             return 0;
@@ -1223,9 +1234,12 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
-            else if (op->do_hex)
-                hex2stdout(rp, len, no_ascii_4hex(op));
-            else {
+            else if (op->do_hex) {
+                if (op->do_hex > 2)
+                    named_hhh_output(np, rp, len, op);
+                else
+                    hex2stdout(rp, len, no_ascii_4hex(op));
+            } else {
                 if (vb || long_notquiet)
                     sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
                               "%s]\n", pqual, pdt_str);
@@ -1252,9 +1266,12 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
-            else if (op->do_hex)
-                hex2stdout(rp, len, no_ascii_4hex(op));
-            else {
+            else if (op->do_hex) {
+                if (op->do_hex > 2)
+                    named_hhh_output(np, rp, len, op);
+                else
+                    hex2stdout(rp, len, no_ascii_4hex(op));
+            } else {
                 if (vb || long_notquiet)
                     sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
                               "%s]\n", pqual, pdt_str);
@@ -1279,9 +1296,12 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
-            else if (op->do_hex)
-                hex2stdout(rp, len, no_ascii_4hex(op));
-            else {
+            else if (op->do_hex) {
+                if (op->do_hex > 2)
+                    named_hhh_output(np, rp, len, op);
+                else
+                    hex2stdout(rp, len, no_ascii_4hex(op));
+            } else {
                 if (vb || long_notquiet)
                     sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
                               "%s]\n", pqual, pdt_str);

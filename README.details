@@ -165,8 +165,10 @@ hackers using a VM containing a real OS to circumvent the Apple restriction.
 C standard is C11
 ==================
 The C code in this package is written for portability rather than speed.
-It assumes a level of C99 compliance (the C standard prior to C11) and
-favours POSIX system and library calls over OS specific calls.
+It assumes a level of C11 compliance (the C standard after to C99) and
+favours POSIX system and library calls over OS specific calls. Almost
+all of the package will compile using C99 but it does not support
+"struct timespec"
 
 The C code is written in a C++ friendly way and is checked from time to
 time that it compiles clean with C++. To accommodate C++ certain C99

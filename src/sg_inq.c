@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.31 20220915";  /* spc6r06, sbc5r03 */
+static const char * version_str = "2.32 20221208";  /* spc6r06, sbc5r03 */
 
 #define MY_NAME "sg_inq"
 
@@ -4620,10 +4620,8 @@ main(int argc, char * argv[])
                 goto err_out;
         }
     }
-
-#if (HAVE_NVME && (! IGNORE_NVME))
 fini2:
-#endif
+
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
     defined(HDIO_GET_IDENTITY)
 fini3:

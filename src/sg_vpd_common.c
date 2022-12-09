@@ -193,6 +193,15 @@ svpd_enumerate_vendor(int vend_prod_num)
     }
 }
 
+void
+named_hhh_output(const char * pname, const uint8_t * b, int blen,
+                 const struct opts_t * op)
+{
+    if ((op->do_hex > 4) && pname)
+        printf("# %s\n", pname);
+    hex2stdout(b, blen, -1);
+}
+
 /* mxlen is command line --maxlen=LEN option (def: 0) or -1 for a VPD page
  * with a short length (1 byte). Returns 0 for success. */
 int     /* global: use by sg_vpd_vendor.c */
@@ -335,14 +344,18 @@ decode_net_man_vpd(const uint8_t * buff, int len, struct opts_t * op,
     const uint8_t * bp;
     const char * assoc_str;
     const char * nst_str;
+    static const char * const mna_vpdp =
+                        "Management network addresses VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(mna_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("Management network addresses VPD page length too short=%d\n",
-                len);
+        pr2serr("%s length too short=%d\n", mna_vpdp, len);
         return;
     }
     len -= 4;
@@ -373,8 +386,8 @@ decode_net_man_vpd(const uint8_t * buff, int len, struct opts_t * op,
         }
         bump = 4 + na_len;
         if ((k + bump) > len) {
-            pr2serr("Management network addresses VPD page, short "
-                    "descriptor length=%d, left=%d\n", bump, (len - k));
+            pr2serr("%s, short descriptor length=%d, left=%d\n", mna_vpdp,
+                    bump, (len - k));
             return;
         }
     }
@@ -394,13 +407,17 @@ decode_x_inq_vpd(const uint8_t * b, int len, bool protect, struct opts_t * op,
     const char * nex_p;
     char d[128];
     static const int dlen = sizeof(d);
+    static const char * const eid_vpdp = "Extended INQUIRY data VPD page";
 
     if (len < 7) {
-        pr2serr("Extended INQUIRY data VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", eid_vpdp, len);
         return;
     }
     if (op->do_hex) {
-        hex2stdout(b, len, (1 == op->do_hex) ? 0 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(eid_vpdp, b, len, op);
+        else
+            hex2stdout(b, len, 0);
         return;
     }
     if (do_long_nq || jsp->pr_as_json) {
@@ -646,9 +663,14 @@ decode_softw_inf_id(const uint8_t * buff, int len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jop;
     uint64_t ieee_id;
+    static const char * const sii_vpdp =
+                        "Software interface identification VPD page";
 
     if (op->do_hex) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(sii_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     len -= 4;
@@ -683,13 +705,17 @@ decode_mode_policy_vpd(const uint8_t * buff, int len, struct opts_t * op,
     const uint8_t * bp;
     char b[128];
     static const int blen = sizeof(b);
+    static const char * const mp_vpdp = "Mode policy VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(mp_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("Mode page policy VPD page length too short=%d\n", len);
+        pr2serr("%s page length too short=%d\n", mp_vpdp, len);
         return;
     }
     len -= 4;
@@ -697,8 +723,8 @@ decode_mode_policy_vpd(const uint8_t * buff, int len, struct opts_t * op,
     for (k = 0; k < len; k += bump, bp += bump) {
         bump = 4;
         if ((k + bump) > len) {
-            pr2serr("Mode page policy VPD page, short "
-                    "descriptor length=%d, left=%d\n", bump, (len - k));
+            pr2serr("%s, short descriptor length=%d, left=%d\n", mp_vpdp,
+                    bump, (len - k));
             return;
         }
         if (op->do_hex > 1)
@@ -736,13 +762,17 @@ decode_power_condition(const uint8_t * buff, int len, struct opts_t * op,
                        sgj_opaque_p jop)
 {
     sgj_state * jsp = &op->json_st;
+    static const char * const pc_vpdp = "Power condition VPD page";
 
     if (len < 18) {
-        pr2serr("Power condition VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", pc_vpdp, len);
         return;
     }
     if (op->do_hex) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(pc_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     sgj_pr_hr(jsp, "  Standby_y=%d Standby_z=%d Idle_c=%d Idle_b=%d "
@@ -821,13 +851,17 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
     static const char * sat_vip = "SAT Vendor identification";
     static const char * sat_pip = "SAT Product identification";
     static const char * sat_prlp = "SAT Product revision level";
+    static const char * const ai_vpdp = "ATA information VPD page";
 
     if (len < 36) {
-        pr2serr("ATA information VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", ai_vpdp, len);
         return;
     }
     if (op->do_hex && (2 != op->do_hex)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(ai_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     memcpy(b, buff + 8, 8);
@@ -915,13 +949,17 @@ decode_feature_sets_vpd(const uint8_t * buff, int len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     char b[256];
     char d[80];
+    static const char * const sfs_vpdp = "SCSI feature sets VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(sfs_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("SCSI Feature sets VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", sfs_vpdp, len);
         return;
     }
     len -= 8;
@@ -980,13 +1018,17 @@ decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op,
     char d[64];
     static const int blen = sizeof(b);
     static const int dlen = sizeof(d);
+    static const char * const dc_vpdp = "Device constituents VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(dc_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", dc_vpdp, len);
         return;
     }
     len -= 4;
@@ -1091,13 +1133,17 @@ decode_cga_profile_vpd(const uint8_t * buff, int len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     const uint8_t * bp;
     sgj_opaque_p jo2p;
+    static const char * const cp_vpdp = "CFA profile information VPD page";
 
     if (op->do_hex) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(cp_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", cp_vpdp, len);
         return;
     }
     len -= 4;
@@ -1270,13 +1316,17 @@ decode_power_consumption(const uint8_t * buff, int len, struct opts_t * op,
     static const char * pcmp = "power_consumption";
     static const char * pci = "Power consumption identifier";
     static const char * mpc = "Maximum power consumption";
+    static const char * const psm_vpdp = "Power consumption VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(psm_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", psm_vpdp, len);
         return;
     }
     len -= 4;
@@ -1348,9 +1398,17 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     static const char * matlwab = "Maximum atomic transfer length with "
                                   "atomic boundary";
     static const char * mabs = "Maximum atomic boundary size";
+    static const char * const bl_vpdp = "Block limits VPD page";
 
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(bl_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
+        return;
+    }
     if (len < 16) {
-        pr2serr("page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", bl_vpdp, len);
         return;
     }
     wsnz = !!(buff[4] & 0x1);
@@ -1547,9 +1605,18 @@ decode_block_dev_ch_vpd(const uint8_t * buff, int len, struct opts_t * op,
     static const char * mrr_h = "Medium rotation rate";
     static const char * nrm = "Non-rotating medium (e.g. solid state)";
     static const char * pt_j = "product_type";
+    static const char * const bdc_vpdp =
+                                "Block device characteristics VPD page";
 
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(bdc_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
+        return;
+    }
     if (len < 64) {
-        pr2serr("page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", bdc_vpdp, len);
         return;
     }
     u = sg_get_unaligned_be16(buff + 4);
@@ -1653,9 +1720,18 @@ decode_block_lb_prov_vpd(const uint8_t * buff, int len, struct opts_t * op,
     static const char * mp = "Minimum percentage";
     static const char * tp = "Threshold percentage";
     static const char * pgd = "Provisioning group descriptor";
+    static const char * const lbp_vpdp =
+                                "Logical block provisioning VPD page";
 
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(lbp_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
+        return 0;
+    }
     if (len < 4) {
-        pr2serr("page too short=%d\n", len);
+        pr2serr("%s too short=%d\n", lbp_vpdp, len);
         return SG_LIB_CAT_MALFORMED;
     }
     t_exp = buff[4];
@@ -1736,9 +1812,17 @@ decode_referrals_vpd(const uint8_t * buff, int len, struct opts_t * op,
     uint32_t u;
     sgj_state * jsp = &op->json_st;
     char b[64];
+    static const char * const ref_vpdp = "Referrals VPD page";
 
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(ref_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
+        return;
+    }
     if (len < 16) {
-        pr2serr("Referrals VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", ref_vpdp, len);
         return;
     }
     u = sg_get_unaligned_be32(buff + 8);
@@ -1763,9 +1847,18 @@ decode_sup_block_lens_vpd(const uint8_t * buff, int len, struct opts_t * op,
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
+    static const char * const sbl_vpdp =
+                "Supported block lengths and protection types VPD page";
 
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(sbl_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
+        return;
+    }
     if (len < 4) {
-        pr2serr("page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", sbl_vpdp, len);
         return;
     }
     len -= 4;
@@ -1815,9 +1908,18 @@ decode_block_dev_char_ext_vpd(const uint8_t * buff, int len,
     const char * uip = null_s;
     char b[128];
     static const int blen = sizeof(b);
+    static const char * const bdce_vpdp =
+                        "Block device characteristics extension VPD page";
 
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(bdce_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
+        return;
+    }
     if (len < 16) {
-        pr2serr("page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", bdce_vpdp, len);
         return;
     }
     switch (buff[5]) {
@@ -1897,14 +1999,18 @@ decode_zbdch_vpd(const uint8_t * buff, int len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     char b[128];
     static const int blen = sizeof(b);
+    static const char * const zbdc_vpdp =
+                                "Zoned Block device characteristics VPD page";
 
-    if (op->do_hex) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(zbdc_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 64) {
-        pr2serr("Zoned block device characteristics VPD page length too "
-                "short=%d\n", len);
+        pr2serr("%s length too short=%d\n", zbdc_vpdp, len);
         return;
     }
     pdt = PDT_MASK & buff[0];
@@ -1980,13 +2086,17 @@ decode_block_limits_ext_vpd(const uint8_t * buff, int len, struct opts_t * op,
 {
     uint32_t u;
     sgj_state * jsp = &op->json_st;
+    static const char * const ble_vpdp = "Block limits extension VPD page";
 
-    if (op->do_hex) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(ble_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 12) {
-        pr2serr("page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", ble_vpdp, len);
         return;
     }
     u = sg_get_unaligned_be16(buff + 6);
@@ -2070,13 +2180,17 @@ decode_format_presets_vpd(const uint8_t * buff, int len, struct opts_t * op,
     static const char * llczp = "Low LBA conventional zones percentage";
     static const char * hlczp = "High LBA conventional zones percentage";
     static const char * ztzd = "Zone type for zone domain";
+    static const char * const fp_vpdp = "Format presets VPD page";
 
-    if (op->do_hex) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(fp_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", fp_vpdp, len);
         return;
     }
     len -= 4;
@@ -2209,13 +2323,18 @@ decode_con_pos_range_vpd(const uint8_t * buff, int len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     const uint8_t * bp;
     sgj_opaque_p jo2p;
+    static const char * const cpr_vpdp =
+                        "Concurrent positioning ranges VPD page";
 
-    if (op->do_hex) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(cpr_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 64) {
-        pr2serr("VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", cpr_vpdp, len);
         return;
     }
     len -= 64;
@@ -2495,7 +2614,15 @@ decode_3party_copy_vpd(const uint8_t * buff, int len,
     sgj_opaque_p jo3p = NULL;
     char b[144];
     static const int blen = sizeof(b);
+    static const char * const tpc_vpdp = "Third party copy VPD page";
 
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(tpc_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
+        return;
+    }
     if (len < 4) {
         pr2serr("VPD page length too short=%d\n", len);
         return;
@@ -2789,13 +2916,18 @@ decode_proto_lu_vpd(const uint8_t * buff, int len, struct opts_t * op,
     sgj_opaque_p jo2p = NULL;
     char b[128];
     static const int blen = sizeof(b);
+    static const char * const pslu_vpdp =
+                                "Protocol specific logical unit VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(pslu_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", pslu_vpdp, len);
         return;
     }
     len -= 4;
@@ -2853,13 +2985,17 @@ decode_proto_port_vpd(const uint8_t * buff, int len, struct opts_t * op,
     sgj_opaque_p jo3p = NULL;
     char b[128];
     static const int blen = sizeof(b);
+    static const char * const psp_vpdp = "Protocol specific port VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 1 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(psp_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 4) {
-        pr2serr("VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", psp_vpdp, len);
         return;
     }
     len -= 4;
@@ -2926,9 +3062,13 @@ decode_lb_protection_vpd(const uint8_t * buff, int len, struct opts_t * op,
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
+    static const char * const lbp_vpdp = "Logical block protection VPD page";
 
     if ((1 == op->do_hex) || (op->do_hex > 2)) {
-        hex2stdout(buff, len, (1 == op->do_hex) ? 0 : -1);
+        if (op->do_hex > 2)
+            named_hhh_output(lbp_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
         return;
     }
     if (len < 8) {
@@ -2975,9 +3115,17 @@ decode_tapealert_supported_vpd(const uint8_t * buff, int len,
     char b[144];
     char d[64];
     static const int blen = sizeof(b);
+    static const char * const tas_vpdp = "TapeAlert supported VPD page";
 
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(tas_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, 0);
+        return;
+    }
     if (len < 12) {
-        pr2serr("VPD page length too short=%d\n", len);
+        pr2serr("%s length too short=%d\n", tas_vpdp, len);
         return;
     }
     b[0] ='\0';
@@ -3069,13 +3217,17 @@ decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
     const char * c2p;
     char b[256];
     static const int blen = sizeof(b);
+    static const char * const vs_eu_vpdp = "EMC upr VPD page";
 
-    if (len < 3) {
-        pr2serr("EMC upr VPD page [0xc0]: length too short=%d\n", len);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(vs_eu_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, no_ascii_4hex(op));
         return;
     }
-    if (op->do_hex) {
-        hex2stdout(buff, len, no_ascii_4hex(op));
+    if (len < 3) {
+        pr2serr("%s [0xc0]: length too short=%d\n", vs_eu_vpdp, len);
         return;
     }
     if (buff[9] != 0x00) {
@@ -3177,13 +3329,18 @@ decode_rdac_vpd_c2(uint8_t * buff, int len, struct opts_t * op,
     char b[256];
     static const int blen = sizeof(b);
     char part[5];
+    static const char * const vs_sv_vpdp =
+                                "Software Version supported VPD page";
 
-    if (len < 3) {
-        pr2serr("Software Version VPD page length too short=%d\n", len);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(vs_sv_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, no_ascii_4hex(op));
         return;
     }
-    if (op->do_hex) {
-        hex2stdout(buff, len, no_ascii_4hex(op));
+    if (len < 3) {
+        pr2serr("%s length too short=%d\n", vs_sv_vpdp, len);
         return;
     }
     if (buff[4] != 's' && buff[5] != 'w' && buff[6] != 'r') {
@@ -3340,13 +3497,18 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     char b[196];
     static const int blen = sizeof(b);
+    static const char * const vs_vac_vpdp =
+                                "Volume Access Control VPD page";
 
-    if (len < 3) {
-        pr2serr("Volume Access Control VPD page length too short=%d\n", len);
+    if ((1 == op->do_hex) || (op->do_hex > 2)) {
+        if (op->do_hex > 2)
+            named_hhh_output(vs_vac_vpdp, buff, len, op);
+        else
+            hex2stdout(buff, len, no_ascii_4hex(op));
         return;
     }
-    if (op->do_hex) {
-        hex2stdout(buff, len, no_ascii_4hex(op));
+    if (len < 3) {
+        pr2serr("%s length too short=%d\n", vs_vac_vpdp, len);
         return;
     }
     if (buff[4] != 'v' && buff[5] != 'a' && buff[6] != 'c') {

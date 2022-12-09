@@ -101,6 +101,9 @@ the information as a long list whose indentation indicates the level
 of nesting. This option is actually the same as \fI\-\-join\fR, see its
 description for more information.
 .br
+To output all pages without attempting a join, use \fI\-\-page=all\fR
+rather than this option.
+.br
 If used twice, adds threshold elements to output (if they are available).
 So it is the same as using \fI\-\-join\fR twice.
 .br
@@ -243,7 +246,7 @@ To dump one of more dpage responses to stdout in ASCII parsable hexadecimal
 use \fI\-HHH\fR or \fI\-HHHH\fR. The triple H form only outputs hexadecimals
 which is fine for a single dpage response. When all dpages are dumped (e.g.
 with \fI\-\-page=all\fR) then the quad H form adds the name of each dpage
-following a hash mark ('#'). The \fI\-\-data=\fR option parser ignores
+preceded by a hash mark ('#'). The \fI\-\-data=\fR option parser ignores
 everything from and including a hash mark to the end of the line. Hence the
 output of the quad H form is still parsable plus it is easier for users to
 view and possibly edit. \fI\-HHHHH\fR (that is 5) adds the page code in
@@ -701,6 +704,11 @@ named "status_descriptor" that contains the corresponding "Enclosure
 Status" dpage's Enclosure status element. As required, the corresponding
 Additional element status, Element descriptor by type element, and
 Threshold status descriptors may also appear.
+.PP
+The human readable output (which is output by default) tends to trim output
+when a line of element values are all 0. On the other hand when JSON output
+is chosen, all fields, that meet the requirements of the command line
+options, are output.
 .SH NOTES
 This utility can be used to fetch arbitrary (i.e. non SES) dpages (using
 the SCSI READ DIAGNOSTIC command). To this end the \fI\-\-page=PG\fR and

@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.60 20221202";    /* ses4r04 */
+static const char * version_str = "2.62 20221208";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -426,7 +426,7 @@ static const struct diag_page_code dpc_arr[] = {
     {0x40, "Translate Address (SBC)"},
     {0x41, "Device Status (SBC)"},
     {0x42, "Rebuild Assist (SBC)"},     /* sbc3r31 */
-    {ALL_DPC, "All SES diagnostic pages output (sg_ses)"},
+    {ALL_DPC, ">> All available SES diagnostic pages (sg_ses)"},
     {-1, NULL},
 };
 
@@ -1200,7 +1200,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         int option_index = 0;
 
         c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fG:hHiI:jJ::ln:N:m:Mp:q"
-                        "rRsS:vVwx:z", long_options, &option_index);
+                        "rRsS:vVwx:X:z", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1997,8 +1997,7 @@ do_rec_diag(struct sg_pt_base * ptvp, int page_code, uint8_t * rsp_buff,
         if (found)
             memcpy(rsp_buff, bp + off, d_len);
         else {
-            if (vb)
-                pr2serr("%s: %s not found in user data\n", __func__, cp);
+            pr2serr("%s: %s not found in user data\n", __func__, cp);
             return SG_LIB_CAT_OTHER;
         }
 

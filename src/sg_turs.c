@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.51 20220425";
+static const char * version_str = "3.52 20221208";
 
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
@@ -330,7 +330,7 @@ parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     return res;
 }
 
-#ifdef SG_LIB_MINGW
+#if defined(SG_LIB_MINGW)
 
 #include <windows.h>
 
@@ -341,7 +341,8 @@ wait_millisecs(int millisecs)
     Sleep(millisecs);
 }
 
-#else
+
+#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
 
 static void
 wait_millisecs(int millisecs)
@@ -354,6 +355,20 @@ wait_millisecs(int millisecs)
                 wait_period = rem;
 }
 
+#else
+
+static void
+wait_millisecs(int millisecs)
+{
+    int res;
+    struct timeval wait_period;
+
+    wait_period.tv_sec = millisecs / 1000;
+    wait_period.tv_usec = (millisecs % 1000) * 1000;
+    res = select(0, NULL, NULL, NULL, &wait_period);
+    if (res < 0)
+        pr2serr("%s: unexpected select() errno=%d\n", __func__, errno);
+}
 #endif
 
 /* Returns true if prints estimate of duration to ready */
