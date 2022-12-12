@@ -43,12 +43,13 @@ Alternatively it may be attached to another type of SCSI device (e.g. a
 disk) in which case the EncServ bit is set in its INQUIRY response.
 .PP
 If the \fIDEVICE\fR argument is given with no options then the names of all
-diagnostic pages (dpages) supported are listed. Most, but not necessarily
-all, of the named dpages are defined in the SES standards and drafts. The
-most recent reference for this utility is the draft SCSI Enclosure Services
-4 document T10/BSR INCITS 555 Revision 5 at https://www.t10.org . Existing
-standards for SES, SES\-2 and SES\-3 are ANSI INCITS 305\-1998 and ANSI
-INCITS 448\-2008 and ANSI INCITS 518\-2017 respectively.
+SES diagnostic pages (dpages) supported are listed. Most, but not
+necessarily all, of the named dpages are defined in the SES standards and
+drafts. The most recent reference for this utility is the draft SCSI
+Enclosure Services 4 document T10/BSR INCITS 555 Revision 5 at
+https://www.t10.org . Existing standards for SES, SES\-2 and SES\-3 are ANSI
+INCITS 305\-1998 and ANSI INCITS 448\-2008 and ANSI INCITS 518\-2017
+respectively.
 .PP
 SAS expanders typically have a SES device attached via a virtual port.
 Some HBAs (SCSI initiators) choose to expose a SES device internally. That
@@ -57,27 +58,27 @@ devices connected to that HBA (e.g. a SAS expander) cannot see the HBA's
 SES device. That internal SES device might report on the temperature(s)
 of the HBA and whether anything is connected to its SCSI ports.
 .PP
-The first form shown in the synopsis is for fetching and decoding dpages or
+The first form shown in the SYNOPSIS is for fetching and decoding dpages or
 fields from the SES \fIDEVICE\fR. A SCSI RECEIVE DIAGNOSTIC RESULTS command
 is sent to the \fIDEVICE\fR to obtain each dpage response.  Rather than
-decoding a fetched dpage, it may be output in hex or binary with the
-\fI\-\-hex\fR or \fI\-\-raw \-\-raw\fR options.
+decoding a fetched dpage, its contents may be output in hex or binary with
+the \fI\-\-hex\fR or \fI\-\-raw \-\-raw\fR options.
 .PP
-The second form in the synopsis is for modifying dpages or fields held in
+The second form in the SYNOPSIS is for modifying dpages or fields held in
 the SES \fIDEVICE\fR. A SCSI SEND DIAGNOSTIC command containing a "control"
 dpage is sent to the \fIDEVICE\fR to cause changes. Changing the state of an
 enclosure (e.g. requesting the "ident" (locate) LED to flash on a disk
 carrier in an array) is typically done using a read\-modify\-write cycle.
 See the section on CHANGING STATE below.
 .PP
-The third form in the synopsis has two equivalent invocations shown. They
+The third form in the SYNOPSIS has two equivalent invocations shown. They
 decode the contents of a file (named \fIFN\fR) that holds a hexadecimal or
 binary representation of one, or many, SES dpage responses. Typically an
 earlier invocation of the first form of this utility with the '\-HHHH'
 option would have generated that file. Since no SCSI commands are sent, the
-\fIDEVICE\fR argument if given will be ignored.
+\fIDEVICE\fR argument, if given, will be ignored.
 .PP
-The last form in the synopsis shows the options for providing command line
+The last form in the SYNOPSIS shows the options for providing command line
 help (i.e. usage information), listing out dpage and field information tables
 held by the utility (\fI\-\-enumerate\fR), or printing the version string
 of this utility.
@@ -92,29 +93,34 @@ a SCSI SEND DIAGNOSTIC command, or fetched from data supplied by the
 \fI\-\-data=\fR or the \fI\-\-inhex=FN\fR option.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
-The options are arranged in alphabetical order based on the long
-option name.
+The options are arranged in alphabetical order based on the long option name.
 .TP
 \fB\-a\fR, \fB\-\-all\fR
-shows (almost) all status dpages, following references and presenting
-the information as a long list whose indentation indicates the level
-of nesting. This option is actually the same as \fI\-\-join\fR, see its
-description for more information.
+shows the output of the \fI\-\-join\fR option followed by the other SES
+dpages. Since a single \fI\-\-join\fR option does not include the Threshold
+In dpage, it is listed separately in the "other SES dpages" section. In
+this context, "other" means all SES dpages that have not (explicitly) been
+output by the \fI\-\-join\fR option.
 .br
-To output all pages without attempting a join, use \fI\-\-page=all\fR
-rather than this option.
+To output all pages without attempting a join, use the \fI\-\-page=all\fR
+option rather than this option.
 .br
-If used twice, adds threshold elements to output (if they are available).
-So it is the same as using \fI\-\-join\fR twice.
+If this option is used twice, includes Threshold In dpage (if available) in
+the \fI\-\-join\fR option output. Note that now the Threshold In dpage is not
+listed separately in the "other SES dpages" section. Using this option twice
+is equivalent to invoking the \fI\-\-ALL\fR option.
 .br
 This option implies the \fI\-\-status\fR option as long as the
 \fI\-\-control\fR option has not been given.
 .TP
 \fB\-z\fR, \fB\-\-ALL\fR
-shows (almost) all status dpages, following references and presenting
-the information as a long list whose indentation indicates the level
-of nesting. Also shows the threshold elements if they are available.
-This option is the same as using  \fI\-\-join\fR twice.
+shows the output of the \fI\-\-join\fR option invoked twice, followed by the
+other SES dpages. Since two \fI\-\-join\fR options does include the Threshold
+In dpage, that dpage is not listed separately in the "other SES dpages"
+section.
+.br
+This option implies the \fI\-\-status\fR option as long as the
+\fI\-\-control\fR option has not been given.
 .TP
 \fB\-b\fR, \fB\-\-byte1\fR=\fIB1\fR
 some modifiable dpages may need byte 1 (i.e. the second byte) set. In the
@@ -307,7 +313,7 @@ option with this option is an error.
 .TP
 \fB\-J\fR, \fB\-\-json[\fR=\fIJO\fR]
 output is in JSON format instead of human readable form. For general
-information about JSON usage in this package ee the sg3_utils_json manpage
+information about JSON usage in this package see the sg3_utils_json manpage
 or use '?' for \fIJO\fR in order to have a summary printed to stderr.
 For more specific information about JSON output with this utility, see the
 JSON INFORMATION section below.
@@ -354,9 +360,9 @@ dpage 'sdp' which is page_code 0 (i.e. "Supported Diagnostic Pages") if
 no other options are given.
 .br
 Page code 0xff or abbreviation "all" is not a real dpage (as the highest
-real dpage is 0x3f) but instead causes all dpages whose page code is 0x2f
-or less to be output. This can be used with either the \fI\-HHHH\fR or
-\fI\-rr\fR to send either hexadecimal ASCII or binary respectively to
+real dpage is 0x3f) but instead causes all SES dpages whose page code is
+0x2f or less to be output. This can be used with either the \fI\-HHHH\fR
+or \fI\-rr\fR to send either hexadecimal ASCII or binary respectively to
 stdout.
 .br
 To list the available dpage abbreviations give "xxx" for \fIPG\fR; the same
@@ -372,12 +378,15 @@ later invocation using the \fI\-\-data=\fR option. A dpage less its first
 4 bytes (page code and length) is output. When used twice (e.g. \fI\-rr\fR)
 the full dpage contents is output in binary to stdout.
 .br
-when \fI\-rr\fR is used together with the \fI\-\-data=\-\fR or
-\fI\-\-data=@FN\fR then stdin or file FN is decoded as a binary stream that
-continues to be read until an end of file (EOF). Once that data is read then
-the internal raw option is cleared to 0 so the output is not effected. So
-the \fI\-rr\fR option either changes how the input or output is treated,
-but not both.
+Note that the use of a single \fI\-\-raw\fR option is different from most
+other utilities in the sg3_utils package.
+.br
+When \fI\-rr\fR is used together with the \fI\-\-data=\-\fR,
+\fI\-\-data=@FN\fR, or \fI\-\-inhex=FN\fR then stdin or file FN is decoded as
+a binary stream that continues to be read until an end of file (EOF). Once
+that data is read then the internal raw option is cleared to 0 so the output
+is not effected. So the \fI\-rr\fR option either changes how the input or
+output is treated, but not both in a single invocation.
 .TP
 \fB\-R\fR, \fB\-\-readonly\fR
 open the \fIDEVICE\fR read\-only (e.g. in Unix with the O_RDONLY flag).
@@ -684,7 +693,7 @@ option is given twice, then each descriptor will be output in hex.
 .PP
 When the \fI\-\-json[=JO]\fR and \fI\-\-page=PG\fR options are used in the
 same invocation, then the top level object name is the name of \fIPG\fR in
-snake notation. This includes the "_diagnostic_name" suffix.
+snake notation. This includes the "_diagnostic_page" suffix.
 .PP
 When the \fI\-\-json[=JO]\fR and \fI\-\-join\fR options are used in the same
 invocation (and the \fI\-\-page=PG\fR option is _not_ given), then the top

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20221208] [svn: r986]
+Changelog for pre-release sg3_utils-1.48 [20221211] [svn: r987]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -41,6 +41,7 @@ Changelog for pre-release sg3_utils-1.48 [20221208] [svn: r986]
     - add --statistics option
   - sg_get_elem_status: change '--maxlen=' option default to
     1056 (header plus 32 physical element status descriptors)
+  - sg_get_lba_status: decode new LBA accessibility field
   - sg_decode_sense: add --nodecode option
   - sg_logs: tweak the meaning of --list option to more closely
     reflect the contents of log pages 0x0 and 0x0,0xff
@@ -70,6 +71,8 @@ Changelog for pre-release sg3_utils-1.48 [20221208] [svn: r986]
   - sg_ses: add exp_sas_addr acronym for getting expander's
     SAS address
     - add json support
+    - extend --all so after join output, the remaining dpages,
+      not already shown in the join output, are output
   - sg_turs: change nanosleep() to Sleep() in MinGW
     - see sg_lib below for two new exit status values
   - sg_stream_ctl: fix --get indexing

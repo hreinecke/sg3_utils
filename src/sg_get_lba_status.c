@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.31 20220807";      /* sbc5r03 */
+static const char * version_str = "1.32 20221211";      /* sbc5r03++ */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -153,7 +153,8 @@ dStrRaw(const char * str, int len)
  */
 static int
 decode_lba_status_desc(const uint8_t * bp, uint64_t * slbap,
-                       uint32_t * blocksp, uint8_t * add_statusp)
+                       uint32_t * blocksp, uint8_t * lba_accessp,
+                       uint8_t * add_statusp)
 {
     uint32_t blocks;
     uint64_t ull;
@@ -166,9 +167,11 @@ decode_lba_status_desc(const uint8_t * bp, uint64_t * slbap,
         *slbap = ull;
     if (blocksp)
         *blocksp = blocks;
+    if (lba_accessp)    /* See t10.org document: 22-108r1 */
+        *lba_accessp = (bp[12] >> 4) & 0x7;
     if (add_statusp)
         *add_statusp = bp[13];
-    return bp[12] & 0xf;
+    return bp[12] & 0xf;        /* Provisioning status */
 }
 
 static char *
@@ -214,6 +217,29 @@ get_pr_status_str(int as, char * b, int blen)
     return b;
 }
 
+static char *
+get_lba_access_str(int la, char * b, int blen, bool short_form)
+{
+    switch (la) {
+    case 0:
+        sg_scnpr(b, blen, "LBA access%s not reported",
+                 short_form ? "" : "ibility is");
+        break;
+    case 1:
+        sg_scnpr(b, blen, "LBA extent %s", short_form ? "inaccessible" :
+                 "is not able to be written and not able to be read");
+        break;
+    case 2:
+        sg_scnpr(b, blen, "LBA extent %sread-only", short_form ? "" : "is ");
+        break;
+    default:
+        sg_scnpr(b, blen, "%sReserved [0x%x]", short_form ? "LBA access " :
+                 "", la);       /* yes, short form is longer ! */
+        break;
+    }
+    return b;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -225,7 +251,7 @@ main(int argc, char * argv[])
     bool o_readonly = false;
     bool verbose_given = false;
     bool version_given = false;
-    int k, j, res, c, n, rlen, num_descs, completion_cond, in_len;
+    int k, res, c, n, rlen, num_descs, completion_cond, in_len;
     int sg_fd = -1;
     int blockhex = 0;
     int do_brief = 0;
@@ -235,6 +261,7 @@ main(int argc, char * argv[])
     int rt = 0;
     int verbose = 0;
     uint8_t add_status = 0;     /* keep gcc quiet */
+    uint8_t lba_access = 0;     /* keep gcc quiet */
     uint64_t d_lba = 0;
     uint32_t d_blocks = 0;
     uint32_t element_id = 0;
@@ -251,11 +278,13 @@ main(int argc, char * argv[])
     sgj_opaque_p jap = NULL;
     sgj_state json_st SG_C_CPP_ZERO_INIT;
     sgj_state * jsp = &json_st;
-    char b[144];
+    char b[196];
     static const size_t blen = sizeof(b);
-    static const char * prov_stat_s = "Provisoning status";
-    static const char * add_stat_s = "Additional status";
+    static const char * prov_stat_sn = "provisoning_status";
+    static const char * add_stat_sn = "additional_status";
+    static const char * lba_access_sn = "lba_accessibility";
     static const char * compl_cond_s = "Completion condition";
+    static const char * compl_cond_sn = "completion_condition";
 
     while (1) {
         int option_index = 0;
@@ -530,7 +559,7 @@ start_response:
             goto fini;
         }
         res = decode_lba_status_desc(glbasBuffp + 8, &d_lba, &d_blocks,
-                                     &add_status);
+                                     &lba_access, &add_status);
         if ((res < 0) || (res > 15)) {
             pr2serr("first LBA status descriptor returned %d ??\n", res);
             ret = SG_LIB_LOGIC_ERROR;
@@ -538,20 +567,19 @@ start_response:
         }
         if ((lba < d_lba) || (lba >= (d_lba + d_blocks))) {
             pr2serr("given LBA not in range of first descriptor:\n"
-                    "  descriptor LBA: 0x");
-            for (j = 0; j < 8; ++j)
-                pr2serr("%02x", glbasBuffp[8 + j]);
-            pr2serr("  blocks: 0x%x  p_status: %d  add_status: 0x%x\n",
-                    (unsigned int)d_blocks, res,
-                    (unsigned int)add_status);
+                    "  descriptor LBA: 0x%" PRIx64, d_lba);
+            pr2serr("  blocks: 0x%x  lba_access: %d  p_status: %d  "
+                    "add_status: 0x%x\n", (unsigned int)d_blocks, lba_access,
+                    res, (unsigned int)add_status);
             ret = SG_LIB_CAT_OTHER;
             goto fini;
         }
-        sgj_pr_hr(jsp,"p_status: %d  add_status: 0x%x\n", res,
-                  (unsigned int)add_status);
+        sgj_pr_hr(jsp,"lba_access: %d, p_status: %d  add_status: 0x%x\n",
+                  lba_access, res, (unsigned int)add_status);
         if (jsp->pr_as_json) {
-            sgj_js_nv_i(jsp, jop, prov_stat_s, res);
-            sgj_js_nv_i(jsp, jop, add_stat_s, add_status);
+            sgj_js_nv_i(jsp, jop, lba_access_sn, lba_access);
+            sgj_js_nv_i(jsp, jop, prov_stat_sn, res);
+            sgj_js_nv_i(jsp, jop, add_stat_sn, add_status);
         }
         goto fini;
     }
@@ -587,7 +615,7 @@ start_response:
             break;
         }
         sgj_pr_hr(jsp, "%s\n", b);
-        sgj_js_nv_istr(jsp, jop, compl_cond_s, completion_cond,
+        sgj_js_nv_istr(jsp, jop, compl_cond_sn, completion_cond,
                        NULL /* "meaning" */, b);
     }
     sgj_haj_vi(jsp, jop, 0, "RTP", SGJ_SEP_EQUAL_NO_SPACE,
@@ -598,17 +626,16 @@ start_response:
         jap = sgj_named_subarray_r(jsp, jop, "lba_status_descriptor");
 
     for (bp = glbasBuffp + 8, k = 0; k < num_descs; bp += 16, ++k) {
-        res = decode_lba_status_desc(bp, &d_lba, &d_blocks, &add_status);
+        res = decode_lba_status_desc(bp, &d_lba, &d_blocks, &lba_access,
+                                     &add_status);
         if ((res < 0) || (res > 15))
             pr2serr("descriptor %d: bad LBA status descriptor returned "
                     "%d\n", k + 1, res);
         if (jsp->pr_as_json)
             jo2p = sgj_new_unattached_object_r(jsp);
-        if (do_brief) {
+        if (do_brief) { /* no LBA accessibility field */
             n = 0;
-            n += sg_scnpr(b + n, blen - n, "0x");
-            for (j = 0; j < 8; ++j)
-                n += sg_scnpr(b + n, blen - n, "%02x", bp[j]);
+            n += sg_scnpr(b + n, blen - n, "0x%" PRIx64, d_lba);
             if ((0 == blockhex) || (1 == (blockhex % 2)))
                 n += sg_scnpr(b + n, blen - n, "  0x%x  %d  %d",
                               (unsigned int)d_blocks, res, add_status);
@@ -618,31 +645,33 @@ start_response:
             sgj_pr_hr(jsp, "%s\n", b);
             sgj_js_nv_ihex(jsp, jo2p, "lba", d_lba);
             sgj_js_nv_ihex(jsp, jo2p, "blocks", d_blocks);
-            sgj_js_nv_i(jsp, jo2p, prov_stat_s, res);
-            sgj_js_nv_i(jsp, jo2p, add_stat_s, add_status);
+            sgj_js_nv_i(jsp, jo2p, prov_stat_sn, res);
+            sgj_js_nv_i(jsp, jo2p, add_stat_sn, add_status);
         } else {
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihex(jsp, jo2p, "lba", d_lba);
                 sgj_js_nv_ihex(jsp, jo2p, "blocks", d_blocks);
-                sgj_js_nv_istr(jsp, jo2p, prov_stat_s, res, NULL,
+                sgj_js_nv_istr(jsp, jo2p, lba_access_sn, lba_access, NULL,
+                       get_lba_access_str(lba_access, b, blen, false));
+                sgj_js_nv_istr(jsp, jo2p, prov_stat_sn, res, NULL,
                                get_prov_status_str(res, b, blen));
-                sgj_js_nv_istr(jsp, jo2p, add_stat_s, add_status, NULL,
+                sgj_js_nv_istr(jsp, jo2p, add_stat_sn, add_status, NULL,
                                get_pr_status_str(add_status, b, blen));
             } else {
                 char d[64];
 
-                n = 0;
-                n += sg_scnpr(b + n, blen - n, "[%d] LBA: 0x", k + 1);
-                for (j = 0; j < 8; ++j)
-                    n += sg_scnpr(b + n, blen - n, "%02x", bp[j]);
+                n = sg_scnpr(b, blen, "[%d] LBA: 0x%" PRIx64, k + 1, d_lba);
+                if (n < 24)     /* add some padding spaces */
+                    n += sg_scnpr(b + n, blen - n,  "%*c", 24 - n, ' ');
                 if (1 == (blockhex % 2)) {
 
                     snprintf(d, sizeof(d), "0x%x", d_blocks);
-                    n += sg_scnpr(b + n, blen - n, "  blocks: %10s", d);
+                    n += sg_scnpr(b + n, blen - n, " blocks: %10s", d);
                 } else
-                    n += sg_scnpr(b + n, blen - n, "  blocks: %10u",
-                                  (unsigned int)d_blocks);
+                    n += sg_scnpr(b + n, blen - n, " blocks: %10u", d_blocks);
                 get_prov_status_str(res, d, sizeof(d));
+                n += sg_scnpr(b + n, blen - n, "  %s;", d);
+                get_lba_access_str(lba_access, d, sizeof(d), true);
                 n += sg_scnpr(b + n, blen - n, "  %s", d);
                 get_pr_status_str(add_status, d, sizeof(d));
                 if (strlen(d) > 0)

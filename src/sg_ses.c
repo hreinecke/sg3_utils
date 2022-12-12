@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.63 20221208";    /* ses4r04 */
+static const char * version_str = "2.64 20221211";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -380,6 +380,7 @@ static const char * const gc_s = "generation code";
 static const char * const et_sn = "element_type";
 static const char * const pc_sn = "page_code";
 static const char * const dp_s = "diagnostic page";
+static const char * const dp_sn = "diagnostic_page";
 static const char * const si_s = "subenclosure identifier";
 static const char * const si_sn = "subenclosure_identifier";
 static const char * const es_s = "enclosure status";
@@ -391,13 +392,9 @@ static const char * const rsv_s = "reserved";
 static const char * const od_s = "Overall descriptor";
 static const char * const od_sn = "overall_descriptor";
 static const char * const rts_s = "response too short";
-static const char * const hct = "High critical threshold";
 static const char * const hct_sn = "high_critical_threshold";
-static const char * const hwt = "High warning threshold";
 static const char * const hwt_sn = "high_warning_threshold";
-static const char * const lwt = "Low warning threshold";
 static const char * const lwt_sn = "low_warning_threshold";
-static const char * const lct = "Low critical threshold";
 static const char * const lct_sn = "low_critical_threshold";
 static const char * const sdl_s = "Status descriptor list";
 static const char * const sdl_sn = "status_descriptor_list";
@@ -915,8 +912,7 @@ usage(int help_num)
         }
         pr2serr(
             "  where the main options are:\n"
-            "    --all|-a            show (almost) all status pages (same "
-            "as --join)\n"
+            "    --all|-a            --join followed by other SES dpages\n"
             "    --clear=STR|-C STR    clear field by acronym or position\n"
             "    --control|-c        send control information (def: fetch "
             "status)\n"
@@ -972,7 +968,8 @@ usage(int help_num)
     } else {    /* for '-hh' or '--help --help' */
         pr2serr(
             "  where the remaining sg_ses options are:\n"
-            "    --ALL|-z            same as --all twice (adds thresholds)\n"
+            "    --ALL|-z            same as --join twice plus other "
+            "SES dpages\n"
             "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
             "to B1\n"
             "    --data=H,H...|-d H,H...    string of ASCII hex bytes to "
@@ -1437,6 +1434,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'z':       /* --ALL and -z are synonyms for '--join --join' */
             /* -A already used for --sas-addr=SA shortened form */
             op->do_join += 2;
+            op->do_all = true;
             break;
         default:
             pr2serr("unrecognised option code 0x%x ??\n", c);
@@ -1484,10 +1482,11 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         }
         if ((! op->do_status) && (! op->do_control)) {
             if ((op->do_join > 0) || op->partial_join ||
-                (op->inner_hex > 0)) {
+                (op->inner_hex > 0) ||
+                ((op->page_code_given && (ALL_DPC == op->page_code)))) {
                 if (op->verbose > 1)
-                    pr2serr("Since --join, --all or --inner_hex given; "
-                            "assume --status\n");
+                    pr2serr("Since --join, --all, --page=all or --inner_hex "
+                            "given; assume --status\n");
                 op->dev_name = NULL;    /* quash device name */
                 op->do_status = true;  /* default to receiving status pages */
             }
@@ -1595,9 +1594,11 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     } else if (! op->do_status) {
         if (op->do_data) {
             if ((op->do_join > 0) || op->partial_join ||
-                (op->inner_hex > 0)) {
+                (op->inner_hex > 0) ||
+                ((op->page_code_given && (ALL_DPC == op->page_code)))) {
                 if (op->verbose > 1)
-                    pr2serr("Since --join or --all given; assume --status\n");
+                    pr2serr("Since --join, --all, --page=all, or "
+                            "--inner_hex given, assume --status\n");
                 op->dev_name = NULL;    /* quash device name */
             } else {
                 pr2serr("when user data given, require '--control' or "
@@ -1725,6 +1726,21 @@ parse_cgs_str(char * buff, struct tuple_acronym_val * tavp)
     return 0;
 }
 
+static bool
+dpage_in_join(int dpage_code, const struct opts_t * op)
+{
+    switch (dpage_code) {
+    case ENC_STATUS_DPC:
+    case ELEM_DESC_DPC:
+    case ADD_ELEM_STATUS_DPC:
+        return true;
+    case THRESHOLD_DPC:
+        return (op->do_join > 1);
+    default:
+        return false;
+    }
+}
+
 /* Fetch diagnostic page name (control or out). Returns NULL if not found. */
 static const char *
 find_out_diag_page_desc(int page_num)
@@ -1803,6 +1819,26 @@ find_diag_page_desc(int page_num)
     }
     return NULL;
 }
+
+/* Always returns valid string */
+static const char *
+find_dpage_cat_str(int page_code)
+{
+    if (page_code < 0x10)
+        return "unknown";
+    else if ((page_code >= 0x10) && (page_code <= 0x1f))
+        return vs_s;
+    else if (page_code <= 0x3f)
+        return rsv_s;
+    else if (0x3f == page_code)
+        return "SCSI transport";
+    else if (page_code >= 0x80)
+        return vs_s;
+    else
+        return rsv_s;
+}
+
+
 
 /* Fetch diagnostic page name (status or in). Returns NULL if not found. */
 static const char *
@@ -1998,7 +2034,7 @@ do_rec_diag(struct sg_pt_base * ptvp, int page_code, uint8_t * rsp_buff,
             memcpy(rsp_buff, bp + off, d_len);
         else {
             pr2serr("%s: %s not found in user data\n", __func__, cp);
-            return SG_LIB_CAT_OTHER;
+            return SG_LIB_OK_FALSE;     /* flag dpage not found */
         }
 
         cp = find_in_diag_page_desc(page_code);
@@ -2697,8 +2733,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
     }
     if (! abridged) {
         int status = s0 & 0xf;
-        const char * ccp = elem_status_code_desc[status];
 
+        ccp = elem_status_code_desc[status];
         n += sg_scnpr(a + n, alen - n, "%sPredicted failure=%d, Disabled=%d, "
                       "Swap=%d, status: %s\n", pad, !!(s0 & 0x40),
                       !!(s0 & 0x20), !!(s0 & 0x10), ccp);
@@ -3611,8 +3647,7 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     if (jsp->pr_as_json) {
         jap = sgj_named_subarray_r(jsp, jop, sdl_sn);
         if ((! op->partial_join) && (op->inner_hex > 0)) {
-            int n = (resp_len - 8) / 4;
-
+            n = (resp_len - 8) / 4;
             if (op->verbose > 2)
                 pr2serr("%s: decoded _without_ using type descriptor header "
                         "info\n", __func__);
@@ -3918,14 +3953,10 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     sgj_js_nv_hex_bytes(jsp, jo2p, "threshold_status_element",
                                         bp, 4);
                 else {
-                    sgj_convert_to_snake_name(hct, b, blen);
-                    sgj_js_nv_ihex(jsp, jo2p, b, bp[0]);
-                    sgj_convert_to_snake_name(hwt, b, blen);
-                    sgj_js_nv_ihex(jsp, jo2p, b, bp[1]);
-                    sgj_convert_to_snake_name(lwt, b, blen);
-                    sgj_js_nv_ihex(jsp, jo2p, b, bp[2]);
-                    sgj_convert_to_snake_name(lct, b, blen);
-                    sgj_js_nv_ihex(jsp, jo2p, b, bp[3]);
+                    sgj_js_nv_ihex(jsp, jo2p, hct_sn, bp[0]);
+                    sgj_js_nv_ihex(jsp, jo2p, hwt_sn, bp[1]);
+                    sgj_js_nv_ihex(jsp, jo2p, lwt_sn, bp[2]);
+                    sgj_js_nv_ihex(jsp, jo2p, lct_sn, bp[3]);
                 }
                 sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             }
@@ -4362,6 +4393,12 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                    (SCSI_IPORT_ETC == etype) ||
                    (ENC_SCELECTR_ETC == etype)) {
             sgj_pr_hr(jsp, "%snumber of phys: %d\n", pad, phys);
+            if (jsp->pr_as_json) {
+                sgj_js_nv_ihex(jsp, jop,
+                               "number_of_phy_descriptors", phys);
+                jap = sgj_named_subarray_r(jsp, jop,
+                                           "phy_descriptor_list");
+            }
             aep = ae_bp + 6 + eip_offset;
             for (j = 0; j < phys; ++j, aep += 12) {
                 cei = aep[2];   /* connector element index */
@@ -4647,6 +4684,8 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     char b[128];
     static const int blen = sizeof(b);
     static const char * aes_dp = "Additional element status diagnostic page";
+    static const char * aesbetl =
+                 "Additional element status by element type list";
     static const char * aesdl = "Additional element status descriptor list";
     static const char * psi_sn = "protocol_specific_information";
 
@@ -4666,17 +4705,17 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         pr2serr("  <<%s>>\n", soec);
         return;
     }
-    sgj_pr_hr(jsp, "  %s:\n", aesdl);
     bp = resp + 8;
     if (jsp->pr_as_json) {
-        jap = sgj_named_subarray_r(jsp, jop,
-                                   sgj_convert_to_snake_name(aesdl, b, blen));
         if ((! op->partial_join) && (op->inner_hex > 0)) {
             int n;
 
+            sgj_pr_hr(jsp, "  %s:\n", aesdl);
             if (op->verbose > 2)
                 pr2serr("%s: decoded _without_ using type descriptor header "
                         "info\n", __func__);
+            jap = sgj_named_subarray_r(jsp, jop,
+                                   sgj_convert_to_snake_name(aesdl, b, blen));
             for ( ; bp < last_bp; bp += n) {
                 n = bp[1] + 2;
                 jo2p = sgj_new_unattached_object_r(jsp);
@@ -4703,6 +4742,10 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             }
             return;
+        } else {
+            sgj_pr_hr(jsp, "  %s:\n", aesbetl);
+            jap = sgj_named_subarray_r(jsp, jop,
+                                sgj_convert_to_snake_name(aesbetl, b, blen));
         }
     }
     my_eiioe_force = op->eiioe_force;
@@ -4773,6 +4816,8 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                               etype_str(etype, b, blen));
             sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
                               (0 == tp->se_id) ? "primary" : NULL);
+            ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                sgj_convert_to_snake_name(aesdl, b, blen));
         }
         el_num = 0;
 
@@ -4792,8 +4837,6 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     continue;
             }
             if (jsp->pr_as_json) {
-                ja2p = sgj_named_subarray_r(jsp, jo2p,
-                                            "same_element_type_list");
                 jo3p = sgj_new_unattached_object_r(jsp);
                 jo4p = sgj_named_subobject_r(jsp, jo3p, aesd_sn);
                 sgj_js_nv_ihex(jsp, jo4p, "invalid", invalid);
@@ -4815,7 +4858,7 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                           "information)\n");
             else
                 additional_elem_helper("        ", bp, desc_len, etype,
-                                       tesp, op, jo2p);
+                                       tesp, op, jo4p);
             if (jsp->pr_as_json)
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
         }
@@ -4841,6 +4884,8 @@ subenc_help_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     sgj_opaque_p jap = NULL;
+    char b[80];
+    static const int blen = sizeof(b);
     static const char * sht_dp = "Subenclosure help text diagnostic page";
 
     sgj_pr_hr(jsp, "%s:\n", sht_dp);
@@ -4848,14 +4893,18 @@ subenc_help_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_bp = resp + resp_len - 1;
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                            sgj_convert_to_snake_name(sht_dp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, sht_dp);
+    }
     sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
                false);
     gen_code = sg_get_unaligned_be32(resp + 4);
     sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
-    if (jsp->pr_as_json) {
-        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, sht_dp);
+    if (jsp->pr_as_json)
         jap = sgj_named_subarray_r(jsp, jop, "subenclosure_help_text_list");
-    }
     bp = resp + 8;
 
     for (k = 0; k < num_subs; ++k, bp += el) {
@@ -4897,22 +4946,26 @@ subenc_string_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     sgj_opaque_p jap = NULL;
     char b[512];
     static const int blen = sizeof(b);
-    static const char * ssi_dp = "Subenclosure string in diagnostic page";
+    static const char * ssi_dp = "Subenclosure String In diagnostic page";
 
     sgj_pr_hr(jsp, "%s:\n", ssi_dp);
     if (resp_len < 4)
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_bp = resp + resp_len - 1;
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                            sgj_convert_to_snake_name(ssi_dp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, ssi_dp);
+    }
     sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
                false);
     gen_code = sg_get_unaligned_be32(resp + 4);
     sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
-    if (jsp->pr_as_json) {
-        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, ssi_dp);
+    if (jsp->pr_as_json)
         jap = sgj_named_subarray_r(jsp, jop,
                                    "subenclosure_string_in_data_list");
-    }
     bp = resp + 8;
 
     for (k = 0; k < num_subs; ++k, bp += el) {
@@ -4964,15 +5017,19 @@ subenc_nickname_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_bp = resp + resp_len - 1;
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                                sgj_convert_to_snake_name(sns_dp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, sns_dp);
+    }
     sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
                false);
     gen_code = sg_get_unaligned_be32(resp + 4);
     sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
-    if (jsp->pr_as_json) {
-        sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, sns_dp);
+    if (jsp->pr_as_json)
         jap = sgj_named_subarray_r(jsp, jop,
                         "subenclosure_nickname_status_descriptor_list");
-    }
     bp = resp + 8;
     el = 40;
     for (k = 0; k < num_subs; ++k, bp += el) {
@@ -5012,6 +5069,7 @@ supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
 {
     bool got1;
     int k, n, code, prev;
+    const char * ccp;
     const struct diag_page_abbrev * ap;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
@@ -5022,27 +5080,25 @@ supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
                 "Supported SES diagnostic pages diagnostic page";
     static const char * sdp = "Supported diagnostic pages diagnostic page";
 
-    sgj_pr_hr(jsp, "%s:\n", is_ssp ? ssp : sdp);
+    ccp = is_ssp ? ssp : sdp;
+    sgj_pr_hr(jsp, "%s:\n", ccp);
     if (jsp->pr_as_json) {
-        if (is_ssp)
-            sgj_js_nv_ihexstr(jsp, jop, pc_sn, 0xd, NULL, ssp);
-        else
-            sgj_js_nv_ihexstr(jsp, jop, pc_sn, 0x0, NULL, sdp);
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                                    sgj_convert_to_snake_name(ccp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, (is_ssp ? 0xd : 0x0), NULL, ccp);
         jap = sgj_named_subarray_r(jsp, jop, "supported_page_list");
-
     }
     for (k = 0, prev = 0; k < (resp_len - 4); ++k, prev = code) {
-        const char * cp;
-
         code = resp[k + 4];
         if (code < prev)
             break;      /* assume to be padding at end */
         if (jsp->pr_as_json)
             jo2p = sgj_new_unattached_object_r(jsp);
 
-        cp = find_diag_page_desc(code);
-        if (cp) {
-            n = sg_scnpr(b, blen, "  %s [", cp);
+        ccp = find_diag_page_desc(code);
+        if (ccp) {
+            n = sg_scnpr(b, blen, "  %s [", ccp);
             for (ap = dp_abbrev, got1 = false; ap->abbrev; ++ap) {
                 if (ap->page_code == code) {
                     n += sg_scnpr(b + n, blen - n, "%s%s", (got1 ? "," : ""),
@@ -5051,10 +5107,12 @@ supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
                 }
             }
             sgj_pr_hr(jsp, "%s] [0x%x]\n", b, code);
-        } else
-            sgj_pr_hr(jsp, "  <unknown> [0x%x]\n", code);
+        } else {
+            ccp = find_dpage_cat_str(code);
+            sgj_pr_hr(jsp, "  <%s> [0x%x]\n", ccp, code);
+        }
         if (jsp->pr_as_json) {
-            sgj_js_nv_ihexstr(jsp, jo2p, pc_sn, code, NULL, cp);
+            sgj_js_nv_ihexstr(jsp, jo2p, pc_sn, code, NULL, ccp);
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
     }
@@ -5116,16 +5174,21 @@ download_code_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
         goto truncated;
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     last_bp = resp + resp_len - 1;
+    if (jsp->pr_as_json) {
+        /* re-use (overwrite) passed jop argument */
+        jop = sgj_named_subobject_r(jsp, jop,
+                                 sgj_convert_to_snake_name(dm_dp, b, blen));
+        sgj_js_nv_ihexstr(jsp, jop, pc_sn, DOWNLOAD_MICROCODE_DPC, NULL,
+                          dm_dp);
+    }
     sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
                false);
     gen_code = sg_get_unaligned_be32(resp + 4);
     sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
-    if (jsp->pr_as_json) {
-        sgj_js_nv_ihexstr(jsp, jop, pc_sn, DOWNLOAD_MICROCODE_DPC, NULL,
-                          dm_dp);
+    if (jsp->pr_as_json)
         jap = sgj_named_subarray_r(jsp, jop,
                                    sgj_convert_to_snake_name(dmsdl, b, blen));
-    }
+
     sgj_pr_hr(jsp, "  %s:\n", dmsdl);
     bp = resp + 8;
 
@@ -5397,25 +5460,29 @@ static int
 process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
                      int resp_len, struct opts_t * op, sgj_opaque_p jop)
 {
-    int num_ths;
+    int num_ths, k;
     int ret = 0;
     uint32_t ref_gen_code;
-    const char * cp;
+    const char * ccp;
     sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
     struct enclosure_info primary_info;
     struct th_es_t tes;
     struct th_es_t * tesp;
     char b[128];
+    char e[64];
     static const int blen = sizeof(b);
+    static const int elen = sizeof(e);
     static const char * const ht_dp = "Help text diagnostic page";
 
     tesp = &tes;
     memset(tesp, 0, sizeof(tes));
-    if ((cp = find_in_diag_page_desc(page_code)))
-        snprintf(b, blen, "%s %s", cp, dp_s);
+    if ((ccp = find_in_diag_page_desc(page_code)))
+        snprintf(b, blen, "%s %s", ccp, dp_s);
     else
         snprintf(b, blen, "%s 0x%x", dp_s, page_code);
-    cp = b;
+    ccp = b;
     if (op->do_raw) {
         if (1 == op->do_raw)
             hex2stdout(resp + 4, resp_len - 4, -1);
@@ -5429,13 +5496,13 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         if (op->do_hex > 2) {
             if (op->do_hex > 3) {
                 if (4 == op->do_hex)
-                    printf("\n# %s:\n", cp);
+                    printf("\n# %s:\n", ccp);
                 else
-                    printf("\n# %s [0x%x]:\n", cp, page_code);
+                    printf("\n# %s [0x%x]:\n", ccp, page_code);
             }
             hex2stdout(resp, resp_len, -1);
          } else {
-            printf("# Response in hex for %s:\n", cp);
+            printf("# Response in hex for %s:\n", ccp);
             hex2stdout(resp, resp_len, (2 == op->do_hex));
         }
         goto fini;
@@ -5489,8 +5556,12 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         break;
     case HELP_TEXT_DPC:         /* <"ht"> */
         sgj_pr_hr(jsp, "%s (for primary subenclosure):\n", ht_dp);
-        if (jsp->pr_as_json)
+        if (jsp->pr_as_json) {
+            /* re-use (overwrite) passed jop argument */
+            jop = sgj_named_subobject_r(jsp, jop,
+                                 sgj_convert_to_snake_name(ht_dp, e, elen));
             sgj_js_nv_ihexstr(jsp, jop, pc_sn, HELP_TEXT_DPC, NULL, ht_dp);
+        }
         if (resp_len > 4)
             sgj_pr_hr(jsp, "  %.*s\n", resp_len - 4, resp + 4);
         else
@@ -5500,10 +5571,14 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
                             (const char *)resp + 4, resp_len - 4);
         break;
     case STRING_DPC:    /* <"str"> */
-        sgj_pr_hr(jsp, "String In %s (for primary subenclosure):\n", dp_s);
-        if (jsp->pr_as_json)
-            sgj_js_nv_ihexstr(jsp, jop, pc_sn, STRING_DPC, NULL,
-                              "string_in_diagnostic_page");
+        snprintf(b, blen, "String In %s", dp_s);
+        sgj_pr_hr(jsp, "%s (for primary subenclosure):\n", b);
+        if (jsp->pr_as_json) {
+            /* re-use (overwrite) passed jop argument */
+            jop = sgj_named_subobject_r(jsp, jop,
+                                 sgj_convert_to_snake_name(b, e, elen));
+            sgj_js_nv_ihexstr(jsp, jop, pc_sn, STRING_DPC, NULL, b);
+        }
         if (resp_len > 4) {
             int n = 6 * (resp_len - 4);
             char * p = (char *)malloc(n);
@@ -5601,7 +5676,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         break;
     default:
         sgj_pr_hr(jsp, "Cannot decode response from %s: %s\n",
-                  dp_s, cp);
+                  dp_s, ccp);
         if (resp_len > 0) {
             int n = resp_len * 4;
             char * p = (char *)malloc(n);
@@ -5612,16 +5687,94 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
                 free(p);
             }
         }
+        if (jsp->pr_as_json) {
+            snprintf(b, blen, "%s_0x%x", dp_sn, page_code);
+            jop = sgj_named_subobject_r(jsp, jop, b);
+            ccp = find_dpage_cat_str(page_code);
+            sgj_js_nv_ihexstr(jsp, jop, pc_sn, page_code, NULL, ccp);
+            sgj_js_nv_ihexstr_nex(jsp, jop, "page_length", resp_len, true,
+                                  NULL, NULL, "[unit: byte]");
+            if (resp_len > 0) {
+                bool gt256 = (resp_len > 256);
+                uint8_t * bp = resp;
+                int rem;
+
+                if (gt256)
+                    jap = sgj_named_subarray_r(jsp, jop, "in_hex_list");
+                for (k = 0; k < resp_len; bp += 256, k += 256) {
+                    rem = resp_len - k;
+                    if (gt256)
+                        jo2p = sgj_new_unattached_object_r(jsp);
+                    else
+                        jo2p = jop;
+                    sgj_js_nv_hex_bytes(jsp, jo2p, "in_hex", bp,
+                                        (rem > 256) ? 256 : rem);
+                    if (gt256)
+                        sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+                }
+            }
+        }
+        break;
     }
 
 fini:
     return ret;
 }
 
+static int
+process_many_status_dpages(struct sg_pt_base * ptvp,  uint8_t * resp,
+                           bool with_joinpgs, struct opts_t * op,
+                           sgj_opaque_p jop)
+{
+    int k, n, ret, resp_len, page_code;
+    uint8_t pc, prev;
+    uint8_t supp_dpg_arr[256];
+    const int s_arr_sz = sizeof(supp_dpg_arr);
+
+    memset(supp_dpg_arr, 0, s_arr_sz);
+    ret = do_rec_diag(ptvp, SUPPORTED_DPC, resp, op->maxlen, op,
+                      &resp_len);
+    if (ret)        /* SUPPORTED_DPC failed so try SUPPORTED_SES_DPC */
+        ret = do_rec_diag(ptvp, SUPPORTED_SES_DPC, resp, op->maxlen, op,
+                          &resp_len);
+    if (ret)
+        return ret;
+    for (n = 0, pc = 0; (n < s_arr_sz) && (n < (resp_len - 4)); ++n) {
+        prev = pc;
+        pc = resp[4 + n];
+        if (prev > pc) {
+            if (pc) {       /* could be zero pad at end which is ok */
+                pr2serr("%s: Supported (SES) dpage seems corrupt, "
+                        "should ascend\n", __func__);
+                return SG_LIB_CAT_OTHER;
+            }
+            break;
+        }
+        if (pc > 0x2f)
+            break;
+        supp_dpg_arr[n] = pc;
+    }
+    for (k = 0; k < n; ++k) {
+        page_code = supp_dpg_arr[k];
+        if ((! with_joinpgs) && dpage_in_join(page_code, op))
+            continue;
+        ret = do_rec_diag(ptvp, page_code, resp, op->maxlen, op,
+                          &resp_len);
+        if (ret) {
+            if (SG_LIB_OK_FALSE == ret)
+                continue;       /* not found in user data */
+            return ret;
+        }
+        ret = process_status_dpage(ptvp, page_code, resp, resp_len,
+                                   op, jop);
+    }
+    return 0;
+}
+
 /* Display "status" page or pages (if op->page_code==0xff) . data-in from
  * SES device or user provided (with --data= option). Return 0 for success */
 static int
-process_status_page_s(struct sg_pt_base * ptvp, struct opts_t * op,
+process_1ormore_status_dpages(struct sg_pt_base * ptvp, struct opts_t * op,
                       sgj_opaque_p jop)
 {
     int page_code, ret, resp_len;
@@ -5636,45 +5789,8 @@ process_status_page_s(struct sg_pt_base * ptvp, struct opts_t * op,
         goto fini;
     }
     page_code = op->page_code;
-    if (ALL_DPC == page_code) {         /* <"all"> */
-        int k, n;
-        uint8_t pc, prev;
-        uint8_t supp_dpg_arr[256];
-        const int s_arr_sz = sizeof(supp_dpg_arr);
-
-        memset(supp_dpg_arr, 0, s_arr_sz);
-        ret = do_rec_diag(ptvp, SUPPORTED_DPC, resp, op->maxlen, op,
-                          &resp_len);
-        if (ret)        /* SUPPORTED_DPC failed so try SUPPORTED_SES_DPC */
-            ret = do_rec_diag(ptvp, SUPPORTED_SES_DPC, resp, op->maxlen, op,
-                              &resp_len);
-        if (ret)
-            goto fini;
-        for (n = 0, pc = 0; (n < s_arr_sz) && (n < (resp_len - 4)); ++n) {
-            prev = pc;
-            pc = resp[4 + n];
-            if (prev > pc) {
-                if (pc) {       /* could be zero pad at end which is ok */
-                    pr2serr("%s: Supported (SES) dpage seems corrupt, "
-                            "should ascend\n", __func__);
-                    ret = SG_LIB_CAT_OTHER;
-                    goto fini;
-                }
-                break;
-            }
-            if (pc > 0x2f)
-                break;
-            supp_dpg_arr[n] = pc;
-        }
-        for (k = 0; k < n; ++k) {
-            page_code = supp_dpg_arr[k];
-            ret = do_rec_diag(ptvp, page_code, resp, op->maxlen, op,
-                              &resp_len);
-            if (ret)
-                goto fini;
-            ret = process_status_dpage(ptvp, page_code, resp, resp_len,
-                                       op, jop);
-        }
+    if (ALL_DPC == page_code) {         /* <"--page=all"> */
+        ret = process_many_status_dpages(ptvp, resp, true, op, jop);
     } else {    /* asking for a specific page code */
         ret = do_rec_diag(ptvp, page_code, resp, op->maxlen, op, &resp_len);
         if (ret)
@@ -5942,7 +6058,6 @@ join_array_display(struct th_es_t * tesp, struct opts_t * op,
         jop = sgj_named_subobject_r(jsp, jop, "join_of_diagnostic_pages");
         jap = sgj_named_subarray_r(jsp, jop, "element_list");
     }
-// zzzzzzzzzzzzzzzz
     need_aes = (op->page_code_given &&
                 (ADD_ELEM_STATUS_DPC == op->page_code));
     dn_len = op->desc_name ? (int)strlen(op->desc_name) : 0;
@@ -6226,7 +6341,6 @@ join_work(struct sg_pt_base * ptvp, bool display, struct opts_t * op,
                           primary_info.enc_log_id[j]);
         sgj_pr_hr(jsp, "  %s\n", b);
     }
-// xxxxxxxxxxxx  yyyyyyyyyyyyyyyy
     mlen = enc_stat_rsp_sz;
     if (mlen > op->maxlen)
         mlen = op->maxlen;
@@ -6352,9 +6466,26 @@ join_work(struct sg_pt_base * ptvp, bool display, struct opts_t * op,
         join_array_dump(tesp, broken_ei, op);
 
     join_done = true;
-    if (display)      /* probably wanted join_arr[] built only */
+    if (display) {
         join_array_display(tesp, op, jop);
+        if (op->do_all) {
+            uint8_t * resp = NULL;
+            uint8_t * free_resp = NULL;
 
+            resp = sg_memalign(op->maxlen, 0, &free_resp, false);
+            if (NULL == resp) {
+                pr2serr("%s: unable to allocate %d bytes on heap\n",
+                        __func__, op->maxlen);
+                res = sg_convert_errno(ENOMEM);
+                goto fini;
+            }
+            sgj_pr_hr(jsp, "Join output completed, now output rest of "
+                      "dpages\n\n");
+            res = process_many_status_dpages(ptvp, resp, false, op, jop);
+            free(free_resp);
+        }
+    }
+fini:
     return res;
 
 }
@@ -7194,7 +7325,7 @@ main(int argc, char * argv[])
     } else if (op->do_join)
         ret = join_work(ptvp, true, op, jop);
     else if (op->do_status)
-        ret = process_status_page_s(ptvp, op, jop);
+        ret = process_1ormore_status_dpages(ptvp, op, jop);
     else { /* control page requested */
         op->data_arr[0] = op->page_code;
         op->data_arr[1] = op->byte1;
