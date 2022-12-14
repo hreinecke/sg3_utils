@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.83 20220915";  /* spc6r06 + sbc5r03 */
+static const char * version_str = "1.85 20221213";  /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_vpd"
 
@@ -73,8 +73,6 @@ uint8_t * rsp_buff;
 
 static int svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                            int subvalue, int off, const char * prefix);
-static int svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue,
-                                 int off);
 
 static int filter_dev_ids(const char * print_if_found, int num_leading,
                           uint8_t * buff, int len, int m_assoc,
@@ -1045,63 +1043,95 @@ decode_b5_vpd(uint8_t * b, int len, int do_hex, int pdt)
 
 /* Returns 0 if successful */
 static int
-svpd_unable_to_decode(int sg_fd, struct opts_t * op, int subvalue, int off)
+svpd_unable_to_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
+                      int subvalue, int off)
 {
     bool as_json, json_o_hr, hex0;
-    int res, len, n;
-    sgj_state * jsp = &op->json_st;
+    int res, len, n, pg_c;
     uint8_t * rp;
+    sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    char b[128];
+    static const int blen = sizeof(b);
 
     as_json = jsp->pr_as_json;
     json_o_hr = as_json && jsp->pr_out_hr;
     hex0 = (0 == op->do_hex);
+    b[0] = '\0';
+    pg_c = op->vpd_pn;
     rp = rsp_buff + off;
     if (hex0 && (! op->do_raw) && (! op->examine_given))
         sgj_pr_hr(jsp, "Only hex output supported\n");
-    if ((!op->do_raw) && (op->do_hex < 2) && (! op->examine_given)) {
-        if (subvalue) {
-            if (hex0)
-                sgj_pr_hr(jsp, "VPD page code=0x%.2x, subvalue=0x%.2x:\n",
-                          op->vpd_pn, subvalue);
-            else
-                printf("VPD page code=0x%.2x, subvalue=0x%.2x:\n", op->vpd_pn,
-                       subvalue);
-        } else if (op->vpd_pn >= 0) {
-            if (hex0)
-                sgj_pr_hr(jsp, "VPD page code=0x%.2x:\n", op->vpd_pn);
-            else
-                printf("VPD page code=0x%.2x:\n", op->vpd_pn);
-        } else {
-            if (hex0)
-                sgj_pr_hr(jsp, "VPD page code=%d:\n", op->vpd_pn);
-            else
-                printf("VPD page code=%d:\n", op->vpd_pn);
-        }
-    }
+    if (subvalue)
+        snprintf(b, blen, "VPD page code=0x%.2x, subvalue=0x%.2x",
+                 pg_c, subvalue);
+    else if (op->vpd_pn >= 0)
+        snprintf(b, blen, "VPD page code=0x%.2x", pg_c);
+    else
+        snprintf(b, blen, "VPD page code=%d", pg_c);
+    if ((!op->do_raw) && (op->do_hex < 2) && (! op->examine_given))
+        sgj_pr_hr(jsp, "%s:\n", b);
 
-    res = vpd_fetch_page(sg_fd, rp, op->vpd_pn, op->maxlen, op->do_quiet,
+    res = vpd_fetch_page(sg_fd, rp, pg_c, op->maxlen, op->do_quiet,
                          op->verbose, &len);
     if (0 == res) {
-        if (op->do_raw)
-            dStrRaw(rp, len);
-        else {
-           if (json_o_hr && hex0 && (len > 0) && (len < UINT16_MAX)) {
-                char * p;
+        int rlen;
+        char * p;
 
-                n = len * 4;
-                p = (char *)malloc(n);
-                if (p) {
-                    n = hex2str(rp, len, NULL, 1, n - 1, p);
-                    sgj_js_str_out(jsp, p, n);
-                }
-            } else
+        if (op->do_raw) {
+            dStrRaw(rp, len);
+            return 0;
+        } else if (op->do_hex) {
+            if (op->do_hex > 2)
+                named_hhh_output(b, rp, len, op);
+            else
                 hex2stdout(rp, len, no_ascii_4hex(op));
+            return 0;
+        }
+        if (len < 4) {
+            pr2serr("%s: response too short (< 4 bytes)\n", __func__);
+            return SG_LIB_CAT_MALFORMED;
+        }
+        rlen = sg_get_unaligned_be16(rp + 2) + 4;
+        if (len > rlen)
+            len = rlen;
+
+        n = len * 4;
+        p = (char *)malloc(n);
+        if (p) {
+            n = hex2str(rp, len, NULL, 1, n - 1, p);
+            if (json_o_hr)
+                sgj_js_str_out(jsp, p, strlen(p));
+            else
+                sgj_pr_hr(jsp, "%s\n", p);
+            free(p);
+        }
+        if (as_json) {
+            const char * ccp;
+
+            snprintf(b, blen, "vpd_page_%02x", pg_c);
+            jo2p = sg_vpd_js_hdr(jsp, jop, b, rp);
+            snprintf(b, blen, "%d bytes long when 4 byte header included",
+                     rlen);
+            sgj_js_nv_ihexstr(jsp, jo2p, "page_length", rlen - 4, NULL, b);
+            if (pg_c <= 0x80)
+                ccp = "unimplemented";
+            else if (pg_c <= 0x82)
+                ccp = "obsolete";
+            else if (pg_c <= 0x8f)
+                ccp = "unimplemented";
+            else if (pg_c <= 0xbf)
+                ccp = "restricted";
+            else
+                ccp = "vendor_specific";
+            sgj_js_nv_s(jsp, jo2p, "vpd_category", ccp);
+            sgjv_js_hex_long(jsp, jo2p, rp, len);
         }
     } else if ((! op->do_quiet) && (! op->examine_given)) {
-        if (op->vpd_pn >= 0)
-            pr2serr("fetching VPD page code=0x%.2x: failed\n", op->vpd_pn);
+        if (pg_c >= 0)
+            pr2serr("fetching VPD page code=0x%.2x: failed\n", pg_c);
         else
-            pr2serr("fetching VPD page code=%d: failed\n", op->vpd_pn);
+            pr2serr("fetching VPD page code=%d: failed\n", pg_c);
     }
     return res;
 }
@@ -1114,7 +1144,7 @@ recurse_vpd_decode(struct opts_t * op, sgj_opaque_p jop, int off)
     if (SG_LIB_CAT_OTHER == res) {
         res = svpd_decode_vendor(-1, op, jop, off);
         if (SG_LIB_CAT_OTHER == res)
-            svpd_unable_to_decode(-1, op, 0, off);
+            svpd_unable_to_decode(-1, op, jop, 0, off);
     }
     return res;
 }
@@ -1193,7 +1223,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
 
     switch(pn) {
     case VPD_NOPE_WANT_STD_INQ:    /* -2 (want standard inquiry response) */
-	np = "Standard Inquiry data format";
+        np = "Standard Inquiry data format";
         if (!inhex_active) {
             if (op->maxlen > 0)
                 alloc_len = op->maxlen;
@@ -2170,7 +2200,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
             if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(sg_fd, op, jop, 0);
                 if (SG_LIB_CAT_OTHER == res)
-                    res = svpd_unable_to_decode(sg_fd, op, 0, 0);
+                    res = svpd_unable_to_decode(sg_fd, op, jop, 0, 0);
             }
             if (! op->do_quiet) {
                 if (SG_LIB_CAT_ABORTED_COMMAND == res)
@@ -2230,7 +2260,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
             if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(-1, op, jop, off);
                 if (SG_LIB_CAT_OTHER == res)
-                    res = svpd_unable_to_decode(-1, op, 0, off);
+                    res = svpd_unable_to_decode(-1, op, jop, 0, off);
             }
         }
     }
@@ -2281,7 +2311,7 @@ svpd_examine_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
         if (SG_LIB_CAT_OTHER == res) {
             res = svpd_decode_vendor(sg_fd, op, jop, 0);
             if (SG_LIB_CAT_OTHER == res)
-                res = svpd_unable_to_decode(sg_fd, op, 0, 0);
+                res = svpd_unable_to_decode(sg_fd, op, jop, 0, 0);
         }
         if (! op->do_quiet) {
             if (SG_LIB_CAT_ABORTED_COMMAND == res)
@@ -2708,7 +2738,7 @@ main(int argc, char * argv[])
             if (SG_LIB_CAT_OTHER == res) {
                 res = svpd_decode_vendor(-1, op, jop, 0);
                 if (SG_LIB_CAT_OTHER == res)
-                    res = svpd_unable_to_decode(-1, op, subvalue, 0);
+                    res = svpd_unable_to_decode(-1, op, jop, subvalue, 0);
             }
         }
         ret = res;
@@ -2750,7 +2780,7 @@ main(int argc, char * argv[])
         if (SG_LIB_CAT_OTHER == res) {
             res = svpd_decode_vendor(sg_fd, op, jop, 0);
             if (SG_LIB_CAT_OTHER == res)
-                res = svpd_unable_to_decode(sg_fd, op, subvalue, 0);
+                res = svpd_unable_to_decode(sg_fd, op, jop, subvalue, 0);
         }
         if (! op->do_quiet) {
             if (SG_LIB_CAT_ABORTED_COMMAND == res)

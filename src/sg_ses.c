@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.64 20221211";    /* ses4r04 */
+static const char * version_str = "2.66 20221213";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -143,6 +143,7 @@ struct opts_t {
     bool byte1_given;   /* true if -b B1 or --byte1=B1 given */
     bool do_control;    /* want to write to DEVICE */
     bool do_data;       /* flag if --data= option has been used */
+    bool do_json;       /* --json[=JO] option given or implied */
     bool do_list;
     bool do_status;     /* want to read from DEVICE (or user data) */
     bool eiioe_auto;    /* Element Index Includes Overall (status) Element */
@@ -187,6 +188,7 @@ struct opts_t {
     const struct element_type_t * ind_etp;
     const char * index_str;
     const char * nickname_str;
+    const char * js_file;
     sgj_state json_st;
     struct cgs_cl_t cgs_cl_arr[CGS_CL_ARR_MAX_SZ];
     uint8_t sas_addr[8];  /* Big endian byte sequence */
@@ -797,6 +799,8 @@ static const struct option long_options[] = {
     {"inner-hex", no_argument, 0, 'i'},
     {"inner_hex", no_argument, 0, 'i'},
     {"json", optional_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'Q'},
+    {"js-file", required_argument, 0, 'Q'},
     {"join", no_argument, 0, 'j'},
     {"list", no_argument, 0, 'l'},
     {"nickid", required_argument, 0, 'N'},
@@ -869,10 +873,11 @@ usage(int help_num)
             "[--hex]\n"
             "              [--index=IIA | =TIA,II] [--inner-hex] [--join] "
             "[--json[=JO]]\n"
-            "              [--maxlen=LEN] [--page=PG] [--quiet] [--raw] "
-            "[--readonly]\n "
-            "              [--sas-addr=SA] [--status] [--verbose] [--warn] "
-            "DEVICE\n\n"
+            "              [--js-file=JFN] [--maxlen=LEN] [--page=PG] "
+            "[--quiet]\n"
+            "              [--raw] [--readonly] [--sas-addr=SA] [--status] "
+            "[--verbose]\n"
+            "              [--warn] DEVICE\n\n"
             "       sg_ses --control [--byte1=B1] [--clear=STR] "
             "[--data=H,H...]\n"
             "              [--descriptor=DES] [--dev-slot-num=SN] "
@@ -991,6 +996,10 @@ usage(int help_num)
             "    --hex|-H            print page response (or field) in hex\n"
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
+            "    --js-file=JFN|-Q JFN    JFN is a filename to which JSON "
+            "output is\n"
+            "                            written (def: stdout); overwrites "
+            "existing\n"
             "    --list|-l           same as '--enumerate' option\n"
             "    --mask|-M           ignore status element mask in modify "
             "actions\n"
@@ -1196,8 +1205,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fG:hHiI:jJ::ln:N:m:Mp:q"
-                        "rRsS:vVwx:X:z", long_options, &option_index);
+        c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fG:hHiI:jJ::ln:N:m:Mp:"
+                        "qQrRsS:vVwx:X:z", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1320,6 +1329,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 pr2serr("%s", e);
                 return SG_LIB_SYNTAX_ERROR;
             }
+            op->do_json = true;
             break;
         case 'l':
             op->do_list = true;
@@ -1383,6 +1393,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'q':
             op->quiet = true;
+            break;
+        case 'Q':
+            op->js_file = optarg;
             break;
         case 'r':
             ++op->do_raw;
@@ -1453,6 +1466,13 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 pr2serr("Unexpected extra argument: %s\n", argv[optind]);
             goto err_help;
         }
+    }
+    if (op->js_file && (! op->do_json)) {
+        if (! sgj_init_state(&op->json_st, NULL)) {
+            pr2serr("JSON initialization failed\n");
+            goto err_help;
+        }
+        op->do_json = true;
     }
     op->mx_arr_len = (op->maxlen > MIN_DATA_IN_SZ) ? op->maxlen :
                                                      MIN_DATA_IN_SZ;
@@ -2200,7 +2220,10 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
         if (el > 40) {
             sgj_pr_hr(jsp, "      %s data:\n", vs_s);
             hex2str(bp + 40, el - 40, "        ", 0, blen, b);
-            sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json && jsp->pr_out_hr)
+                sgj_js_str_out(jsp, b, strlen(b));
+            else
+                sgj_pr_hr(jsp, "%s\n", b);
             if (jsp->pr_as_json)
                 sgj_js_nv_hex_bytes(jsp, jo2p,
                          "vendor_specific_enclosure_information",
@@ -4978,7 +5001,10 @@ subenc_string_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
         el = sg_get_unaligned_be16(bp + 2) + 4;
         if (el > 4) {
             hex2str(bp + 40, el - 40, "    ", 0, blen, b);
-            sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json && jsp->pr_out_hr)
+                sgj_js_str_out(jsp, b, strlen(b));
+            else
+                sgj_pr_hr(jsp, "%s\n", b);
         } else
             sgj_pr_hr(jsp, "    <empty>\n");
         if (jsp->pr_as_json) {
@@ -5585,7 +5611,10 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
 
             if (p) {
                 hex2str(resp + 4, resp_len - 4, "", 0, n, p);
-                sgj_pr_hr(jsp, "%s\n", p);
+                if (jsp->pr_as_json && jsp->pr_out_hr)
+                    sgj_js_str_out(jsp, p, strlen(p));
+                else
+                    sgj_pr_hr(jsp, "%s\n", p);
                 free(p);
             }
         } else
@@ -5683,7 +5712,10 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
 
             if (p) {
                 hex2str(resp, resp_len, "", 0, n, p);
-                sgj_pr_hr(jsp, "%s\n", p);
+                if (jsp->pr_as_json && jsp->pr_out_hr)
+                    sgj_js_str_out(jsp, p, strlen(p));
+                else
+                    sgj_pr_hr(jsp, "%s\n", p);
                 free(p);
             }
         }
@@ -5763,6 +5795,8 @@ process_many_status_dpages(struct sg_pt_base * ptvp,  uint8_t * resp,
         if (ret) {
             if (SG_LIB_OK_FALSE == ret)
                 continue;       /* not found in user data */
+            if (op->do_json)
+                continue;       /* page in supported but not in reality? */
             return ret;
         }
         ret = process_status_dpage(ptvp, page_code, resp, resp_len,
@@ -7446,7 +7480,16 @@ early_out:
     if (free_config_dp_resp)
         free(free_config_dp_resp);
     if (as_json && jop) {
-        if (0 == op->do_hex)
+        if (op->js_file) {
+            FILE * fp = fopen(op->js_file, "w");   /* truncate if exists */
+
+            /* Experiment: send json to file when do_hex > 0 */
+            if (fp) {
+                sgj_js2file(jsp, NULL, ret, fp);
+                fclose(fp);
+            } else
+                pr2serr("unable to open file: %s\n", op->js_file);
+        } else if (0 == op->do_hex)
             sgj_js2file(jsp, NULL, ret, stdout);
         sgj_finish(jsp);
     }

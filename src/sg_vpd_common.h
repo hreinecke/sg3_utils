@@ -268,6 +268,8 @@ void svpd_enumerate_vendor(int vend_prod_num);
 int svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num);
 int svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                        int off);
+void sgjv_js_hex_long(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * bp,
+                      int len);
 const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 int svpd_find_vp_num_by_acron(const char * vp_ap);
 const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
@@ -277,7 +279,7 @@ int vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen,
 void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 
 void named_hhh_output(const char * pname, const uint8_t * buff, int len,
-		      const struct opts_t * op);
+                      const struct opts_t * op);
 
 extern uint8_t * rsp_buff;
 extern const char * t10_vendor_id_hr;

@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.13 20221209";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.14 20221213";    /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_logs"
 
@@ -6622,7 +6622,6 @@ show_requested_recovery_page(const uint8_t * resp, int len,
                                   (pc <= 0x8000) ? rsv_s : vend_spec);
             if (pc <= 0x8000) {
                 sgj_pr_hr(jsp, "  %s [%s=0x%x]:\n", rsv_s, param_c_sn, pc);
-// xxxxxxxxxxxxxxxxx
                 hex2str(bp + 4, n, "    ", op->h2s_oformat, blen, b);
                 sgj_pr_hr(jsp, "%s\n", b);
                 if (jsp->pr_as_json)
@@ -9297,8 +9296,6 @@ show_unknown_page(int subpg_code, const uint8_t * resp, int len,
     static const int blen = sizeof(b);
     static const char * unable_s = "Unable to decode page";
 
-// yyyyyyyyyyyyyyyyyyyyyyyy
-// pr2serr("boo\n");
     pg_code = resp[0] & 0x3f;
     if (0 == op->do_hex) {
         if (subpg_code > 0)
@@ -9775,7 +9772,6 @@ main(int argc, char * argv[])
                         sgj_pr_hr(jsp, "Unable to decode %s [%s]\n",
                                   lep->name, lep->acron);
                         show_unknown_page(subpg_code, bp, n, op, jop);
-// yyyyyy
                     }
                 } else {
                     nn = sg_scnpr(b, blen, "Unable to decode page=0x%x",
@@ -9787,7 +9783,6 @@ main(int argc, char * argv[])
                         sg_scnpr(b + nn, blen - nn, ", pdt=0x%x\n", pdt);
                     sgj_pr_hr(jsp, "%s\n", b);
                     show_unknown_page(subpg_code, bp, n, op, jop);
-// yyyyyyyyyyyyy
                 }
             }           /* end of page/subpage search loop */
             if (op->pg_arg && (! found)) {

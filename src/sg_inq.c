@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.32 20221208";  /* spc6r06, sbc5r03 */
+static const char * version_str = "2.34 20221213";  /* spc6r06, sbc5r03 */
 
 #define MY_NAME "sg_inq"
 
@@ -1194,17 +1194,14 @@ vpd_page_is_supported(uint8_t * vpd_pg0, int v0_len, int pg_num, int vb)
 
 /* ASCII Information VPD pages (page numbers: 0x1 to 0x7f) */
 static void
-decode_ascii_inf(uint8_t * buff, int len, struct opts_t * op)
+decode_ascii_inf(uint8_t * buff, int len, struct opts_t * op,
+                 sgj_opaque_p jop)
 {
-    int al, k, bump;
+    int al, k, n, bump;
     uint8_t * bp;
     uint8_t * p;
     sgj_state * jsp = &op->json_st;
 
-    if (op->do_hex) {
-        hex2stdout(buff, len, no_ascii_4hex(op));
-        return;
-    }
     if (len < 4) {
         pr2serr("ASCII information VPD page length too short=%d\n", len);
         return;
@@ -1225,9 +1222,21 @@ decode_ascii_inf(uint8_t * buff, int len, struct opts_t * op)
     }
     bp = buff + 5 + al;
     if (bp < (buff + len)) {
+        char * cp;
+
         sgj_pr_hr(jsp, "Vendor specific information in hex:\n");
-        hex2stdout(bp, len - (al + 5), 0);
+        n = (len * 4) + 64;
+        cp = (char *)malloc(n);
+        if (cp) {
+            n = hex2str(bp, len - (al + 5), NULL, 1, n - 1, cp);
+            if (jsp && jsp->pr_out_hr)
+                sgj_js_str_out(jsp, cp, n);
+            else
+                sgj_pr_hr(jsp, "%s\n", cp);
+        }
     }
+    if (jsp->pr_as_json)
+        sgjv_js_hex_long(jsp, jop, buff, len);
 }
 
 static void
@@ -2753,18 +2762,17 @@ cmddt_process(int sg_fd, const struct opts_t * op)
 
 /* Returns 0 if successful */
 static int
-vpd_mainly_hex(int sg_fd, struct opts_t * op, sgj_opaque_p jap, int off)
+vpd_mainly_hex(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
 {
     bool as_json;
-    bool json_o_hr;
     int res, len, n;
-    char b[128];
     sgj_state * jsp = &op->json_st;
     const char * cp;
     uint8_t * rp;
+    char b[144];
+    static const int blen = sizeof(b);
 
     as_json = jsp->pr_as_json;
-    json_o_hr = as_json && jsp->pr_out_hr;
     rp = rsp_buff + off;
     if ((! op->do_raw) && (op->do_hex < 3)) {
         if (op->do_hex)
@@ -2787,10 +2795,10 @@ vpd_mainly_hex(int sg_fd, struct opts_t * op, sgj_opaque_p jap, int off)
             int pdt = pdt = rp[0] & PDT_MASK;
 
             if (0 == op->vpd_pn)
-                decode_supported_vpd_4inq(rp, len, op, jap);
+                decode_supported_vpd_4inq(rp, len, op, NULL);
             else {
                 if (op->verbose) {
-                    cp = sg_get_pdt_str(pdt, sizeof(b), b);
+                    cp = sg_get_pdt_str(pdt, blen, b);
                     if (op->do_hex)
                         printf("   [PQual=%d  Peripheral device type: %s]\n",
                                (rp[0] & 0xe0) >> 5, cp);
@@ -2798,16 +2806,21 @@ vpd_mainly_hex(int sg_fd, struct opts_t * op, sgj_opaque_p jap, int off)
                         sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device "
                                   "type: %s]\n", (rp[0] & 0xe0) >> 5, cp);
                 }
-                if (json_o_hr && (0 == op->do_hex) && (len > 0) &&
-                    (len < UINT16_MAX)) {
+                if ((0 == op->do_hex) && (len > 0) && (len <= UINT16_MAX)) {
                     char * p;
 
-                    n = len * 4;
+                    n = (len * 4) + 64;
                     p = (char *)malloc(n);
                     if (p) {
-                        n = hex2str(rp, len, NULL, 1, n - 1, p);
-                        sgj_js_str_out(jsp, p, n);
+                        n = hex2str(rp, len, NULL, 0, n, p);
+                        if (jsp->pr_out_hr)
+                            sgj_js_str_out(jsp, p, n);
+                        else
+                            sgj_pr_hr(jsp, "%s\n", p);
+                        free(p);
                     }
+                    if (as_json)
+                        sgjv_js_hex_long(jsp, jop, rp, len);
                 } else
                     hex2stdout(rp, len, no_ascii_4hex(op));
             }
@@ -2817,7 +2830,7 @@ vpd_mainly_hex(int sg_fd, struct opts_t * op, sgj_opaque_p jap, int off)
             pr2serr("    inquiry: field in cdb illegal (page not "
                     "supported)\n");
         else {
-            sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
+            sg_get_category_sense_str(res, blen, b, op->verbose);
             pr2serr("    inquiry: %s\n", b);
         }
     }
@@ -2845,6 +2858,8 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
     const char * np;
     const char * ep = "";
     uint8_t * rp;
+    char b[144];
+    static const int blen = sizeof(b);
 
     rp = rsp_buff + off;
     vb = op->verbose;
@@ -3361,7 +3376,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             else if (tas)
                 decode_tapealert_supported_vpd(rp, len, op, jo2p);
             else
-                return vpd_mainly_hex(sg_fd, op, NULL, off);
+                return vpd_mainly_hex(sg_fd, op, jo2p, off);
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb2\n");
         break;
@@ -3443,10 +3458,10 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             } else if (dtde) {
                 if (! jsp->pr_as_json)
                     hex2stdout(rp + 4, len - 4, 1);
-                sgj_js_nv_hex_bytes(jsp, jop, "device_transfer_data_element",
+                sgj_js_nv_hex_bytes(jsp, jo2p, "device_transfer_data_element",
                                     rp + 4, len - 4);
             } else
-                return vpd_mainly_hex(sg_fd, op, NULL, off);
+                return vpd_mainly_hex(sg_fd, op, jo2p, off);
             return 0;
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb4\n");
@@ -3493,7 +3508,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
                      "logical_block_protection_method_descriptor_list");
                 decode_lb_protection_vpd(rp, len, op, jap);
             } else
-                return vpd_mainly_hex(sg_fd, op, NULL, off);
+                return vpd_mainly_hex(sg_fd, op, jo2p, off);
             return 0;
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb5\n");
@@ -3529,7 +3544,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             if (zbdch)
                 decode_zbdch_vpd(rp, len, op, jo2p);
             else
-                return vpd_mainly_hex(sg_fd, op, NULL, off);
+                return vpd_mainly_hex(sg_fd, op, jo2p, off);
             return 0;
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb6\n");
@@ -3565,7 +3580,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             if (ble)
                 decode_block_limits_ext_vpd(rp, len, op, jo2p);
             else
-                return vpd_mainly_hex(sg_fd, op, NULL, off);
+                return vpd_mainly_hex(sg_fd, op, jo2p, off);
             return 0;
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb7\n");
@@ -3604,7 +3619,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             if (fp)
                 decode_format_presets_vpd(rp, len, op, jap);
             else
-                return vpd_mainly_hex(sg_fd, op, NULL, off);
+                return vpd_mainly_hex(sg_fd, op, jo2p, off);
             return 0;
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb8\n");
@@ -3643,7 +3658,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             if (cpr)
                 decode_con_pos_range_vpd(rp, len, op, jap);
             else
-                return vpd_mainly_hex(sg_fd, op, NULL, off);
+                return vpd_mainly_hex(sg_fd, op, jo2p, off);
             return 0;
         } else if (! op->do_raw)
             pr2serr("VPD INQUIRY: page=0xb8\n");
@@ -3743,31 +3758,45 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
     }
     if (bad) {
         if ((pn > 0) && (pn < 0x80)) {
+            np = "ASCII information VPD page";
             if (!op->do_raw && (op->do_hex < 3))
-                printf("VPD INQUIRY: ASCII information page, FRU code=0x%x\n",
-                       pn);
+                sgj_pr_hr(jsp, "VPD INQUIRY: %s, FRU code=0x%x\n", np, pn);
             res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
-            if (0 == res) {
-                if (op->do_raw)
-                    dStrRaw((const char *)rp, len);
-                else
-                    decode_ascii_inf(rp, len, op);
+            if (res)
+                goto out;
+            if (op->do_raw) {
+                dStrRaw((const char *)rp, len);
+                return 0;
+            } else if (op->do_hex) {
+                hex2stdout(rp, len, no_ascii_4hex(op));
+                return 0;
             }
+            if (as_json)
+                jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
+            decode_ascii_inf(rp, len, op, jo2p);
         } else {
-            if (op->do_hex < 3)
+            if (as_json) {
+                int rlen = sg_get_unaligned_be16(rp + 2) + 4;
+
+                snprintf(b, blen, "vpd_page_%02x", pn);
+                jo2p = sg_vpd_js_hdr(jsp, jop, b, rp);
+                snprintf(b, blen, "%d bytes long when 4 byte header included",
+                         rlen);
+                sgj_js_nv_ihexstr(jsp, jo2p, "page_length", rlen - 4, NULL,
+                                  b);
+            } else if (op->do_hex < 3)
                 pr2serr(" Only hex output supported.\n");
-            return vpd_mainly_hex(sg_fd, op, NULL, off);
+            return vpd_mainly_hex(sg_fd, op, jo2p, off);
         }
     }
 out:
     if (res) {
-        char b[80];
 
         if (SG_LIB_CAT_ILLEGAL_REQ == res)
             pr2serr("    inquiry: field in cdb illegal (page not "
                     "supported)\n");
         else {
-            sg_get_category_sense_str(res, sizeof(b), b, vb);
+            sg_get_category_sense_str(res, blen, b, vb);
             pr2serr("    inquiry: %s\n", b);
         }
     }
@@ -4514,7 +4543,7 @@ main(int argc, char * argv[])
             if (op->do_decode)
                 ret = vpd_decode(-1, op, jop, 0);
             else
-                ret = vpd_mainly_hex(-1, op, NULL, 0);
+                ret = vpd_mainly_hex(-1, op, jop, 0);
             goto err_out;
         }
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
@@ -4615,7 +4644,7 @@ main(int argc, char * argv[])
             if (ret)
                 goto err_out;
         } else {
-            ret = vpd_mainly_hex(sg_fd, op, NULL, 0);
+            ret = vpd_mainly_hex(sg_fd, op, jop, 0);
             if (ret)
                 goto err_out;
         }

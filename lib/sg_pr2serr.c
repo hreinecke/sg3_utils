@@ -2035,4 +2035,98 @@ fini:
     return ret;
 }
 
+/*****************************************************************************
+ * Convert a byte stream that is meant to be printable ASCII to a string that
+ * is suitable to be a JSON string (without the enclosing double quotes). A
+ * JSON string is close to a C string literal but unprintable ASCII characters
+ * are escaped with \u<hhhh> where <hhhh> is four hex digits. Input is pointed
+ * to by 'cup' which is 'ulen' bytes long. The output is written to 'op' and
+ * will not exceed 'olen_max' bytes. If 'olen_max' is breached returns -1 els
+ * returns number of bytes written to 'op'.
+ ****************************************************************/
+
+int
+sg_conv2json_string(const uint8_t * cup, int ulen, char * op, int olen_max)
+{
+    bool exhaust = false;
+    uint8_t u;
+    int k, j;
+    const int next2last = olen_max - 1;
+    char b[8];
+
+    for (k = 0, j = 0; (k < ulen) && (j < olen_max); k++) {
+        u = cup[k];
+        exhaust = false;
+
+        switch (u) {
+        case '"':
+        case '\\':
+            op[j++] = '\\';
+            if (j >= next2last) {
+                exhaust = false;
+                break;
+            }
+            op[j++] = u;
+            break;
+        case '\b':
+            op[j++] = '\\';
+            if (j >= next2last) {
+                exhaust = false;
+                break;
+            }
+            op[j++] = 'b';
+            break;
+        case '\f':
+            op[j++] = '\\';
+            if (j >= next2last) {
+                exhaust = false;
+                break;
+            }
+            op[j++] = 'f';
+            break;
+        case '\n':
+            op[j++] = '\\';
+            if (j >= next2last) {
+                exhaust = false;
+                break;
+            }
+            op[j++] = 'n';
+            break;
+        case '\r':
+            op[j++] = '\\';
+            if (j >= next2last) {
+                exhaust = false;
+                break;
+            }
+            op[j++] = 'r';
+            break;
+        case '\t':
+            op[j++] = '\\';
+            if (j >= next2last) {
+                exhaust = false;
+                break;
+            }
+            op[j++] = 't';
+            break;
+        default:
+            /* Treat DEL [0x7f] as non-printable */
+            if ((u > 0x20) && (u < 0x7f))
+                op[j++] = u;
+            else {
+                snprintf(b, 8, "\\u%04x", u);
+                if (j >= olen_max - 6) {
+                    exhaust = true;
+                    break;
+                }
+                memcpy(op + j, b, 6);
+                j += 6;
+            }
+            break;
+        }
+    }
+    if (exhaust || (j == olen_max))
+        return -1;
+    return j;
+}
+
 #endif

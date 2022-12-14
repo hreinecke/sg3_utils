@@ -7,8 +7,8 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-filter\fR]
 [\fI\-\-get=STR\fR] [\fI\-\-hex\fR] [\fI\-\-index=IIA\fR |
 \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR] [\fI\-\-join\fR]
-[\fI\-\-json[=JO]\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-json[=JO]\fR]  [\fI\-\-js\-file=JFN\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
 [\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR]
 [\fI\-\-warn\fR] \fIDEVICE\fR
 .PP
@@ -112,6 +112,10 @@ is equivalent to invoking the \fI\-\-ALL\fR option.
 .br
 This option implies the \fI\-\-status\fR option as long as the
 \fI\-\-control\fR option has not been given.
+.br
+It is not recommended to use the \fI\-HHHH\fR option with this option to dump
+all pages in hex for later decoding. Instead the \fI\-HHHH\fR option should
+be used with the \fI\-\-page=all\fR option for that purpose.
 .TP
 \fB\-z\fR, \fB\-\-ALL\fR
 shows the output of the \fI\-\-join\fR option invoked twice, followed by the
@@ -317,6 +321,15 @@ information about JSON usage in this package see the sg3_utils_json manpage
 or use '?' for \fIJO\fR in order to have a summary printed to stderr.
 For more specific information about JSON output with this utility, see the
 JSON INFORMATION section below.
+.TP
+\fB\-Q\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\f. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\f parameter to non-default values.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 This option is equivalent to \fI\-\-enumerate\fR. See that option.

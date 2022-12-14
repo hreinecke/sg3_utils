@@ -299,6 +299,30 @@ sg_vpd_js_hdr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     return jo2p;
 }
 
+void
+sgjv_js_hex_long(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * bp,
+                 int len)
+{
+    bool gt256 = (len > 256);
+    int k, rem;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jap = NULL;
+
+    if (gt256)
+        jap = sgj_named_subarray_r(jsp, jop, "in_hex_list");
+    for (k = 0; k < len; bp += 256, k += 256) {
+        rem = len - k;
+        if (gt256)
+            jo2p = sgj_new_unattached_object_r(jsp);
+        else
+            jo2p = jop;
+        sgj_js_nv_hex_bytes(jsp, jo2p, "in_hex", bp,
+                            (rem > 256) ? 256 : rem);
+        if (gt256)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+    }
+}
+
 const char *
 pqual_str(int pqual)
 {
