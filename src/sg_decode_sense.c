@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.32 20220730";
+static const char * version_str = "1.33 20221215";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -127,8 +127,9 @@ usage()
           "    --json[=JO]|-j[JO]    output in JSON instead of human "
           "readable text.\n"
           "                          Use --json=? for JSON help\n"
-          "    --nodecode|-N         do not decode, may be neither sense "
-          "nor cdb\n"
+          "    --nodecode|-N         do not decode, input hex or binary may "
+          "be\n"
+          "                          unrelated to SCSI sense or CDB formats\n"
           "    --nospace|-n          no spaces or other separators between "
           "pairs of\n"
           "                          hex digits (e.g. '3132330A')\n"
@@ -143,7 +144,8 @@ usage()
           "of\nhexadecimal bytes (H1 H2 H3 ...) . Alternatively the sense "
           "data can\nbe in a binary file or in a file containing ASCII "
           "hexadecimal. If\n'--cdb' is given then interpret hex as SCSI CDB "
-          "rather than sense data.\n"
+          "rather than sense data.\nMay translate arbitrary hex data to "
+          "binary and vice versa when\n--nodecode is given.\n"
           );
 }
 
@@ -348,7 +350,7 @@ main(int argc, char *argv[])
     char b[2048];
 
     op = (struct opts_t *)sg_memalign(sizeof(*op), 0 /* page align */,
-				      &free_op_buff, false);
+                                      &free_op_buff, false);
     if (NULL == op) {
         pr2serr("Unable to allocate heap for options structure\n");
         ret = sg_convert_errno(ENOMEM);

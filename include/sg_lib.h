@@ -698,6 +698,10 @@ bool sg_is_big_endian();
 bool sg_all_zeros(const uint8_t * bp, int b_len);
 bool sg_all_ffs(const uint8_t * bp, int b_len);
 
+/* Returns true and exits when a byte < 0x20 or DEL is detected. If no
+ * such byte is found by *(up + len - 1) then false is returned. */
+bool sg_has_control_char(const uint8_t * up, int len);
+
 /* Extract character sequence from ATA words as in the model string
  * in a IDENTIFY DEVICE response. Returns number of characters
  * written to 'ochars' before 0 character is found or 'num' words

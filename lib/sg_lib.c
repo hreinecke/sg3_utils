@@ -4043,6 +4043,22 @@ sg_set_big_endian(uint64_t val, uint8_t * to,
     }
 }
 
+/* Returns true and exits when a byte < 0x20 or DEL is detected. If no
+ * such byte is found by *(up + len - 1) then false is returned. */
+bool
+sg_has_control_char(const uint8_t * up, int len)
+{
+    int k;
+    uint8_t u;
+
+    for (k = 0; k < len; ++k) {
+        u = up[k];
+        if ((u < 0x20) || (0x7f == u))
+            return true;
+    }
+    return false;
+}
+
 const char *
 sg_lib_version()
 {

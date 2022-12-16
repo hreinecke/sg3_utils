@@ -584,12 +584,12 @@ sgj_js_nv_s(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
 
 sgj_opaque_p
 sgj_js_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
-                const char * value, int slen)
+                const char * value, int vlen)
 {
     int k;
 
-    if (jsp && jsp->pr_as_json && value && (slen >= 0)) {
-        for (k = 0; k < slen; ++k) {    /* don't want '\0' in value string */
+    if (jsp && jsp->pr_as_json && value && (vlen >= 0)) {
+        for (k = 0; k < vlen; ++k) {    /* don't want '\0' in value string */
             if (0 == value[k])
                 break;
         }
@@ -601,6 +601,30 @@ sgj_js_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
                                    json_string_new_length(k, value));
     } else
         return NULL;
+}
+
+sgj_opaque_p
+sgj_js_nv_s_len_chk(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
+                    const uint8_t * value, int vlen)
+{
+    sgj_opaque_p res = NULL;
+
+    if (value && (vlen > 0) &&
+        sg_has_control_char(value, vlen)) {
+        const int n = vlen * 4 + 4;
+        char * p = (char *)malloc(n);
+
+        if (p) {
+            int k;
+
+            k = sgj_conv2json_string(value, vlen, p, n);
+            if (k > 0)
+                res = sgj_js_nv_s_len(jsp, jop, sn_name, p, k);
+            free(p);
+        }
+        return res;
+    } else
+        return sgj_js_nv_s_len(jsp, jop, sn_name, (const char *)value, vlen);
 }
 
 sgj_opaque_p
@@ -2035,97 +2059,60 @@ fini:
     return ret;
 }
 
-/*****************************************************************************
- * Convert a byte stream that is meant to be printable ASCII to a string that
- * is suitable to be a JSON string (without the enclosing double quotes). A
- * JSON string is close to a C string literal but unprintable ASCII characters
- * are escaped with \u<hhhh> where <hhhh> is four hex digits. Input is pointed
- * to by 'cup' which is 'ulen' bytes long. The output is written to 'op' and
- * will not exceed 'olen_max' bytes. If 'olen_max' is breached returns -1 els
- * returns number of bytes written to 'op'.
- ****************************************************************/
-
+/* Convert a byte stream that is meant to be printable ASCII or UTF-8 to
+ * something that is allowable in a JSON string. This means treating the
+ * ASCII control characters (i.e. < 0x20) and DEL as specials. Also '\' and
+ * '"' need to be escaped with a preceding '\'. These C escape codes are used
+ * in JSON: '\b', '\f', '\n', '\r' and '\t'. Other control characters, and DEL
+ * are encoded as '\x<hh>' where <hh> is two hex digits. So the DEL and
+ * null ACSII characters in the input will appear as '\x7f' and '\x00'
+ * respectively in the output. The output serializer will expand those
+ * two to '\\x7f' and '\\x00'. Note that the JSON form of '\u<hhhh>' is
+ * _not_ used. The input is pointed to by 'cup' which is 'ulen' bytes long.
+ * The output is written to 'op' and will not exceed 'olen_max' bytes. If
+ * 'olen_max' is breached, this function returns -1 else it returns the
+ * number of bytes written to 'op'. */
 int
-sg_conv2json_string(const uint8_t * cup, int ulen, char * op, int olen_max)
+sgj_conv2json_string(const uint8_t * cup, int ulen, char * op, int olen_max)
 {
-    bool exhaust = false;
-    uint8_t u;
     int k, j;
-    const int next2last = olen_max - 1;
-    char b[8];
 
-    for (k = 0, j = 0; (k < ulen) && (j < olen_max); k++) {
-        u = cup[k];
-        exhaust = false;
+    for (k = 0, j = 0; k < ulen; k++) {
+        uint8_t u = cup[k];
 
-        switch (u) {
-        case '"':
-        case '\\':
-            op[j++] = '\\';
-            if (j >= next2last) {
-                exhaust = false;
-                break;
-            }
+        /* Treat DEL [0x7f] as non-printable, output: "\\x7f" */
+        if ((u >= 0x20) && (u != 0x7f)) {
+            if (j + 1 >= olen_max)
+                return -1;
             op[j++] = u;
-            break;
-        case '\b':
-            op[j++] = '\\';
-            if (j >= next2last) {
-                exhaust = false;
-                break;
+        } else {
+            uint8_t u2 = 0;
+
+            switch (u) {
+            case '"': case '\\': u2 = u; break;
+            case '\b': u2 = 'b'; break;
+            case '\f': u2 = 'f'; break;
+            case '\n': u2 = 'n'; break;
+            case '\r': u2 = 'r'; break;
+            case '\t': u2 = 't'; break;
             }
-            op[j++] = 'b';
-            break;
-        case '\f':
-            op[j++] = '\\';
-            if (j >= next2last) {
-                exhaust = false;
-                break;
+            if (u2) {
+                /* the escaping of these is handled by the json_builder's
+                 * output serializer. */
+                if (j + 1 >= olen_max)
+                    return -1;
+                op[j++] = u;    /* not using u2, only that it is != 0 */
+            } else {
+                char b[8];
+
+                if (snprintf(b, sizeof(b), "\\x%02x", u) != 4 ||
+                    j + 4 >= olen_max)
+                    return -1;
+                memcpy(op + j, b, 4);
+                j += 4;
             }
-            op[j++] = 'f';
-            break;
-        case '\n':
-            op[j++] = '\\';
-            if (j >= next2last) {
-                exhaust = false;
-                break;
-            }
-            op[j++] = 'n';
-            break;
-        case '\r':
-            op[j++] = '\\';
-            if (j >= next2last) {
-                exhaust = false;
-                break;
-            }
-            op[j++] = 'r';
-            break;
-        case '\t':
-            op[j++] = '\\';
-            if (j >= next2last) {
-                exhaust = false;
-                break;
-            }
-            op[j++] = 't';
-            break;
-        default:
-            /* Treat DEL [0x7f] as non-printable */
-            if ((u > 0x20) && (u < 0x7f))
-                op[j++] = u;
-            else {
-                snprintf(b, 8, "\\u%04x", u);
-                if (j >= olen_max - 6) {
-                    exhaust = true;
-                    break;
-                }
-                memcpy(op + j, b, 6);
-                j += 6;
-            }
-            break;
         }
     }
-    if (exhaust || (j == olen_max))
-        return -1;
     return j;
 }
 

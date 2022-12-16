@@ -195,7 +195,13 @@ sgj_opaque_p sgj_js_nv_s(sgj_state * jsp, sgj_opaque_p jop,
                          const char * sn_name, const char * value);
 sgj_opaque_p sgj_js_nv_s_len(sgj_state * jsp, sgj_opaque_p jop,
                              const char * sn_name,
-                             const char * value, int slen);
+                             const char * value, int vlen);
+
+/* This variant checks 'value' for characters that are not permitted in JSON
+ * strings and takes appropriate actions. See sgj_conv2json_string() below. */
+sgj_opaque_p sgj_js_nv_s_len_chk(sgj_state * jsp, sgj_opaque_p jop,
+                                 const char * sn_name,
+                                 const uint8_t * value, int vlen);
 
 /* If either jsp is NULL or jsp->pr_as_json is false then nothing happens and
  * NULL is returned. The insertion point is at jop but if it is NULL
@@ -374,9 +380,24 @@ void sgj_finish(sgj_state * jsp);
 
 /* Forms a string of the JSON command line options help and assumes,
  * if char_if_not_j is zero, that '-j' is the short form of the of
- * the --json[=JO] command line option.
- */
+ * the --json[=JO] command line option.  */
 char * sg_json_usage(int char_if_not_j, char * b, int blen);
+
+/* Convert a byte stream that is meant to be printable ASCII or UTF-8 to
+ * something that is allowable in a JSON string. This means treating the
+ * ASCII control characters (i.e. < 0x20) and DEL as specials. Also '\' and
+ * '"' need to be escaped with a preceding '\'. These C escape codes are used
+ * in JSON: '\b', '\f', '\n', '\r' and '\t'. Other control characters, and DEL
+ * are encoded as '\x<hh>' where <hh> is two hex digits. So the DEL and
+ * null ACSII characters in the input will appear as '\x7f' and '\x00'
+ * respectively in the output. The output serializer will expand those
+ * two to '\\x7f' and '\\x00'. Note that the JSON form of '\u<hhhh>' is
+ * _not_ used. The input is pointed to by 'cup' which is 'ulen' bytes long.
+ * The output is written to 'op' and will not exceed 'olen_max' bytes. If
+ * 'olen_max' is breached, this function returns -1 else it returns the
+ * number of bytes written to 'op'. */
+int sgj_conv2json_string(const uint8_t * cup, int ulen, char * op,
+                         int olen_max);
 
 #ifdef __cplusplus
 }

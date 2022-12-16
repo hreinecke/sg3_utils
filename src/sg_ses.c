@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.66 20221213";    /* ses4r04 */
+static const char * version_str = "2.67 20221215";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -2211,12 +2211,10 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
                        sg_get_unaligned_be64(bp + 4));
         sgj_pr_hr(jsp, "      enclosure vendor: %.8s  product: %.16s  "
                   "rev: %.4s\n", bp + 12, bp + 20, bp + 36);
-        sgj_js_nv_s_len(jsp, jo2p, "enclosure_vendor_identification",
-                        (const char *)bp + 12, 8);
-        sgj_js_nv_s_len(jsp, jo2p, "product_identification",
-                        (const char *)bp + 20, 16);
-        sgj_js_nv_s_len(jsp, jo2p, "product_revision_level",
-                        (const char *)bp + 36, 4);
+        sgj_js_nv_s_len_chk(jsp, jo2p, "enclosure_vendor_identification",
+                            bp + 12, 8);
+        sgj_js_nv_s_len_chk(jsp, jo2p, "product_identification", bp + 20, 16);
+        sgj_js_nv_s_len_chk(jsp, jo2p, "product_revision_level", bp + 36, 4);
         if (el > 40) {
             sgj_pr_hr(jsp, "      %s data:\n", vs_s);
             hex2str(bp + 40, el - 40, "        ", 0, blen, b);
@@ -2260,8 +2258,7 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
             sgj_pr_hr(jsp, "      text: %.*s\n", bp[3],
                       (const char *)text_bp);
             if (op->partial_join)
-                sgj_js_nv_s_len(jsp, jo2p, "text",
-                                (const char *)text_bp, bp[3]);
+                sgj_js_nv_s_len_chk(jsp, jo2p, "text", text_bp, bp[3]);
             text_bp += bp[3];
         }
         if (jsp->pr_as_json)
@@ -2273,7 +2270,7 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
         text_bp = bp + (sum_elem_types * 4);
         for (k = 0; k < sum_elem_types; ++k, bp += 4) {
             jo2p = sgj_new_unattached_object_r(jsp);
-            sgj_js_nv_s_len(jsp, jo2p, "text", (const char *)text_bp, bp[3]);
+            sgj_js_nv_s_len_chk(jsp, jo2p, "text", text_bp, bp[3]);
             text_bp += bp[3];
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
@@ -3075,8 +3072,7 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
             n += sg_scnpr(a + n, alen - n, "%slast 3 bytes (hex): %02x %02x "
                           "%02x\n", pad, s1, s2, s3);
             if (jsp->pr_as_json)
-                sgj_js_nv_s_len(jsp, jop, "bytes_1_2_3",
-                                (const char *)statp + 1, 3);
+                sgj_js_nv_s_len_chk(jsp, jop, "bytes_1_2_3", statp + 1, 3);
             break;
         }
         break;
@@ -3139,8 +3135,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
             sgj_js_nv_i(jsp, jop, "fail", !!(s1 & 0x40));
             sgj_js_nv_ihexstr(jsp, jop, "display_mode_status", dms, NULL,
                               display_mode_status[dms]);
-            sgj_js_nv_s_len(jsp, jop, "display_character_status",
-                            (const char *)statp + 2, 2);
+            sgj_js_nv_s_len_chk(jsp, jop, "display_character_status",
+                                statp + 2, 2);
         }
         break;
     case KEY_PAD_ETC:   /* Key pad entry */
@@ -3232,7 +3228,7 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
                 snprintf(b, blen, "%.2s", (const char *)statp + 2);
                 ccp = b;
             } else
-                ccp = "English";
+                ccp = "en";
             sgj_js_nv_ihexstr(jsp, jop, "language_code", m, NULL, ccp);
         }
         break;
@@ -4121,8 +4117,7 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
             for ( ; bp < last_bp; bp += (n + 4)) {
                 n = sg_get_unaligned_be16(bp + 2);
                 jo2p = sgj_new_unattached_object_r(jsp);
-                sgj_js_nv_s_len(jsp, jo2p, "descriptor",
-                                (const char *)bp + 4, n);
+                sgj_js_nv_s_len_chk(jsp, jo2p, "descriptor", bp + 4, n);
                 sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             }
             return;
@@ -4160,8 +4155,8 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         }
         if (jsp->pr_as_json) {
             jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
-            sgj_js_nv_s_len(jsp, jo3p, "descriptor", (const char *)bp + 4,
-                            desc_len - 4);
+            sgj_js_nv_s_len_chk(jsp, jo3p, "descriptor", bp + 4,
+                                desc_len - 4);
             ja2p = sgj_named_subarray_r(jsp, jo2p, "element_descriptor");
         }
 
@@ -4181,8 +4176,8 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
             got1 = true;
             if (jsp->pr_as_json) {
                 jo4p = sgj_new_unattached_object_r(jsp);
-                sgj_js_nv_s_len(jsp, jo4p, "descriptor",
-                                (const char *)bp + 4, desc_len - 4);
+                sgj_js_nv_s_len_chk(jsp, jo4p, "descriptor", bp + 4,
+                                    desc_len - 4);
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             }
         }
@@ -4628,10 +4623,8 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
             sgj_js_nv_ihex(jsp, jop, "device_slot_number", ae_bp[7]);
             sgj_js_nv_ihexstr(jsp, jop, "pcie_vendor_id", pcie_vid, NULL,
                               (0xffff == pcie_vid) ? not_rep : NULL);
-            sgj_js_nv_s_len(jsp, jop, "serial_number",
-                            (const char *)ae_bp + 12, 20);
-            sgj_js_nv_s_len(jsp, jop, "model_number",
-                            (const char *)ae_bp + 32, 40);
+            sgj_js_nv_s_len_chk(jsp, jop, "serial_number", ae_bp + 12, 20);
+            sgj_js_nv_s_len_chk(jsp, jop, "model_number", ae_bp + 32, 40);
             jap = sgj_named_subarray_r(jsp, jop,
                                        "physical_port_descriptor_list");
         }
@@ -4944,8 +4937,8 @@ subenc_help_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
             sgj_pr_hr(jsp, "    <empty>\n");
         if (jsp->pr_as_json) {
             if (el > 4)
-                sgj_js_nv_s_len(jsp, jo2p, "subenclosure_help_text",
-                                (const char *)bp + 4, el - 4);
+                sgj_js_nv_s_len_chk(jsp, jo2p, "subenclosure_help_text",
+                                    bp + 4, el - 4);
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
     }
@@ -5024,8 +5017,10 @@ static void
 subenc_nickname_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
                     sgj_opaque_p jop)
 {
+    bool lc_z;
     int k, el, num_subs;
     uint32_t gen_code;
+    const char * ccp;
     const uint8_t * bp;
     const uint8_t * last_bp;
     sgj_state * jsp = &op->json_st;
@@ -5070,15 +5065,21 @@ subenc_nickname_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
         sgj_haj_vi(jsp, jo2p, 4, "subenclosure nickname additional status",
                    SGJ_SEP_COLON_1_SPACE, bp[3], true);
 
-        sgj_pr_hr(jsp, "    %s: %.2s\n", snlc, bp + 6);
+        lc_z = ((0 == bp[6]) && (0 == bp[7]));
+        if (lc_z)
+            sgj_pr_hr(jsp, "    %s: en\n", snlc);
+        else
+            sgj_pr_hr(jsp, "    %s: %.2s\n", snlc, bp + 6);
         sgj_pr_hr(jsp, "    %s: %.*s\n", sn_s, 32, bp + 8);
         if (jsp->pr_as_json) {
-            sgj_js_nv_s_len(jsp, jo2p,
-                            sgj_convert_to_snake_name(snlc, b, blen),
-                            (const char *)bp + 6, 2);
-            sgj_js_nv_s_len(jsp, jo2p,
-                            sgj_convert_to_snake_name(sn_s, b, blen),
-                            (const char *)bp + 8, 32);
+            ccp = sgj_convert_to_snake_name(snlc, b, blen);
+            if (lc_z)
+                sgj_js_nv_s(jsp, jo2p, ccp, "en");
+            else
+                sgj_js_nv_s_len_chk(jsp, jo2p, ccp, bp + 6, 2);
+            sgj_js_nv_s_len_chk(jsp, jo2p,
+                                sgj_convert_to_snake_name(sn_s, b, blen),
+                                bp + 8, 32);
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
     }
@@ -5593,8 +5594,8 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         else
             sgj_pr_hr(jsp, "  <empty>\n");
         if (jsp->pr_as_json)
-            sgj_js_nv_s_len(jsp, jop, "primary_subenclosure_help_text",
-                            (const char *)resp + 4, resp_len - 4);
+            sgj_js_nv_s_len_chk(jsp, jop, "primary_subenclosure_help_text",
+                                resp + 4, resp_len - 4);
         break;
     case STRING_DPC:    /* <"str"> */
         snprintf(b, blen, "String In %s", dp_s);

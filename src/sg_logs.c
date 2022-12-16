@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.14 20221213";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.15 20221215";    /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_logs"
 
@@ -3315,8 +3315,7 @@ show_last_n_error_page(const uint8_t * resp, int len,
             } else if (0x01 == (bp[2] & 0x3)) {  /* ASCII */
                 sgj_pr_hr(jsp, "    %.*s\n", pl - 4, (const char *)(bp + 4));
                 if (jsp->pr_as_json)
-                    sgj_js_nv_s_len(jsp, jo3p, eed,
-                                    (const char *)(bp + 4), pl - 4);
+                    sgj_js_nv_s_len_chk(jsp, jo3p, eed, bp + 4, pl - 4);
             } else {
                 sgj_pr_hr(jsp, "    [data counter?? (LP bit should be "
                           "set)]:\n");
@@ -4001,10 +4000,10 @@ show_start_stop_page(const uint8_t * resp, int len, struct opts_t * op,
                 if (jsp->pr_as_json) {
                     sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL,
                                       "Date of manufacture");
-                    sgj_js_nv_s_len(jsp, jo3p, "year_of_manufacture",
-                                    (const char *)(bp + 4), 4);
-                    sgj_js_nv_s_len(jsp, jo3p, "week_of_manufacture",
-                                    (const char *)(bp + 8), 2);
+                    sgj_js_nv_s_len_chk(jsp, jo3p, "year_of_manufacture",
+                                        bp + 4, 4);
+                    sgj_js_nv_s_len_chk(jsp, jo3p, "week_of_manufacture",
+                                        bp + 8, 2);
                 }
             } else if (op->verbose) {
                 pr2serr("%s: %s parameter length strange: %d\n", __func__,
@@ -4019,10 +4018,10 @@ show_start_stop_page(const uint8_t * resp, int len, struct opts_t * op,
                 if (jsp->pr_as_json) {
                     sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL,
                                       "Accounting date");
-                    sgj_js_nv_s_len(jsp, jo3p, "year_of_manufacture",
-                                    (const char *)(bp + 4), 4);
-                    sgj_js_nv_s_len(jsp, jo3p, "week_of_manufacture",
-                                    (const char *)(bp + 8), 2);
+                    sgj_js_nv_s_len_chk(jsp, jo3p, "year_of_manufacture",
+                                        bp + 4, 4);
+                    sgj_js_nv_s_len_chk(jsp, jo3p, "week_of_manufacture",
+                                        bp + 8, 2);
                 }
             } else if (op->verbose) {
                 pr2serr("%s: %s parameter length strange: %d\n", __func__,
@@ -7998,8 +7997,8 @@ show_device_stats_page(const uint8_t * resp, int len,
                 sgj_pr_hr(jsp, "  %s: %.*s\n", ccp, pl - 4, bp + 4);
                 if (jsp->pr_as_json) {
                     sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);
-                    sgj_js_nv_s_len(jsp, jo3p, "yyyymmdd",
-                                    (const char *)(bp + 4), pl - 4);
+                    sgj_js_nv_s_len_chk(jsp, jo3p, "yyyymmdd", bp + 4,
+                                        pl - 4);
                 }
                 break;
             case 0x43:          /* added ssc5r02b */
@@ -8008,8 +8007,7 @@ show_device_stats_page(const uint8_t * resp, int len,
                 sgj_pr_hr(jsp, "  %s: %.*s\n", ccp, pl - 4, bp + 4);
                 if (jsp->pr_as_json) {
                     sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);
-                    sgj_js_nv_s_len(jsp, jo3p, "yyyyww",
-                                    (const char *)(bp + 4), pl - 4);
+                    sgj_js_nv_s_len_chk(jsp, jo3p, "yyyyww", bp + 4, pl - 4);
                 }
                 break;
             case 0x80:
@@ -8603,12 +8601,12 @@ volume_stats_history(const char * name, const uint8_t * xp, int len,
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex(jsp, jo2p, "mount_history_index", mhi);
             if (dl >= 12) {
-                sgj_js_nv_s_len(jsp, jo2p, "mount_history_vendor_id",
-                                (const char *)xp + 4, 8);
+                sgj_js_nv_s_len_chk(jsp, jo2p, "mount_history_vendor_id",
+                                    xp + 4, 8);
                 if (dl > 12)
-                    sgj_js_nv_s_len(jsp, jo2p,
-                                    "mount_history_unit_serial_number",
-                                    (const char *)xp + 12, dl - 12);
+                    sgj_js_nv_s_len_chk(jsp, jo2p,
+                                        "mount_history_unit_serial_number",
+                                        xp + 12, dl - 12);
             }
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
@@ -8955,8 +8953,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);
                 if (is_str)
-                    sgj_js_nv_s_len(jsp, jo3p, ccp,
-                                    (const char *)(bp + 4), pl - 4);
+                    sgj_js_nv_s_len_chk(jsp, jo3p, ccp, bp + 4, pl - 4);
                 else
                     sgj_js_nv_ihexstr_nex(jsp, jo3p, "value", ull, true, NULL,
                                           is_unkn ? unkn_s : NULL, cc2p);
