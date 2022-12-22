@@ -97,8 +97,8 @@ typedef struct sgj_state_t {
  * "snake_case"). Parentheses and the characters between them are removed.
  * Returns sn_name (i.e. the pointer to the output buffer).
  * Note: strlen(in_name) should be <= max_sn_name_len . */
-char * sgj_convert_to_snake_name(const char * in_name, char * sn_name,
-                                 int max_sn_name_len);
+char * sgj_convert2snake(const char * in_name, char * sn_name,
+                         int max_sn_name_len);
 bool sgj_is_snake_name(const char * in_name);
 
 /* There are many variants of JSON supporting functions below and some
@@ -344,8 +344,8 @@ void sgj_haj_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 /* Breaks up the string pointed to by 'sp' into lines and adds them to the
  * jsp->out_hrp array. Treat '\n' in sp as line breaks. Consumes characters
  * from sp until either a '\0' is found or slen is exhausted. Add each line
- * to jsp->out_hrp JSON array (if conditions met). */
-void sgj_js_str_out(sgj_state * jsp, const char * sp, int slen);
+ * to jsp->out_hrp JSON array (if conditions met). Outputs to stdout. */
+void sgj_hr_str_out(sgj_state * jsp, const char * sp, int slen);
 
 /* This function only produces JSON output if jsp is non-NULL and
  * jsp->pr_as_json is true. 'sbp' is assumed to point to sense data as

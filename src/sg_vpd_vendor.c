@@ -96,21 +96,6 @@
 #define DEF_ALLOC_LEN 252
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 
-void
-dup_sanity_chk(int sz_opts_t, int sz_values_name_t)
-{
-    const size_t my_sz_opts_t = sizeof(struct opts_t);
-    const size_t my_sz_values_name_t = sizeof(struct svpd_values_name_t);
-
-    if (sz_opts_t != (int)my_sz_opts_t)
-        pr2serr(">>> struct opts_t differs in size from sg_vpd.c [%d != "
-                "%d]\n", (int)my_sz_opts_t, sz_opts_t);
-    if (sz_values_name_t != (int)my_sz_values_name_t)
-        pr2serr(">>> struct svpd_values_name_t differs in size from "
-                "sg_vpd.c [%d != %d]\n", (int)my_sz_values_name_t,
-                sz_values_name_t);
-}
-
 static bool
 is_like_pdt(int actual_pdt, const struct svpd_values_name_t * vnp)
 {

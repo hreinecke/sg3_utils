@@ -40,7 +40,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.42 20220807";
+static const char * version_str = "1.43 20221222";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -705,7 +705,8 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
     bool as_json = (jsp && (0 == op->do_hex)) ?  jsp->pr_as_json : false;
     bool found = false;
     uint8_t zt;
-    int k, res, resid, rlen, num_zd, num_rem;
+    int k, resid, rlen, num_zd, num_rem;
+    int res = 0;
     uint32_t zn_dnum = 0;
     uint64_t slba = op->st_lba;
     uint64_t mx_lba = 0;
@@ -838,7 +839,8 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
                   struct opts_t * op)
 {
     uint8_t zt, zc;
-    int k, res, resid, rlen, num_zd, num_rem;
+    int k, resid, rlen, num_zd, num_rem;
+    int res = 0;
     uint32_t zn_dnum = 0;
     uint64_t slba = op->st_lba;
     uint64_t mx_lba = 0;
@@ -856,7 +858,6 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
     num_rem = op->do_num ? op->do_num : INT_MAX;
     for ( ; num_rem > 0; num_rem -= num_zd) {
         resid = 0;
-        zs_lba = slba;
         if (sg_fd >= 0) {
             res = sg_ll_report_zzz(sg_fd, REPORT_ZONES_SA, slba,
                                    true /* set partial */, op->reporting_opt,
@@ -1154,6 +1155,8 @@ main(int argc, char * argv[])
     struct opts_t opts SG_C_CPP_ZERO_INIT;
     struct opts_t * op = &opts;
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
     op->serv_act = REPORT_ZONES_SA;
     while (1) {
         int option_index = 0;

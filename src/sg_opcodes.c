@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.86 20221005";    /* spc6r06 */
+static const char * version_str = "0.87 20221222";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -789,7 +789,14 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
     for (k = 0, j = 0; k < cd_len; ++j, k += len) {
         jop = sgj_new_unattached_object_r(jsp);
 
-        bp = op->do_unsorted ? (rsoc_buff + 4 + k) : sort_arr[j];
+        if (op->do_unsorted)
+            bp = rsoc_buff + 4 + k;
+        else if (sort_arr)
+            bp = sort_arr[j];
+        else {
+            pr2serr("%s: logic error\n", __func__);
+            return sg_convert_errno(EDOM);
+        }
         byt5 = bp[5];
         len = (byt5 & 0x2) ? 20 : 8;
         opcode = bp[0];
@@ -826,9 +833,9 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                     n += sg_scnpr(b + n, blen - n, "  %8u", timeout);
                 timeout = sg_get_unaligned_be32(bp + 16);
                 if (0 == timeout)
-                    n += sg_scnpr(b + n, blen - n, "          -");
+                    sg_scnpr(b + n, blen - n, "          -");
                 else
-                    n += sg_scnpr(b + n, blen - n, "   %8u", timeout);
+                    sg_scnpr(b + n, blen - n, "   %8u", timeout);
                 sgj_pr_hr(jsp, "%s    %s\n", b, name_buff);
             } else                      /* CTDP clear */
                 if (op->do_compact)
@@ -989,7 +996,7 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
     jop = sgj_named_subobject_r(jsp, jsp->basep, "one_command_descriptor");
     n += sg_scnpr(b + n, blen - n, "\n  Opcode=0x%.2x", op->opcode);
     if (rep_opts > 1)
-        n += sg_scnpr(b + n, blen - n, "  Service_action=0x%.4x", op->servact);
+        sg_scnpr(b + n, blen - n, "  Service_action=0x%.4x", op->servact);
     sgj_pr_hr(jsp, "%s\n", b);
     sg_get_opcode_sa_name(((op->opcode > 0) ? op->opcode : 0),
                           ((op->servact > 0) ? op->servact : 0),
@@ -1129,6 +1136,8 @@ main(int argc, char * argv[])
 
     op = &opts;
     memset(op, 0, sizeof(opts));
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
     op->opcode = -1;
     op->servact = -1;
     res = parse_cmd_line(op, argc, argv);
@@ -1256,7 +1265,6 @@ main(int argc, char * argv[])
             res = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        res = 0;
         act_len = in_len;
         goto start_response;
     }

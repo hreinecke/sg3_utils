@@ -50,6 +50,7 @@ static const json_serialize_opts default_opts =
    3  /* indent_size */
 };
 
+/* json_builder_value is derived from json_value */
 typedef struct json_builder_value
 {
    json_value value;
@@ -132,6 +133,7 @@ static int get_serialize_flags (json_serialize_opts opts)
 
 json_value * json_array_new (size_t length)
 {
+    /* 'value' will be pointer to an instance of the base class json_value */
     json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
 
     if (!value)

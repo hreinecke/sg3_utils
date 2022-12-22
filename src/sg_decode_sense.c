@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.33 20221215";
+static const char * version_str = "1.34 20221220";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -349,6 +349,8 @@ main(int argc, char *argv[])
     uint8_t * free_op_buff = NULL;
     char b[2048];
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
     op = (struct opts_t *)sg_memalign(sizeof(*op), 0 /* page align */,
                                       &free_op_buff, false);
     if (NULL == op) {
@@ -527,7 +529,7 @@ main(int argc, char *argv[])
                 if (jsp->pr_out_hr) {
                     sg_get_sense_str(NULL, op->sense, op->sense_len,
                                      op->verbose, blen, b);
-                     sgj_js_str_out(jsp, b, strlen(b));
+                     sgj_hr_str_out(jsp, b, strlen(b));
                 }
             } else {
                 sg_get_sense_str(NULL, op->sense, op->sense_len,

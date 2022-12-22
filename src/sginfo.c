@@ -124,7 +124,7 @@
 #define _GNU_SOURCE 1
 #endif
 
-static const char * version_str = "2.45 [20220425]";
+static const char * version_str = "2.46 [20221216]";
 
 #include <stdio.h>
 #include <string.h>
@@ -3054,7 +3054,7 @@ print_hex_page(struct mpage_info * mpi, const char * prefix,
     }
     for (k = off; k < len; k++)
     {
-        char nm[8];
+        char nm[16];    /* idiotic code checkers caused this change */
 
         snprintf(nm, sizeof(nm), "0x%02x", (unsigned char)k);
         hexdatafield(pagestart + k, 1, nm);

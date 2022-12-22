@@ -14,6 +14,8 @@ Briefly, the shell commands './configure; make; make install' should
 configure, build, and install this package. If that fails try
 doing './autogen.sh' first and then repeat the above sequence. The
 autogen.sh script may require some autotools packages to be loaded.
+Note that some autotools packages use the script name 'bootstrap'
+instead of 'autogen.sh', they both have similar functions.
 
 The following more detailed instructions are generic; see the `README'
 file for instructions specific to this package.

@@ -44,7 +44,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.17 20220717";
+static const char * version_str = "1.18 20221220";
 
 
 #define MY_NAME "tst_sg_lib"
@@ -367,10 +367,10 @@ main(int argc, char * argv[])
         }
 #if 1
         if (as_json) {
-            sgj_js_str_out(jsp, "sg_get_sense_str(ds_data1)", 999);
+            sgj_hr_str_out(jsp, "sg_get_sense_str(ds_data1)", 999);
             sg_get_sense_str(leadin, desc_sense_data1,
                              sizeof(desc_sense_data1), vb, b_len, b);
-            sgj_js_str_out(jsp, b, strlen(b));
+            sgj_hr_str_out(jsp, b, strlen(b));
 
         } else {
             printf("sg_get_sense_str(ds_data1):\n");

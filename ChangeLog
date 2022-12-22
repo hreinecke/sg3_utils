@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20221215] [svn: r989]
+Changelog for pre-release sg3_utils-1.48 [20221222] [svn: r990]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -74,6 +74,7 @@ Changelog for pre-release sg3_utils-1.48 [20221215] [svn: r989]
     - extend --all so after join output, the remaining dpages,
       not already shown in the join output, are output
     - add --js-file= option to send json output to a file
+    - add --no-config option for debugging
   - sg_turs: change nanosleep() to Sleep() in MinGW
     - see sg_lib below for two new exit status values
   - sg_stream_ctl: fix --get indexing

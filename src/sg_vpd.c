@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.85 20221213";  /* spc6r06 + sbc5r03 */
+static const char * version_str = "1.86 20221221";  /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_vpd"
 
@@ -387,8 +387,8 @@ std_inq_decode(uint8_t * b, int len, struct opts_t * op, sgj_opaque_p jop)
         n += sg_scnpr(c + n, clen - n, "MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
     else
         n += sg_scnpr(c + n, clen - n, "MultiP=0  ");
-    n += sg_scnpr(c + n, clen - n, "[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d",
-                  !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01));
+    sg_scnpr(c + n, clen - n, "[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d",
+             !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01));
     sgj_pr_hr(jsp, "  %s\n", c);
     sgj_pr_hr(jsp, "  [RelAdr=%d]  WBus16=%d  Sync=%d  [Linked=%d]  "
               "[TranDis=%d]  CmdQue=%d\n", !!(b[7] & 0x80), !!(b[7] & 0x20),
@@ -845,7 +845,7 @@ filter_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
             if (strlen(print_if_found) > 0) {
                 snprintf(b, blen, "  %s:", print_if_found);
                 if (sgj_out_hr)
-                    sgj_js_str_out(jsp, b, strlen(b));
+                    sgj_hr_str_out(jsp, b, strlen(b));
                 else
                     printf("%s\n", b);
             }
@@ -853,14 +853,14 @@ filter_dev_ids(const char * print_if_found, int num_leading, uint8_t * buff,
         if (NULL == print_if_found) {
             snprintf(b, blen, "  %s%s:", sp, sg_get_desig_assoc_str(assoc));
             if (sgj_out_hr)
-                sgj_js_str_out(jsp, b, strlen(b));
+                sgj_hr_str_out(jsp, b, strlen(b));
             else
                 printf("%s\n", b);
         }
         sg_get_designation_descriptor_str(sp, bp, i_len + 4, false,
                                           op->do_long, blen, b);
         if (sgj_out_hr)
-            sgj_js_str_out(jsp, b, strlen(b));
+            sgj_hr_str_out(jsp, b, strlen(b));
         else
             printf("%s", b);
     }
@@ -1099,9 +1099,9 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         n = len * 4;
         p = (char *)malloc(n);
         if (p) {
-            n = hex2str(rp, len, NULL, 1, n - 1, p);
+            hex2str(rp, len, NULL, 1, n - 1, p);
             if (json_o_hr)
-                sgj_js_str_out(jsp, p, strlen(p));
+                sgj_hr_str_out(jsp, p, strlen(p));
             else
                 sgj_pr_hr(jsp, "%s\n", p);
             free(p);
@@ -1184,7 +1184,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         allow_name = true;
     allow_if_found = op->examine_given && (! op->do_quiet);
     rp = rsp_buff + off;
-    pn = op->vpd_pn;
     if ((off > 0) && (VPD_NOPE_WANT_STD_INQ != op->vpd_pn))
         pn = rp[1];
     else
@@ -1246,7 +1245,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 if (! op->do_quiet && (op->do_hex < 3))
                     sgj_pr_hr(jsp, "%s:\n", np);
                 if (op->do_hex > 2)
-                    named_hhh_output(np, rp, len, op);
+                    named_hhh_output(np, rp, alloc_len, op);
                 else
                     hex2stdout(rp, alloc_len, (1 == op->do_hex) ? 0 : -1);
             } else
@@ -1273,9 +1272,6 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 if (vb || long_notquiet)
                     sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
                               "%s]\n", pqual, pdt_str);
-                num = rp[3];
-                if (num > (len - 4))
-                    num = (len - 4);
                 if (as_json) {
                     jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
                     jap = sgj_named_subarray_r(jsp, jo2p,
@@ -2348,8 +2344,8 @@ main(int argc, char * argv[])
     struct opts_t opts SG_C_CPP_ZERO_INIT;
     struct opts_t * op = &opts;
 
-    op->invoker = SG_VPD_INV_SG_VPD;
-    dup_sanity_chk((int)sizeof(opts), (int)sizeof(*vnp));
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
     op->vend_prod_num = -1;
     while (1) {
         int option_index = 0;

@@ -118,15 +118,9 @@ extern "C" {
 #define MX_ALLOC_LEN (0xc000 + 0x80)
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
-enum sg_vpd_invoker_e {
-    SG_VPD_INV_NONE = 0,
-    SG_VPD_INV_SG_INQ,
-    SG_VPD_INV_SG_VPD,
-};
 
 /* This structure holds the union of options available in sg_inq and sg_vpd */
 struct opts_t {
-    enum sg_vpd_invoker_e invoker;  /* indicates if for sg_inq or sg_vpd */
     bool do_all;                /* sg_vpd */
     bool do_ata;                /* sg_inq */
     bool do_decode;             /* sg_inq */
@@ -276,7 +270,6 @@ const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
                                                           int vend_prod_num);
 int vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen,
                    bool qt, int vb, int * rlenp);
-void dup_sanity_chk(int sz_opts_t, int sz_values_name_t);
 
 void named_hhh_output(const char * pname, const uint8_t * buff, int len,
                       const struct opts_t * op);

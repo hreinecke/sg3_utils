@@ -798,6 +798,11 @@ void sg_set_big_endian(uint64_t val, uint8_t * to, int start_bit /* 0 to 7 */,
  * os_err_num is 0 then 0 is returned. */
 int sg_convert_errno(int os_err_num);
 
+/* Report utility name, version string and invocation arguments to the file
+ * pointed to be fp. If fp is NULL, outputs to stdout. */
+void sg_rep_invocation(const char * util_name, const char * ver_str,
+		       int argc, char *argv[], FILE * fp);
+
 
 /* <<< Architectural support functions [is there a better place?] >>> */
 

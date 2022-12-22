@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.15 20220807";      /* sbc5r03 */
+static const char * version_str = "1.16 20221221";      /* sbc5r03 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -305,6 +305,8 @@ main(int argc, char * argv[])
     char b[80];
     static const int blen = sizeof(b);
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
     while (1) {
         int option_index = 0;
 
@@ -478,7 +480,6 @@ main(int argc, char * argv[])
                 ret = SG_LIB_SYNTAX_ERROR;
                 goto fini;
             }
-            res = 0;
             goto start_response;
         } else {
             pr2serr("missing device name!\n\n");
@@ -616,8 +617,7 @@ start_response:
             else
                 m += sg_scnpr(b2 + m, b2len - m, "%s", b);
             if (a_ped.restoration_allowed)
-                m += sg_scnpr(b2 + m, b2len - m,
-                              " [restoration allowed [RALWD]]");
+                sg_scnpr(b2 + m, b2len - m, " [restoration allowed [RALWD]]");
             sgj_pr_hr(jsp, "%s\n", b2);
         }
     }

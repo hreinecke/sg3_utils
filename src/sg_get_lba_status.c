@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.32 20221211";      /* sbc5r03++ */
+static const char * version_str = "1.33 20221222";      /* sbc5r03++ */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -286,6 +286,8 @@ main(int argc, char * argv[])
     static const char * compl_cond_s = "Completion condition";
     static const char * compl_cond_sn = "completion_condition";
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
     while (1) {
         int option_index = 0;
 
@@ -637,11 +639,11 @@ start_response:
             n = 0;
             n += sg_scnpr(b + n, blen - n, "0x%" PRIx64, d_lba);
             if ((0 == blockhex) || (1 == (blockhex % 2)))
-                n += sg_scnpr(b + n, blen - n, "  0x%x  %d  %d",
-                              (unsigned int)d_blocks, res, add_status);
+                sg_scnpr(b + n, blen - n, "  0x%x  %d  %d",
+                         (unsigned int)d_blocks, res, add_status);
             else
-                n += sg_scnpr(b + n, blen - n, "  %u  %d  %d",
-                              (unsigned int)d_blocks, res, add_status);
+                sg_scnpr(b + n, blen - n, "  %u  %d  %d",
+                         (unsigned int)d_blocks, res, add_status);
             sgj_pr_hr(jsp, "%s\n", b);
             sgj_js_nv_ihex(jsp, jo2p, "lba", d_lba);
             sgj_js_nv_ihex(jsp, jo2p, "blocks", d_blocks);
@@ -675,7 +677,7 @@ start_response:
                 n += sg_scnpr(b + n, blen - n, "  %s", d);
                 get_pr_status_str(add_status, d, sizeof(d));
                 if (strlen(d) > 0)
-                    n += sg_scnpr(b + n, blen - n, "  [%s]", d);
+                    sg_scnpr(b + n, blen - n, "  [%s]", d);
                 sgj_pr_hr(jsp, "%s\n", b);
             }
         }

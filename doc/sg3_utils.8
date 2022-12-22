@@ -92,6 +92,15 @@ The SG3_UTILS_OLD_OPTS environment variable is explained in the previous
 section. It is only for backward compatibility of the command line options
 for older utilities.
 .PP
+The SG3_UTILS_INVOCATION environment variable has been implemented on some
+utilities that decode a lot of data. When set then those utilities will print
+out a line of 60 "v" characters. After that the utility name and
+version (which includes a date) followed by a line by line breakdown of the
+command line arguments that the utility was invoked with. The command line
+arguments includes the utility name and options in the order they were given.
+The output is sent to stdout. The option is designed to help automatic
+testing of utilities in the package.
+.PP
 The SG3_UTILS_DSENSE environment variable may be set to a number. It is
 only used by the embedded SNTL within the library used by the utilities in
 this library. SNTL is a SCSI to NVMe Translation Layer. This environment

@@ -759,7 +759,7 @@ decode_mode_policy_vpd(const uint8_t * buff, int len, struct opts_t * op,
             pspc = bp[1];
             n = sg_scnpr(b + n, blen - n, "  Policy page code: 0x%x", ppc);
             if (pspc)
-                n += sg_scnpr(b + n, blen - n, ",  subpage code: 0x%x", pspc);
+                sg_scnpr(b + n, blen - n, ",  subpage code: 0x%x", pspc);
             sgj_pr_hr(jsp, "%s\n", b);
             if ((0 == k) && (0x3f == (0x3f & bp[0])) && (0xff == bp[1]))
                 sgj_pr_hr(jsp, "  therefore the policy applies to all modes "
@@ -932,7 +932,7 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
         num = sg_ata_get_chars((const unsigned short *)(buff + 60), 23, 4,
                                is_be, d);
         d[num] = '\0';
-        n += sg_scnpr(b + n, blen - n, "    firmware revision: %s\n", d);
+        sg_scnpr(b + n, blen - n, "    firmware revision: %s\n", d);
         sgj_pr_hr(jsp, "%s", b);
         if (do_long_nq)
             sgj_pr_hr(jsp, "  ATA command IDENTIFY %sDEVICE response in "
@@ -941,11 +941,11 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
         sgj_pr_hr(jsp, "  ATA command 0x%x got following response:\n",
                   (unsigned int)cc);
     if (jsp->pr_as_json) {
-        sgj_convert_to_snake_name(sat_vip, d, dlen);
+        sgj_convert2snake(sat_vip, d, dlen);
         sgj_js_nv_s_len(jsp, jop, d, (const char *)(buff + 8), 8);
-        sgj_convert_to_snake_name(sat_pip, d, dlen);
+        sgj_convert2snake(sat_pip, d, dlen);
         sgj_js_nv_s_len(jsp, jop, d, (const char *)(buff + 16), 16);
-        sgj_convert_to_snake_name(sat_prlp, d, dlen);
+        sgj_convert2snake(sat_prlp, d, dlen);
         sgj_js_nv_s_len(jsp, jop, d, (const char *)(buff + 32), 4);
         sgj_js_nv_hex_bytes(jsp, jop, "ata_device_signature", buff + 36, 20);
         sgj_js_nv_ihex(jsp, jop, "command_code", buff[56]);
@@ -1370,7 +1370,7 @@ decode_power_consumption(const uint8_t * buff, int len, struct opts_t * op,
             pcmp_unit = 0x7 & bp[1];
             pcmp_val = sg_get_unaligned_be16(bp + 2);
             if (jsp->pr_as_json) {
-                sgj_convert_to_snake_name(pci, b, blen);
+                sgj_convert2snake(pci, b, blen);
                 sgj_js_nv_ihex(jsp, jo2p, b, pcmp_id);
                 snprintf(b, blen, "%s_units", pcmp);
                 sgj_js_nv_ihexstr(jsp, jo2p, b, pcmp_unit, NULL,
@@ -1442,7 +1442,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     u = buff[5];
     if (0 == u) {
         sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mcawl, cni);
-        sgj_convert_to_snake_name(mcawl, b, blen);
+        sgj_convert2snake(mcawl, b, blen);
         sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, cni);
     } else
         sgj_haj_vi_nex(jsp, jop, 2, mcawl, SGJ_SEP_COLON_1_SPACE, u,
@@ -1451,7 +1451,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     u = sg_get_unaligned_be16(buff + 6);
     if (0 == u) {
         sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", otlg, nr_s);
-        sgj_convert_to_snake_name(otlg, b, blen);
+        sgj_convert2snake(otlg, b, blen);
         sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
         sgj_haj_vi_nex(jsp, jop, 2, otlg, SGJ_SEP_COLON_1_SPACE, u,
@@ -1460,7 +1460,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     u = sg_get_unaligned_be32(buff + 8);
     if (0 == u) {
         sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mtl, nr_s);
-        sgj_convert_to_snake_name(mtl, b, blen);
+        sgj_convert2snake(mtl, b, blen);
         sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
         sgj_haj_vi_nex(jsp, jop, 2, mtl, SGJ_SEP_COLON_1_SPACE, u,
@@ -1469,7 +1469,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     u = sg_get_unaligned_be32(buff + 12);
     if (0 == u) {
         sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", otl, nr_s);
-        sgj_convert_to_snake_name(otl, b, blen);
+        sgj_convert2snake(otl, b, blen);
         sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
     } else
         sgj_haj_vi_nex(jsp, jop, 2, otl, SGJ_SEP_COLON_1_SPACE, u,
@@ -1478,7 +1478,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         u = sg_get_unaligned_be32(buff + 16);
         if (0 == u) {
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mpl, nr_s);
-            sgj_convert_to_snake_name(mpl, b, blen);
+            sgj_convert2snake(mpl, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
             sgj_haj_vi_nex(jsp, jop, 2, mpl, SGJ_SEP_COLON_1_SPACE, u,
@@ -1486,7 +1486,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
     }
     if (len > 27) {     /* added in sbc3r18 */
         u = sg_get_unaligned_be32(buff + 20);
-        sgj_convert_to_snake_name(mulc, b, blen);
+        sgj_convert2snake(mulc, b, blen);
         if (0 == u) {
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mulc, cni);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, cni);
@@ -1498,7 +1498,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
                            true, "unit: LB");
 
         u = sg_get_unaligned_be32(buff + 24);
-        sgj_convert_to_snake_name(mulc, b, blen);
+        sgj_convert2snake(mulc, b, blen);
         if (0 == u) {
             sgj_pr_hr(jsp, "  %s: 0 block descriptors [%s]\n", mubdc, cni);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, cni);
@@ -1513,7 +1513,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         u = sg_get_unaligned_be32(buff + 28);
         if (0 == u) {
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", oug, nr_s);
-            sgj_convert_to_snake_name(oug, b, blen);
+            sgj_convert2snake(oug, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
             sgj_haj_vi_nex(jsp, jop, 2, oug, SGJ_SEP_COLON_1_SPACE, u,
@@ -1532,7 +1532,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         ull = sg_get_unaligned_be64(buff + 36);
         if (0 == ull) {
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mwsl, nr_s);
-            sgj_convert_to_snake_name(mwsl, b, blen);
+            sgj_convert2snake(mwsl, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, ull, NULL, nr_s);
         } else
             sgj_haj_vi_nex(jsp, jop, 2, mwsl, SGJ_SEP_COLON_1_SPACE,
@@ -1542,7 +1542,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         u = sg_get_unaligned_be32(buff + 44);
         if (0 == u) {
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", matl, nr_s);
-            sgj_convert_to_snake_name(matl, b, blen);
+            sgj_convert2snake(matl, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
             sgj_haj_vi_nex(jsp, jop, 2, matl, SGJ_SEP_COLON_1_SPACE,
@@ -1553,7 +1553,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             static const char * uawp = "unaligned atomic writes permitted";
 
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", aa, uawp);
-            sgj_convert_to_snake_name(aa, b, blen);
+            sgj_convert2snake(aa, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, uawp);
         } else
             sgj_haj_vi_nex(jsp, jop, 2, aa, SGJ_SEP_COLON_1_SPACE,
@@ -1564,7 +1564,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             static const char * ngr = "no granularity requirement";
 
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", atlg, ngr);
-            sgj_convert_to_snake_name(atlg, b, blen);
+            sgj_convert2snake(atlg, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, ngr);
         } else
             sgj_haj_vi_nex(jsp, jop, 2, aa, SGJ_SEP_COLON_1_SPACE,
@@ -1574,7 +1574,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
         u = sg_get_unaligned_be32(buff + 56);
         if (0 == u) {
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", matlwab, nr_s);
-            sgj_convert_to_snake_name(matlwab, b, blen);
+            sgj_convert2snake(matlwab, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, nr_s);
         } else
             sgj_haj_vi_nex(jsp, jop, 2, matlwab, SGJ_SEP_COLON_1_SPACE,
@@ -1585,7 +1585,7 @@ decode_block_limits_vpd(const uint8_t * buff, int len, struct opts_t * op,
             static const char * cowa1b = "can only write atomic 1 block";
 
             sgj_pr_hr(jsp, "  %s: 0 blocks [%s]\n", mabs, cowa1b);
-            sgj_convert_to_snake_name(mabs, b, blen);
+            sgj_convert2snake(mabs, b, blen);
             sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, cowa1b);
         } else
             sgj_haj_vi_nex(jsp, jop, 2, mabs, SGJ_SEP_COLON_1_SPACE,
@@ -1784,7 +1784,7 @@ decode_block_lb_prov_vpd(const uint8_t * buff, int len, struct opts_t * op,
         sgj_pr_hr(jsp, "  %s: 0 [%s]\n", mp, nr_s);
     else
         sgj_pr_hr(jsp, "  %s: %u\n", mp, u);
-    sgj_convert_to_snake_name(mp, b, blen);
+    sgj_convert2snake(mp, b, blen);
     sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, (0 == u) ? nr_s : NULL);
     pt = buff[6] & 0x7;
     cp = prov_type_arr[pt];
@@ -1800,7 +1800,7 @@ decode_block_lb_prov_vpd(const uint8_t * buff, int len, struct opts_t * op,
         sgj_pr_hr(jsp, "  %s: 0 [percentages %s]\n", b, ns_s);
     else
         sgj_pr_hr(jsp, "  %s: %u", b, u);
-    sgj_convert_to_snake_name(tp, b, blen);
+    sgj_convert2snake(tp, b, blen);
     sgj_js_nv_ihexstr(jsp, jop, b, u, NULL, (0 == u) ? ns_s : NULL);
     if (dp && (len > 11)) {
         int i_len;
@@ -1821,7 +1821,7 @@ decode_block_lb_prov_vpd(const uint8_t * buff, int len, struct opts_t * op,
         sg_get_designation_descriptor_str("    ", bp, i_len + 4, true,
                                           op->do_long, blen, b);
         if (jsp->pr_as_json && jsp->pr_out_hr)
-            sgj_js_str_out(jsp, b, strlen(b));
+            sgj_hr_str_out(jsp, b, strlen(b));
         else
             sgj_pr_hr(jsp, "%s", b);
     }
@@ -2007,8 +2007,8 @@ decode_block_dev_char_ext_vpd(const uint8_t * buff, int len,
         n += sg_scnpr(b + n, blen - n, "%u %s for reads and ", u, uup);
     u = sg_get_unaligned_be32(buff + 12);
     sgj_haj_vi(jsp, jop, 2, "Utilization A", SGJ_SEP_COLON_1_SPACE, u, true);
-    n += sg_scnpr(b + n, blen - n, "%u %s for %swrites, %s", u, uup,
-                  combined ? "reads and " : null_s, uip);
+    sg_scnpr(b + n, blen - n, "%u %s for %swrites, %s", u, uup,
+             combined ? "reads and " : null_s, uip);
     sgj_pr_hr(jsp, "  %s\n", b);
     if (jsp->pr_string)
         sgj_js_nv_s(jsp, jop, "summary", b);
@@ -2257,12 +2257,12 @@ decode_format_presets_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_pr_hr(jsp, "    Defines zones for host aware device:\n");
             u = bp[40 + 0];
             sgj_pr_hr(jsp, "      %s: %u.%u %%\n", llczp, u / 10, u % 10);
-            sgj_convert_to_snake_name(llczp, b, blen);
+            sgj_convert2snake(llczp, b, blen);
             sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
                                "percent");
             u = bp[40 + 1];
             sgj_pr_hr(jsp, "      %s: %u.%u %%\n", hlczp, u / 10, u % 10);
-            sgj_convert_to_snake_name(hlczp, b, blen);
+            sgj_convert2snake(hlczp, b, blen);
             sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
                                "percent");
             u = sg_get_unaligned_be32(bp + 40 + 12);
@@ -2274,12 +2274,12 @@ decode_format_presets_vpd(const uint8_t * buff, int len, struct opts_t * op,
             sgj_pr_hr(jsp, "    Defines zones for host managed device:\n");
             u = bp[40 + 0];
             sgj_pr_hr(jsp, "      %s: %u.%u %%\n", llczp, u / 10, u % 10);
-            sgj_convert_to_snake_name(llczp, b, blen);
+            sgj_convert2snake(llczp, b, blen);
             sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
                                "percent");
             u = bp[40 + 1];
             sgj_pr_hr(jsp, "      %s: %u.%u %%\n", hlczp, u / 10, u % 10);
-            sgj_convert_to_snake_name(hlczp, b, blen);
+            sgj_convert2snake(hlczp, b, blen);
             sgj_js_nv_ihex_nex(jsp, jo3p, b, u, true, "unit: 1/10 of a "
                                "percent");
             u = bp[40 + 3] & 0x7;
@@ -3279,7 +3279,7 @@ decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
     else
        n += sg_scnpr(b + n, blen - n, "%s", sp_arr[uc]);
     sgj_js_nv_ihexstr(jsp, jop, "path_connects_to", uc, NULL, b);
-    n += sg_scnpr(b + n, blen - n, ", Port Number: %u", buff[7]);
+    sg_scnpr(b + n, blen - n, ", Port Number: %u", buff[7]);
     sgj_pr_hr(jsp, "  This path connects to: %s\n", b);
     sgj_js_nv_ihex(jsp, jop, "port_number", buff[7]);
 
@@ -3387,7 +3387,7 @@ decode_rdac_vpd_c2(uint8_t * buff, int len, struct opts_t * op,
     if (buff[14] & 0x08)
         n += sg_scnpr(b + n, blen - n, " DCE/DRM/DSS/DVE,");
     if (buff[14] & 0x10)
-        n += sg_scnpr(b + n, blen - n, " Asymmetric Logical Unit Access,");
+        sg_scnpr(b + n, blen - n, " Asymmetric Logical Unit Access,");
     sgj_pr_hr(jsp, "%s\n", b);
     if (jsp->pr_as_json) {
         jo2p = sgj_snake_named_subobject_r(jsp, jop, "features");
@@ -3550,13 +3550,12 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
                               "Enabled",
                               "a.k.a. ALUA (Asymmetric Logical Unit Access)");
     } else {
-        n = 0;
         n = snprintf(b, blen, "  AVT:");
         n_hold = n;
         if (buff[8] & 0x80) {
             n += sg_scnpr(b + n, blen - n, " Enabled");
             if (buff[8] & 0x40)
-                n += sg_scnpr(b + n, blen - n, " (Allow reads on sector 0)");
+                sg_scnpr(b + n, blen - n, " (Allow reads on sector 0)");
             sgj_pr_hr(jsp, "%s\n", b);
             sgj_js_nv_ihexstr(jsp, jop, "avt", buff[8], NULL, b + n_hold);
 
@@ -3662,9 +3661,9 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
         if (jsp->pr_as_json) {
             jo2p = sgj_snake_named_subobject_r(jsp, jop, tpg_s);
             jo3p = sgj_snake_named_subobject_r(jsp, jo2p, "this_controller");
-            sgj_convert_to_snake_name(aas_s, b, blen);
+            sgj_convert2snake(aas_s, b, blen);
             sgj_js_nv_ihexstr(jsp, jo3p, b, buff[10], NULL, d1);
-            sgj_convert_to_snake_name(vsf_s, b, blen);
+            sgj_convert2snake(vsf_s, b, blen);
             sgj_js_nv_ihexstr(jsp, jo3p, b, buff[11], NULL, d2);
         }
         sgj_pr_hr(jsp, " Target Port Group Data (Alternate controller):\n");
@@ -3678,9 +3677,9 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
             jo2p = sgj_snake_named_subobject_r(jsp, jop, tpg_s);
             jo3p = sgj_snake_named_subobject_r(jsp, jo2p,
                                                "alternate_controller");
-            sgj_convert_to_snake_name(aas_s, b, blen);
+            sgj_convert2snake(aas_s, b, blen);
             sgj_js_nv_ihexstr(jsp, jo3p, b, buff[12], NULL, d1);
-            sgj_convert_to_snake_name(vsf_s, b, blen);
+            sgj_convert2snake(vsf_s, b, blen);
             sgj_js_nv_ihexstr(jsp, jo3p, b, buff[13], NULL, d2);
         }
     }

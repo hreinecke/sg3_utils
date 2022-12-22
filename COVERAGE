@@ -21,7 +21,7 @@ COPY OPERATION ABORT    ddptctl, ++
 EXTENDED COPY(LID1)    sg_xcopy, ddpt, ++
 GET CONFIGURATION   sg_get_config, ++
 GET LBA STATUS      sg_get_lba_status, ++ <J>
-GET PHYSICAL ELEMENT STATUS      sg_get_elem_status, ++
+GET PHYSICAL ELEMENT STATUS      sg_get_elem_status, ++ <J>
 GET STREAM STATUS   sg_stream_ctl
 INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
                     sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
@@ -188,4 +188,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-12 December 2022
+21 December 2022

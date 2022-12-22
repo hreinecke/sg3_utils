@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.15 20221215";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.16 20221222";    /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_logs"
 
@@ -983,7 +983,7 @@ js_snakenv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop,
     else {
         char b[128];
 
-        sgj_convert_to_snake_name(conv2sname, b, sizeof(b));
+        sgj_convert2snake(conv2sname, b, sizeof(b));
         sgj_js_nv_ihexstr_nex(jsp, jop, b, val_i, hex_as_well, str_name,
                               val_s, nex_s);
     }
@@ -2011,7 +2011,7 @@ show_error_counter_page(const uint8_t * resp, int len,
         jo2p = sg_log_js_hdr(jsp, jop, b, resp);
         n = strlen(b);
         memcpy(b + n, " parameters", 11 + 1);
-        sgj_convert_to_snake_name(b, d, sizeof(d) - 1);
+        sgj_convert2snake(b, d, sizeof(d) - 1);
         jap = sgj_named_subarray_r(jsp, jo2p, d);
     }
     num = len - 4;
@@ -2097,7 +2097,7 @@ show_error_counter_page(const uint8_t * resp, int len,
             if (jsp->pr_as_json) {
                 js_snakenv_ihexstr_nex(jsp, jo3p, param_c, pc, true,
                                        NULL, par_cp, NULL);
-                sgj_convert_to_snake_name(pg_cp, e, sizeof(e) - 1);
+                sgj_convert2snake(pg_cp, e, sizeof(e) - 1);
                 sgj_js_nv_ihexstr(jsp, jo3p, e, val, as_s_s, d);
             }
         }
@@ -3755,12 +3755,10 @@ show_self_test_page(const uint8_t * resp, int len, struct opts_t * op,
 
         addr_all_ffs = sg_all_ffs(bp + 8, 8);
         if (! addr_all_ffs) {
-            addr_all_ffs = false;
             if ((res > 0) && ( res < 0xf))
                 sgj_pr_hr(jsp, "    address of first error = 0x%" PRIx64 "\n",
                           ull);
         }
-            addr_all_ffs = false;
         v = bp[16] & 0xf;
         if (v) {
             if (op->do_brief)
@@ -4779,7 +4777,7 @@ show_sas_port_param(const uint8_t * bp, int param_len, struct opts_t * op,
             cc2p = sas_negot_link_rate(t, s, sz);
             sgj_pr_hr(jsp, "    %s: %s\n", ccp, cc2p);
             if (jsp->pr_as_json) {
-                sgj_convert_to_snake_name(ccp, b, blen);
+                sgj_convert2snake(ccp, b, blen);
                 sgj_js_nv_ihexstr(jsp, jo2p, b, t, NULL, cc2p);
             }
 
@@ -4823,13 +4821,13 @@ show_sas_port_param(const uint8_t * bp, int param_len, struct opts_t * op,
             cc4p = "Phy reset problem count";
             ui4 = sg_get_unaligned_be32(vcp + 44);
             if (jsp->pr_as_json) {
-                sgj_convert_to_snake_name(ccp, b, blen);
+                sgj_convert2snake(ccp, b, blen);
                 sgj_js_nv_ihex(jsp, jo2p, b, ui);
-                sgj_convert_to_snake_name(cc2p, b, blen);
+                sgj_convert2snake(cc2p, b, blen);
                 sgj_js_nv_ihex(jsp, jo2p, b, ui2);
-                sgj_convert_to_snake_name(cc3p, b, blen);
+                sgj_convert2snake(cc3p, b, blen);
                 sgj_js_nv_ihex(jsp, jo2p, b, ui3);
-                sgj_convert_to_snake_name(cc4p, b, blen);
+                sgj_convert2snake(cc4p, b, blen);
                 sgj_js_nv_ihex(jsp, jo2p, b, ui4);
             } else {
                 if (0 == op->do_brief) {
@@ -4888,7 +4886,7 @@ show_sas_port_param(const uint8_t * bp, int param_len, struct opts_t * op,
                     }
                 } else {
                     if (jsp->pr_as_json) {
-                        sgj_convert_to_snake_name(ccp, s, sz);
+                        sgj_convert2snake(ccp, s, sz);
                         sgj_js_nv_ihex(jsp, jo3p, s, ui);
                         if (0x2b == pes)
                             sgj_js_nv_ihex(jsp, jo3p, pvdt, pvdt_v);
@@ -5453,7 +5451,7 @@ show_cache_stats_page(const uint8_t * resp, int len, struct opts_t * op,
             sgj_haj_vi(jsp, jo3p, 4, ccp, sep, ui, true);
             ui = sg_get_unaligned_be32(bp + 8);
             ccp = nm ? "time_interval_int" : "time interval integer";
-            sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);
+            sgj_haj_vi(jsp, jo3p, 4, ccp, sep, ui, true);
             break;
         default:
             if (nm) {
@@ -5594,7 +5592,7 @@ show_format_status_page(const uint8_t * resp, int len,
             }
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, cp);
-                sgj_convert_to_snake_name(cp, b, blen);
+                sgj_convert2snake(cp, b, blen);
                 if (is_not_avail)
                     sgj_js_nv_ihexstr(jsp, jo3p, b, 0, NULL, not_avail);
                 else
@@ -5948,7 +5946,7 @@ show_utilization_page(const uint8_t * resp, int len, struct opts_t * op,
             sgj_pr_hr(jsp, "  %s: %s\n", wu_s, b);
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, wu_s);
-                sgj_convert_to_snake_name(wu_s, b, blen);
+                sgj_convert2snake(wu_s, b, blen);
                 sgj_js_nv_ihexstr_nex(jsp, jo3p, b, k, true, NULL, NULL,
                               "1 --> 0.01%, 65535 --> 655.35% or more");
             }
@@ -5967,7 +5965,7 @@ show_utilization_page(const uint8_t * resp, int len, struct opts_t * op,
             sgj_pr_hr(jsp, "  %s: %d %%\n", uurbodat, k);
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, uurbodat);
-                sgj_convert_to_snake_name(wu_s, b, blen);
+                sgj_convert2snake(wu_s, b, blen);
                 sgj_js_nv_ihexstr_nex(jsp, jo3p, b, k, true, NULL, NULL,
                                       "1 --> 1%, 255 --> 255% or more");
             }
@@ -6967,7 +6965,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             if (jsp->pr_as_json)
                 js_snakenv_ihexstr_nex(jsp, jo3p, rs, j, true, NULL,
                                        ok ? reassign_status[j] : NULL, NULL);
-            n = 0xf & b[8];
+            n = 0xf & bp[8];
             sgj_pr_hr(jsp, "    %s: %s  [sk,asc,ascq: 0x%x,0x%x,0x%x]\n",
                       s_key, sg_get_sense_key_str(n, blen, b), n, bp[9],
                                                   bp[10]);
@@ -8508,7 +8506,7 @@ volume_stats_partition(const char * name, const uint8_t * xp, int len,
     sgj_pr_hr(jsp, "  %s:\n", name);
     if (jsp->pr_as_json) {
         jap = sgj_named_subarray_r(jsp, jop,
-                                   sgj_convert_to_snake_name(name, b, blen));
+                                   sgj_convert2snake(name, b, blen));
     }
     while (len > 3) {
         bool all_ffs, ffs_last_fe;
@@ -8579,7 +8577,7 @@ volume_stats_history(const char * name, const uint8_t * xp, int len,
     sgj_pr_hr(jsp, "  %s:\n", name);
     if (jsp->pr_as_json) {
         jap = sgj_named_subarray_r(jsp, jop,
-                                   sgj_convert_to_snake_name(name, b, blen));
+                                   sgj_convert2snake(name, b, blen));
     }
 
     while (len > 3) {
@@ -8997,7 +8995,6 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
         jo2p = sg_log_js_hdr(jsp, jop, ta_lp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p, "tapealert_log_parameters");
     }
-    num = len - 4;
     num = len - 4;
     bp = &resp[0] + 4;
 
@@ -9566,6 +9563,8 @@ main(int argc, char * argv[])
     static const int blen = sizeof(b);
 
     op = &opts;
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
     /* N.B. some disks only give data for current cumulative */
     op->page_control = 1;
     op->dev_pdt = DEF_DEV_PDT;

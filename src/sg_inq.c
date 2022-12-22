@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.34 20221213";  /* spc6r06, sbc5r03 */
+static const char * version_str = "2.35 20221222";  /* spc6r06, sbc5r03 */
 
 #define MY_NAME "sg_inq"
 
@@ -1072,8 +1072,6 @@ svpd_inhex_decode_all(struct opts_t * op, sgj_opaque_p jop)
     int in_len = op->maxlen;
     int prev_pn = -1;
     sgj_state * jsp = &op->json_st;
-    uint8_t vpd0_buff[512];
-    uint8_t * rp = vpd0_buff;
 
     if (op->vpd_pn > 0)
         max_pn = op->vpd_pn;
@@ -1083,7 +1081,8 @@ svpd_inhex_decode_all(struct opts_t * op, sgj_opaque_p jop)
         return vpd_decode(-1, op, jop, 0);
 
     for (off = 0; off < in_len; off += bump) {
-        rp = rsp_buff + off;
+        uint8_t * rp = rsp_buff + off;
+
         pn = rp[1];
         bump = sg_get_unaligned_be16(rp + 2) + 4;
         if ((off + bump) > in_len) {
@@ -1230,7 +1229,7 @@ decode_ascii_inf(uint8_t * buff, int len, struct opts_t * op,
         if (cp) {
             n = hex2str(bp, len - (al + 5), NULL, 1, n - 1, cp);
             if (jsp && jsp->pr_out_hr)
-                sgj_js_str_out(jsp, cp, n);
+                sgj_hr_str_out(jsp, cp, n);
             else
                 sgj_pr_hr(jsp, "%s\n", cp);
         }
@@ -1397,8 +1396,8 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                       sg_get_trans_proto_str(p_id, dlen, d));
         n = 0;
         cp = sg_get_desig_type_str(desig_type);
-        n += sg_scnpr(b + n, blen - n, "    designator_type: %s,  ",
-                      cp ? cp : "-");
+        sg_scnpr(b + n, blen - n, "    designator_type: %s,  ",
+                 cp ? cp : "-");
         cp = sg_get_desig_code_set_str(c_set);
         sgj_pr_hr(jsp, "%scode_set: %s\n", b, cp ? cp : "-");
         cp = sg_get_desig_assoc_str(assoc);
@@ -1455,9 +1454,8 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
             if (16 == i_len) {
                 ci_off = 8;
                 id_ext = sg_get_unaligned_be64(ip);
-                n += sg_scnpr(b + n, blen - n,
-                              "      Identifier extension: 0x%" PRIx64 "\n",
-                              id_ext);
+                sg_scnpr(b + n, blen - n, "      Identifier extension: 0x%"
+                         PRIx64 "\n", id_ext);
             } else if ((8 != i_len) && (12 != i_len)) {
                 pr2serr("      << can only decode 8, 12 and 16 "
                         "byte ids>>\n");
@@ -1616,7 +1614,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
             }
             sgj_pr_hr(jsp, "      MD5 logical unit identifier:\n");
             if (jsp->pr_out_hr)
-                sgj_js_str_out(jsp, (const char *)ip, i_len);
+                sgj_hr_str_out(jsp, (const char *)ip, i_len);
             else
                 hex2stdout(ip, i_len, -1);
             break;
@@ -2792,7 +2790,7 @@ vpd_mainly_hex(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else {
-            int pdt = pdt = rp[0] & PDT_MASK;
+            int pdt = rp[0] & PDT_MASK;
 
             if (0 == op->vpd_pn)
                 decode_supported_vpd_4inq(rp, len, op, NULL);
@@ -2814,7 +2812,7 @@ vpd_mainly_hex(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
                     if (p) {
                         n = hex2str(rp, len, NULL, 0, n, p);
                         if (jsp->pr_out_hr)
-                            sgj_js_str_out(jsp, p, n);
+                            sgj_hr_str_out(jsp, p, n);
                         else
                             sgj_pr_hr(jsp, "%s\n", p);
                         free(p);
@@ -4192,11 +4190,13 @@ main(int argc, char * argv[])
     struct opts_t * op;
 
     op = &opts;
-    op->invoker = SG_VPD_INV_SG_INQ;
     op->vpd_pn = -1;
     op->vend_prod_num = -1;
     op->page_pdt = -1;
     op->do_block = -1;         /* use default for OS */
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
+
     res = parse_cmd_line(op, argc, argv);
     if (res)
         return SG_LIB_SYNTAX_ERROR;
@@ -4364,7 +4364,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
-        subvalue = op->vend_prod_num;
+        // subvalue = op->vend_prod_num;
     }
     if (as_json)
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);

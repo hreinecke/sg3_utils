@@ -248,13 +248,13 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
     n +=  sg_scnpr(b + n, blen - n,
                    "      - | ~ | !    toggle next letter setting\n");
 
-    n +=  sg_scnpr(b + n, blen - n, "\nIn the absence of the optional JO "
-                   "argument, the following are set\non: 'elps' while the "
-                   "others are set off, and tabs are set to 4.\nBefore "
-                   "command line JO options are applied, the environment\n"
-                   "variable: %s is applied (if present). Note that\nno "
-                   "space is permitted between the short option ('-%c') "
-                   "and its\nargument ('JO').\n", sgj_opts_ev, short_opt);
+    sg_scnpr(b + n, blen - n, "\nIn the absence of the optional JO argument, "
+             "the following are set\non: 'elps' while the others are set "
+             "off, and tabs are set to 4.\nBefore command line JO options "
+             "are applied, the environment\nvariable: %s is applied (if "
+             "present). Note that\nno space is permitted between the short "
+             "option ('-%c') and its\nargument ('JO').\n", sgj_opts_ev,
+             short_opt);
 fini:
     return b;
 }
@@ -380,7 +380,7 @@ sgj_start_r(const char * util_name, const char * ver_str, int argc,
 
             if (bp) {
                 sg_json_usage(0, bp, 4096);
-                sgj_js_str_out(jsp, bp, strlen(bp));
+                sgj_hr_str_out(jsp, bp, strlen(bp));
                 free(bp);
             }
         }
@@ -857,9 +857,9 @@ sgj_js_nv_ihexstr_nex(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
 
 /* Treat '\n' in sp as line breaks. Consumes characters from sp until either
  * a '\0' is found or slen is exhausted. Add each line to jsp->out_hrp JSON
- * array (if conditions met). */
+ * array (if conditions met). Outputs to stdout. */
 void
-sgj_js_str_out(sgj_state * jsp, const char * sp, int slen)
+sgj_hr_str_out(sgj_state * jsp, const char * sp, int slen)
 {
     char c;
     int k, n;
@@ -887,8 +887,7 @@ sgj_js_str_out(sgj_state * jsp, const char * sp, int slen)
 }
 
 char *
-sgj_convert_to_snake_name(const char * in_name, char * sn_name,
-                          int max_sname_len)
+sgj_convert2snake(const char * in_name, char * sn_name, int max_sname_len)
 {
     sgj_name_to_snake(in_name, sn_name, max_sname_len);
     return sn_name;
@@ -1064,7 +1063,7 @@ sgj_haj_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
     b[n] = '\0';
     if (NULL == aname) {
         if ((! as_json) || (jsp && jsp->pr_out_hr)) {
-            n += sgj_jtype_to_s(b + n, blen - n, jvp, hex_haj);
+            sgj_jtype_to_s(b + n, blen - n, jvp, hex_haj);
             printf("%s\n", b);
         }
         if (NULL == jop) {
@@ -1132,8 +1131,7 @@ sgj_haj_xx(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         }
     }
     if (jvp && ((as_json && jsp->pr_out_hr) || (! as_json)))
-        n += sgj_haj_helper(b + n, blen - n, aname, sep, true, jvp, 0,
-                            hex_haj);
+        sgj_haj_helper(b + n, blen - n, aname, sep, true, jvp, 0, hex_haj);
 
     if (as_json && jsp->pr_out_hr)
         json_array_push((json_value *)jsp->out_hrp, json_string_new(b));
@@ -1229,8 +1227,8 @@ sgj_haj_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
         b[n] = ' ';
     b[n] = '\0';
     if ((! as_json) || (jsp && jsp->pr_out_hr))
-        n += sgj_haj_helper(b + n, blen - n, aname, sep, false, NULL, value,
-                            hex_haj);
+        sgj_haj_helper(b + n, blen - n, aname, sep, false, NULL, value,
+                       hex_haj);
 
     if (as_json && jsp->pr_out_hr)
         json_array_push((json_value *)jsp->out_hrp, json_string_new(b));
@@ -1846,7 +1844,7 @@ sgj_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
                 n += sg_scnpr(b + n, blen - n, "EXTENDED COPY command copy %s",
                               (sds == 1) ? "source" : "destination");
                 if (sds > 1)
-                    n += sg_scnpr(b + n, blen - n, " %d", sds - 1);
+                    sg_scnpr(b + n, blen - n, " %d", sds - 1);
             }
             sgj_js_nv_ihexstr(jsp, jo2p, "sense_data_source",
                               (0x7 & descp[2]), NULL, b);

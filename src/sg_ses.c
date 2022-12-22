@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.67 20221215";    /* ses4r04 */
+static const char * version_str = "2.69 20221221";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -71,7 +71,7 @@ static const char * version_str = "2.67 20221215";    /* ses4r04 */
 #define THRESHOLD_DPC 0x5
 #define ARRAY_CONTROL_DPC 0x6   /* obsolete, last seen ses-r08b.pdf */
 #define ARRAY_STATUS_DPC 0x6    /* obsolete */
-#define ELEM_DESC_DPC 0x7
+#define ELEM_DESC_DPC 0x7       /* names of elements in ENC_STATUS_DPC */
 #define SHORT_ENC_STATUS_DPC 0x8
 #define ENC_BUSY_DPC 0x9
 #define ADD_ELEM_STATUS_DPC 0xa /* Additional Element Status dpage code */
@@ -142,7 +142,7 @@ struct opts_t {
     bool do_all;        /* one or more --all options */
     bool byte1_given;   /* true if -b B1 or --byte1=B1 given */
     bool do_control;    /* want to write to DEVICE */
-    bool do_data;       /* flag if --data= option has been used */
+    bool do_data;       /* flag if --data= or --inhex= option given */
     bool do_json;       /* --json[=JO] option given or implied */
     bool do_list;
     bool do_status;     /* want to read from DEVICE (or user data) */
@@ -151,9 +151,9 @@ struct opts_t {
     bool ind_given;     /* '--index=...' or '-I ...' */
     bool many_dpages;   /* user supplied data has more than one dpage */
     bool mask_ign;      /* element read-mask-modify-write actions */
+    bool no_config;     /* -F  (do not depend on config dpage) */
     bool o_readonly;
     bool page_code_given;       /* or suitable abbreviation */
-    bool partial_join;  /* --join and --page= given (apart from aes) */
     bool quiet;         /* exit status unaltered by --quiet */
     bool seid_given;
     bool verbose_given;
@@ -164,16 +164,18 @@ struct opts_t {
     int do_filter;
     int do_help;
     int do_hex;
+    int do_hex_inner;   /* when --hex and --inner-hex are both given */
     int do_join;        /* relational join of Enclosure status, Element
                            descriptor and Additional element status dpages.
                            Use twice to add Threshold in dpage to join. */
     int do_raw;
     int enumerate;      /* -e */
+    int h2s_oformat;    /* oformat argument for hex2str() */
     int ind_th;    /* type header index, set by build_type_desc_hdr_arr() */
     int ind_indiv;      /* individual element index; -1 for overall */
     int ind_indiv_last; /* if > ind_indiv then [ind_indiv..ind_indiv_last] */
     int ind_et_inst;    /* ETs can have multiple type header instances */
-    int inner_hex;      /* -i */
+    int inner_hex;      /* -i, incremented if multiple */
     int maxlen;         /* -m LEN */
     int seid;
     int page_code;      /* recognised abbreviations converted to dpage num */
@@ -197,6 +199,11 @@ struct opts_t {
 struct diag_page_code {
     int page_code;
     const char * desc;
+};
+
+struct diag_page_controllable {
+    int page_code;
+    bool has_controllable_variant;
 };
 
 struct diag_page_abbrev {
@@ -379,11 +386,13 @@ static const char * const not_avail = "not available";
 static const char * const not_rep = "not reported";
 static const char * const noss_s = "number of secondary subenclosures";
 static const char * const gc_s = "generation code";
+static const char * const et_s = "Element type";
 static const char * const et_sn = "element_type";
 static const char * const pc_sn = "page_code";
 static const char * const dp_s = "diagnostic page";
 static const char * const dp_sn = "diagnostic_page";
 static const char * const si_s = "subenclosure identifier";
+static const char * const si_ss = "subenclosure id";
 static const char * const si_sn = "subenclosure_identifier";
 static const char * const es_s = "enclosure status";
 static const char * const peli = "Primary enclosure logical identifier";
@@ -391,6 +400,7 @@ static const char * const soec =
                  "  <<state of enclosure changed, please try again>>";
 static const char * const vs_s = "Vendor specific";
 static const char * const rsv_s = "reserved";
+static const char * const in_hex_sn = "in_hex";
 static const char * const od_s = "Overall descriptor";
 static const char * const od_sn = "overall_descriptor";
 static const char * const rts_s = "response too short";
@@ -400,7 +410,12 @@ static const char * const lwt_sn = "low_warning_threshold";
 static const char * const lct_sn = "low_critical_threshold";
 static const char * const sdl_s = "Status descriptor list";
 static const char * const sdl_sn = "status_descriptor_list";
-static const char * aesd_sn = "additional_element_status_descriptor";
+static const char * const aes_dp =
+                "Additional element status diagnostic page";
+static const char * const aesd_s = "Additional element status descriptor";
+static const char * const aesd_sn = "additional_element_status_descriptor";
+static const char * const dwuti = "decoded _without_ using type info";
+static const char * const oohm = ">>> Out of heap (memory)";
 
 
 /* Diagnostic page names, control and/or status (in and/or out) */
@@ -477,6 +492,28 @@ static const struct diag_page_code out_dpc_arr[] = {
     {0x41, "Device Status (SBC)"},
     {0x42, "Rebuild Assist Output (SBC)"},
     {-1, NULL},
+};
+
+/* Diagnostic page that have control variant have true in second field */
+static const struct diag_page_controllable dpctl_arr[] = {
+    {SUPPORTED_DPC, false},  /* 0 */
+    {CONFIGURATION_DPC, false},
+    {ENC_STATUS_DPC, true},
+    {HELP_TEXT_DPC, false},
+    {STRING_DPC, true},
+    {THRESHOLD_DPC, true},
+    {ARRAY_STATUS_DPC, true},
+    {ELEM_DESC_DPC, false},
+    {SHORT_ENC_STATUS_DPC, false},  /* 8 */
+    {ENC_BUSY_DPC, false},
+    {ADD_ELEM_STATUS_DPC, false},
+    {SUBENC_HELP_TEXT_DPC, false},
+    {SUBENC_STRING_DPC, true},
+    {SUPPORTED_SES_DPC, false},
+    {DOWNLOAD_MICROCODE_DPC, true},
+    {SUBENC_NICKNAME_DPC, true},
+    {ALL_DPC, false},
+    {-1, false},
 };
 
 static const struct diag_page_abbrev dp_abbrev[] = {
@@ -805,6 +842,8 @@ static const struct option long_options[] = {
     {"list", no_argument, 0, 'l'},
     {"nickid", required_argument, 0, 'N'},
     {"nickname", required_argument, 0, 'n'},
+    {"no-config", no_argument, 0, 'F'},
+    {"no_config", no_argument, 0, 'F'},
     {"mask", required_argument, 0, 'M'},
     {"maxlen", required_argument, 0, 'm'},
     {"page", required_argument, 0, 'p'},
@@ -873,11 +912,11 @@ usage(int help_num)
             "[--hex]\n"
             "              [--index=IIA | =TIA,II] [--inner-hex] [--join] "
             "[--json[=JO]]\n"
-            "              [--js-file=JFN] [--maxlen=LEN] [--page=PG] "
-            "[--quiet]\n"
-            "              [--raw] [--readonly] [--sas-addr=SA] [--status] "
-            "[--verbose]\n"
-            "              [--warn] DEVICE\n\n"
+            "              [--js-file=JFN] [--maxlen=LEN] [--no-config] "
+            "[--page=PG]\n"
+            "              [--quiet] [--raw] [--readonly] [--sas-addr=SA] "
+            "[--status]\n"
+            "              [--verbose] [--warn] DEVICE\n\n"
             "       sg_ses --control [--byte1=B1] [--clear=STR] "
             "[--data=H,H...]\n"
             "              [--descriptor=DES] [--dev-slot-num=SN] "
@@ -1012,6 +1051,8 @@ usage(int help_num)
             "                            used to specify which nickname to "
             "change\n"
             "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
+            "    --no-config|-f      output without depending on config "
+            "dpage\n"
             "    --quiet|-q          suppress some output messages\n"
             "    --raw|-r            print status page in ASCII hex suitable "
             "for '-d';\n"
@@ -1191,6 +1232,19 @@ parse_index(struct opts_t *op)
     return 0;
 }
 
+static bool
+dpage_has_control_variant(int page_num)
+{
+    const struct diag_page_controllable * dpctlp;
+
+    for (dpctlp = dpctl_arr; dpctlp->page_code >= 0; ++dpctlp) {
+        if (page_num == dpctlp->page_code)
+            return dpctlp->has_controllable_variant;
+        else if (page_num < dpctlp->page_code)
+            return false;
+    }
+    return false;
+}
 
 /* command line process, options and arguments. Returns 0 if ok. */
 static int
@@ -1205,7 +1259,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fG:hHiI:jJ::ln:N:m:Mp:"
+        c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fFG:hHiI:jJ::ln:N:m:Mp:"
                         "qQrRsS:vVwx:X:z", long_options, &option_index);
         if (c == -1)
             break;
@@ -1280,6 +1334,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'f':
             ++op->do_filter;
+            break;
+        case 'F':
+            op->no_config = true;
             break;
         case 'G':
             if (strlen(optarg) >= CGS_STR_MAX_SZ) {
@@ -1467,6 +1524,10 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             goto err_help;
         }
     }
+    if (op->no_config && (op->do_join > 0)) {
+         pr2serr("Need configuration dpage to do the join operation\n\n");
+         goto err_help;
+    }
     if (op->js_file && (! op->do_json)) {
         if (! sgj_init_state(&op->json_st, NULL)) {
             pr2serr("JSON initialization failed\n");
@@ -1474,6 +1535,18 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         }
         op->do_json = true;
     }
+    if (op->inner_hex > 0) {
+        if (op->do_hex > 0) {
+            if (op->do_hex > 3) {
+                pr2serr("-HHHH and --inner-hex not permitted\n");
+                return SG_LIB_CONTRADICT;
+            }
+            op->h2s_oformat = (1 == op->do_hex);
+            op->do_hex_inner = op->do_hex;
+            op->do_hex = 0;
+        }
+    } else if (op->do_hex > 0)
+        op->h2s_oformat = (1 == op->do_hex);
     op->mx_arr_len = (op->maxlen > MIN_DATA_IN_SZ) ? op->maxlen :
                                                      MIN_DATA_IN_SZ;
     op->data_arr = sg_memalign(op->mx_arr_len, 0 /* page aligned */,
@@ -1482,7 +1555,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         pr2serr("unable to allocate %u bytes on heap\n", op->mx_arr_len);
         return sg_convert_errno(ENOMEM);
     }
-    if (data_arg || inhex_arg) {
+    if (data_arg || inhex_arg) {        /* same as op->do_data==true */
         if (inhex_arg) {
             data_arg = inhex_arg;
             if (read_hex(data_arg, op->data_arr + DATA_IN_OFF,
@@ -1501,14 +1574,19 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             }
         }
         if ((! op->do_status) && (! op->do_control)) {
-            if ((op->do_join > 0) || op->partial_join ||
+            if ((op->do_join > 0) || op->no_config ||
                 (op->inner_hex > 0) ||
-                ((op->page_code_given && (ALL_DPC == op->page_code)))) {
+                ((op->page_code_given &&
+                 (! dpage_has_control_variant(op->page_code))))) {
                 if (op->verbose > 1)
-                    pr2serr("Since --join, --all, --page=all or --inner_hex "
-                            "given; assume --status\n");
+                    pr2serr("Since --join, --all, --page=all, --no-config, "
+                            "or --inner_hex given; assume --status\n");
                 op->dev_name = NULL;    /* quash device name */
                 op->do_status = true;  /* default to receiving status pages */
+            } else {
+                pr2serr("require '--control' or '--status' option, if both "
+                        "possible\n\n");
+                goto err_help;
             }
         }
         op->do_raw = 0;
@@ -1612,20 +1690,23 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             goto err_help;
         }
     } else if (! op->do_status) {
+#if 0
         if (op->do_data) {
-            if ((op->do_join > 0) || op->partial_join ||
+            if ((op->do_join > 0) || op->no_config ||
                 (op->inner_hex > 0) ||
-                ((op->page_code_given && (ALL_DPC == op->page_code)))) {
+                ((op->page_code_given &&
+                 (! dpage_has_control_variant(op->page_code))))) {
                 if (op->verbose > 1)
-                    pr2serr("Since --join, --all, --page=all, or "
-                            "--inner_hex given, assume --status\n");
+                    pr2serr("Since --join, --all, --page=all, --inner_hex, "
+                            "or --no-config given, assume --status\n");
                 op->dev_name = NULL;    /* quash device name */
             } else {
                 pr2serr("when user data given, require '--control' or "
-                        "'--status' option\n");
+                        "'--status' option\n\n");
                 goto err_help;
             }
         }
+#endif
         op->do_status = true;  /* default to receiving status pages */
     } else if (op->do_status && op->do_data && op->dev_name) {
         pr2serr(">>> Warning: device name (%s) will be ignored\n",
@@ -2136,8 +2217,10 @@ static void
 configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
                   sgj_opaque_p jop)
 {
-    int j, k, n, el, num_subs, sum_elem_types;
+    bool as_json;
+    int k, el, num_subs, sum_elem_types;
     uint32_t gen_code;
+    uint64_t ull;
     const uint8_t * bp;
     const uint8_t * last_bp;
     const uint8_t * text_bp;
@@ -2146,11 +2229,15 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     sgj_opaque_p jap = NULL;
-    char b[256];
+    char b[512];
+    char e[80];
     static const int blen = sizeof(b);
+    static const int elen = sizeof(e);
     static const char * cf_dp = "Configuration diagnostic page";
     static const char * eli = "enclosure logical identifier";
     static const char * edl = "enclosure descriptor list";
+    static const char * tdh_s = "type descriptor header";
+    static const char * tt_s = "text";
 
     sgj_pr_hr(jsp, "%s:\n", cf_dp);
     if (resp_len < 4)
@@ -2158,10 +2245,11 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     num_subs = resp[1] + 1;  /* number of subenclosures (add 1 for primary) */
     sum_elem_types = 0;
     last_bp = resp + resp_len - 1;
-    if (jsp->pr_as_json) {
+    as_json = jsp->pr_as_json;
+    if (as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                                 sgj_convert_to_snake_name(cf_dp, b, blen));
+                                    sgj_convert2snake(cf_dp, b, blen));
         sgj_js_nv_ihexstr(jsp, jop, pc_sn, CONFIGURATION_DPC, NULL, cf_dp);
     }
     sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
@@ -2170,20 +2258,32 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
     bp = resp + 8;
     sgj_pr_hr(jsp, "  %s:\n", edl);
-    if (jsp->pr_as_json)
+    if (as_json)
         jap = sgj_named_subarray_r(jsp, jop,
-                                   sgj_convert_to_snake_name(edl, b, blen));
+                                   sgj_convert2snake(edl, b, blen));
 
     for (k = 0; k < num_subs; ++k, bp += el) {
         bool primary;
 
         if ((bp + 3) > last_bp)
             goto truncated;
-        if (jsp->pr_as_json)
+        if (as_json)
             jo2p = sgj_new_unattached_object_r(jsp);
         el = bp[3] + 4;
         sum_elem_types += bp[2];
         primary = (0 == bp[1]);
+        if (op->inner_hex) {
+            hex2str(bp, el, "        ", op->h2s_oformat, blen, b);
+            if (as_json && jsp->pr_out_hr)
+                sgj_hr_str_out(jsp, b, strlen(b));
+            else
+                sgj_pr_hr(jsp, "%s\n", b);
+            if (as_json) {
+                sgj_js_nv_hex_bytes(jsp, jo2p, in_hex_sn, bp, el);
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
+            continue;
+        }
         sgj_pr_hr(jsp, "    Subenclosure identifier: %d%s\n", bp[1],
                   (primary ? " [primary]" : ""));
         sgj_js_nv_ihexstr(jsp, jo2p, si_sn, bp[1], NULL,
@@ -2199,16 +2299,13 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
                    SGJ_SEP_COLON_1_SPACE, bp[2], false);
         if (el < 40) {
             pr2serr("      enc descriptor len=%d ??\n", el);
-            if (jsp->pr_as_json)
+            if (as_json)
                 sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             continue;
         }
-        n = sg_scnpr(b, blen, "      %s (hex): ", eli);
-        for (j = 0; j < 8; ++j)
-            n += sg_scnpr(b + n, blen - n, "%02x", bp[4 + j]);
-        sgj_pr_hr(jsp, "%s\n", b);
-        sgj_js_nv_ihex(jsp, jo2p, sgj_convert_to_snake_name(eli, b, blen),
-                       sg_get_unaligned_be64(bp + 4));
+        ull = sg_get_unaligned_be64(bp + 4);
+        sgj_pr_hr(jsp, "      %s (hex): %" PRIx64 "\n", eli, ull);
+        sgj_js_nv_ihex(jsp, jo2p, sgj_convert2snake(eli, b, blen), ull);
         sgj_pr_hr(jsp, "      enclosure vendor: %.8s  product: %.16s  "
                   "rev: %.4s\n", bp + 12, bp + 20, bp + 36);
         sgj_js_nv_s_len_chk(jsp, jo2p, "enclosure_vendor_identification",
@@ -2217,62 +2314,91 @@ configuration_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
         sgj_js_nv_s_len_chk(jsp, jo2p, "product_revision_level", bp + 36, 4);
         if (el > 40) {
             sgj_pr_hr(jsp, "      %s data:\n", vs_s);
-            hex2str(bp + 40, el - 40, "        ", 0, blen, b);
-            if (jsp->pr_as_json && jsp->pr_out_hr)
-                sgj_js_str_out(jsp, b, strlen(b));
+            hex2str(bp + 40, el - 40, "        ", op->h2s_oformat, blen, b);
+            if (as_json && jsp->pr_out_hr)
+                sgj_hr_str_out(jsp, b, strlen(b));
             else
                 sgj_pr_hr(jsp, "%s\n", b);
-            if (jsp->pr_as_json)
+            if (as_json)
                 sgj_js_nv_hex_bytes(jsp, jo2p,
                          "vendor_specific_enclosure_information",
                                     bp + 40, el - 40);
         }
-        if (jsp->pr_as_json)
+        if (as_json)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
-    /* printf("\n"); */
-    if (jsp->pr_as_json)
-        jap = sgj_named_subarray_r(jsp, jop, "type_descriptor_header_list");
-    sgj_pr_hr(jsp, "  type descriptor header and text list\n");
+    snprintf(e, elen, "%s%s list", tdh_s,
+             (op->inner_hex > 0) ? "" : " and text");
+    sgj_pr_hr(jsp, "  %s:\n", e);
+    if (as_json)
+        jap = sgj_named_subarray_r(jsp, jop, sgj_convert2snake(e, b, blen));
     type_dh_bp = bp;
     text_bp = bp + (sum_elem_types * 4);
     for (k = 0; k < sum_elem_types; ++k, bp += 4) {
         if ((bp + 3) > last_bp)
             goto truncated;
-        if (jsp->pr_as_json)
+        if (as_json)
             jo2p = sgj_new_unattached_object_r(jsp);
         ccp = etype_str(bp[0], b, blen);
-        sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d\n", ccp,
-                  bp[2]);
-        sgj_js_nv_ihexstr(jsp, jo2p, et_sn, bp[0], NULL, ccp);
+        sgj_pr_hr(jsp, "    %s: %s, %s: %d\n", et_s, ccp, si_ss, bp[2]);
         sgj_pr_hr(jsp, "      number of possible elements: %d\n", bp[1]);
-        sgj_js_nv_ihex(jsp, jo2p, "number_of_possible_elements", bp[1]);
-        sgj_js_nv_ihex(jsp, jo2p, si_sn, bp[2]);
+        if ((op->inner_hex < 2) && as_json) {
+            sgj_js_nv_ihexstr(jsp, jo2p, et_sn, bp[0], NULL, ccp);
+            sgj_js_nv_ihex(jsp, jo2p, "number_of_possible_elements", bp[1]);
+            sgj_js_nv_ihex(jsp, jo2p, si_sn, bp[2]);
+        }
+        if (op->inner_hex > 0) {
+            hex2str(bp, 4, "        ", op->h2s_oformat, blen, b);
+            if (as_json && jsp->pr_out_hr)
+                sgj_hr_str_out(jsp, b, strlen(b));
+            else
+                sgj_pr_hr(jsp, "%s\n", b);
+            if (as_json) {
+                sgj_js_nv_hex_bytes(jsp, jo2p, in_hex_sn, bp, 4);
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
+            continue;
+        }
         sgj_js_nv_ihex(jsp, jo2p, "type_descriptor_text_length", bp[3]);
         if (bp[3] > 0) {
             if (text_bp > last_bp) {
-                if (jsp->pr_as_json)
+                if (as_json)
                     sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
                 goto truncated;
             }
-            sgj_pr_hr(jsp, "      text: %.*s\n", bp[3],
+            sgj_pr_hr(jsp, "      %s: %.*s\n", tt_s, bp[3],
                       (const char *)text_bp);
-            if (op->partial_join)
-                sgj_js_nv_s_len_chk(jsp, jo2p, "text", text_bp, bp[3]);
+            if (as_json)
+                sgj_js_nv_s_len_chk(jsp, jo2p, tt_s, text_bp, bp[3]);
             text_bp += bp[3];
         }
-        if (jsp->pr_as_json)
+        if (as_json)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
-    if (jsp->pr_as_json && (! op->partial_join)) {
-        jap = sgj_named_subarray_r(jsp, jop, "type_descriptor_text_list");
+
+    if (op->inner_hex > 0) {
         bp = type_dh_bp;
         text_bp = bp + (sum_elem_types * 4);
+        snprintf(e, elen, "type descriptor text list");
+        sgj_pr_hr(jsp, "  %s:\n", e);
+        if (as_json)
+            jap = sgj_named_subarray_r(jsp, jop,
+                                       sgj_convert2snake(e, b, blen));
         for (k = 0; k < sum_elem_types; ++k, bp += 4) {
-            jo2p = sgj_new_unattached_object_r(jsp);
-            sgj_js_nv_s_len_chk(jsp, jo2p, "text", text_bp, bp[3]);
+            if (as_json)
+                jo2p = sgj_new_unattached_object_r(jsp);
+            if (1 == op->inner_hex)
+                sgj_pr_hr(jsp, "    %s:\n", tt_s);
+            hex2str(text_bp, bp[3], "        ", op->h2s_oformat, blen, b);
+            sgj_pr_hr(jsp, "%s\n", b);
+            if (as_json) {
+                if (1 == op->inner_hex)
+                    sgj_js_nv_s_len_chk(jsp, jo2p, tt_s, text_bp, bp[3]);
+                else
+                    sgj_js_nv_hex_bytes(jsp, jo2p, tt_s, text_bp, bp[3]);
+                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
+            }
             text_bp += bp[3];
-            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
     }
     return;
@@ -2746,9 +2872,11 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
     s1 = statp[1];
     s2 = statp[2];
     s3 = statp[3];
-    if (op->inner_hex) {
+    if (op->inner_hex || op->no_config) {
         n += sg_scnpr(a + n, alen - n, "%s%02x %02x %02x %02x\n", pad,
                       s0, s1, s2, s3);
+        if (jsp->pr_as_json)
+            sgj_js_nv_hex_bytes(jsp, jop, "status_element", statp, 4);
         return n;
     }
     if (! abridged) {
@@ -3069,8 +3197,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
             // [[fallthrough]];
             /* FALLTHRU */
         case 3:
-            n += sg_scnpr(a + n, alen - n, "%slast 3 bytes (hex): %02x %02x "
-                          "%02x\n", pad, s1, s2, s3);
+            n += sg_scnpr(a + n, alen - n, "%s%s, last 3 bytes (hex): %02x "
+                          "%02x %02x\n", pad, ccp, s1, s2, s3);
             if (jsp->pr_as_json)
                 sgj_js_nv_s_len_chk(jsp, jop, "bytes_1_2_3", statp + 1, 3);
             break;
@@ -3460,7 +3588,7 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                const uint8_t * resp, int resp_len, struct opts_t * op,
                sgj_opaque_p jop)
 {
-    bool got1, match_ind_th;
+    bool got1, match_ind_th, as_json;
     uint8_t es1;
     int j, k;
     uint32_t gen_code;
@@ -3481,14 +3609,15 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     sgj_pr_hr(jsp, "%s\n", es_dp);
     if (resp_len < 4)
         goto truncated;
+    as_json = jsp->pr_as_json;
     es1 = resp[1];
     sgj_pr_hr(jsp, "  INVOP=%d, INFO=%d, NON-CRIT=%d, CRIT=%d, UNRECOV=%d\n",
               !!(es1 & 0x10), !!(es1 & 0x8), !!(es1 & 0x4), !!(es1 & 0x2),
               !!(es1 & 0x1));
-    if (jsp->pr_as_json) {
+    if (as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                                 sgj_convert_to_snake_name(es_dp, b, blen));
+                                    sgj_convert2snake(es_dp, b, blen));
         sgj_js_nv_ihexstr_nex(jsp, jop, "invop", !!(es1 & 0x10), false,
                               NULL, NULL, "INvalid Operation requested");
         sgj_js_nv_ihexstr_nex(jsp, jop, "info", !!(es1 & 0x8), false,
@@ -3512,21 +3641,22 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     }
     bp = resp + 8;
     sgj_pr_hr(jsp, "  %s:\n", sdl_s);
-    if (jsp->pr_as_json) {
+    if (as_json)
         jap = sgj_named_subarray_r(jsp, jop, sdl_sn);
-        if ((! op->partial_join) && (op->inner_hex > 0)) {
-            int n = (resp_len - 8) / 4;
+    if (op->no_config) {
+        int n = (resp_len - 8) / 4;
 
-            if (op->verbose > 2)
-                pr2serr("%s: decoded _without_ using type descriptor header "
-                        "info\n", __func__);
-            for (j = 0; j < n; ++j, bp += 4) {
+        if (op->verbose > 2)
+            pr2serr("%s: %s\n", __func__, dwuti);
+        for (j = 0; j < n; ++j, bp += 4) {
+            if (as_json)
                 jo2p = sgj_new_unattached_object_r(jsp);
-                sgj_js_nv_hex_bytes(jsp, jo2p, "status_element", bp, 4);
+            enc_status_helper("        ", bp, 0, false, op, jo2p, b, blen);
+            sgj_pr_hr(jsp, "%s", b);
+            if (as_json)
                 sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
-            }
-            return;
         }
+        return;
     }
     if (NULL == tesp) {
         pr2serr("%s: logic error, resp==NULL\n", __func__);
@@ -3537,9 +3667,9 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         if ((bp + 3) > last_bp)
             goto truncated;
 
-        if (jsp->pr_as_json) {
+        if (as_json) {
             jo2p = sgj_new_unattached_object_r(jsp);
-            if (op->partial_join || (op->do_join > 0)) {
+            if (op->inner_hex < 2) {
                 sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
                                   NULL, etype_str(tdhp->etype, b, blen));
                 sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
@@ -3550,18 +3680,18 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
-                      "[ti=%d]\n", etype_str(tdhp->etype, b, blen),
-                      tdhp->se_id, k);
-            sgj_pr_hr(jsp, "      %s:\n", od_s);
-            if (! jsp->pr_as_json) {
+            sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
+                      etype_str(tdhp->etype, b, blen), si_ss, tdhp->se_id, k);
+            if (op->inner_hex < 2)
+                sgj_pr_hr(jsp, "      %s:\n", od_s);
+            if (! as_json) {
                 enc_status_helper("        ", bp, tdhp->etype, false, op,
                                   jo2p, b, blen);
                 sgj_pr_hr(jsp, "%s", b);
             }
             got1 = true;
         }
-        if (jsp->pr_as_json) {
+        if (as_json) {
             jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
             enc_status_helper("        ", bp, tdhp->etype, false, op, jo3p,
                               b, blen);
@@ -3575,21 +3705,18 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     (! match_ind_indiv(j, op)))
                     continue;
             }
-            sgj_pr_hr(jsp, "      Element %d descriptor:\n", j);
-            if (jsp->pr_as_json) {
+            if (op->inner_hex < 2)
+                sgj_pr_hr(jsp, "      Element %d descriptor:\n", j);
+            if (as_json)
                 jo4p = sgj_new_unattached_object_r(jsp);
-                if (! op->partial_join)
-                    sgj_js_nv_hex_bytes(jsp, jo4p,
-                                        "individual_status_element", bp, 4);
-            }
             enc_status_helper("        ", bp, tdhp->etype, false, op, jo4p,
                               b, blen);
             sgj_pr_hr(jsp, "%s", b);
-            if (jsp->pr_as_json)
+            if (as_json)
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             got1 = true;
         }
-        if (jsp->pr_as_json)
+        if (as_json)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }           /* end of outer for loop */
     if (op->ind_given && (! got1)) {
@@ -3613,7 +3740,7 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                  const uint8_t * resp, int resp_len,
                  struct opts_t * op, sgj_opaque_p jop)
 {
-    bool got1, match_ind_th;
+    bool got1, match_ind_th, as_json;
     uint8_t as1;
     int j, k, n;
     uint32_t gen_code;
@@ -3625,7 +3752,7 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     sgj_opaque_p jo4p = NULL;
     sgj_opaque_p jap = NULL;
     sgj_opaque_p ja2p = NULL;
-    const struct type_desc_hdr_t * tdhp = tesp->th_base;
+    const struct type_desc_hdr_t * tdhp = tesp ? tesp->th_base : NULL;
     char b[512];
     static const int blen = sizeof(b);
     static const char * const as_dp = "Array status diagnostic page";
@@ -3634,13 +3761,14 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     if (resp_len < 4)
         goto truncated;
     as1 = resp[1];
+    as_json = jsp->pr_as_json;
     sgj_pr_hr(jsp, "  INVOP=%d, INFO=%d, NON-CRIT=%d, CRIT=%d, UNRECOV=%d\n",
               !!(as1 & 0x10), !!(as1 & 0x8), !!(as1 & 0x4), !!(as1 & 0x2),
               !!(as1 & 0x1));
-    if (jsp->pr_as_json) {
+    if (as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                                 sgj_convert_to_snake_name(as_dp, b, blen));
+                                    sgj_convert2snake(as_dp, b, blen));
         sgj_js_nv_ihexstr_nex(jsp, jop, "invop", !!(as1 & 0x10), false,
                               NULL, NULL, "INvalid Operation requested");
         sgj_js_nv_ihexstr_nex(jsp, jop, "info", !!(as1 & 0x8), false,
@@ -3663,29 +3791,34 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     }
     bp = resp + 8;
     sgj_pr_hr(jsp, "  %s:\n", sdl_s);
-    if (jsp->pr_as_json) {
+    if (as_json)
         jap = sgj_named_subarray_r(jsp, jop, sdl_sn);
-        if ((! op->partial_join) && (op->inner_hex > 0)) {
-            n = (resp_len - 8) / 4;
-            if (op->verbose > 2)
-                pr2serr("%s: decoded _without_ using type descriptor header "
-                        "info\n", __func__);
-            for (j = 0; j < n; ++j, bp += 4) {
+    if (op->no_config) {
+        if (op->verbose > 2)
+            pr2serr("%s: %s\n", __func__, dwuti);
+        n = (resp_len - 8) / 4;
+        for (j = 0; j < n; ++j, bp += 4) {
+            if (as_json)
                 jo2p = sgj_new_unattached_object_r(jsp);
-                sgj_js_nv_hex_bytes(jsp, jo2p, "status_element", bp, 4);
+            enc_status_helper("        ", bp, 0, false, op, jo2p, b, blen);
+            sgj_pr_hr(jsp, "%s", b);
+            if (as_json)
                 sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
-            }
-            return;
         }
+        return;
+    }
+    if (NULL == tesp) {
+        pr2serr("%s: logic error, resp==NULL\n", __func__);
+        return;
     }
 
     for (k = 0, got1 = false; k < tesp->num_ths; ++k, ++tdhp) {
         if ((bp + 3) > last_bp)
             goto truncated;
 
-        if (jsp->pr_as_json) {
+        if (as_json) {
             jo2p = sgj_new_unattached_object_r(jsp);
-            if (op->partial_join || (op->do_join > 0)) {
+            if (op->do_join > 0) {
                 sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
                                   NULL, etype_str(tdhp->etype, b, blen));
                 sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
@@ -3696,18 +3829,17 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
-                      "[ti=%d]\n", etype_str(tdhp->etype, b, blen),
-                      tdhp->se_id, k);
+            sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
+                      etype_str(tdhp->etype, b, blen), si_ss, tdhp->se_id, k);
             sgj_pr_hr(jsp, "      %s:\n", od_s);
-            if (! jsp->pr_as_json) {
+            if (! as_json) {
                 enc_status_helper("        ", bp, tdhp->etype, false, op,
                                   jo2p, b, blen);
                 sgj_pr_hr(jsp, "%s", b);
             }
             got1 = true;
         }
-        if (jsp->pr_as_json) {
+        if (as_json) {
             jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
             enc_status_helper("        ", bp, tdhp->etype, false, op, jo3p,
                               b, blen);
@@ -3722,20 +3854,20 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     continue;
             }
             sgj_pr_hr(jsp, "      Element %d descriptor:\n", j);
-            if (jsp->pr_as_json) {
+            if (as_json) {
                 jo4p = sgj_new_unattached_object_r(jsp);
-                if (! op->partial_join)
+                if (0 == op->inner_hex)
                     sgj_js_nv_hex_bytes(jsp, jo4p,
                                         "individual_status_element", bp, 4);
             }
             enc_status_helper("        ", bp, tdhp->etype, false, op, jo4p,
                               b, blen);
             sgj_pr_hr(jsp, "%s", b);
-            if (jsp->pr_as_json)
+            if (as_json)
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             got1 = true;
         }
-        if (jsp->pr_as_json)
+        if (as_json)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }           /* end of outer for loop */
     if (op->ind_given && (! got1)) {
@@ -3782,6 +3914,7 @@ static void
 threshold_helper(const char * header, const char * pad, const uint8_t *tp,
                  int etype, struct opts_t * op, sgj_opaque_p jop)
 {
+    bool as_json;
     uint8_t t0, t1, t2, t3;
     const char * cct0p;
     const char * cct1p;
@@ -3809,10 +3942,20 @@ threshold_helper(const char * header, const char * pad, const uint8_t *tp,
     t1 = tp[1];
     t2 = tp[2];
     t3 = tp[3];
-    if (op->inner_hex > 0) {
+    as_json = jsp->pr_as_json;
+    if (op->no_config || (op->inner_hex > 0)) {
         if (header)
             sgj_pr_hr(jsp, "%s", header);
         sgj_pr_hr(jsp, "%s%02x %02x %02x %02x\n", pad, t0, t1, t2, t3);
+        if (as_json) {
+            if (op->inner_hex < 2) {
+                sgj_js_nv_ihex(jsp, jop, hct_sn, t0);
+                sgj_js_nv_ihex(jsp, jop, hwt_sn, t1);
+                sgj_js_nv_ihex(jsp, jop, lwt_sn, t2);
+                sgj_js_nv_ihex(jsp, jop, lct_sn, t3);
+            } else
+                sgj_js_nv_hex_bytes(jsp, jop, "threshold_element", tp, 4);
+        }
         return;
     }
     switch (etype) {
@@ -3836,7 +3979,7 @@ threshold_helper(const char * header, const char * pad, const uint8_t *tp,
             sgj_pr_hr(jsp, "%slow warning=%s, low critical=%s (in Celsius)\n",
                       pad, cct2p, cct3p);
         }
-        if (jsp->pr_as_json) {
+        if (as_json) {
             sgj_js_nv_ihexstr(jsp, jop, hct_sn, t0, NULL, cct0p);
             sgj_js_nv_ihexstr(jsp, jop, hwt_sn, t1, NULL, cct1p);
             sgj_js_nv_ihexstr(jsp, jop, lwt_sn, t2, NULL, cct2p);
@@ -3856,7 +3999,7 @@ threshold_helper(const char * header, const char * pad, const uint8_t *tp,
         else
             snprintf(b3, b3len, "%d", t3);
         sgj_pr_hr(jsp, "%slow critical=%s (in minutes)\n", b, b3);
-        if (jsp->pr_as_json) {
+        if (as_json) {
             sgj_js_nv_ihexstr_nex(jsp, jop, lwt_sn, t2, true, NULL, b2, tr_s);
             sgj_js_nv_ihexstr_nex(jsp, jop, lct_sn, t3, true, NULL, b3, tr_s);
         }
@@ -3870,7 +4013,7 @@ threshold_helper(const char * header, const char * pad, const uint8_t *tp,
         sgj_pr_hr(jsp, "%slow warning=%d.%d %%, low critical=%d.%d %% "
                   "(below nominal voltage)\n", pad, t2 / 2,
                   (t2 % 2) ? 5 : 0, t3 / 2, (t3 % 2) ? 5 : 0);
-        if (jsp->pr_as_json) {
+        if (as_json) {
             snprintf(b0, b0len, "%d.%d %%", t0 / 2, (t0 % 2) ? 5 : 0);
             snprintf(b, blen, "%s %s %s", an_s, v_s, ru_s);
             sgj_js_nv_ihexstr_nex(jsp, jop, hct_sn, t0, true, NULL, b0, b);
@@ -3889,7 +4032,7 @@ threshold_helper(const char * header, const char * pad, const uint8_t *tp,
         sgj_pr_hr(jsp, "%shigh critical=%d.%d %%, high warning=%d.%d %% "
                   "(above nominal current)\n", pad, t0 / 2,
                   (t0 % 2) ? 5 : 0, t1 / 2, (t1 % 2) ? 5 : 0);
-        if (jsp->pr_as_json) {
+        if (as_json) {
             snprintf(b0, b0len, "%d.%d %%", t0 / 2, (t0 % 2) ? 5 : 0);
             snprintf(b, blen, "%s %s %s", an_s, c_s, ru_s);
             sgj_js_nv_ihexstr_nex(jsp, jop, hct_sn, t0, true, NULL, b0, b);
@@ -3914,7 +4057,7 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
               const uint8_t * resp, int resp_len, struct opts_t * op,
               sgj_opaque_p jop)
 {
-    bool got1, match_ind_th, thresh_in_use;
+    bool got1, match_ind_th, thresh_in_use, as_json;
     int j, k;
     uint32_t gen_code;
     const uint8_t * bp;
@@ -3937,10 +4080,11 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     sgj_pr_hr(jsp, "%s:\n", ti_dp);
     if (resp_len < 4)
         goto truncated;
-    if (jsp->pr_as_json) {
+    as_json = jsp->pr_as_json;
+    if (as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                                 sgj_convert_to_snake_name(ti_dp, b, blen));
+                                    sgj_convert2snake(ti_dp, b, blen));
         sgj_js_nv_ihexstr(jsp, jop, pc_sn, THRESHOLD_DPC, NULL, ti_dp);
     }
     sgj_haj_vi(jsp, jop, 2, "INVOP", SGJ_SEP_EQUAL_NO_SPACE,
@@ -3956,31 +4100,25 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     }
     bp = resp + 8;
     sgj_pr_hr(jsp, "  %s\n", tsdl);
-    if (jsp->pr_as_json) {
+    if (as_json) {
         if ((NULL == tesp) || (tesp->num_ths > 0))
             jap = sgj_named_subarray_r(jsp, jop,
-                                sgj_convert_to_snake_name(tsdl, b, blen));
-        if ((! op->partial_join) && (op->inner_hex > 0)) {
-            int n = (resp_len - 8) / 4;
+                                       sgj_convert2snake(tsdl, b, blen));
+    }
+    if (op->no_config) {
+        int n = (resp_len - 8) / 4;
 
-            if (op->verbose > 2)
-                pr2serr("%s: decoded _without_ using type descriptor header "
-                        "info\n", __func__);
-            for (j = 0; j < n; ++j, bp += 4) {
+        if (op->verbose > 2)
+            pr2serr("%s: %s\n", __func__, dwuti);
+        for (j = 0; j < n; ++j, bp += 4) {
+            if (as_json)
                 jo2p = sgj_new_unattached_object_r(jsp);
-                if (op->inner_hex > 1)
-                    sgj_js_nv_hex_bytes(jsp, jo2p, "threshold_status_element",
-                                        bp, 4);
-                else {
-                    sgj_js_nv_ihex(jsp, jo2p, hct_sn, bp[0]);
-                    sgj_js_nv_ihex(jsp, jo2p, hwt_sn, bp[1]);
-                    sgj_js_nv_ihex(jsp, jo2p, lwt_sn, bp[2]);
-                    sgj_js_nv_ihex(jsp, jo2p, lct_sn, bp[3]);
-                }
+            threshold_helper("    Threshold status element:\n", "      ",
+                             bp, 0, op, jo2p);
+            if (as_json)
                 sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
-            }
-            return;
         }
+        return;
     }
     if (NULL == tesp) {
         pr2serr("%s: logic error, resp==NULL\n", __func__);
@@ -3998,31 +4136,28 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         if ((bp + 3) > last_bp)
             goto truncated;
         thresh_in_use = threshold_used(tdhp->etype);
-        if (jsp->pr_as_json && thresh_in_use) {
+        if (as_json && thresh_in_use) {
             jo2p = sgj_new_unattached_object_r(jsp);
-            if (op->partial_join || (op->do_join > 0)) {
-                sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
-                                  NULL, etype_str(tdhp->etype, b, blen));
-                sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
-                                  (0 == tdhp->se_id) ? "primary" : NULL);
-            }
+            sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
+                              NULL, etype_str(tdhp->etype, b, blen));
+            sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
+                              (0 == tdhp->se_id) ? "primary" : NULL);
         }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
-                      "[ti=%d]\n", etype_str(tdhp->etype, b, blen),
-                      tdhp->se_id, k);
-            if (! jsp->pr_as_json)
+            sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
+                      etype_str(tdhp->etype, b, blen), si_sn, tdhp->se_id, k);
+            if (! as_json)
                 threshold_helper("      Overall descriptor:\n", "        ",
                                  bp, tdhp->etype, op, NULL);
             got1 = true;
         }
-        if (jsp->pr_as_json && thresh_in_use) {
-            sgj_convert_to_snake_name(otse, b, blen);
+        if (as_json && thresh_in_use) {
+            sgj_convert2snake(otse, b, blen);
             jo3p = sgj_named_subobject_r(jsp, jo2p, b);
             threshold_helper(otse, "        ", bp, tdhp->etype, op, jo3p);
             if (tdhp->num_elements > 0) {
-                sgj_convert_to_snake_name(itse, e, sizeof(e));
+                sgj_convert2snake(itse, e, sizeof(e));
                 snprintf(b, blen, "%s_list", e);
                 ja2p = sgj_named_subarray_r(jsp, jo2p, b);
             }
@@ -4035,16 +4170,16 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     continue;
             }
             snprintf(b, blen, "      Element %d descriptor:\n", j);
-            if (! jsp->pr_as_json)
+            if (! as_json)
                 threshold_helper(b, "        ", bp, tdhp->etype, op, NULL);
             got1 = true;
-            if (jsp->pr_as_json && thresh_in_use) {
+            if (as_json && thresh_in_use) {
                 jo4p = sgj_new_unattached_object_r(jsp);
                 threshold_helper(itse, "        ", bp, tdhp->etype, op, jo4p);
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             }
         }
-        if (jsp->pr_as_json && thresh_in_use)
+        if (as_json && thresh_in_use)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }                                   /* end of outer for loop */
     if (op->ind_given && (! got1)) {
@@ -4068,7 +4203,8 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                  const uint8_t * resp, int resp_len,
                  struct opts_t * op, sgj_opaque_p jop)
 {
-    int j, k, desc_len;
+    bool as_json;
+    int j, k, n, desc_len;
     uint32_t gen_code;
     bool got1, match_ind_th;
     const uint8_t * bp;
@@ -4080,10 +4216,11 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     sgj_opaque_p jo4p = NULL;
     sgj_opaque_p jap = NULL;
     sgj_opaque_p ja2p = NULL;
-    char b[128];
+    char b[256];
     static const int blen = sizeof(b);
     static const char * const ed_dp = "Element descriptor diagnostic page";
     static const char * const edbtl = "Element descriptor by type list";
+    static const char * const d_s = "descriptor";
 
     sgj_pr_hr(jsp, "%s:\n", ed_dp);
     if (resp_len < 4)
@@ -4091,11 +4228,13 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     last_bp = resp + resp_len - 1;
     if (resp_len < 8)
         goto truncated;
-    if (jsp->pr_as_json) {
+    as_json = jsp->pr_as_json;
+    if (as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                         sgj_convert_to_snake_name(ed_dp, b, blen));
-        sgj_js_nv_ihexstr(jsp, jop, pc_sn, ELEM_DESC_DPC, NULL, ed_dp);
+                                    sgj_convert2snake(ed_dp, b, blen));
+        sgj_js_nv_ihexstr_nex(jsp, jop, pc_sn, ELEM_DESC_DPC, true, NULL,
+                              ed_dp, "names for elements in es dpage");
     }
     gen_code = sg_get_unaligned_be32(resp + 4);
     sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
@@ -4105,23 +4244,27 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     }
     sgj_pr_hr(jsp, "  %s:\n", edbtl);
     bp = resp + 8;
-    if (jsp->pr_as_json) {
+    if (as_json)
         jap = sgj_named_subarray_r(jsp, jop,
-                                   sgj_convert_to_snake_name(edbtl, b, blen));
-        if ((! op->partial_join) && (op->inner_hex > 0)) {
-            int n;
-
-            if (op->verbose > 2)
-                pr2serr("%s: decoded _without_ using type descriptor header "
-                        "info\n", __func__);
-            for ( ; bp < last_bp; bp += (n + 4)) {
-                n = sg_get_unaligned_be16(bp + 2);
-                jo2p = sgj_new_unattached_object_r(jsp);
-                sgj_js_nv_s_len_chk(jsp, jo2p, "descriptor", bp + 4, n);
-                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
-            }
-            return;
+                                   sgj_convert2snake(edbtl, b, blen));
+    if (op->no_config) {
+        if (op->verbose > 2)
+            pr2serr("%s: %s\n", __func__, dwuti);
+        for ( ; bp < last_bp; bp += (n + 4)) {
+            n = sg_get_unaligned_be16(bp + 2);
+            if (op->inner_hex > 0) {
+                hex2str(bp, n + 4, "      ", op->h2s_oformat, blen, b);
+                sgj_pr_hr(jsp, "%s\n", b);
+            } else
+                sgj_pr_hr(jsp, "    %s: %.*s\n", d_s, n, bp + 4);
+            jo2p = sgj_new_unattached_object_r(jsp);
+            if (op->inner_hex > 1)
+                sgj_js_nv_hex_bytes(jsp, jo2p, d_s, bp, n + 4);
+            else
+                sgj_js_nv_s_len_chk(jsp, jo2p, d_s, bp + 4, n);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
+        return;
     }
     got1 = false;
     if (NULL == tesp) {
@@ -4132,31 +4275,37 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     for (k = 0, tp = tesp->th_base; k < tesp->num_ths; ++k, ++tp) {
         if ((bp + 3) > last_bp)
             goto truncated;
-        if (jsp->pr_as_json) {
+        if (as_json) {
             jo2p = sgj_new_unattached_object_r(jsp);
-            if (op->partial_join || (op->do_join > 0)) {
-                sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tp->etype,
-                                  NULL, etype_str(tp->etype, b, blen));
-                sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
-                                  (0 == tp->se_id) ? "primary" : NULL);
-            }
+            sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tp->etype,
+                              NULL, etype_str(tp->etype, b, blen));
+            sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
+                              (0 == tp->se_id) ? "primary" : NULL);
         }
         desc_len = sg_get_unaligned_be16(bp + 2) + 4;
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
-                      "[ti=%d]\n", etype_str(tp->etype, b, blen), tp->se_id,
-                      k);
-            if (desc_len > 4)
-                sgj_pr_hr(jsp, "      %s: %.*s\n", od_s, desc_len - 4, bp + 4);
-            else
+            sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
+                      etype_str(tp->etype, b, blen), si_ss, tp->se_id, k);
+            if (desc_len > 4) {
+                if (op->inner_hex > 0) {
+                    sgj_pr_hr(jsp, "      %s:\n", od_s);
+                    hex2str(bp, desc_len, "        ", op->h2s_oformat, blen,
+                            b);
+                    sgj_pr_hr(jsp, "%s\n", b);
+                } else
+                    sgj_pr_hr(jsp, "      %s: %.*s\n", od_s, desc_len - 4,
+                              bp + 4);
+            } else
                 sgj_pr_hr(jsp, "      %s: <empty>\n", od_s);
             got1 = true;
         }
-        if (jsp->pr_as_json) {
+        if (as_json) {
             jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
-            sgj_js_nv_s_len_chk(jsp, jo3p, "descriptor", bp + 4,
-                                desc_len - 4);
+            if (op->inner_hex > 0)
+                sgj_js_nv_hex_bytes(jsp, jo3p, d_s, bp, desc_len);
+            else
+                sgj_js_nv_s_len_chk(jsp, jo3p, d_s, bp + 4, desc_len - 4);
             ja2p = sgj_named_subarray_r(jsp, jo2p, "element_descriptor");
         }
 
@@ -4168,20 +4317,28 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     (! match_ind_indiv(j, op)))
                     continue;
             }
-            if (desc_len > 4)
-                sgj_pr_hr(jsp, "      Element %d descriptor: %.*s\n", j,
-                          desc_len - 4, bp + 4);
-            else
+            if (desc_len > 4) {
+                if (op->inner_hex > 0) {
+                    sgj_pr_hr(jsp, "      Element %d descriptor:\n", j);
+                    hex2str(bp, desc_len, "        ", op->h2s_oformat,
+                            blen, b);
+                    sgj_pr_hr(jsp, "%s\n", b);
+                } else
+                    sgj_pr_hr(jsp, "      Element %d descriptor: %.*s\n", j,
+                              desc_len - 4, bp + 4);
+            } else
                 sgj_pr_hr(jsp, "      Element %d descriptor: <empty>\n", j);
             got1 = true;
-            if (jsp->pr_as_json) {
+            if (as_json) {
                 jo4p = sgj_new_unattached_object_r(jsp);
-                sgj_js_nv_s_len_chk(jsp, jo4p, "descriptor", bp + 4,
-                                    desc_len - 4);
+                if (op->inner_hex > 0)
+                    sgj_js_nv_hex_bytes(jsp, jo4p, d_s, bp, desc_len);
+                else
+                    sgj_js_nv_s_len_chk(jsp, jo4p, d_s, bp + 4, desc_len - 4);
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             }
         }
-        if (jsp->pr_as_json)
+        if (as_json)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }                                   /* end of outer for loop */
     if (op->ind_given && (! got1)) {
@@ -4218,7 +4375,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                     sgj_opaque_p jop)
 {
     bool nofilter = ! op->do_filter;
-    bool eip;
+    bool eip, as_json;
     uint8_t cei, oei;
     int phys, j, n, q, desc_type, eiioe, eip_offset;
     uint64_t sa, asa;
@@ -4226,6 +4383,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
     const uint8_t * aep;
     const uint8_t * ed_bp;
     const char * ccp;
+    char * cp;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     sgj_opaque_p jap = NULL;
@@ -4233,12 +4391,16 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
     char e[64];
     static const int blen = sizeof(b);
     static const int elen = sizeof(e);
+    static const int m_sz = 4096;
+    static const char * pdl_s = "Phy descriptor list";
+    static const char * pdl_sn = "phy_descriptor_list";
 
     eip = !!(0x10 & ae_bp[0]);
     eiioe = eip ? (0x3 & ae_bp[2]) : 0;
     eip_offset = eip ? 2 : 0;
     desc_type = (ae_bp[3 + eip_offset] >> 6) & 0x3;
-    if (jsp->pr_as_json)
+    as_json = jsp->pr_as_json;
+    if (as_json)
         sgj_js_nv_ihex(jsp, jop, "descriptor_type", desc_type);
     if (op->verbose > 1)
         sgj_pr_hr(jsp, "%sdescriptor_type: %d\n", pad, desc_type);
@@ -4251,7 +4413,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
             sg_scnpr(b + n, blen - n, ", device slot number: %d",
                      ae_bp[5 + eip_offset]);
         sgj_pr_hr(jsp, "%s\n", b);
-        if (jsp->pr_as_json) {
+        if (as_json) {
             sgj_js_nv_ihex(jsp, jop, "number_of_phy_descriptors", phys);
             sgj_js_nv_i(jsp, jop, "not_all_phys",
                            ae_bp[3 + eip_offset] & 1);
@@ -4260,8 +4422,22 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                                ae_bp[5 + eip_offset]);
         }
         aep = ae_bp + 4 + eip_offset + eip_offset;
-        if (jsp->pr_as_json)
-            jap = sgj_named_subarray_r(jsp, jop, "phy_descriptor_list");
+        if (op->inner_hex > 0) {
+            cp = (char *)malloc(m_sz);
+            if (NULL == cp) {
+                pr2serr("%s\n", oohm);
+                return;
+            }
+            j = phys * 28;
+            sgj_pr_hr(jsp, "%s%s:\n", pad, pdl_s);
+            hex2str(aep, j, "          ", op->h2s_oformat, m_sz, cp);
+            sgj_pr_hr(jsp, "%s", cp);
+            sgj_js_nv_hex_bytes(jsp, jop, pdl_sn, aep, j);
+            free(cp);
+            return;
+        }
+        if (as_json)
+            jap = sgj_named_subarray_r(jsp, jop, pdl_sn);
 
         for (j = 0; j < phys; ++j, aep += 28) {
             bool print_sas_addr = false;
@@ -4300,7 +4476,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
             }
             if (print_sas_addr)
                 sgj_pr_hr(jsp, "%s  phy identifier: 0x%x\n", pad, aep[20]);
-            if (jsp->pr_as_json) {
+            if (as_json) {
                 jo2p = sgj_new_unattached_object_r(jsp);
                 sgj_js_nv_ihexstr(jsp, jo2p, "device_type", dt, NULL,
                                   sas_device_type[(0x70 & aep[0]) >> 4]);
@@ -4326,19 +4502,34 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
             sgj_pr_hr(jsp, "%sSAS address: 0x%" PRIx64 "\n", pad, sa);
             sgj_pr_hr(jsp, "%sAttached connector; other_element pairs:\n",
                       pad);
-            if (jsp->pr_as_json) {
+            if (as_json) {
                 sgj_js_nv_ihex(jsp, jop,
                                "number_of_expander_phy_descriptors", phys);
                 sgj_js_nv_ihex(jsp, jop, "sas_address", sa);
-                jap = sgj_named_subarray_r(jsp, jop,
-                                           "expander_phy_descriptor_list");
             }
             aep = ae_bp + 14 + eip_offset;
+            snprintf(e, elen, "expander_%s", pdl_sn);
+            if (op->inner_hex > 0) {
+                cp = (char *)malloc(m_sz);
+                if (NULL == cp) {
+                    pr2serr("%s\n", oohm);
+                    return;
+                }
+                j = phys * 2;
+                sgj_pr_hr(jsp, "%sExpander %s:\n", pad, pdl_s);
+                hex2str(aep, j, "          ", op->h2s_oformat, m_sz, cp);
+                sgj_pr_hr(jsp, "%s", cp);
+                sgj_js_nv_hex_bytes(jsp, jop, e, aep, j);
+                free(cp);
+                return;
+            }
+            if (as_json)
+                jap = sgj_named_subarray_r(jsp, jop, e);
 
             for (j = 0; j < phys; ++j, aep += 2) {
                 cei = aep[0];   /* connector element index */
                 oei = aep[1];   /* other element index */
-                if (jsp->pr_as_json) {
+                if (as_json) {
                     jo2p = sgj_new_unattached_object_r(jsp);
                     sgj_js_nv_ihex(jsp, jo2p, "connector_element_index", cei);
                     sgj_js_nv_ihex(jsp, jo2p, "other_element_index", oei);
@@ -4379,49 +4570,63 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                         else
                             jrp = find_join_row_cnst(tesp, oei, FJ_EOE);
                         if (NULL == jrp)
-                            n += sg_scnpr(b + n, blen - n,
-                                          "broken [oth_elem_idx=%d]", oei);
+                            sg_scnpr(b + n, blen - n,
+                                     "broken [oth_elem_idx=%d]", oei);
                         else if (jrp->elem_descp) {
                             ccp = etype_str(jrp->etype, e, elen);
                             ed_bp = jrp->elem_descp;
                             q = sg_get_unaligned_be16(ed_bp + 2);
                             if (q > 0)
-                                n += sg_scnpr(b + n, blen - n,
-                                              "%.*s [%d,%d] etype: %s", q,
-                                              (const char *)(ed_bp + 4),
-                                              jrp->th_i, jrp->indiv_i, ccp);
+                                sg_scnpr(b + n, blen - n,
+                                         "%.*s [%d,%d] etype: %s", q,
+                                         (const char *)(ed_bp + 4),
+                                         jrp->th_i, jrp->indiv_i, ccp);
                             else
-                                n += sg_scnpr(b + n, blen - n,
-                                              "[%d,%d] etype: %s", jrp->th_i,
-                                              jrp->indiv_i, ccp);
+                                sg_scnpr(b + n, blen - n,
+                                         "[%d,%d] etype: %s", jrp->th_i,
+                                          jrp->indiv_i, ccp);
                         } else {
                             ccp = etype_str(jrp->etype, e, elen);
-                            n += sg_scnpr(b + n, blen - n,
-                                          "[%d,%d] etype: %s", jrp->th_i,
-                                          jrp->indiv_i, ccp);
+                            sg_scnpr(b + n, blen - n,
+                                     "[%d,%d] etype: %s", jrp->th_i,
+                                     jrp->indiv_i, ccp);
                         }
                     } else
-                        n += sg_scnpr(b + n, blen - n, "other ei: %d", oei);
+                        sg_scnpr(b + n, blen - n, "other ei: %d", oei);
                 }
                 sgj_pr_hr(jsp, "%s\n", b);
-                if (jsp->pr_as_json)
+                if (as_json)
                     sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             }
         } else if ((SCSI_TPORT_ETC == etype) ||
                    (SCSI_IPORT_ETC == etype) ||
                    (ENC_SCELECTR_ETC == etype)) {
             sgj_pr_hr(jsp, "%snumber of phys: %d\n", pad, phys);
-            if (jsp->pr_as_json) {
+            if (as_json)
                 sgj_js_nv_ihex(jsp, jop,
                                "number_of_phy_descriptors", phys);
-                jap = sgj_named_subarray_r(jsp, jop,
-                                           "phy_descriptor_list");
-            }
             aep = ae_bp + 6 + eip_offset;
+            if (op->inner_hex > 0) {
+                cp = (char *)malloc(m_sz);
+                if (NULL == cp) {
+                    pr2serr("%s\n", oohm);
+                    return;
+                }
+                j = phys * 12;
+                sgj_pr_hr(jsp, "%s%s:\n", pad, pdl_s);
+                hex2str(aep, j, "          ", op->h2s_oformat, m_sz, cp);
+                sgj_pr_hr(jsp, "%s", cp);
+                sgj_js_nv_hex_bytes(jsp, jop, pdl_sn, aep, j);
+                free(cp);
+                return;
+            }
+            if (as_json)
+                jap = sgj_named_subarray_r(jsp, jop, pdl_sn);
+
             for (j = 0; j < phys; ++j, aep += 12) {
                 cei = aep[2];   /* connector element index */
                 oei = aep[3];   /* other element index */
-                if (jsp->pr_as_json)
+                if (as_json)
                     jo2p = sgj_new_unattached_object_r(jsp);
                 sa = sg_get_unaligned_be64(aep + 4);
                 sgj_pr_hr(jsp, "%sphy index: %d\n", pad, j);
@@ -4462,33 +4667,33 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                         else
                             jrp = find_join_row_cnst(tesp, oei, FJ_EOE);
                         if (NULL == jrp)
-                            n += sg_scnpr(b + n, blen - n,
-                                          "broken [oth_elem_idx=%d]", oei);
+                            sg_scnpr(b + n, blen - n,
+                                     "broken [oth_elem_idx=%d]", oei);
                         else if (jrp->elem_descp) {
                             ccp = etype_str(jrp->etype, e, elen);
                             ed_bp = jrp->elem_descp;
                             q = sg_get_unaligned_be16(ed_bp + 2);
                             if (q > 0)
-                                n += sg_scnpr(b + n, blen - n,
-                                              "%.*s [%d,%d] etype: %s", q,
-                                              (const char *)(ed_bp + 4),
-                                              jrp->th_i, jrp->indiv_i, ccp);
+                                sg_scnpr(b + n, blen - n,
+                                         "%.*s [%d,%d] etype: %s", q,
+                                         (const char *)(ed_bp + 4),
+                                         jrp->th_i, jrp->indiv_i, ccp);
                             else
-                                n += sg_scnpr(b + n, blen - n,
-                                              "[%d,%d] etype: %s", jrp->th_i,
-                                              jrp->indiv_i, ccp);
+                                sg_scnpr(b + n, blen - n,
+                                         "[%d,%d] etype: %s", jrp->th_i,
+                                         jrp->indiv_i, ccp);
                         } else {
                             ccp = etype_str(jrp->etype, e, elen);
-                            n += sg_scnpr(b + n, blen - n,
-                                          "[%d,%d] etype: %s", jrp->th_i,
-                                          jrp->indiv_i, ccp);
+                            sg_scnpr(b + n, blen - n,
+                                     "[%d,%d] etype: %s", jrp->th_i,
+                                     jrp->indiv_i, ccp);
                         }
                     } else
-                        n += sg_scnpr(b + n, blen - n, "other ei: %d", oei);
+                        sg_scnpr(b + n, blen - n, "other ei: %d", oei);
                 }
                 sgj_pr_hr(jsp, "%s\n", b);
                 sgj_pr_hr(jsp, "%s  SAS address: 0x%" PRIx64 "\n", pad, sa);
-                if (jsp->pr_as_json) {
+                if (as_json) {
                     sgj_js_nv_ihex(jsp, jo2p, "connector_element_index", cei);
                     sgj_js_nv_ihex(jsp, jo2p, "other_element_index", oei);
                     sgj_js_nv_ihex(jsp, jo2p, "sas_address", sa);
@@ -4508,24 +4713,34 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
                        int len, int etype, const struct th_es_t * tesp,
                        struct opts_t * op, sgj_opaque_p jop)
 {
-    bool eip;
+    bool eip, as_json;
     uint16_t pcie_vid;
     int ports, j, m, n, eip_offset, pcie_pt, proto;
+    char * cp;
     const uint8_t * aep;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     sgj_opaque_p jap = NULL;
-    char b[128];
+    char b[512];
     static const int blen = sizeof(b);
+    static const int m_sz = 4096;
 
-    if (op->inner_hex > 0) {
-        for (n = 0, j = 0; j < len; ++j) {
-            if (0 == (j % 16))
-                n += sg_scnpr(b + n, blen - n,
-                              "%s%s", ((0 == j) ? "" : "\n"), pad);
-            n += sg_scnpr(b + n, blen - n, "%02x ", ae_bp[j]);
+    as_json = jsp->pr_as_json;
+    if (1 == op->inner_hex) {
+        cp = (char *)malloc(m_sz);
+        if (NULL == cp) {
+            pr2serr("%s\n", oohm);
+            return;
         }
-        sgj_pr_hr(jsp, "%s\n", b);
+        sgj_pr_hr(jsp, "%s%s:\n", pad, "in hex");
+        hex2str(ae_bp, len, pad, op->h2s_oformat, m_sz, cp);
+        if (as_json && jsp->pr_out_hr)
+            sgj_hr_str_out(jsp, cp, strlen(cp));
+        else
+            sgj_pr_hr(jsp, "%s\n", cp);
+        if (as_json)
+            sgj_js_nv_hex_bytes(jsp, jop, in_hex_sn, ae_bp, len);
+        free(cp);
         return;
     }
     eip = !!(0x10 & ae_bp[0]);
@@ -4543,10 +4758,10 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
         for (m = 0; m < 8; ++m)
             n += sg_scnpr(b + n, blen - n, "%02x", ae_bp[6 + eip_offset + m]);
         if (eip_offset)
-            n += sg_scnpr(b + n, blen - n, ", device slot number: %d",
-                          ae_bp[5 + eip_offset]);
+            sg_scnpr(b + n, blen - n, ", device slot number: %d",
+                     ae_bp[5 + eip_offset]);
         sgj_pr_hr(jsp, "%s\n", b);
-        if (jsp->pr_as_json) {
+        if (as_json) {
             sgj_js_nv_ihex(jsp, jop, "number_of_ports", ports);
             if (eip_offset)
                 sgj_js_nv_ihex(jsp, jop, "device_slot_number",
@@ -4565,7 +4780,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
             for (m = 0; m < 8; ++m)
                 n += sg_scnpr(b + n, blen - n, "%02x", aep[8 + m]);
             sgj_pr_hr(jsp, "%s\n", b);
-            if (jsp->pr_as_json) {
+            if (as_json) {
                 jo2p = sgj_new_unattached_object_r(jsp);
                 sgj_js_nv_ihex(jsp, jo2p, "port_loop_position", aep[0]);
                 sgj_js_nv_ihex(jsp, jo2p, "bypass_reason", aep[1]);
@@ -4614,7 +4829,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
                   (0xffff == pcie_vid) ? not_rep : "");
         sgj_pr_hr(jsp, "%sserial number: %.20s\n", pad, ae_bp + 12);
         sgj_pr_hr(jsp, "%smodel number: %.40s\n", pad, ae_bp + 32);
-        if (jsp->pr_as_json) {
+        if (as_json) {
             sgj_js_nv_ihexstr(jsp, jop, "pcie_protocol_type", pcie_pt, NULL,
                               (TPROTO_PCIE_PS_NVME == pcie_pt) ?
                                  "NVMe" : "unexpected value");
@@ -4648,7 +4863,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
             if (psn_valid)      /* little endian, top 3 bits assumed zero */
                 sgj_pr_hr(jsp, "%s  physical slot number: 0x%" PRIx16 "\n",
                           pad, 0x1fff & sg_get_unaligned_le16(aep + 6));
-            if (jsp->pr_as_json) {
+            if (as_json) {
                 jo2p = sgj_new_unattached_object_r(jsp);
                 sgj_js_nv_ihex(jsp, jo2p, "psn_valid", (int)psn_valid);
                 snprintf(b, blen, "bus number, device number and function "
@@ -4684,85 +4899,114 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     const uint8_t * resp, int resp_len, struct opts_t * op,
                     sgj_opaque_p jop)
 {
+    bool eip, invalid, match_ind_th, my_eiioe_force, skip, as_json;
     int j, k, desc_len, etype, el_num, ind, elem_count, ei, eiioe, num_elems;
     int fake_ei, proto;
     uint32_t gen_code;
-    bool eip, invalid, match_ind_th, my_eiioe_force, skip;
+    const char * ccp;
     const uint8_t * bp;
     const uint8_t * last_bp;
     const struct type_desc_hdr_t * tp = tesp ? tesp->th_base : NULL;
+    char * b;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     sgj_opaque_p jo3p = NULL;
     sgj_opaque_p jo4p = NULL;
     sgj_opaque_p jap = NULL;
     sgj_opaque_p ja2p = NULL;
-    char b[128];
-    static const int blen = sizeof(b);
-    static const char * aes_dp = "Additional element status diagnostic page";
+    char e[128];
+    static const int blen = 4096;
+    static const int elen = sizeof(e);
     static const char * aesbetl =
                  "Additional element status by element type list";
     static const char * aesdl = "Additional element status descriptor list";
     static const char * psi_sn = "protocol_specific_information";
 
     sgj_pr_hr(jsp, "%s:\n", aes_dp);
+    b = (char *)malloc(blen);
+    if (NULL == b) {
+        pr2serr("%s\n", oohm);
+        return;
+    }
     if (resp_len < 4)
         goto truncated;
     last_bp = resp + resp_len - 1;
-    if (jsp->pr_as_json) {
+    as_json = jsp->pr_as_json;
+    if (as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                         sgj_convert_to_snake_name(aes_dp, b, blen));
+                                    sgj_convert2snake(aes_dp, b, blen));
         sgj_js_nv_ihexstr(jsp, jop, pc_sn, ADD_ELEM_STATUS_DPC, NULL, aes_dp);
     }
     gen_code = sg_get_unaligned_be32(resp + 4);
     sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
     if (tesp && (ref_gen_code != gen_code)) {
         pr2serr("  <<%s>>\n", soec);
-        return;
+        goto fini;
     }
     bp = resp + 8;
-    if (jsp->pr_as_json) {
-        if ((! op->partial_join) && (op->inner_hex > 0)) {
-            int n;
+    if (op->no_config) {
+        int n;
 
-            sgj_pr_hr(jsp, "  %s:\n", aesdl);
-            if (op->verbose > 2)
-                pr2serr("%s: decoded _without_ using type descriptor header "
-                        "info\n", __func__);
+        if (op->verbose > 2)
+            pr2serr("%s: %s\n", __func__, dwuti);
+        sgj_pr_hr(jsp, "  %s:\n", aesdl);
+        if (as_json)
             jap = sgj_named_subarray_r(jsp, jop,
-                                   sgj_convert_to_snake_name(aesdl, b, blen));
-            for ( ; bp < last_bp; bp += n) {
-                n = bp[1] + 2;
-                jo2p = sgj_new_unattached_object_r(jsp);
-                if (op->inner_hex > 1)
+                                       sgj_convert2snake(aesdl, b, blen));
+        for ( ; bp < last_bp; bp += n) {
+            n = bp[1] + 2;
+            jo2p = sgj_new_unattached_object_r(jsp);
+            sgj_pr_hr(jsp, "    %s:\n", aesd_s);
+            if (op->inner_hex > 1) {
+                hex2str(bp, n, "      ", op->h2s_oformat, blen, b);
+                sgj_pr_hr(jsp, "%s", b);
+                if (as_json)
                     sgj_js_nv_hex_bytes(jsp, jo2p, aesd_sn, bp, n);
-                else {
+            } else {
+                invalid = !!(0x80 & bp[0]);
+                eip = !!(0x10 & bp[0]);
+                if (eip) {
+                    eiioe = 0x3 & bp[2];
+                    ei = bp[3];
+                    j = 4;
+                } else
+                    j = 2;
+                proto = (0xf & bp[0]);
+                ccp = sg_get_trans_proto_str(proto, elen, e);
+                sgj_pr_hr(jsp, "    invalid=%d\n", (int)invalid);
+                sgj_pr_hr(jsp, "    eip=%d\n", (int)eip);
+                sgj_pr_hr(jsp, "    proto=%d\n", proto);
+                if (eip && (n > 3)) {
+                    sgj_pr_hr(jsp, "    eiioe=%d\n", eiioe);
+                    sgj_pr_hr(jsp, "    element_index=%d\n", ei);
+                }
+                hex2str(bp + j, n - j, "      ", op->h2s_oformat, blen, b);
+                sgj_pr_hr(jsp, "%s", b);
+                if (as_json) {
                     jo3p = sgj_named_subobject_r(jsp, jo2p, aesd_sn);
-                    sgj_js_nv_ihex(jsp, jo3p, "invalid", !!(0x80 & bp[0]));
-                    eip = !!(0x10 & bp[0]);
+                    sgj_js_nv_ihex(jsp, jo3p, "invalid", (int)invalid);
                     sgj_js_nv_ihex(jsp, jo3p, "eip", eip);
-                    proto = (0xf & bp[0]);
                     sgj_js_nv_ihexstr(jsp, jo3p, "protocol_identifier", proto,
-                                      NULL, sg_get_trans_proto_str(proto,
-                                                                   blen, b));
-                    if ((0 == eip) || (n < 4))
-                        sgj_js_nv_hex_bytes(jsp, jo3p, psi_sn, bp + 2, n - 2);
-                    else {
+                                      NULL, ccp);
+                    if (eip && (n > 3)) {
                         sgj_js_nv_ihex(jsp, jo3p, "eiioe", 0x3 & bp[2]);
                         sgj_js_nv_ihex(jsp, jo3p, "element_index", bp[3]);
-                        sgj_js_nv_hex_bytes(jsp, jo3p, psi_sn, bp + 4, n - 4);
-
                     }
+                    sgj_js_nv_hex_bytes(jsp, jo3p, psi_sn, bp + j, n - j);
                 }
-                sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             }
-            return;
-        } else {
-            sgj_pr_hr(jsp, "  %s:\n", aesbetl);
-            jap = sgj_named_subarray_r(jsp, jop,
-                                sgj_convert_to_snake_name(aesbetl, b, blen));
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
+        goto fini;
+    } else {
+        sgj_pr_hr(jsp, "  %s:\n", aesbetl);
+        jap = sgj_named_subarray_r(jsp, jop,
+                                   sgj_convert2snake(aesbetl, b, blen));
+    }
+    if (NULL == tesp) {
+        pr2serr("%s: logic error, resp==NULL\n", __func__);
+        return;
     }
     my_eiioe_force = op->eiioe_force;
 
@@ -4823,17 +5067,17 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
-            sgj_pr_hr(jsp, "    Element type: %s, subenclosure id: %d "
-                      "[ti=%d]\n", etype_str(etype, b, blen), tp->se_id, k);
+            sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
+                      etype_str(etype, b, blen), si_ss, tp->se_id, k);
         }
-        if (jsp->pr_as_json) {
+        if (as_json) {
             jo2p = sgj_new_unattached_object_r(jsp);
             sgj_js_nv_ihexstr(jsp, jo2p, et_sn, etype, NULL,
                               etype_str(etype, b, blen));
             sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
                               (0 == tp->se_id) ? "primary" : NULL);
             ja2p = sgj_named_subarray_r(jsp, jo2p,
-                                sgj_convert_to_snake_name(aesdl, b, blen));
+                                         sgj_convert2snake(aesdl, b, blen));
         }
         el_num = 0;
 
@@ -4852,7 +5096,7 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     (! match_ind_indiv(el_num, op)))
                     continue;
             }
-            if (jsp->pr_as_json) {
+            if (as_json) {
                 jo3p = sgj_new_unattached_object_r(jsp);
                 jo4p = sgj_named_subobject_r(jsp, jo3p, aesd_sn);
                 sgj_js_nv_ihex(jsp, jo4p, "invalid", invalid);
@@ -4875,16 +5119,18 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
             else
                 additional_elem_helper("        ", bp, desc_len, etype,
                                        tesp, op, jo4p);
-            if (jsp->pr_as_json)
+            if (as_json)
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
         }
         elem_count += tp->num_elements;
         if (jsp->pr_as_json)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }           /* end_for: loop over type descriptor headers */
-    return;
+    goto fini;
 truncated:
     pr2serr("    <<<%s: %s>>>\n", __func__, rts_s);
+fini:
+    free(b);
     return;
 }
 
@@ -4912,7 +5158,7 @@ subenc_help_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     if (jsp->pr_as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                            sgj_convert_to_snake_name(sht_dp, b, blen));
+                                    sgj_convert2snake(sht_dp, b, blen));
         sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, sht_dp);
     }
     sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
@@ -4972,7 +5218,7 @@ subenc_string_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     if (jsp->pr_as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                            sgj_convert_to_snake_name(ssi_dp, b, blen));
+                                    sgj_convert2snake(ssi_dp, b, blen));
         sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, ssi_dp);
     }
     sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
@@ -4993,9 +5239,9 @@ subenc_string_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
                       (0 == bp[1] ? "primary" : NULL));
         el = sg_get_unaligned_be16(bp + 2) + 4;
         if (el > 4) {
-            hex2str(bp + 40, el - 40, "    ", 0, blen, b);
+            hex2str(bp + 40, el - 40, "    ", op->h2s_oformat, blen, b);
             if (jsp->pr_as_json && jsp->pr_out_hr)
-                sgj_js_str_out(jsp, b, strlen(b));
+                sgj_hr_str_out(jsp, b, strlen(b));
             else
                 sgj_pr_hr(jsp, "%s\n", b);
         } else
@@ -5041,7 +5287,7 @@ subenc_nickname_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     if (jsp->pr_as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                                sgj_convert_to_snake_name(sns_dp, b, blen));
+                                    sgj_convert2snake(sns_dp, b, blen));
         sgj_js_nv_ihexstr(jsp, jop, pc_sn, SUBENC_NICKNAME_DPC, NULL, sns_dp);
     }
     sgj_haj_vi(jsp, jop, 2, noss_s, SGJ_SEP_COLON_1_SPACE, num_subs - 1,
@@ -5072,13 +5318,12 @@ subenc_nickname_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
             sgj_pr_hr(jsp, "    %s: %.2s\n", snlc, bp + 6);
         sgj_pr_hr(jsp, "    %s: %.*s\n", sn_s, 32, bp + 8);
         if (jsp->pr_as_json) {
-            ccp = sgj_convert_to_snake_name(snlc, b, blen);
+            ccp = sgj_convert2snake(snlc, b, blen);
             if (lc_z)
                 sgj_js_nv_s(jsp, jo2p, ccp, "en");
             else
                 sgj_js_nv_s_len_chk(jsp, jo2p, ccp, bp + 6, 2);
-            sgj_js_nv_s_len_chk(jsp, jo2p,
-                                sgj_convert_to_snake_name(sn_s, b, blen),
+            sgj_js_nv_s_len_chk(jsp, jo2p, sgj_convert2snake(sn_s, b, blen),
                                 bp + 8, 32);
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
@@ -5094,7 +5339,7 @@ static void
 supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
                          struct opts_t * op, sgj_opaque_p jop)
 {
-    bool got1;
+    bool got1, as_json;
     int k, n, code, prev;
     const char * ccp;
     const struct diag_page_abbrev * ap;
@@ -5107,12 +5352,13 @@ supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
                 "Supported SES diagnostic pages diagnostic page";
     static const char * sdp = "Supported diagnostic pages diagnostic page";
 
+    as_json = jsp->pr_as_json;
     ccp = is_ssp ? ssp : sdp;
     sgj_pr_hr(jsp, "%s:\n", ccp);
-    if (jsp->pr_as_json) {
+    if (as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                                    sgj_convert_to_snake_name(ccp, b, blen));
+                                    sgj_convert2snake(ccp, b, blen));
         sgj_js_nv_ihexstr(jsp, jop, pc_sn, (is_ssp ? 0xd : 0x0), NULL, ccp);
         jap = sgj_named_subarray_r(jsp, jop, "supported_page_list");
     }
@@ -5120,7 +5366,7 @@ supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
         code = resp[k + 4];
         if (code < prev)
             break;      /* assume to be padding at end */
-        if (jsp->pr_as_json)
+        if (as_json)
             jo2p = sgj_new_unattached_object_r(jsp);
 
         ccp = find_diag_page_desc(code);
@@ -5138,7 +5384,7 @@ supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
             ccp = find_dpage_cat_str(code);
             sgj_pr_hr(jsp, "  <%s> [0x%x]\n", ccp, code);
         }
-        if (jsp->pr_as_json) {
+        if (as_json) {
             sgj_js_nv_ihexstr(jsp, jo2p, pc_sn, code, NULL, ccp);
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
@@ -5204,7 +5450,7 @@ download_code_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     if (jsp->pr_as_json) {
         /* re-use (overwrite) passed jop argument */
         jop = sgj_named_subobject_r(jsp, jop,
-                                 sgj_convert_to_snake_name(dm_dp, b, blen));
+                                    sgj_convert2snake(dm_dp, b, blen));
         sgj_js_nv_ihexstr(jsp, jop, pc_sn, DOWNLOAD_MICROCODE_DPC, NULL,
                           dm_dp);
     }
@@ -5214,7 +5460,7 @@ download_code_sdp(const uint8_t * resp, int resp_len, struct opts_t * op,
     sgj_haj_vi(jsp, jop, 2, gc_s, SGJ_SEP_COLON_1_SPACE, gen_code, true);
     if (jsp->pr_as_json)
         jap = sgj_named_subarray_r(jsp, jop,
-                                   sgj_convert_to_snake_name(dmsdl, b, blen));
+                                   sgj_convert2snake(dmsdl, b, blen));
 
     sgj_pr_hr(jsp, "  %s:\n", dmsdl);
     bp = resp + 8;
@@ -5482,7 +5728,7 @@ err_with_fp:
     return 1;
 }
 
-/* Process all status/in diagnostic pages. */
+/* Process all status/in diagnostic pages. Return of 0 is good. */
 static int
 process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
                      int resp_len, struct opts_t * op, sgj_opaque_p jop)
@@ -5544,7 +5790,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         configuration_sdp(resp, resp_len, op, jop);
         break;
     case ENC_STATUS_DPC:
-        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+        if (op->no_config) {
             enc_status_sdp(NULL, 0, resp, resp_len, op, jop);
             break;
         }
@@ -5563,7 +5809,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         enc_status_sdp(tesp, ref_gen_code, resp, resp_len, op, jop);
         break;
     case ARRAY_STATUS_DPC:
-        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+        if (op->no_config) {
             array_status_sdp(NULL, 0, resp, resp_len, op, jop);
             break;
         }
@@ -5586,7 +5832,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         if (jsp->pr_as_json) {
             /* re-use (overwrite) passed jop argument */
             jop = sgj_named_subobject_r(jsp, jop,
-                                 sgj_convert_to_snake_name(ht_dp, e, elen));
+                                        sgj_convert2snake(ht_dp, e, elen));
             sgj_js_nv_ihexstr(jsp, jop, pc_sn, HELP_TEXT_DPC, NULL, ht_dp);
         }
         if (resp_len > 4)
@@ -5603,7 +5849,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         if (jsp->pr_as_json) {
             /* re-use (overwrite) passed jop argument */
             jop = sgj_named_subobject_r(jsp, jop,
-                                 sgj_convert_to_snake_name(b, e, elen));
+                                        sgj_convert2snake(b, e, elen));
             sgj_js_nv_ihexstr(jsp, jop, pc_sn, STRING_DPC, NULL, b);
         }
         if (resp_len > 4) {
@@ -5611,9 +5857,9 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
             char * p = (char *)malloc(n);
 
             if (p) {
-                hex2str(resp + 4, resp_len - 4, "", 0, n, p);
+                hex2str(resp + 4, resp_len - 4, "", op->h2s_oformat, n, p);
                 if (jsp->pr_as_json && jsp->pr_out_hr)
-                    sgj_js_str_out(jsp, p, strlen(p));
+                    sgj_hr_str_out(jsp, p, strlen(p));
                 else
                     sgj_pr_hr(jsp, "%s\n", p);
                 free(p);
@@ -5626,7 +5872,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
                                 resp + 4, resp_len - 4);
         break;
     case THRESHOLD_DPC:
-        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+        if (op->no_config) {
             threshold_sdp(NULL, 0, resp, resp_len, op, jop);
             break;
         }
@@ -5645,7 +5891,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         threshold_sdp(tesp, ref_gen_code, resp, resp_len, op, jop);
         break;
     case ELEM_DESC_DPC:
-        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+        if (op->no_config) {
             element_desc_sdp(NULL, 0, resp, resp_len, op, jop);
             break;
         }
@@ -5671,7 +5917,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
                   resp[1] & 1, vs_s, (resp[1] >> 1) & 0xff);
         break;
     case ADD_ELEM_STATUS_DPC:
-        if (jsp->pr_as_json && (! op->partial_join) && (op->inner_hex > 0)) {
+        if (op->no_config) {
             additional_elem_sdp(NULL, 0, resp, resp_len, op, jop);
             break;
         }
@@ -5712,9 +5958,9 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
             char * p = (char *)malloc(n);
 
             if (p) {
-                hex2str(resp, resp_len, "", 0, n, p);
+                hex2str(resp, resp_len, "", op->h2s_oformat, n, p);
                 if (jsp->pr_as_json && jsp->pr_out_hr)
-                    sgj_js_str_out(jsp, p, strlen(p));
+                    sgj_hr_str_out(jsp, p, strlen(p));
                 else
                     sgj_pr_hr(jsp, "%s\n", p);
                 free(p);
@@ -5740,7 +5986,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
                         jo2p = sgj_new_unattached_object_r(jsp);
                     else
                         jo2p = jop;
-                    sgj_js_nv_hex_bytes(jsp, jo2p, "in_hex", bp,
+                    sgj_js_nv_hex_bytes(jsp, jo2p, in_hex_sn, bp,
                                         (rem > 256) ? 256 : rem);
                     if (gt256)
                         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
@@ -5802,6 +6048,9 @@ process_many_status_dpages(struct sg_pt_base * ptvp,  uint8_t * resp,
         }
         ret = process_status_dpage(ptvp, page_code, resp, resp_len,
                                    op, jop);
+        if (ret && (op->verbose > 2))
+            pr2serr("%s: failure decoding page_code=0x%x, ret=%d, "
+                    "continuing\n", __func__, page_code, ret);
     }
     return 0;
 }
@@ -6138,15 +6387,15 @@ join_array_display(struct th_es_t * tesp, struct opts_t * op,
         if (ed_bp) {
             desc_len = sg_get_unaligned_be16(ed_bp + 2) + 4;
             if (desc_len > 4)
-                sgj_pr_hr(jsp, "%.*s [%d,%d]  Element type: %s\n",
-                          desc_len - 4, (const char *)(ed_bp + 4),
-                          jrp->th_i, jrp->indiv_i, cp);
+                sgj_pr_hr(jsp, "%.*s [%d,%d]  %s: %s\n", desc_len - 4,
+                          (const char *)(ed_bp + 4), jrp->th_i,
+                          jrp->indiv_i, et_s, cp);
             else
-                sgj_pr_hr(jsp, "[%d,%d]  Element type: %s\n", jrp->th_i,
-                          jrp->indiv_i, cp);
+                sgj_pr_hr(jsp, "[%d,%d]  %s: %s\n", jrp->th_i, jrp->indiv_i,
+                          et_s, cp);
         } else
-            sgj_pr_hr(jsp, "[%d,%d]  Element type: %s\n", jrp->th_i,
-                      jrp->indiv_i, cp);
+            sgj_pr_hr(jsp, "[%d,%d]  %s: %s\n", jrp->th_i, jrp->indiv_i,
+                      et_s, cp);
         sgj_pr_hr(jsp, "  Enclosure Status:\n");
         if (jsp->pr_as_json) {
             jo2p = sgj_new_unattached_object_r(jsp);
@@ -6452,7 +6701,7 @@ join_work(struct sg_pt_base * ptvp, bool display, struct opts_t * op,
             ae_last_bp = NULL;
             res = 0;
             if (op->verbose)
-                pr2serr("  Additional Element Status page %s\n", not_avail);
+                pr2serr("  %s %s\n", aes_dp, not_avail);
         }
     } else {
         ae_bp = NULL;
@@ -6773,8 +7022,7 @@ cgs_additional_el(const struct join_row_t * jrp,
         else
             printf("%" PRId64 "\n", (int64_t)ui);
     } else {
-        pr2serr("--clear and --set %s for Additional Element Status page\n",
-                not_avail);
+        pr2serr("--clear and --set %s for %s\n", not_avail, aes_dp);
         return -1;
     }
     return 0;
@@ -7036,8 +7284,7 @@ enumerate_work(const struct opts_t * op)
             else
                 printf("%s\n", a);
         }
-        printf("\n--get acronyms for Additional Element Status ['aes'] page "
-               "(SAS EIP=1):\n");
+        printf("\n--get acronyms for %s ['aes'] (SAS EIP=1):\n", aes_dp);
         for (ap = ae_sas_a2t_arr; ap->acron; ++ap) {
             cp = (ap->etype < 0) ? "*" : etype_str(ap->etype, b, sizeof(b));
             snprintf(a, sizeof(a), "  %s  [%s] [%d:%d:%d]", ap->acron,
@@ -7082,6 +7329,8 @@ main(int argc, char * argv[])
     op->dev_slot_num = -1;
     op->ind_indiv_last = -1;
     op->maxlen = MX_ALLOC_LEN;
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
 
     res = parse_cmd_line(op, argc, argv);
     vb = op->verbose;
@@ -7091,7 +7340,7 @@ main(int argc, char * argv[])
         if (SG_SES_CALL_ENUMERATE == res) {
             pr2serr("\n");
             enumerate_work(op);
-            res = SG_LIB_SYNTAX_ERROR;
+            ret = SG_LIB_SYNTAX_ERROR;
             goto early_out;
         }
         ret = res;
@@ -7126,12 +7375,6 @@ main(int argc, char * argv[])
     if (op->enumerate || op->do_list) {
         enumerate_work(op);
         goto early_out;
-    }
-    if (op->page_code_given && (op->do_join > 0) &&
-        (ADD_ELEM_STATUS_DPC != op->page_code) &&
-        ((as_json || (ENC_STATUS_DPC != op->page_code)))) {
-        op->partial_join = true;
-        op->do_join = 0;
     }
     if (as_json)
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
@@ -7169,7 +7412,7 @@ main(int argc, char * argv[])
                (ADD_ELEM_STATUS_DPC == op->page_code))) {
             pr2serr("--clear, --get or --set options only supported for the "
                     "Enclosure\nControl/Status, Threshold In/Out and "
-                    "Additional Element Status pages\n");
+                    "%ss\n", aes_dp);
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }

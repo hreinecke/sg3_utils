@@ -98,11 +98,36 @@ sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...)
 }
 
 /* Simple ASCII printable (does not use locale), includes space and excludes
- * DEL (0x7f). */
+ * DEL (0x7f). Note all UTF-8 encoding apart from <= 0x7f have top bit set. */
 static inline int
 my_isprint(int ch)
 {
     return ((ch >= ' ') && (ch < 0x7f));
+}
+
+void sg_rep_invocation(const char * util_name, const char * ver_str,
+                       int argc, char *argv[], FILE * fgp)
+{
+    int k;
+    FILE * fp = fgp ? fgp : stdout;
+
+    /* header line that is visually easy to spot */
+    fprintf(fp, "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+            "vvvvvvvvvv\n");
+    if (util_name)
+        fprintf(fp, "utility_given=%s\n", util_name);
+    else
+        fprintf(fp, "utility_given=<not_given>\n");
+    if (ver_str)
+        fprintf(fp, "version_string=%s\n", ver_str);
+    else
+        fprintf(fp, "version_string=<not_given>\n");
+    if ((argc > 0) && argv) {
+        fprintf(fp, "invocation_arguments:\n");
+        for (k = 0; k < argc; ++k)
+            fprintf(fp, "  %s\n", argv[k]);
+    } else
+        fprintf(fp, "invocation_arguments:<none>\n");
 }
 
 /* DSENSE is 'descriptor sense' as opposed to the older 'fixed sense'.
