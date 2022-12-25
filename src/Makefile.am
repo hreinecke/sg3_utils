@@ -9,8 +9,8 @@ bin_PROGRAMS = \
 	sg_sanitize sg_sat_identify sg_sat_phy_event sg_sat_read_gplog \
 	sg_sat_set_features sg_seek sg_senddiag sg_ses sg_ses_microcode \
 	sg_start sg_stpg sg_stream_ctl sg_sync sg_timestamp sg_turs sg_unmap \
-	sg_verify sg_vpd sg_wr_mode sg_write_buffer sg_write_long \
-	sg_write_same sg_write_verify sg_write_x sg_zone
+	sg_verify sg_vpd sg_wr_mode sg_write_attr sg_write_buffer \
+	sg_write_long sg_write_same sg_write_verify sg_write_x sg_zone
 sg_scan_SOURCES =
 
 
@@ -186,6 +186,8 @@ sg_vpd_SOURCES = sg_vpd.c sg_vpd_vendor.c
 sg_vpd_LDADD = ../lib/libsgutils2.la
 
 sg_wr_mode_LDADD = ../lib/libsgutils2.la
+
+sg_write_attr_LDADD = ../lib/libsgutils2.la
 
 sg_write_buffer_LDADD = ../lib/libsgutils2.la
 

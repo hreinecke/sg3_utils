@@ -180,7 +180,7 @@ static struct attr_name_info_t attr_name_arr[] = {
     {0x808, "Media pool", RA_FMT_TEXT, 160, 0},
     {0x809, "Partition user text label", RA_FMT_ASCII, 16, 0},
     {0x80a, "Load/unload at partition", RA_FMT_BINARY, 1, 0},
-    {0x80a, "Application format version", RA_FMT_ASCII, 16, 0},
+    {0x80b, "Application format version", RA_FMT_ASCII, 16, 0},
     {0x80c, "Volume coherency information", RA_FMT_BINARY, -1, 1},
      /* SSC-5 */
     {0x820, "Medium globally unique identifier", RA_FMT_BINARY, 36, 1},
