@@ -1,17 +1,16 @@
-.TH SG_VPD "8" "August 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_VPD "8" "December 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_vpd \- fetch SCSI VPD page and/or decode its response
 .SH SYNOPSIS
 .B sg_vpd
 [\fI\-\-all\fR] [\fI\-\-enumerate\fR] [\fI\-\-examine\fR] [\fI\-\-force\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-ident\fR] [\fI\-\-inhex=FN\fR]
-[\fI\-\-json[=JO]\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
+[\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR] [\fI\-\-long\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
 [\fI\-\-sinq_inraw=RFN\fR] [\fI\-\-vendor=VP\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This utility, when \fIDEVICE\fR is given, fetches a Vital Product Data (VPD)
 page and decodes it or outputs it in ASCII hexadecimal or binary. VPD pages
 are fetched with a SCSI INQUIRY command.
@@ -127,6 +126,15 @@ option is also given then \fIFN\fR is treated as binary.
 output is in JSON format instead of human readable form. See sg3_utils_json
 manpage or use '?' for \fIJO\fR for a summary.
 .TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
+.TP
 \fB\-l\fR, \fB\-\-long\fR
 when decoding some VPD pages, give a little more output. For example the ATA
 Information VPD page only shows the signature (in hex) and the IDENTIFY
@@ -186,7 +194,7 @@ Some VPD pages (e.g. the Extended Inquiry VPD page) depend on knowing
 the settings in the standard INQUIRY response to interpret the fields
 in that VPD page. This option together with the \fI\-\-all\fR,
 \fI\-\-examine\fR or \fI\-\-page=PG\fR allows this utility to process
-both the standard INQUIRY response and VPD pages in the same invocation. 
+both the standard INQUIRY response and VPD pages in the same invocation.
 .TP
 \fB\-M\fR, \fB\-\-vendor\fR=\fIVP\fR
 where \fIVP\fR is a vendor (e.g. "sea" for Seagate) or vendor/product
@@ -247,15 +255,10 @@ command line invocation is shown first followed by a typical response:
    # sg_vpd /dev/sdb
 .br
 Supported VPD pages VPD page:
-.br
   Supported VPD pages [sv]
-.br
   Unit serial number [sn]
-.br
   Device identification [di]
-.br
   Extended inquiry data [ei]
-.br
   Block limits (SBC) [bl]
 .PP
 To see the VPD page numbers associated with each supported page then
@@ -266,49 +269,32 @@ square brackets above. In the next example the Extended inquiry data
 VPD page is listed:
 .PP
    # sg_vpd \-\-page=ei /dev/sdb
-.br
-extended INQUIRY data VPD page:
-.br
-  ACTIVATE_MICROCODE=0 SPT=0 GRD_CHK=0 APP_CHK=0 REF_CHK=0
-.br
-  UASK_SUP=0 GROUP_SUP=0 PRIOR_SUP=0 HEADSUP=1 ORDSUP=1 SIMPSUP=1
-.br
-  WU_SUP=0 CRD_SUP=0 NV_SUP=0 V_SUP=0
-.br
-  P_I_I_SUP=0 LUICLR=0 R_SUP=0 CBCS=0
-.br
-  Multi I_T nexus microcode download=0
-.br
-  Extended self\-test completion minutes=0
-.br
-  POA_SUP=0 HRA_SUP=0 VSA_SUP=0
+   extended INQUIRY data VPD page:
+     ACTIVATE_MICROCODE=0 SPT=0 GRD_CHK=0 APP_CHK=0 REF_CHK=0
+     UASK_SUP=0 GROUP_SUP=0 PRIOR_SUP=0 HEADSUP=1 ORDSUP=1 SIMPSUP=1
+     WU_SUP=0 CRD_SUP=0 NV_SUP=0 V_SUP=0
+     P_I_I_SUP=0 LUICLR=0 R_SUP=0 CBCS=0
+     Multi I_T nexus microcode download=0
+     Extended self\-test completion minutes=0
+     POA_SUP=0 HRA_SUP=0 VSA_SUP=0
 .PP
 To check if any protection types are supported by a disk use the '\-\-long'
 option on the Extended inquiry data VPD page:
 .PP
    # sg_vpd \-\-page=ei \-\-long /dev/sdb
-.br
    extended INQUIRY data VPD page:
-.br
      ACTIVATE_MICROCODE=0
-.br
      SPT=1 [protection types 1 and 2 supported]
-.br
      GRD_CHK=1
-.br
      ....
 .PP
 Search for the name (and acronym) of all pages that share VPD page number
 0xb0 .
 .PP
    # sg_vpd \-\-page=0xb0 \-\-enumerate
-.br
    Matching standard VPD pages:
-.br
      bl         0xb0      Block limits (SBC)
-.br
      oi         0xb0      OSD information
-.br
      sad        0xb0      Sequential access device capabilities (SSC)
 .PP
 Some examples follow using the "\-\-all" option. Send an ASCII hexadecimal
@@ -324,7 +310,6 @@ To do the equivalent as the previous example but use a file containing
 binary:
 .PP
    # sg_vpd \-\-all \-\-raw /dev/sg3 > all_vpds.bin
-.br
    # sg_vpd \-\-all \-\-raw \-\-inhex=all_vpds.bin
 .PP
 Notice that "\-\-raw" must be given with the second (\-\-inhex) invocation

@@ -9,7 +9,6 @@ sg_get_config \- send SCSI GET CONFIGURATION command (MMC\-4 +)
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Sends a SCSI GET CONFIGURATION command to \fIDEVICE\fR and decodes the
 response. The response includes the features and profiles of the device.
 Typically these devices are CD, DVD, HD\-DVD and BD players that may (but
@@ -76,15 +75,10 @@ returned (whose feature code is greater than or equal to \fIFC\fR). When
 if any, is returned.  When \fIRT\fR is 3 the response is reserved (probably
 yields an "illegal field in cdb" error). To simplify the meanings of the
 \fIRT\fR values are:
-.br
   \fB0\fR : all features, current on not
-.br
   \fB1\fR : only current features
-.br
   \fB2\fR : only feature whose code is \fIFC\fR
-.br
   \fB3\fR : reserved
-.br
 .TP
 \fB\-R\fR, \fB\-\-raw\fR
 output response in binary (to stdout). Note that the short form is \fI\-R\fR

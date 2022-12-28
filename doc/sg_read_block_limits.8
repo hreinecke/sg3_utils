@@ -8,7 +8,6 @@ sg_read_block_limits \- send SCSI READ BLOCK LIMITS command
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Send a SCSI READ BLOCK LIMITS command to \fIDEVICE\fR and outputs the
 response. This command is defined for tape (drives) and its description
 is found in the SSC documents at https://www.t10.org .
@@ -46,15 +45,10 @@ It is usually okay to use no options. Here is an invocation (on the first
 line following the "#" command prompt) followed by some typical output:
 .PP
    # sg_read_block_limits /dev/st0
-.br
-Read Block Limits results:
-.br
-    Minimum block size: 1 byte(s)
-.br
-    Maximum block size: 16777215 byte(s), 16383 KB, 15 MB
-.br
-    Granularity: 0
-.br
+   Read Block Limits results:
+     Minimum block size: 1 byte(s)
+     Maximum block size: 16777215 byte(s), 16383 KB, 15 MB
+     Granularity: 0
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

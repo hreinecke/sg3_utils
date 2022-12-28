@@ -14,7 +14,6 @@ devices
 [\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Copy data to and from any files. Specialised for "files" that are
 Linux SCSI generic (sg) and raw devices. Similar syntax and semantics to
 .B dd(1)
@@ -237,7 +236,6 @@ above.  Similar to 'conv=noerror,sync' in
 utility. Default is 0 which implies stop on error. More advanced
 coe=1 processing on reads is performed by the sg_dd utility.
 .TP
-.TP
 fua=0 | 1 | 2 | 3
 force unit access bit. When 3, fua is set on both \fIIFILE\fR and
 \fIOFILE\fR; when 2, fua is set on \fIIFILE\fR;, when 1, fua is set on
@@ -285,7 +283,6 @@ the records in + out counts; then they have their default action.
 SIGUSR1 causes the same information to be output yet the copy continues.
 All output caused by signals is sent to stderr.
 .SH EXAMPLES
-.PP
 Looks quite similar in usage to dd:
 .PP
    sgp_dd if=/dev/sg0 of=t bs=512 count=1MB
@@ -302,13 +299,11 @@ correspondingly scaled. Using a raw device to do something similar on a
 ATA disk:
 .PP
    raw /dev/raw/raw1 /dev/hda
-.br
    sgp_dd if=/dev/raw/raw1 of=t bs=512 count=1MB
 .PP
 To copy a SCSI disk partition to an ATA disk partition:
 .PP
    raw /dev/raw/raw2 /dev/hda3
-.br
    sgp_dd if=/dev/sg0 skip=10123456 of=/dev/raw/raw2 bs=512
 .PP
 This assumes a valid partition is found on the SCSI disk at the given

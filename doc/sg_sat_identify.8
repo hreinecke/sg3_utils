@@ -9,7 +9,6 @@ Translation (SAT) layer
 [\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This utility sends either an ATA IDENTIFY DEVICE command or an ATA IDENTIFY
 PACKET DEVICE command to \fIDEVICE\fR and outputs the response. The devices
 that respond to these commands are ATA disks and ATAPI devices respectively.
@@ -112,11 +111,8 @@ connector) dongle that implements the UAS (USB attached SCSI) protocol (also
 known as UASP). UAS is a vast improvement over the USB mass storage class.
 .PP
     # sg_sat_identify /dev/sdb
-.br
-Response for IDENTIFY DEVICE ATA command:
-.br
- 00   0c5a 3fff c837 0010 0000 0000 003f 0000  .Z ?. .7 .. .. .. .? ..
-.br
+    Response for IDENTIFY DEVICE ATA command:
+    00   0c5a 3fff c837 0010 0000 0000 003f 0000  .Z ?. .7 .. .. .. .? ..
  ....
 .PP
 The hexadecimal ASCII (with plain ASCII to the right) output is abridged
@@ -124,28 +120,19 @@ to a single line (i.e. the first 16 bytes (or 8 words)). Now to decode
 some of that ATA Identify response. First sg_inq can decode a few strings:
 .PP
     # sg_sat_identify \-HHHH /dev/sdb | sg_inq \-\-ata \-I \-
-.br
-ATA device: model, serial number and firmware revision:
-.br
-  ST9500420AS     5VJCE6R7 0002SDM1
+    ATA device: model, serial number and firmware revision:
+    ST9500420AS     5VJCE6R7 0002SDM1
 .PP
 For a lot more details, the hdparm utility is a good choice:
 .PP
     # sg_sat_identify \-HHH /dev/sdb | hdparm \-\-Istdin
-.br
-ATA device, with non\-removable media
-.br
+    ATA device, with non\-removable media
         Model Number:       ST9500420AS
-.br
         Serial Number:      5VJCE6R7
-.br
         Firmware Revision:  0002SDM1
-.br
         Transport:          Serial
-.br
-Standards:
-.br
- ....
+    Standards:
+    ....
 .PP
 There are about 80 more lines of details decoded by hdparm in this case.
 Notice the difference in the number of "H" options: three give an unadorned

@@ -3,10 +3,10 @@
 sg3_utils_json \- JSON output for some sg3_utils utilities
 .SH SYNOPSIS
 .B sg_*
-\fI\-\-json[=JO]\fR [\fIOTHER_OPTIONS\fR] [\fIDEVICE\fR]
+\fI\-\-json[=JO]\fR [\fI\-\-js\-file=JFN\fR] [\fIOTHER_OPTIONS\fR]
+[\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 sg3_utils is a package of utilities that send SCSI commands to the given
 \fIDEVICE\fR via a SCSI pass through interface provided by the host
 operating system. Some utilities, mainly those decoding structured data
@@ -72,6 +72,18 @@ the short form option is itself optional, there can be no space between the
 short form option and \fIJO\fR, if it is given. To make this read a little
 better on the command line, "=" may be first character of \fIJO\fR, so for
 example, this is valid '\-j=av'.
+.TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
+.br
+The short option may be other than \fI\-J\fR if that short option was already
+in use.
 .SH JSON CONTROL CHARACTERS
 Each \fIJO\fR string is made up of zero or more of the following JSON control
 characters.

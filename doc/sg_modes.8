@@ -16,7 +16,6 @@ sg_modes \- reads mode pages with SCSI MODE SENSE command
 [\fI\-v\fR] [\fI\-V\fR] [\fI\-w\fR] [\fI\-?\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This utility sends a MODE SENSE SCSI command to the \fIDEVICE\fR and
 outputs the response. There is a 6 byte and 10 byte (cdb) variant of the
 MODE SENSE command, this utility defaults to the 10 byte variant. The SPC\-4
@@ -27,7 +26,7 @@ in favour of the 10 byte variants (e.g. MODE SENSE(10)).
 This utility decodes mode page headers and block descriptors but outputs
 the contents of each mode page in hex. It also has no facility to change
 the mode page contents or block descriptor data. Mode page contents are
-decoded and can be changed by the
+decoded and can be changed with the
 .B sdparm
 utility.
 .PP
@@ -51,13 +50,9 @@ are requested which is equivalent to '\-\-page=63,255'.
 \fB\-c\fR, \fB\-\-control\fR=\fIPC\fR
 \fIPC\fR is the page control value. Up to four different versions of each
 page are held by the device:
-.br
   \fB0\fR : current values (i.e. those active at present)
-.br
   \fB1\fR : changeable values
-.br
   \fB2\fR : default values (i.e. the manufacturer's settings)
-.br
   \fB3\fR : saved values
 .br
 The changeable values are bit masks showing which fields could be changed

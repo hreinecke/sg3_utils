@@ -10,7 +10,6 @@ sg_ses_microcode \- send microcode to a SCSI enclosure
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This utility attempts to download microcode to an enclosure (or one of its
 sub\-enclosures) associated with the \fIDEVICE\fR. The process for doing
 this is defined in the SCSI Enclosure Services (SES) standards and drafts
@@ -233,24 +232,15 @@ the Download microcode status dpage which could possibly show another
 initiator in the process of updating the microcode. Even if that is
 happening, fetching the status page should not cause any problems:
 .PP
-  sg_ses_microcode /dev/sg3
-.br
-Download microcode status diagnostic page:
-.br
-  number of secondary sub\-enclosures: 0
-.br
-  generation code: 0x0
-.br
-   sub\-enclosure identifier: 0 [primary]
-.br
+  $ sg_ses_microcode /dev/sg3
+  Download microcode status diagnostic page:
+    number of secondary sub\-enclosures: 0
+    generation code: 0x0
+    sub\-enclosure identifier: 0 [primary]
      download microcode status: No download microcode operation in progress [0x0]
-.br
      download microcode additional status: 0x0
-.br
      download microcode maximum size: 1048576 bytes
-.br
      download microcode expected buffer id: 0x0
-.br
      download microcode expected buffer id offset: 0
 .PP
 The following sends new microcode/firmware to an enclosure. Sending a 1.5 MB

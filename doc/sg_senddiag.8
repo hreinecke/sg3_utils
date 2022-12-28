@@ -16,7 +16,6 @@ sg_senddiag \- performs a SCSI SEND DIAGNOSTIC command
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This utility sends a SCSI SEND DIAGNOSTIC command to the \fIDEVICE\fR. It
 can issue self\-tests, find supported diagnostic pages or send arbitrary
 diagnostic pages.
@@ -109,17 +108,12 @@ likely the \fI\-\-pf\fR option should also be given.
 \fB\-s\fR, \fB\-\-selftest\fR=\fIST\fR
 where \fIST\fR is the self\-test code. The default value is 0 which is
 inactive. Some other values:
-.br
   \fB1\fR : background short self\-test
-.br
   \fB2\fR : background extended self\-test
-.br
   \fB4\fR : aborts a (background) self\-test that is in progress
-.br
   \fB5\fR : foreground short self\-test
-.br
   \fB6\fR : foreground extended self\-test
-.br
+.PP
 This option is mutually exclusive with default self\-test (i.e.
 can't have (\fIST\fR > 0) and \fI\-\-test\fR).
 .TP

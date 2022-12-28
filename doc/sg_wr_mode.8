@@ -9,7 +9,6 @@ sg_wr_mode \- write (modify) SCSI mode page
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Writes a modified mode page to \fIDEVICE\fR. Uses the SCSI MODE SENSE (6
 or 10 byte variant) command to fetch the existing mode data which includes
 a mode page (or subpage). It then combines that with the contents,
@@ -188,7 +187,7 @@ manufacturer of the device) as both the current and saved mode page
 values the following sequence could be used:
 .PP
   $ sg_modes \-\-control=2 \-\-page=1a \-r /dev/sda > t
-.br
+  
   $ sg_wr_mode \-\-page=1a \-\-contents=\- \-\-save /dev/sda < t
 .PP
 Next is an example of using a mask to modify the "idle condition counter"
@@ -197,17 +196,13 @@ change is not saved so the "idle condition counter" will revert to 0x28
 after the next power cycle. The output from sg_modes is abridged.
 .PP
  $ sg_modes \-\-page=1a /dev/hdc
-.br
  >> Power condition (mmc), page_control: current
-.br
  00     1a 0a 00 03 00 00 00 28  00 00 01 2c
 .PP
  $ sg_wr_mode \-p 1a \-c 0,0,0,0,0,0,0,37 \-m 0,0,0,0,0,0,0,ff /dev/hdc
 .PP
  $ sg_modes \-p 1a /dev/hdc
-.br
  >> Power condition (mmc), page_control: current
-.br
  00     1a 0a 00 03 00 00 00 37  00 00 01 2c
 .SH EXIT STATUS
 The exit status of sg_wr_mode is 0 when it is successful. Otherwise see

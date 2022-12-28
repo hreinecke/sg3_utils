@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20221222] [svn: r990]
+Changelog for pre-release sg3_utils-1.48 [20221227] [svn: r991]
   - some utilities: add experimental --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -56,6 +56,7 @@ Changelog for pre-release sg3_utils-1.48 [20221222] [svn: r990]
       with their name (if T10 defined)
     - update names for TapeAlert lpage
     - allow --page selection with --inhex=FN
+    - add --js-file=JFN for json output to file
   - sg_modes: improve handling of zbc disks with pdt=0x14
   - sg_inq, sg_vpd: merge VPD page processing for T10
     defined pages, VS pages still differ
@@ -75,6 +76,9 @@ Changelog for pre-release sg3_utils-1.48 [20221222] [svn: r990]
       not already shown in the join output, are output
     - add --js-file= option to send json output to a file
     - add --no-config option for debugging
+    - an index range now uses ':' as a separator; so 0:2
+      matches element indexes 0, 1, and 2 if present.
+      '-' is still accepted as a range separator.
   - sg_turs: change nanosleep() to Sleep() in MinGW
     - see sg_lib below for two new exit status values
   - sg_stream_ctl: fix --get indexing

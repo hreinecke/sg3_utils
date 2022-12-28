@@ -8,7 +8,6 @@ sg_map26 \- map SCSI generic (sg) device to corresponding device names
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Maps a special file (block or char) associated with a SCSI device
 to the corresponding SCSI generic (sg) device, or vice versa.
 Can also be given a sysfs file, for example '/sys/block/sda'
@@ -97,53 +96,39 @@ the "mapped" sg device name, see the lsscsi utility.
 Assume sg2 maps to sdb while dvd, cdrom and hdc are all matching.
 .PP
   # sg_map26 /dev/sg2
-.br
   /dev/sdb
 .PP
   # sg_map26 /dev/sdb
-.br
   /dev/sg2
 .PP
   # sg_map26 \-\-result=0 /dev/sdb
-.br
   /dev/sg2
 .PP
   # sg_map26 \-\-result=3 /dev/sdb
-.br
   /sys/block/sda
 .PP
   # sg_map26 \-\-result=1 /dev/sdb
-.br
   /sys/class/scsi_generic/sg0
 .PP
 Now look at '/dev/hdc' and friends
 .PP
   # sg_map26 /dev/hdc
-.br
   <error: a hd device does not map to a sg device>
 .PP
   # sg_map26 \-\-result=3 /dev/hdc
-.br
   /sys/block/hdc
 .PP
   # sg_map26 \-\-result=2 /dev/hdc
-.br
   /dev/hdc
 .PP
   # sg_map26 \-\-result=2 \-\-symlink /dev/hdc
-.br
   /dev/cdrom
-.br
   /dev/dvd
-.br
   /dev/hdc
 .PP
   # sg_map26 \-\-result=2 \-\-symlink /sys/block/hdc
-.br
   /dev/cdrom
-.br
   /dev/dvd
-.br
   /dev/hdc
 .SH EXIT STATUS
 The exit status of sg_map26 is 0 when it is successful. Otherwise see

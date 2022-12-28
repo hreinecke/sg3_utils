@@ -435,11 +435,11 @@ sgj_js2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
             pr2serr("%s: unable to get %zu bytes on heap\n", __func__, len);
         return;
     }
-
     json_serialize_ex(b, jvp, out_settings);
     if (jsp->verbose > 3)
         fprintf(fp, "json serialized:\n");
     fprintf(fp, "%s\n", b);
+    free(b);
 }
 
 void

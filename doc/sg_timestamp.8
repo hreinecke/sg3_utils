@@ -9,7 +9,6 @@ sg_timestamp \- report or set timestamp on SCSI device
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Sends a SCSI REPORT TIMESTAMP or SET TIMESTAMP command to the \fIDEVICE\fR.
 These commands are found in the SPC\-5 draft standard revision
 7 (spc5r07.pdf).
@@ -110,38 +109,29 @@ To fetch the timestamp from a \fIDEVICE\fR and display it in a humanly
 readable form the following could be used:
 .PP
    # sg_timestamp \-S /dev/sdb
-.br
-1448993950
-.br
+   1448993950
    # date \-\-date=@1448993950
-.br
-Tue Dec  1 13:19:10 EST 2015
-.br
+   Tue Dec  1 13:19:10 EST 2015
    # date \-R \-\-date="@1448993950"
-.br
-Tue, 01 Dec 2015 13:19:10 \-0500
+   Tue, 01 Dec 2015 13:19:10 \-0500
 .PP
 The latter two date commands show different forms of the same date (i.e.
 1448993950 seconds since 1970\-01\-01 00:00:00 UTC). The sg_timestamp and
 date commands can be combined using backquotes:
 .PP
    # date \-R \-\-date=@`sg_timestamp \-S /dev/sdc`
-.br
-Wed, 16 Dec 2015 20:12:59 \-0500
+   Wed, 16 Dec 2015 20:12:59 \-0500
 .PP
 To set the timestamp on the \fIDEVICE\fR to now (approximately) the
 following could be used:
 .PP
    # date +%s
-.br
-1448993955
-.br
+   1448993955
    # sg_timestamp \-\-seconds=1448993955 /dev/sdb
 .PP
 Those two command lines could be combined into one by using backquotes:
 .PP
    # sg_timestamp \-\-seconds=`date +%s` /dev/sdb
-.PP
 .SH AUTHORS
 Written by Douglas Gilbert.
 .SH "REPORTING BUGS"

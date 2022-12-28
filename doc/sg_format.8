@@ -14,7 +14,6 @@ sg_format \- format, format with preset, resize SCSI disk; format tape
 [\fI\-\-verify\fR] [\fI\-\-version\fR] [\fI\-\-wait\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Not all SCSI direct access devices need to be formatted and some have vendor
 specific formatting procedures. SCSI disks with rotating media are probably
 the largest group that do support a 'standard' format operation. They are
@@ -96,30 +95,20 @@ With \fI\-\-format\fR this option need not be given in which case it is
 assumed to be zero.
 .br
 With \fI\-\-format\fR the interpretation of \fICOUNT\fR is:
-.br
   (\fICOUNT\fR > 0) : only format the first \fICOUNT\fR blocks and READ
 CAPACITY will report \fICOUNT\fR blocks after format
-.br
   (\fICOUNT\fR = 0) and block size unchanged : use existing block count
-.br
   (\fICOUNT\fR = 0) and block size changed : recommended maximum block
 count for new block size
-.br
   (\fICOUNT\fR = \-1) : use recommended maximum block count
-.br
   (\fICOUNT\fR < \-1) : illegal
-.br
 With \fI\-\-resize\fR this option must be given and \fICOUNT\fR has this
 interpretation:
-.br
   (\fICOUNT\fR > 0) : after resize READ CAPACITY will report \fICOUNT\fR
 blocks
-.br
   (\fICOUNT\fR = 0) : after resize READ CAPACITY will report 0 blocks
-.br
   (\fICOUNT\fR = \-1) : after resize READ CAPACITY will report its
 maximum number of blocks
-.br
   (\fICOUNT\fR < \-1) : illegal
 .br
 In both cases if the given \fICOUNT\fR exceeds the maximum number of
@@ -436,13 +425,9 @@ command. Those fields correspond to the \fI\-\-fmtpinfo=FPI\fR and the
 \fI\-\-pfu=PFU\fR options in this utility. The list below shows the four
 protection types followed by the options of this utility needed to select
 them:
-.br
   \fB0\fR : \-\-fmtpinfo=0 \-\-pfu=0
-.br
   \fB1\fR : \-\-fmtpinfo=2 \-\-pfu=0
-.br
   \fB2\fR : \-\-fmtpinfo=3 \-\-pfu=0
-.br
   \fB3\fR : \-\-fmtpinfo=3 \-\-pfu=1
 .br
 The default value of \fIFPI\fR (in \fI\-\-fmtpinfo=FPI\fR) is 0 and the
@@ -453,7 +438,6 @@ type 0 (i.e. no protection information) is chosen.
 After a format that changes the logical block size or the number of logical
 blocks on a disk, the operating system may need to be told to re\-initialize
 its setting for that disk. In Linux that can be done with:
-.br
     echo 1 > /sys/block/sd{letter(s)}/device/rescan
 .br
 where "letter(s)" will be between 'a' and 'zzz'. The lsscsi utility in Linux
@@ -643,13 +627,9 @@ field in the Extended inquiry VPD page together with the Protect bit in the
 standard inquiry response):
 .PP
    # sg_vpd \-p ei \-l /dev/sdb
-.br
    extended INQUIRY data VPD page:
-.br
      ACTIVATE_MICROCODE=0
-.br
      SPT=1 [protection types 1 and 2 supported]
-.br
      ....
 .PP
 Format with type 1 protection:
@@ -660,13 +640,9 @@ After a successful format with type 1 protection, READ CAPACITY(16)
 should show something like this:
 .PP
    # sg_readcap \-l /dev/sdm
-.br
    Read Capacity results:
-.br
       Protection: prot_en=1, p_type=0, p_i_exponent=0 [type 1 protection]
-.br
       Logical block provisioning: lbpme=0, lbprz=0
-.br
       ....
 .PP
 To format with type 3 protection:

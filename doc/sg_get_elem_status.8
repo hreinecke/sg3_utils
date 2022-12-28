@@ -4,13 +4,12 @@ sg_get_elem_status \- send SCSI GET PHYSICAL ELEMENT STATUS command
 .SH SYNOPSIS
 .B sg_get_elem_status
 [\fI\-\-brief\fR] [\fI\-\-filter=FLT\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO\fR]] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-report\-type=RT\fR]
-[\fI\-\-starting=ELEM\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-\fIDEVICE\fR
+[\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO\fR]] [\fI\-\-js\-file=JFN\fR]
+[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-report\-type=RT\fR] [\fI\-\-starting=ELEM\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Send the SCSI GET PHYSICAL ELEMENT STATUS command to the \fIDEVICE\fR and
 output the response. That command was introduced in (draft) SBC\-4 revision
 16.
@@ -74,6 +73,15 @@ also given then the contents of \fIFN\fR are treated as binary.
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
 output is in JSON format instead of human readable form. See sg3_utils_json
 manpage or use '?' for \fIJO\fR for a summary.
+.TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
 .TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 where \fILEN\fR is the (maximum) response length in bytes. It is placed in

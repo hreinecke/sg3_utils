@@ -11,7 +11,6 @@ sg_get_lba_status \- send SCSI GET LBA STATUS(16 or 32) command
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Send the SCSI GET LBA STATUS(16) or GET LBA STATUS(32) command to the
 \fIDEVICE\fR and output the response. The 16 byte command variant was
 introduced in (draft) SBC\-3 revision 20 and devices that support logical
@@ -92,6 +91,15 @@ the contents of \fIFN\fR are treated as binary.
 output is in JSON format instead of human readable form. See sg3_utils_json
 manpage or use '?' for \fIJO\fR to get a summary.
 .TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
+.TP
 \fB\-l\fR, \fB\-\-lba\fR=\fILBA\fR
 where \fILBA\fR is the starting Logical Block Address (LBA) to check the
 provisioning status for. Note that the \fIDEVICE\fR chooses how many
@@ -121,7 +129,7 @@ to the GET LBA STATUS cdb in sbc4r12.
 .br
 Since the REPORT TYPE field is newer than the command, the response contains
 the RTP bit to indicate whether or not the \fIDEVICE\fR acts on the REPORT
-TYE field (set when it does act on it, clear otherwise).
+TYPE field (set when it does act on it, clear otherwise).
 .TP
 \fB\-s\fR, \fB\-\-scan\-len\fR=\fISL\fR
 where \fISL\fR is the scan length which is the maximum number of contiguous
@@ -151,19 +159,13 @@ at https://www.t10.org (or the corresponding section of a later draft).
 This example uses a "canned" hex file rather than a real \fIDEVICE\fR.
 .PP
    # cd <folder at root of sg3_utils source package>
-.br
    # sg_get_lba_status \-\-inhex=inhex/get_lba_status.hex
 .PP
   Command completed due to meeting capacity of medium
-.br
   RTP=0x0
-.br
   [1] LBA: 0x0             blocks:  287453952  mapped (or unknown);  LBA accessibility not reported
-.br
   [2] LBA: 0x11223300      blocks:         68  deallocated;  LBA access not reported  [may contain unrecovered errors]
-.br
   [3] LBA: 0x11223344      blocks:         51  deallocated;  LBA extent inaccessible  [may contain unrecovered errors]
-.PP
 .SH EXIT STATUS
 The exit status of sg_get_lba_status is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.

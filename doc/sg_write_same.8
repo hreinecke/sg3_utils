@@ -313,11 +313,8 @@ is awkward to create 0xff bytes in a file (in Unix) as the "tr" command
 below shows:
 .PP
   dd if=/dev/zero bs=1 count=512 of=ud.bin
-.br
   tr "\\000" "\\377" < /dev/zero | dd bs=1 of=ff_s.bin count=8
-.br
   cat ud.bin ff_s.bin > lb.bin
-.br
   dd if=/dev/zero bs=1 count=2 seek=514 conv=notrunc of=lb.bin
 .PP
 The resulting file can be viewed with 'hexdump \-C lb.bin' and should

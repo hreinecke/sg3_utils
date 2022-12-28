@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.34 20221220";
+static const char * version_str = "1.35 20221226";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -50,6 +50,8 @@ static struct option long_options[] = {
     {"ignore-first", no_argument, 0, 'I'},
     {"ignore_first", no_argument, 0, 'I'},
     {"json", optional_argument, 0, 'j'},
+    {"js-file", required_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'J'},
     {"nodecode", no_argument, 0, 'N'},
     {"nospace", no_argument, 0, 'n'},
     {"status", required_argument, 0, 's'},
@@ -63,6 +65,7 @@ struct opts_t {
     bool do_binary;
     bool do_cdb;
     bool do_help;
+    bool do_json;
     bool no_decode;
     bool no_space;
     bool do_status;
@@ -78,6 +81,8 @@ struct opts_t {
     int sstatus;
     int verbose;
     const char * wfname;
+    const char * json_arg;
+    const char * js_file;
     const char * no_space_str;
     sgj_state json_st;
     uint8_t sense[MAX_SENSE_LEN + 4];
@@ -93,10 +98,11 @@ usage()
           "[--file=HFN]\n"
           "                       [--help] [--hex] [--inhex=HFN] "
           "[--ignore-first]\n"
-          "                       [--json[=JO]] [--nodecode] [--nospace] "
-          "[--status=SS]\n"
-          "                       [--verbose] [--version] [--write=WFN] "
-          "H1 H2 H3 ...\n"
+          "                       [--json[=JO]] [--js_file=JFN] "
+          "[--nodecode]\n"
+          "                       [--nospace] [--status=SS] "
+          "[--verbose] [--version]\n"
+          "                       [--write=WFN] H1 H2 H3 ...\n"
           "  where:\n"
           "    --binary=BFN|-b BFN    BFN is a file name to read sense "
           "data in\n"
@@ -127,6 +133,10 @@ usage()
           "    --json[=JO]|-j[JO]    output in JSON instead of human "
           "readable text.\n"
           "                          Use --json=? for JSON help\n"
+          "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
+          "output is\n"
+          "                            written (def: stdout); truncates "
+          "then writes\n"
           "    --nodecode|-N         do not decode, input hex or binary may "
           "be\n"
           "                          unrelated to SCSI sense or CDB formats\n"
@@ -159,8 +169,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     char *endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:ce:f:hHi:Ij::nNs:vVw:", long_options,
-                        NULL);
+        c = getopt_long(argc, argv, "b:ce:f:hHi:Ij::J:nNs:vVw:",
+                        long_options, NULL);
         if (c == -1)
             break;
 
@@ -215,18 +225,12 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->ignore_first = true;
             break;
        case 'j':
-            if (! sgj_init_state(&op->json_st, optarg)) {
-                int bad_char = op->json_st.first_bad_char;
-                char e[1500];
-
-                if (bad_char) {
-                    pr2serr("bad argument to --json= option, unrecognized "
-                            "character '%c'\n\n", bad_char);
-                }
-                sg_json_usage(0, e, sizeof(e));
-                pr2serr("%s", e);
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            op->do_json = true;
+            op->json_arg = optarg;
+            break;
+       case 'J':
+            op->do_json = true;
+            op->js_file = optarg;
             break;
         case 'n':
             op->no_space = true;
@@ -336,7 +340,7 @@ write2wfn(FILE * fp, struct opts_t * op)
 int
 main(int argc, char *argv[])
 {
-    bool as_json;
+    bool as_json = false;
     int k, err, blen;
     int ret = 0;
     unsigned int ui;
@@ -389,10 +393,24 @@ main(int argc, char *argv[])
         usage();
         goto clean_op;
     }
-    as_json = op->json_st.pr_as_json;
     jsp = &op->json_st;
-    if (as_json)
+    if (op->do_json) {
+       if (! sgj_init_state(jsp, op->json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto fini;
+        }
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+    }
+    as_json = jsp->pr_as_json;
 
     if (op->err_given) {
         char d[128];
@@ -539,9 +557,27 @@ main(int argc, char *argv[])
         }
     }
 fini:
-   if (as_json) {
-        if (0 == op->hex_count)
-            sgj_js2file(&op->json_st, NULL, ret, stdout);
+    ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    if (as_json) {
+        FILE * fp = stdout;
+
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    int e = errno;
+
+                    pr2serr("unable to open file: %s [%s]\n", op->js_file,
+                            safe_strerror(e));
+                    ret = sg_convert_errno(e);
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, ret, fp);
+        if (op->js_file && fp && (stdout != fp))
+            fclose(fp);
         sgj_finish(jsp);
     }
 clean_op:

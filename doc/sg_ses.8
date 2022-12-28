@@ -7,7 +7,7 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-dev\-slot\-num=SN\fR] [\fI\-\-eiioe=A_F\fR] [\fI\-\-filter\fR]
 [\fI\-\-get=STR\fR] [\fI\-\-hex\fR] [\fI\-\-index=IIA\fR |
 \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR] [\fI\-\-join\fR]
-[\fI\-\-json[=JO]\fR]  [\fI\-\-js\-file=JFN\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR] [\fI\-\-maxlen=LEN\fR]
 [\fI\-\-no\-config\fR] [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
 [\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR]
 [\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
@@ -34,7 +34,6 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-version\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Fetches management information from a SCSI Enclosure Service (SES) device.
 This utility can also modify the state of a SES device. The \fIDEVICE\fR
 should be a SES device which may be a dedicated enclosure services processor
@@ -104,10 +103,10 @@ output by the \fI\-\-join\fR option.
 To output all pages without attempting a join, use the \fI\-\-page=all\fR
 option rather than this option.
 .br
-If this option is used twice, includes Threshold In dpage (if available) in
-the \fI\-\-join\fR option output. Note that now the Threshold In dpage is not
-listed separately in the "other SES dpages" section. Using this option twice
-is equivalent to invoking the \fI\-\-ALL\fR option.
+If this option is used twice, the Threshold In dpage (if available) is
+included in the \fI\-\-join\fR option output. Note that now the Threshold In
+dpage is not listed separately in the "other SES dpages" section. Using this
+option twice is equivalent to invoking the \fI\-\-ALL\fR option.
 .br
 This option implies the \fI\-\-status\fR option as long as the
 \fI\-\-control\fR option has not been given.
@@ -334,13 +333,13 @@ For more specific information about JSON output with this utility, see the
 JSON INFORMATION section below.
 .TP
 \fB\-Q\fR, \fB\-\-js\-file\fR=\fIJFN\fR
-output is in JSON format and it is sent to a file named \fIJFN\f. If that
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
 file exists then it is truncated. By default, the JSON output is sent to
 stdout.
 .br
 When this option is given, the \fI\-\-json[=JO]\fR option is implied and
 need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
-set the \fIJO\f parameter to non-default values.
+set the \fIJO\fR parameter to non-default values.
 .TP
 \fB\-l\fR, \fB\-\-list\fR
 This option is equivalent to \fI\-\-enumerate\fR. See that option.
@@ -397,11 +396,14 @@ starts with a digit it is assumed to be in decimal unless prefixed by
 dpage 'sdp' which is page_code 0 (i.e. "Supported Diagnostic Pages") if
 no other options are given.
 .br
-Page code 0xff or abbreviation "all" is not a real dpage (as the highest
-real dpage is 0x3f) but instead causes all SES dpages whose page code is
-0x2f or less to be output. This can be used with either the \fI\-HHHH\fR
-or \fI\-rr\fR to send either hexadecimal ASCII or binary respectively to
-stdout.
+Page code 0xff or abbreviation "all" is not a real dpage (as the highest real
+dpage is 0x3f) but instead causes all SES dpages whose page code is 0x2f or
+less to be output. This can be used with either the \fI\-HHHH\fR or \fI\-rr\fR
+to send either hexadecimal ASCII or binary respectively to stdout. If an error
+is detected fetching or decoding a diagnostic page it is noted, the rest of
+the pages are processed then the deferred error is reported in the exit
+status. If the \fI\-\-warn\fR option is also given then \fI\-\-page=all\fR
+will exit immediately when an error is detected.
 .br
 To list the available dpage abbreviations give "xxx" for \fIPG\fR; the same
 information can also be found with the \fI\-\-enumerate\fR option.
@@ -445,7 +447,7 @@ manufactured target port identifier is different from a SATA disk's WWN.
 .br
 \fISA\fR is a hex number that is up to 8 digits long. It may have a
 leading '0x' or '0X' or a trailing 'h' or 'H'. This option is a medium level
- indexing alternative to the low level \fI\-\-index=\fR options.
+indexing alternative to the low level \fI\-\-index=\fR options.
 See the DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS section below.
 .TP
 \fB\-S\fR, \fB\-\-set\fR=\fISTR\fR
@@ -473,20 +475,23 @@ a form suitable for debugging.
 print the version string and then exit.
 .TP
 \fB\-w\fR, \fB\-\-warn\fR
-warn about certain irregularities with warnings sent to stderr. The join
-is a complex operation that relies on information from several dpages to be
-synchronized. The quality of SES devices vary and to be fair, the
-descriptions from T10 drafts and standards have been tweaked several
-times (see the EIIOE field) in order to clear up confusion.
+warn about certain irregularities with warnings sent to stderr. The join is a
+complex operation that requires fields from several dpages to be synchronized.
+The quality of SES devices vary and to be fair, the descriptions from T10
+drafts and standards have been tweaked several times (see the EIIOE field) in
+order to clear up confusion.
+.br
+This option will cause fetching all dpages with the \fI\-\-page=all\fR option
+to exit immediately when an error is detected.
 .SH INDEXES
 An enclosure can have information about its disk and tape drives plus other
 supporting components like power supplies spread across several dpages.
 Addressing a specific element (overall or individual) within a dpage is
-complicated. This section describes low level indexing (i.e. choosing a
-single element (or a group of related elements) from a large number of
-elements). If available, the medium level indexing described in the
-following section (DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS)
-might be simpler to use.
+complicated. This section describes low level indexing (i.e. choosing a single
+element (or a group of related elements) from a large number of elements). If
+available, the medium level indexing described in the following
+section (DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS) might be simpler
+to use.
 .PP
 The Configuration dpage is key to low level indexing: it contains a list
 of "type headers", each of which contains an Element type (e.g. Array
@@ -497,11 +502,11 @@ elements" individual elements all of which have the given Element type. For
 some Element types the "Number of possible elements" will be 0 so the
 Enclosure Status dpage has only one "overall" element corresponding to that
 type header. The Element Descriptor dpage and the Threshold (In and Out)
-dpages follow the same pattern as the Enclosure Status dpage.
+dpages follow a similar pattern as the Enclosure Status dpage.
 .PP
 The numeric index corresponding to the overall element is "\-1". If the
 Configuration dpage indicates a particular element type has "n" elements
-and n is greater than 0 then its indexes range from 0 to n\-1 .
+then its indexes range from \-1 to n\-1 .
 .PP
 The Additional Element Status dpage is a bit more complicated. It has
 entries for "Number of possible elements" of certain Element types. It
@@ -517,9 +522,9 @@ first type header entry which must be a Device Slot or Array Device Slot
 Element type (according to the SES\-2 standard). To address the corresponding
 overall instance, II is set to \-1, otherwise II can be set to the individual
 instance index. As an alternative to the type header index (TI), an Element
-type abbreviation (A) optionally followed by a number (e.g. "ps" refers to
-the first Power Supply Element type; "ps1" refers to the second) can be
-given.
+type abbreviation (A) (e.g. "ps" for Power Supply Element type) optionally
+followed by a number (e.g. "ps" refers to the first Power Supply Element
+type; "ps1" refers to the second) can be given.
 .PP
 One of two command lines variants can be used to specify indexes:
 \fI\-\-index=TIA,II\fR where \fITIA\fR is either an type header index (TI)
@@ -532,8 +537,12 @@ individual index then the option is equivalent to \fI\-\-index=0,II\fR. When
 \fI\-\-index=A,\-1\fR.
 .PP
 Wherever an individual index is applicable, it can be replaced by an
-individual index range. It has the form: <first_ii>\-<last_ii>. For
-example: '3\-5' will select individual indexes 3, 4 and 5 .
+individual index range. It has the form: <first_ii>:<last_ii>. For
+example: '3:5' will select individual indexes 3, 4 and 5 . Note that the
+range \-1:255 represents all possible elements of an element type and is not
+an error, only those element that exist will be selected. Previously '\-' was
+used as an index range separator but that leads to awkward syntax like
+\-1\-1 for indexes: \-1 (overall element), 0 and 1 (individual elements).
 .PP
 To cope with vendor specific Element types (whose type codes should be in
 the range 128 to 255) the Element type code can be given as a number with
@@ -546,26 +555,23 @@ has Array Device Slot Element type then \fI\-\-index=0,\-1\fR is
 equivalent to \fI\-\-index=arr\fR. Also \fI\-\-index=arr,3\fR is equivalent
 to \fI\-\-index=3\fR.
 .PP
-The \fI\-\-index=\fR options  can be used to reduce the amount of
-output (e.g. only showing the element associated with the second 12 volt
-power supply). They may also be used together with with the
-\fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and \fI\-\-set=STR\fR options which
-are described in the STR section below.
+The \fI\-\-index=\fR option is used to reduce the amount of output (e.g. only
+showing the element associated with the second 12 volt power supply). It may
+also be used together with with the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR
+and \fI\-\-set=STR\fR options which are described in the STR section below.
 .SH DESCRIPTOR NAME, DEVICE SLOT NUMBER AND SAS ADDRESS
-The three options: \fI\-\-descriptor=DES\fR, \fI\-\-dev\-slot\-num=SN\fR
-and \fI\-\-sas\-addr=SA\fR allow medium level indexing, as an alternative
-to the low level \fI\-\-index=\fR options. Only one of the three options
-can be used in an invocation. Each of the three options implicitly set the
-\fI\-\-join\fR option since they need either the Element Descriptor dpage
-or the Additional Element Status dpage as well as the dpages needed by the
-\fI\-\-index=\fR option.
+The three options: \fI\-\-descriptor=DES\fR, \fI\-\-dev\-slot\-num=SN\fR and
+\fI\-\-sas\-addr=SA\fR allow medium level indexing, as an alternative to the
+low level \fI\-\-index=\fR option. Only one of the three options can be used
+in an invocation. When either of these three option is used a join operation
+is performed (but not displayed) before element selection takes place.
 .PP
-These medium level indexing options need support from the SES device and
-that support is optional. For example the \fI\-\-descriptor=DES\fR needs
-the Element Descriptor dpage provided by the SES device however that is
-optional. Also the provided descriptor names need to be useful, and having
-descriptor names which are all "0" is not very useful. Also some
-elements (e.g. overall elements) may not have descriptor names.
+These medium level indexing options need support from the SES device and that
+support is optional. For example the \fI\-\-descriptor=DES\fR needs the
+Element Descriptor dpage provided by the SES device however that is optional.
+Also the provided descriptor names need to be useful, and having descriptor
+names which are all "0" is not very useful. Also some elements (e.g. overall
+elements) may not have descriptor names.
 .PP
 These medium level indexing options can be used to reduce the amount of
 output (e.g. only showing the elements related to device slot number 3).
@@ -578,9 +584,8 @@ does not have the mechanism to lock the disk drawer).
 .SH STR FORMAT
 The \fISTR\fR operands of the \fI\-\-clear=STR\fR, \fI\-\-get=STR\fR and
 \fI\-\-set=STR\fR options all have the same structure. There are two forms:
-.br
+.PP
       <acronym>[=<value>]
-.br
       <start_byte>:<start_bit>[:<num_bits>][=<value>]
 .PP
 The <acronym> is one of a list of common fields (e.g. "ident" and "fault")
@@ -835,6 +840,10 @@ disk (or more precisely the carrier drawer the disk is in):
 .PP
    sg_ses \-\-index=7 \-\-set=2:1:1 /dev/sg3
 .PP
+In the above invocation, the \-\-set= option implies \-\-control so the
+latter does not need to be given. The same applies to \-\-clear=. On the
+other hand the \-\-get= option implies \-\-status .
+.br
 If the Element Descriptor diagnostic dpage shows that "ArrayDevice07" is
 the descriptor name associated with element index 7 then this invocation
 is equivalent to the previous one:
@@ -898,6 +907,11 @@ enc_sg5_all.hex has been copied, a "join" could be done. Note that join
 reflects the state of the enclosure when the capture was done.
 .PP
    sg_ses \-\-data=@enc_sg5_all.hex \-\-status \-\-join
+.PP
+The above invocation can also be expressed as:
+   sg_ses \-\-inhex=enc_sg5_all.hex \-\-join
+.PP
+The \-\-join option implies \-\-status .
 .SH EXIT STATUS
 The exit status of sg_ses is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

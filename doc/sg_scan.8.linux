@@ -12,7 +12,6 @@ results
 [\fIDEVICE\fR]*
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 If no \fIDEVICE\fR names are given, sg_scan does a scan of the sg
 devices and outputs a line of information for each sg device that is
 currently bound to a SCSI device. If one or more \fIDEVICE\fRs are given

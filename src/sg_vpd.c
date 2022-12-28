@@ -92,6 +92,8 @@ static struct option long_options[] = {
         {"ident", no_argument, 0, 'i'},
         {"inhex", required_argument, 0, 'I'},
         {"json", optional_argument, 0, 'j'},
+        {"js-file", required_argument, 0, 'J'},
+        {"js_file", required_argument, 0, 'J'},
         {"long", no_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"page", required_argument, 0, 'p'},
@@ -175,11 +177,13 @@ usage()
 {
     pr2serr("Usage: sg_vpd  [--all] [--enumerate] [--examine] [--force] "
             "[--help] [--hex]\n"
-            "               [--ident] [--inhex=FN] [--long] [--maxlen=LEN] "
-            "[--page=PG]\n"
-            "               [--quiet] [--raw] [--sinq_inraw=RFN] "
-            "[--vendor=VP] [--verbose]\n"
-            "               [--version] DEVICE\n");
+            "               [--ident] [--inhex=FN] [--json[=JO]] "
+            "[--js-file=JFN]\n"
+            "               [--long] [--maxlen=LEN] [--page=PG] [--quiet] "
+            "[--raw]\n"
+            "               [--sinq_inraw=RFN] [--vendor=VP] [--verbose] "
+            "[--version]\n"
+            "               DEVICE\n");
     pr2serr("  where:\n"
             "    --all|-a        output all pages listed in the supported "
             "pages VPD\n"
@@ -203,6 +207,10 @@ usage()
             "    --json[=JO]|-j[JO]    output in JSON instead of human "
             "readable text.\n"
             "                          Use --json=? for JSON help\n"
+            "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
+            "output is\n"
+            "                            written (def: stdout); truncates "
+            "then writes\n"
             "    --long|-l       perform extra decoding\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
@@ -2330,7 +2338,7 @@ svpd_examine_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
 int
 main(int argc, char * argv[])
 {
-    bool as_json;
+    bool as_json = false;
     int c, res, matches;
     int sg_fd = -1;
     int inhex_len = 0;
@@ -2350,8 +2358,8 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aeEfhHiI:j::lm:M:p:qQ:rvV", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "aeEfhHiI:j::J:lm:M:p:qQ:rvV",
+                        long_options, &option_index);
         if (c == -1)
             break;
 
@@ -2388,18 +2396,12 @@ main(int argc, char * argv[])
                 op->inhex_fn = optarg;
             break;
         case 'j':
-            if (! sgj_init_state(&op->json_st, optarg)) {
-                int bad_char = op->json_st.first_bad_char;
-                char e[1500];
-
-                if (bad_char) {
-                    pr2serr("bad argument to --json= option, unrecognized "
-                            "character '%c'\n\n", bad_char);
-                }
-                sg_json_usage(0, e, sizeof(e));
-                pr2serr("%s", e);
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            op->do_json = true;
+            op->json_arg = optarg;
+            break;
+        case 'J':
+            op->do_json = true;
+            op->js_file = optarg;
             break;
         case 'l':
             op->do_long = true;
@@ -2490,7 +2492,6 @@ main(int argc, char * argv[])
         return 0;
     }
 
-    jsp = &op->json_st;
     if (op->do_enum) {
         if (op->device_name)
             pr2serr("Device name %s ignored when --enumerate given\n",
@@ -2534,18 +2535,33 @@ main(int argc, char * argv[])
                 matches = svpd_count_vendor_vpds(op->vpd_pn,
                                                  op->vend_prod_num);
             if (0 == matches)
-                sgj_pr_hr(jsp, "No matches found for VPD page number 0x%x\n",
-                          op->vpd_pn);
+                printf("No matches found for VPD page number 0x%x\n",
+                       op->vpd_pn);
         } else {        /* enumerate standard then vendor VPD pages */
-            sgj_pr_hr(jsp, "Standard VPD pages:\n");
+            printf("Standard VPD pages:\n");
             enumerate_vpds(1, 1);
         }
         return 0;
     }
 
-    as_json = jsp->pr_as_json;
-    if (as_json)
+    jsp = &op->json_st;
+    if (op->do_json) {
+        if (! sgj_init_state(jsp, op->json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
+        }
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+    }
+    as_json = jsp->pr_as_json;
 
     if (op->page_str) {
         if ('-' == op->page_str[0])
@@ -2807,9 +2823,26 @@ fini:
             ret = sg_convert_errno(-res);
     }
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
-    if (as_json) {
-        if (0 == op->do_hex)
-            sgj_js2file(jsp, NULL, ret, stdout);
+    if (as_json && jop) {
+        FILE * fp = stdout;
+
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    int e = errno;
+
+                    pr2serr("unable to open file: %s [%s]\n", op->js_file,
+                            safe_strerror(e));
+                    ret = sg_convert_errno(e);
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, ret, fp);
+        if (op->js_file && fp && (stdout != fp))
+            fclose(fp);
         sgj_finish(jsp);
     }
     return ret;

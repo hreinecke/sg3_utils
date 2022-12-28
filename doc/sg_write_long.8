@@ -9,7 +9,6 @@ sg_write_long \- send SCSI WRITE LONG command
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Send the SCSI WRITE LONG (10 or 16 byte) command to \fIDEVICE\fR. The buffer
 to be written to the \fIDEVICE\fR is filled with
 .B 0xff
@@ -159,7 +158,6 @@ the read will most likely fail).
 Another approach is to write back the original contents:
 .PP
   sg_write_long \-\-lba=0x1234 \-\-in=0x1234_1.img \-x \fIBTL\fR /dev/sda
-.PP
 .SH EXIT STATUS
 The exit status of sg_write_long is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

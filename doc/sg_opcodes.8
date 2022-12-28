@@ -4,11 +4,12 @@ sg_opcodes \- report supported SCSI commands or task management functions
 .SH SYNOPSIS
 .B sg_opcodes
 [\fI\-\-alpha\fR] [\fI\-\-compact\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR]
-[\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-mask\fR]
-[\fI\-\-mlu\fR] [\fI\-\-no-inquiry\fR] [\fI\-\-opcode=OP[,SA]\fR]
-[\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-repd\fR]
-[\fI\-\-sa=SA\fR] [\fI\-\-tmf\fR] [\fI\-\-unsorted\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR]
+[\fI\-\-js\-file=JFN\fR] [\fI\-\-mask\fR] [\fI\-\-mlu\fR]
+[\fI\-\-no-inquiry\fR] [\fI\-\-opcode=OP[,SA]\fR] [\fI\-\-pdt=DT\fR]
+[\fI\-\-raw\fR] [\fI\-\-rctd\fR] [\fI\-\-repd\fR] [\fI\-\-sa=SA\fR]
+[\fI\-\-tmf\fR] [\fI\-\-unsorted\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .PP
 .B sg_opcodes
 [\fI\-a\fR] [\fI\-c\fR] [\fI\-e\fR] [\fI\-H\fR] [\fI\-i=FN\fR] [\fI\-j\fR]
@@ -17,7 +18,6 @@ sg_opcodes \- report supported SCSI commands or task management functions
 [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This utility sends a SCSI REPORT SUPPORTED OPERATION CODES or a REPORT
 SUPPORTED TASK MANAGEMENT FUNCTIONS command to the \fIDEVICE\fR and then
 outputs the response. The default action is to report supported operation
@@ -96,6 +96,15 @@ also given then the contents of \fIFN\fR are treated as binary.
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
 output is in JSON format instead of human readable form. See sg3_utils_json
 manpage or use '?' for \fIJO\fR for a summary.
+.TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
 .TP
 \fB\-m\fR, \fB\-\-mask\fR
 additionally prints out the cdb mask in hex. So a 12 byte cdb will have
@@ -286,11 +295,8 @@ followed by a typical response:
    # sg_opcodes \-\-op=93h /dev/sdb
 .PP
   Opcode=0x93
-.br
   Command_name: Write same(16)
-.br
   Command supported [conforming to SCSI standard]
-.br
   Usage data: 93 e2 00 00 00 00 ff ff ff ff 00 00 ff ff 00 00
 .PP
 The next example shows the supported task management functions:
@@ -298,17 +304,11 @@ The next example shows the supported task management functions:
    # sg_opcodes \-\-tmf \-n /dev/sdb
 .PP
 Task Management Functions supported by device:
-.br
     Abort task
-.br
     Abort task set
-.br
     Clear ACA
-.br
     Clear task set
-.br
     Logical unit reset
-.br
     Query task
 .PP
 Enumerate can be used to look up a SCSI command name in the absence of a
@@ -318,9 +318,7 @@ required) should be supplied:
    # sg_opcodes \-\-enumerate \-\-op=0x9b,0xa
 .PP
   SCSI command:
-.br
     Read buffer(16), read data from echo buffer
-.br
 .SH ENVIRONMENT VARIABLES
 Since sg3_utils version 1.23 the environment variable SG3_UTILS_OLD_OPTS
 can be given. When it is present this utility will expect the older command

@@ -8,7 +8,6 @@ sg_read_long \- send a SCSI READ LONG command
 [\fI\-\-version\fR] [\fI\-\-xfer_len=BTL\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Send SCSI READ LONG command to \fIDEVICE\fR. The read buffer is output in hex
 and ASCII to stdout or placed in a file. Note that the data returned includes
 the logical block data (typically 512 bytes for a disk) plus ECC

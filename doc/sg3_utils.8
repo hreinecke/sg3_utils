@@ -5,12 +5,11 @@ sg3_utils \- a package of utilities for sending SCSI commands
 .B sg_*
 [\fI\-\-dry\-run\fR] [\fI\-\-enumerate\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-in=FN\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR]
-[\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR] [\fI\-\-timeout=SECS\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-js\-file=JFN\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-raw\fR]
+[\fI\-\-timeout=SECS\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
 [\fIOTHER_OPTIONS\fR] [\fIDEVICE\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 sg3_utils is a package of utilities that send SCSI commands to the given
 \fIDEVICE\fR via a SCSI pass through interface provided by the host
 operating system.
@@ -93,13 +92,13 @@ section. It is only for backward compatibility of the command line options
 for older utilities.
 .PP
 The SG3_UTILS_INVOCATION environment variable has been implemented on some
-utilities that decode a lot of data. When set then those utilities will print
-out a line of 60 "v" characters. After that the utility name and
-version (which includes a date) followed by a line by line breakdown of the
-command line arguments that the utility was invoked with. The command line
-arguments includes the utility name and options in the order they were given.
-The output is sent to stdout. The option is designed to help automatic
-testing of utilities in the package.
+utilities that decode a lot of data. When SG3_UTILS_INVOCATION is set those
+utilities will print out a line of 60 "v" characters. After that the utility
+name and version (which includes a date) followed by a line by line
+breakdown of the command line arguments that the utility was invoked with.
+The command line arguments include the utility name and options in the order
+they were given. The output is sent to stdout. The option is designed to
+help automatic testing of utilities in the package.
 .PP
 The SG3_UTILS_DSENSE environment variable may be set to a number. It is
 only used by the embedded SNTL within the library used by the utilities in
@@ -306,9 +305,9 @@ correspond to the SCSI sense key values.
 .PP
 The exit status values listed below can be given to the sg_decode_sense
 utility (which is found in this package) as follows:
-.br
+.PP
   sg_decode_sense \-\-err=<exit_status>
-.br
+.PP
 and a short explanatory string will be output to stdout.
 .PP
 The exit status values are:
@@ -646,6 +645,15 @@ The corresponding short option is usually \fI\-j[JO]\fR but maybe
 argument is itself optional. See the sg3_utils_json manpage for more
 information.
 .TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
+.TP
 \fB\-m\fR, \fB\-\-maxlen\fR=\fILEN\fR
 several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
 lengths that vary depending on many factors, only some of which these
@@ -716,29 +724,17 @@ Multiplicative suffixes are accepted. They are one, two or three letter
 strings appended directly after the number to which they apply:
 .PP
    c C         *1
-.br
    w W         *2
-.br
    b B         *512
-.br
    k K KiB     *1024
-.br
    KB kB       *1000
-.br
    m M MiB     *1048576
-.br
    MB mB       *1000000
-.br
    g G GiB     *(2^30)
-.br
    GB gB       *(10^9)
-.br
    t T TiB     *(2^40)
-.br
    TB          *(10^12)
-.br
    p P PiB     *(2^50)
-.br
    PB          *(10^15)
 .PP
 An example is "2k" for 2048. The large tera and peta suffixes are only

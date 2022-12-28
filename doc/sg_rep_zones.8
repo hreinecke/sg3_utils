@@ -5,13 +5,13 @@ sg_rep_zones \- send SCSI REPORT ZONES, REALMS or ZONE DOMAINS command
 .B sg_rep_zones
 [\fI\-\-brief\fR] [\fI\-\-domain\fR] [\fI\-\-find=ZT\fR] [\fI\-\-force\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO\fR]]
-[\fI\-\-locator=LBA\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR]
-[\fI\-\-partial\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-realm\fR]
-[\fI\-\-report=OPT\fR] [\fI\-\-start=LBA\fR] [\fI\-\-statistics\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wp\fR] \fIDEVICE\fR
+[\fI\-\-js\-file=JFN\fR] [\fI\-\-locator=LBA\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-num=NUM\fR] [\fI\-\-partial\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-realm\fR] [\fI\-\-report=OPT\fR] [\fI\-\-start=LBA\fR]
+[\fI\-\-statistics\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-wp\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Sends a SCSI REPORT ZONES, REPORT REALMS or REPORT ZONE DOMAINS command to
 \fIDEVICE\fR and decodes (or simply outputs) the data returned. These
 commands are found in the ZBC\-2 draft standard, revision 12 (zbc2r12.pdf).
@@ -105,6 +105,15 @@ option for decoding the other two commands.
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
 output is in JSON format instead of human readable form. See sg3_utils_json
 manpage or use '?' for \fIJO\fR for a summary.
+.TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
 .TP
 \fB\-l\fR, \fB\-\-locator\fR=\fILBA\fR
 where \fILBA\fR plays a similar role as it does in \fI\-\-start=LBA\fR.

@@ -8,7 +8,6 @@ sginfo \- access mode page information for a SCSI (or ATAPI) device
 [\fIREPLACEMENT_PARAMETERS\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 sginfo is a port of the Linux
 .B scsiinfo
 program by Eric Youngdale. It uses SCSI generic (sg) devices; however in
@@ -221,24 +220,17 @@ single row of values output by the previous command, with the relevant
 parameter changed. Here is a simplified example:
 .PP
    $ sginfo \-C /dev/sda
-.br
    Control mode page (0xa)
-.br
    \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
-.br
    TST                        0
-.br
    D_SENSE                    0
-.br
    GLTSD                      1
-.br
    RLEC                       0
 .PP
 [Actually the Control page has more parameters that shown above.] Next
 output those parameters in single line form:
 .PP
    $ sginfo \-CX /dev/sda
-.br
    0 0 1 0
 .PP
 Let us assume that the GLTSD bit is to be cleared. The command that
@@ -251,17 +243,11 @@ placed at the end of the "\-CXR" command line (after the device name).
 Now check that the change took effect:
 .PP
    $ sginfo \-C /dev/sda
-.br
    Control mode page (0xa)
-.br
    \-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-
-.br
    TST                        0
-.br
    D_SENSE                    0
-.br
    GLTSD                      0
-.br
    RLEC                       0
 .PP
 When a mode page is "replaced" the default action is to change both the
@@ -269,7 +255,6 @@ current page and the saved page. [For some reason versions of sginfo and
 scsiinfo prior to 2.0 did not change the "saved" page.] To change only
 the current mode page but not the corresponding saved page use the "\-N"
 option.
-.PP
 .SH GENERATING SCRIPT FILES AND HEX PAGES
 The "\-aX" or "\-AX" option generates output suitable for a script file.
 Mode pages are output in list format (after the INQUIRY and serial
@@ -289,7 +274,6 @@ start at index position 2 while subpages start at index position 4.
 If the "\-Xu ..." option is used then a list a hex values each value
 prefixed by "@" is output. Mode (sub)page values can then be modified
 with the "\-RXu ..." option.
-.PP
 .SH RESTRICTIONS
 The SCSI MODE SENSE command yields block descriptors as well as a mode
 page(s). This utility ignores block descriptors and does not display
@@ -298,17 +282,14 @@ is not set since some devices yield errors when it is set. When mode page
 values are being changed (the "\-R" option), the same block descriptor
 obtained by reading the mode page (i.e. via a MODE SENSE command) is sent
 back when the mode page is written (i.e. via a MODE SELECT command).
-.PP
 .SH REFERENCES
 SCSI (draft) standards can be found at https://www.t10.org . The relevant
 documents are SPC\-4 (mode pages common to all device types),
 SBC\-2 (direct access devices [e.g. disks]), MMC\-4 (CDs and DVDs) and
 SSC\-2 (tapes).
-.PP
 .SH AUTHORS
 Written by Eric Youngdale, Michael Weller, Douglas Gilbert, Kurt Garloff,
 Thomas Steudten
-.PP
 .SH HISTORY
 scsiinfo version 1.0 was released by Eric Youngdale on 1st November 1993.
 The most recent version of scsiinfo is version 1.7 with the last patches

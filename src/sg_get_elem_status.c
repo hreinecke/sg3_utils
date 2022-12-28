@@ -74,6 +74,8 @@ static struct option long_options[] = {
     {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
     {"inhex", required_argument, 0, 'i'},
     {"json", optional_argument, 0, 'j'},
+    {"js-file", required_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'J'},
     {"maxlen", required_argument, 0, 'm'},
     {"raw", no_argument, 0, 'r'},
     {"readonly", no_argument, 0, 'R'},
@@ -91,12 +93,12 @@ usage()
     pr2serr("Usage: sg_get_elem_status  [--brief] [--filter=FLT] [--help] "
             "[--hex]\n"
             "                           [--inhex=FN] [--json[=JO]] "
-            "[--maxlen=LEN]\n"
-            "                           [--raw] [--readonly] "
-            "[--report-type=RT]\n"
-            "                           [--starting=ELEM] [--verbose] "
-            "[--version]\n"
-            "                           DEVICE\n"
+            "[--js-file=JFN]\n"
+            "                           [--maxlen=LEN] [--raw] "
+            "[--readonly]\n"
+            "                           [--report-type=RT] [--starting=ELEM] "
+            "[--verbose]\n"
+            "                           [--version] DEVICE\n"
             "  where:\n"
             "    --brief|-b        one descriptor per line\n"
             "    --filter=FLT|-f FLT    FLT is 0 (def) for all physical "
@@ -112,6 +114,10 @@ usage()
             "    --json[=JO]|-j[JO]     output in JSON instead of human "
             "readable text\n"
             "                           use --json=? for JSON help\n"
+            "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
+            "output is\n"
+            "                            written (def: stdout); truncates "
+            "then writes\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
             "                           (def: 0 -> %d bytes)\n",
@@ -272,6 +278,7 @@ fetch_health_str(uint8_t health, char * bp, int max_blen)
 int
 main(int argc, char * argv[])
 {
+    bool do_json = false;
     bool do_raw = false;
     bool no_final_msg = false;
     bool o_readonly = false;
@@ -292,6 +299,8 @@ main(int argc, char * argv[])
     int64_t ll;
     const char * device_name = NULL;
     const char * in_fn = NULL;
+    const char * json_arg = NULL;
+    const char * js_file = NULL;
     const char * cp;
     const uint8_t * bp;
     uint8_t * gpesBuffp = gpesBuff;
@@ -310,7 +319,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bf:hHi:j::m:rRs:St:TvV", long_options,
+        c = getopt_long(argc, argv, "bf:hHi:j::J:m:rRs:St:TvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -339,18 +348,12 @@ main(int argc, char * argv[])
             in_fn = optarg;
             break;
         case 'j':
-            if (! sgj_init_state(&json_st, optarg)) {
-                int bad_char = json_st.first_bad_char;
-                char e[1500];
-
-                if (bad_char) {
-                    pr2serr("bad argument to --json= option, unrecognized "
-                            "character '%c'\n\n", bad_char);
-                }
-                sg_json_usage(0, e, sizeof(e));
-                pr2serr("%s", e);
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            do_json = true;
+            json_arg = optarg;
+            break;
+        case 'J':
+            do_json = true;
+            js_file = optarg;
             break;
         case 'm':
             maxlen = sg_get_num(optarg);
@@ -436,8 +439,22 @@ main(int argc, char * argv[])
         pr2serr("version: %s\n", version_str);
         return 0;
     }
-    if (jsp->pr_as_json)
+    if (do_json) {
+       if (! sgj_init_state(jsp, json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto fini;
+        }
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+    }
 
     if (maxlen > DEF_GPES_BUFF_LEN) {
         gpesBuffp = (uint8_t *)sg_memalign(maxlen, 0, &free_gpesBuffp,
@@ -651,8 +668,25 @@ fini:
     }
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
     if (jsp->pr_as_json) {
-        if (0 == do_hex)
-            sgj_js2file(jsp, NULL, ret, stdout);
+        FILE * fp = stdout;
+
+        if (js_file) {
+            if ((1 != strlen(js_file)) || ('-' != js_file[0])) {
+                fp = fopen(js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    int e = errno;
+
+                    pr2serr("unable to open file: %s [%s]\n", js_file,
+                            safe_strerror(e));
+                    ret = sg_convert_errno(e);
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, ret, fp);
+        if (js_file && fp && (stdout != fp))
+            fclose(fp);
         sgj_finish(jsp);
     }
     return ret;

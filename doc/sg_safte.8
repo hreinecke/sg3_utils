@@ -9,7 +9,6 @@ sg_safte \- access SCSI Accessed Fault\-Tolerant Enclosure (SAF\-TE) device
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Fetches enclosure status (via a SCSI READ BUFFER command).
 The \fIDEVICE\fR should be a SAF\-TE device which may be a storage
 array controller (INQUIRY peripheral device type 0xc) or a generic
@@ -115,7 +114,6 @@ To view the configuration:
 To view the device slot status:
 .PP
    sg_safte \-\-devstatus /dev/sg1
-.PP
 .SH EXIT STATUS
 The exit status of sg_safte is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

@@ -5,9 +5,9 @@ sg_decode_sense \- decode SCSI sense and related data
 .B sg_decode_sense
 [\fI\-\-binary=BFN\fR] [\fI\-\-cdb\fR] [\fI\-\-err=ES\fR] [\fI\-\-file=HFN\fR]
 [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=HFN\fR]
-[\fI\-\-ignore\-first\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-nodecode\fR]
-[\fI\-\-nospace\fR] [\fI\-\-status=SS\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] [\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
+[\fI\-\-ignore\-first\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR]
+[\fI\-\-nodecode\fR] [\fI\-\-nospace\fR] [\fI\-\-status=SS\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-write=WFN\fR] [H1 H2 H3 ...]
 .SH DESCRIPTION
 .\" Add any additional description here
 This utility takes SCSI sense data in binary or as a sequence of ASCII
@@ -112,6 +112,15 @@ manpage or use '?' for \fIJO\fR for a summary.
 .br
 This option is designed to parse sense data into JSON output.
 .TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
+.TP
 \fB\-N\fR, \fB\-\-nodecode\fR
 Do not decode the given data as sense or a cdb. Useful when arbitrary data
 is given (e.g. when converting hex to binary or vice versa).
@@ -180,9 +189,7 @@ Cut and paste it after the sg_decode_sense command:
 and for this sense data the output should look like this:
 .PP
  Fixed format, current;  Sense key: Medium Error
-.br
  Additional sense: Unrecovered read error
-.br
   Info fld=0x1234 [4660]
 .PP
 For a medium error the Info field is the logical block address (LBA)

@@ -10,7 +10,6 @@ sg_read_attr \- send SCSI READ ATTRIBUTE command
 [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Sends a SCSI READ ATTRIBUTE command to \fIDEVICE\fR and outputs the data
 returned. This command was introduced in SPC\-3 revision 1 and thus is
 applicable to all SCSI devices. In practice it is used mainly for tape
@@ -136,68 +135,45 @@ pages returned by the INQUIRY command.
 To list the attributes of a tape drive whose \fIDEVICE\fR is /dev/sg1 ,
 the following could be used:
 .PP
-# sg_read_attr \-s al /dev/sg1
-.br
-Attribute list:
-.br
-  Remaining capacity in partition [MiB]
-.br
-  Maximum capacity in partition [MiB]
-.br
-  TapeAlert flags
-.br
-  Load count
-.br
-  MAM space remaining [B]
-.br
-  Assigning organization
-.br
-  Format density code
-.br
-  ...
+  # sg_read_attr \-s al /dev/sg1
+  Attribute list:
+    Remaining capacity in partition [MiB]
+    Maximum capacity in partition [MiB]
+    TapeAlert flags
+    Load count
+    MAM space remaining [B]
+    Assigning organization
+    Format density code
+    ...
 .PP
 To check the number of partitions:
 .PP
-# sg_read_attr \-s pl /dev/sg1
-.br
-Partition number list:
-.br
-  First partition number: 0
-.br
-  Number of partitions available: 2
+  # sg_read_attr \-s pl /dev/sg1
+  Partition number list:
+    First partition number: 0
+    Number of partitions available: 2
 .PP
 And to see the attribute values (which is the default service action):
 .PP
-# sg_read_attr /dev/sg1
-.br
-Attribute values:
-.br
-  Remaining capacity in partition [MiB]: 1386103
-.br
-  Maximum capacity in partition [MiB]: 1386103
-.br
-  TapeAlert flags: 0
-.br
-  ....
+  # sg_read_attr /dev/sg1
+  Attribute values:
+    Remaining capacity in partition [MiB]: 1386103
+    Maximum capacity in partition [MiB]: 1386103
+    TapeAlert flags: 0
+    ....
 .PP
 To redirect the attribute values response to a file for later decoding:
 .PP
-# sg_read_attr \-HHH /dev/sg1 > av.hex
+  # sg_read_attr \-HHH /dev/sg1 > av.hex
 .PP
 And later the response held in the av.hex file could be decoded with:
 .PP
-# sg_read_attr \-s av \-\-in=av.hex
-.br
-Attribute values:
-.br
-  Remaining capacity in partition [MiB]: 1386103
-.br
-  Maximum capacity in partition [MiB]: 1386103
-.br
-  TapeAlert flags: 0
-.br
-  ....
-.PP
+  # sg_read_attr \-s av \-\-in=av.hex
+  Attribute values:
+    Remaining capacity in partition [MiB]: 1386103
+    Maximum capacity in partition [MiB]: 1386103
+    TapeAlert flags: 0
+    ....
 .SH EXIT STATUS
 The exit status of sg_read_attr is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

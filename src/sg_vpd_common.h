@@ -128,6 +128,7 @@ struct opts_t {
     bool do_enum;               /* sg_enum */
     bool do_export;             /* sg_inq */
     bool do_force;              /* sg_inq + sg_vpd */
+    bool do_json;               /* sg_inq + sg_vpd */
     bool do_only; /* sg_inq: --only after stdinq: don't fetch VPD page 0x80 */
     bool do_quiet;              /* sg_vpd */
     bool examine_given;         /* sg_vpd */
@@ -159,6 +160,8 @@ struct opts_t {
     const char * device_name;   /* sg_inq + sg_vpd */
     const char * page_str;      /* sg_inq + sg_vpd */
     const char * inhex_fn;      /* sg_inq + sg_vpd */
+    const char * json_arg;      /* sg_inq + sg_vpd */
+    const char * js_file;       /* sg_inq + sg_vpd */
     const char * sinq_inraw_fn; /* sg_inq + sg_vpd */
     const char * vend_prod;     /* sg_vpd */
     sgj_state json_st;

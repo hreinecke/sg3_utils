@@ -8,7 +8,6 @@ sg_ident \- send SCSI REPORT/SET IDENTIFYING INFORMATION command
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Send a SCSI REPORT IDENTIFYING INFORMATION or SET IDENTIFYING INFORMATION
 command to \fIDEVICE\fR. Prior to SPC\-4 (revision 7) these
 commands were called REPORT DEVICE IDENTIFIER and SET DEVICE IDENTIFIER
@@ -86,22 +85,18 @@ First, to see if there is an existing information whose format
 is unknown (for information type 0), use no options:
 .PP
   # sg_ident /dev/sdb
-.br
    00     31 32 33 34 35 36 37 38  39 30          1234567890
 .PP
 If it is ASCII then it can printed as such:
 .PP
   # sg_ident \-\-ascii /dev/sdb
-.br
   1234567890
 .PP
 The information can be copied to a file, cleared and then
 re\-asserted with this sequence:
 .PP
   # sg_ident \-\-raw /dev/sdb > t
-.br
   # sg_ident \-\-clear /dev/sdb
-.br
   # cat t | sg_ident \-\-set /dev/sdb
 .SH EXIT STATUS
 The exit status of sg_ident is 0 when it is successful. Otherwise see

@@ -7,7 +7,6 @@ sg_map \- displays mapping between Linux sg and other SCSI devices
 [\fI\-sr\fR] [\fI\-st\fR] [\fI\-V\fR] [\fI\-x\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Sometimes it is difficult to determine which SCSI device a sg device
 name (e.g. /dev/sg0) refers to. This command loops through the
 sg devices and finds the corresponding SCSI disk, cdrom or tape
@@ -104,55 +103,33 @@ be listed. This utility assumes that sg device nodes are named using
 the normal conventions and searches from /dev/sg0 to /dev/sg4095
 inclusive.
 .SH EXAMPLES
-.PP
 My system has a SCSI disk, a cd writer and a dvd player:
-.br
    $ sg_map
-.br
    # Note: the devfs pseudo file system is present
-.br
    /dev/sg0  /dev/sda
-.br
    /dev/sg1  /dev/sr0
-.br
    /dev/sg2  /dev/sr1
 .PP
 In order to find which sg device name corresponds to the disk:
-.br
    $ sg_map \-sd
-.br
    # Note: the devfs pseudo file system is present
-.br
    /dev/sg0  /dev/sda
-.br
    /dev/sg1
-.br
    /dev/sg2
 .PP
 The "\-x" option gives the following output:
-.br
    sg_map \-x
-.br
    # Note: the devfs pseudo file system is present
-.br
    /dev/sg0  1 0 1 0  0  /dev/sda
-.br
    /dev/sg1  2 0 4 0  5  /dev/sr0
-.br
    /dev/sg2  2 0 6 0  5  /dev/sr1
 .PP
 When a SCSI scanner is added the output becomes:
-.br
    $ sg_map
-.br
    # Note: the devfs pseudo file system is present
-.br
    /dev/sg0  /dev/sda
-.br
    /dev/sg1  /dev/sr0
-.br
    /dev/sg2  /dev/sr1
-.br
    /dev/sg3
 .PP
 By process of elimination /dev/sg3 must be the scanner.

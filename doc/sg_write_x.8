@@ -574,12 +574,10 @@ called sg_write_x.bin . In the case of WRITE SCATTERED that binary file
 is suitable for supplying to a later invocation to do the actual write
 to media. For example:
 .PP
-  sg_write_x  \-\-scattered=3 \-q scat_file.txt \-xx \-i /dev/zero /dev/sg1
-.br
-Wrote 8192 bytes to sg_write_x.bin, LB data offset: 1
-.br
-Number of LBA range descriptors: 3
-.br
+  $ sg_write_x  \-\-scattered=3 \-q scat_file.txt \-xx \-i /dev/zero /dev/sg1
+  Wrote 8192 bytes to sg_write_x.bin, LB data offset: 1
+  Number of LBA range descriptors: 3
+ 
   sg_write_x  \-\-scattered=0 \-\-combined=1 \-i sg_write_x.bin /dev/sg1
 .PP
 Notice when the sg_write_x.bin is written (and nothing is written to the

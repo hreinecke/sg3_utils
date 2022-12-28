@@ -40,7 +40,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.43 20221222";
+static const char * version_str = "1.44 20221226";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -64,6 +64,7 @@ enum zone_report_sa_e {
 struct opts_t {
     bool do_brief;
     bool do_force;
+    bool do_json;
     bool do_partial;
     bool do_raw;
     bool do_realms;
@@ -84,6 +85,8 @@ struct opts_t {
     int vb;
     uint64_t st_lba;
     const char * in_fn;
+    const char * json_arg;
+    const char * js_file;
     sgj_state json_st;
 };
 
@@ -103,6 +106,8 @@ static struct option long_options[] = {
         {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
         {"inhex", required_argument, 0, 'i'},
         {"json", optional_argument, 0, 'j'},
+        {"js-file", required_argument, 0, 'J'},
+        {"js_file", required_argument, 0, 'J'},
         {"locator", required_argument, 0, 'l'},
         {"maxlen", required_argument, 0, 'm'},
         {"num", required_argument, 0, 'n'},
@@ -163,14 +168,15 @@ usage(int h)
             "sg_rep_zones  [--domain] [--find=ZT] [--force] [--help] "
             "[--hex]\n"
             "                     [--inhex=FN] [--json[=JO]] "
-            "[--locator=LBA]\n"
-            "                     [--maxlen=LEN] [--num=NUM] [--partial] "
-            "[--raw]\n"
-            "                     [--readonly] [--realm] [--report=OPT] "
-            "[--start=LBA]\n"
-            "                     [--statistics] [--verbose] [--version] "
-            "[--wp]\n"
-            "                     DEVICE\n");
+            "[--js_file=JFN]\n"
+            "                     [--locator=LBA] [--maxlen=LEN] "
+            "[--num=NUM]\n"
+            "                     [--partial] [--raw] [--readonly]"
+            "[--realm]\n"
+            "                     [--report=OPT] [--start=LBA] "
+            "[--statistics]\n"
+            "                     [--verbose] [--version] [--wp] "
+            "DEVICE\n");
     pr2serr("  where:\n"
             "    --domain|-d        sends a REPORT ZONE DOMAINS command\n"
             "    --find=ZT|-F ZT    find first zone with ZT zone type, "
@@ -189,6 +195,10 @@ usage(int h)
             "    --json[=JO]|-j[JO]    output in JSON instead of human "
             "readable text.\n"
             "                          Use --json=? for JSON help\n"
+            "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
+            "output is\n"
+            "                            written (def: stdout); truncates "
+            "then writes\n"
             "    --locator=LBA|-l LBA    similar to --start= option\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
@@ -1138,7 +1148,7 @@ int
 main(int argc, char * argv[])
 {
     bool no_final_msg = false;
-    bool as_json;
+    bool as_json = false;
     int res, c, act_len, rlen, in_len, off;
     int sg_fd = -1;
     int resid = 0;
@@ -1161,7 +1171,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bdefF:hHi:j::l:m:n:o:prRs:SvVw",
+        c = getopt_long(argc, argv, "bdefF:hHi:j::J:l:m:n:o:prRs:SvVw",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1217,18 +1227,12 @@ main(int argc, char * argv[])
             op->in_fn = optarg;
             break;
        case 'j':
-            if (! sgj_init_state(&op->json_st, optarg)) {
-                int bad_char = op->json_st.first_bad_char;
-                char e[1500];
-
-                if (bad_char) {
-                    pr2serr("bad argument to --json= option, unrecognized "
-                            "character '%c'\n\n", bad_char);
-                }
-                sg_json_usage(0, e, sizeof(e));
-                pr2serr("%s", e);
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            op->do_json = true;
+            op->json_arg = optarg;
+            break;
+       case 'J':
+            op->do_json = true;
+            op->js_file = optarg;
             break;
         /* case 'l': is under case 's': */
         case 'm':
@@ -1333,10 +1337,24 @@ main(int argc, char * argv[])
         usage(op->do_help);
         return 0;
     }
-    as_json = op->json_st.pr_as_json;
     jsp = &op->json_st;
-    if (as_json)
+    if (op->do_json) {
+       if (! sgj_init_state(jsp, op->json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto the_end;
+        }
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+    }
+    as_json = jsp->pr_as_json;
 
     if (op->do_zdomains && op->do_realms) {
         pr2serr("Can't have both --domain and --realm\n");
@@ -1520,8 +1538,25 @@ the_end:
     }
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
     if (as_json) {
-        if (0 == op->do_hex)
-            sgj_js2file(jsp, NULL, ret, stdout);
+        FILE * fp = stdout;
+
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    int e = errno;
+
+                    pr2serr("unable to open file: %s [%s]\n", op->js_file,
+                            safe_strerror(e));
+                    ret = sg_convert_errno(e);
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, ret, fp);
+        if (op->js_file && fp && (stdout != fp))
+            fclose(fp);
         sgj_finish(jsp);
     }
     return ret;

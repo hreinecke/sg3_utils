@@ -17,7 +17,6 @@ devices
 [\fI\-\-verify\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 Copy data to and from any files. Specialized for "files" that are Linux SCSI
 generic (sg) devices, raw devices or other devices that support the SG_IO
 ioctl (which are only found in the lk 2.6 series). Similar syntax and
@@ -505,7 +504,6 @@ partition) by this invocation:
 .PP
    sg_dd if=/dev/sdb2 blk_sgio=1 of=t bs=512
 .SH EXAMPLES
-.PP
 Looks quite similar in usage to dd:
 .PP
    sg_dd if=/dev/sg0 of=t bs=512 count=1MB
@@ -524,13 +522,11 @@ caching that is usually done on a block device.
 Using a raw device to do something similar on a ATA disk:
 .PP
    raw /dev/raw/raw1 /dev/hda
-.br
    sg_dd if=/dev/raw/raw1 of=t bs=512 count=1MB
 .PP
 To copy a SCSI disk partition to an ATA disk partition:
 .PP
    raw /dev/raw/raw2 /dev/hda3
-.br
    sg_dd if=/dev/sg0 skip=10123456 of=/dev/raw/raw2 bs=512
 .PP
 This assumes a valid partition is found on the SCSI disk at the given
@@ -553,9 +549,7 @@ The 'of2=' option can be used to copy data and take a md5sum of it
 without needing to re\-read the data:
 .PP
   mkfifo fif
-.br
   md5sum fif &
-.br
   sg_dd if=/dev/sg3 iflag=coe of=sg3.img oflag=sparse of2=fif bs=512
 .PP
 This will image /dev/sg3 (e.g. an unmounted disk) and place the contents

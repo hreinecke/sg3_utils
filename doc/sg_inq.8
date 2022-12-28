@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "August 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_INQ "8" "December 2022" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -6,21 +6,20 @@ sg_inq \- issue SCSI INQUIRY command and/or decode its response
 [\fI\-\-ata\fR] [\fI\-\-block=0|1\fR] [\fI\-\-cmddt\fR]
 [\fI\-\-descriptors\fR] [\fI\-\-export\fR] [\fI\-\-extended\fR]
 [\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
-[\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-len=LEN\fR]
-[\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-only\fR] [\fI\-\-page=PG\fR]
-[\fI\-\-raw\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-vpd\fR] \fIDEVICE\fR
+[\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR]
+[\fI\-\-len=LEN\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
+[\fI\-\-only\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR]
 [\fI\-c\fR] [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-f\fR] [\fI\-h\fR]
-[\fI\-H\fR] [\fI\-i\fR] [\fI\-I=FN\fR] [\fI\-j[=LEN]\fR] [\fI\-l=LEN\fR]
+[\fI\-H\fR] [\fI\-i\fR] [\fI\-I=FN\fR] [\fI\-j[=JO]\fR] [\fI\-l=LEN\fR]
 [\fI\-L\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o\fR] [\fI\-p=VPD_PG\fR]
 [\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
 [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This utility, when \fIDEVICE\fR is given, sends a SCSI INQUIRY command to it
 then outputs the response. All SCSI devices are meant to respond to
 a "standard" INQUIRY command with at least a 36 byte response (in SCSI 2 and
@@ -168,6 +167,15 @@ option is also given then \fIFN\fR is treated as binary.
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
 output is in JSON format instead of human readable form. See sg3_utils_json
 manpage or use '?' for \fIJO\fR for a summary.
+.TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
 .TP
 \fB\-l\fR, \fB\-\-len\fR=\fILEN\fR
 the number \fILEN\fR is the "allocation length" field in the INQUIRY cdb.

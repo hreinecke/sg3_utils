@@ -231,6 +231,9 @@ static struct option long_options[] = {
         {"hex", no_argument, 0, 'H'},
         {"id", no_argument, 0, 'i'},
         {"inhex", required_argument, 0, 'I'},
+        {"json", optional_argument, 0, 'j'},
+        {"js-file", required_argument, 0, 'J'},
+        {"js_file", required_argument, 0, 'J'},
         {"len", required_argument, 0, 'l'},
         {"long", no_argument, 0, 'L'},
         {"maxlen", required_argument, 0, 'm'},
@@ -261,11 +264,12 @@ usage()
             "[--export]\n"
             "              [--extended] [--help] [--hex] [--id] "
             "[--inhex=FN]\n"
-            "              [--json[=JO]] [--len=LEN] [--long] "
-            "[--maxlen=LEN]\n"
-            "              [--only] [--page=PG] [--raw] [--sinq_inraw=RFN] "
-            "[--vendor]\n"
-            "              [--verbose] [--version] [--vpd] DEVICE\n"
+            "              [--json[=JO]] [--js-file=JFN] [--len=LEN] "
+            "[--long]\n"
+            "              [--maxlen=LEN] [--only] [--page=PG] [--raw]\n"
+            "              [--sinq_inraw=RFN] [--vendor] [--verbose] "
+            "[--version]\n"
+            "              [--vpd] DEVICE\n"
             "  where:\n"
             "    --ata|-a        treat DEVICE as (directly attached) ATA "
             "device\n");
@@ -274,11 +278,12 @@ usage()
             "[--export]\n"
             "              [--extended] [--help] [--hex] [--id] "
             "[--inhex=FN]\n"
-            "              [--json[=JO]] [--len=LEN] [--long] "
-            "[--maxlen=LEN]\n"
-            "              [--only] [--page=PG] [--raw] [--sinq_inraw=RFN] "
-            "[--verbose]\n"
-            "              [--version] [--vpd] DEVICE\n"
+            "              [--json[=JO]] [--js-file=JFN] [--len=LEN] "
+            "[--long]\n"
+            "              [--maxlen=LEN] [--only] [--page=PG] [--raw]\n"
+            "              [--sinq_inraw=RFN] [--verbose] [--version] "
+            "[--vpd]\n"
+            "              DEVICE\n"
             "  where:\n");
 #endif
     pr2serr("    --block=0|1     0-> open(non-blocking); 1-> "
@@ -309,6 +314,10 @@ usage()
             "    --json[=JO]|-j[JO]    output in JSON instead of human "
             "readable text.\n"
             "                          Use --json=? for JSON help\n"
+            "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
+            "output is\n"
+            "                            written (def: stdout); truncates "
+            "then writes\n"
             "    --len=LEN|-l LEN    requested response length (def: 0 "
             "-> fetch 36\n"
             "                        bytes first, then fetch again as "
@@ -437,18 +446,18 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 
 #ifdef SG_LIB_LINUX
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "aB:cdeEfhHiI:j::l:Lm:M:NoOp:Q:rsuvVx",
+        c = getopt_long(argc, argv, "aB:cdeEfhHiI:j::J:l:Lm:M:NoOp:Q:rsuvVx",
                         long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:j::l:Lm:M:op:Q:rsuvVx",
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:j::J:l:Lm:M:op:Q:rsuvVx",
                         long_options, &option_index);
 #endif /* SG_SCSI_STRINGS */
 #else  /* SG_LIB_LINUX */
 #ifdef SG_SCSI_STRINGS
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:j::l:Lm:M:NoOp:Q:rsuvVx",
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:j::J:l:Lm:M:NoOp:Q:rsuvVx",
                         long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "B:cdeEfhHiI:j::l:Lm:M:op:Q:rsuvVx",
+        c = getopt_long(argc, argv, "B:cdeEfhHiI:j::J:l:Lm:M:op:Q:rsuvVx",
                         long_options, &option_index);
 #endif /* SG_SCSI_STRINGS */
 #endif /* SG_LIB_LINUX */
@@ -498,18 +507,12 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             ++op->do_help;
             break;
         case 'j':
-            if (! sgj_init_state(&op->json_st, optarg)) {
-                int bad_char = op->json_st.first_bad_char;
-                char e[1500];
-
-                if (bad_char) {
-                    pr2serr("bad argument to --json= option, unrecognized "
-                            "character '%c'\n\n", bad_char);
-                }
-                sg_json_usage(0, e, sizeof(e));
-                pr2serr("%s", e);
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            op->do_json = true;
+            op->json_arg = optarg;
+            break;
+        case 'J':
+            op->do_json = true;
+            op->js_file = optarg;
             break;
         case 'o':
             op->do_only = true;
@@ -759,18 +762,8 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             else if ('j' == *cp) { /* handle either '-j' or '-j=<JO>' */
                 const char * c2p = (('=' == *(cp + 1)) ? cp + 2 : NULL);
 
-                if (! sgj_init_state(&op->json_st, c2p)) {
-                    int bad_char = op->json_st.first_bad_char;
-                    char e[1500];
-
-                    if (bad_char) {
-                        pr2serr("bad argument to --json= option, unrecognized "
-                                "character '%c'\n\n", bad_char);
-                    }
-                    sg_json_usage(0, e, sizeof(e));
-                    pr2serr("%s", e);
-                    return SG_LIB_SYNTAX_ERROR;
-                }
+                op->do_json = true;
+                op->json_arg = c2p;
             } else if (0 == strncmp("l=", cp, 2)) {
                 num = sscanf(cp + 2, "%d", &n);
                 if ((1 != num) || (n < 1)) {
@@ -4175,7 +4168,7 @@ err_out:
 int
 main(int argc, char * argv[])
 {
-    bool as_json;
+    bool as_json = false;
     int res, n, err;
     int sg_fd = -1;
     int ret = 0;
@@ -4230,6 +4223,22 @@ main(int argc, char * argv[])
         return 0;
     }
     jsp = &op->json_st;
+    if (op->do_json) {
+        if (! sgj_init_state(jsp, op->json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto err_out;
+        }
+        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+    }
     as_json = jsp->pr_as_json;
     if (op->page_str) {
         if (op->vpd_pn >= 0) {
@@ -4671,9 +4680,26 @@ err_out:
             ret = sg_convert_errno(-res);
     }
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
-    if (as_json) {
-        if (0 == op->do_hex)
-            sgj_js2file(jsp, NULL, ret, stdout);
+    if (as_json && jop) {
+        FILE * fp = stdout;
+
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    int e = errno;
+
+                    pr2serr("unable to open file: %s [%s]\n", op->js_file,
+                            safe_strerror(e));
+                    ret = sg_convert_errno(e);
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, ret, fp);
+        if (op->js_file && fp && (stdout != fp))
+            fclose(fp);
         sgj_finish(jsp);
     }
     return ret;

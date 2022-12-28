@@ -13,7 +13,6 @@ and reservations
 \fI\-\-help\fR | \fI\-\-version\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This utility allows Persistent reservations and registrations to be
 queried and changed. Persistent reservations and registrations are
 queried by sub\-commands (called "service actions" in SPC\-4) of the
@@ -383,7 +382,6 @@ the \fIDEVICE\fR (with type 'write exclusive') the following
 could be used:
 .PP
    sg_persist \-\-out \-\-reserve \-\-param\-rk=123abc
-.br
               \-\-prout\-type=1 /dev/sdb
 .PP
 To
@@ -393,7 +391,6 @@ the \-\-param\-rk and \-\-prout\-type arguments must match those of the
 reservation):
 .PP
    sg_persist \-\-out \-\-release \-\-param\-rk=123abc
-.br
               \-\-prout\-type=1 /dev/sdb
 .PP
 Finally to

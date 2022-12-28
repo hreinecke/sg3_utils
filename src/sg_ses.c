@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.69 20221221";    /* ses4r04 */
+static const char * version_str = "2.71 20221227";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -142,7 +142,7 @@ struct opts_t {
     bool do_all;        /* one or more --all options */
     bool byte1_given;   /* true if -b B1 or --byte1=B1 given */
     bool do_control;    /* want to write to DEVICE */
-    bool do_data;       /* flag if --data= or --inhex= option given */
+    bool data_or_inhex;
     bool do_json;       /* --json[=JO] option given or implied */
     bool do_list;
     bool do_status;     /* want to read from DEVICE (or user data) */
@@ -158,7 +158,7 @@ struct opts_t {
     bool seid_given;
     bool verbose_given;
     bool version_given;
-    bool warn;
+    bool do_warn;
     int byte1;          /* (origin 0 so second byte) in Control dpage */
     int dev_slot_num;
     int do_filter;
@@ -190,10 +190,12 @@ struct opts_t {
     const struct element_type_t * ind_etp;
     const char * index_str;
     const char * nickname_str;
+    const char * json_arg;
     const char * js_file;
     sgj_state json_st;
     struct cgs_cl_t cgs_cl_arr[CGS_CL_ARR_MAX_SZ];
     uint8_t sas_addr[8];  /* Big endian byte sequence */
+    char tmp_arr[8];
 };
 
 struct diag_page_code {
@@ -416,6 +418,7 @@ static const char * const aesd_s = "Additional element status descriptor";
 static const char * const aesd_sn = "additional_element_status_descriptor";
 static const char * const dwuti = "decoded _without_ using type info";
 static const char * const oohm = ">>> Out of heap (memory)";
+static const char * const isel_sn = "individual_status_element_list";
 
 
 /* Diagnostic page names, control and/or status (in and/or out) */
@@ -824,6 +827,10 @@ static const struct option long_options[] = {
     {"descriptor", required_argument, 0, 'D'},
     {"dev-slot-num", required_argument, 0, 'x'},
     {"dev_slot_num", required_argument, 0, 'x'},
+    {"device-slot-num", required_argument, 0, 'x'},
+    {"device_slot_num", required_argument, 0, 'x'},
+    {"device-slot-number", required_argument, 0, 'x'},
+    {"device_slot_number", required_argument, 0, 'x'},
     {"dsn", required_argument, 0, 'x'},
     {"eiioe", required_argument, 0, 'E'},
     {"enumerate", no_argument, 0, 'e'},
@@ -976,7 +983,7 @@ usage(int help_num)
             "                          type abbreviation (e.g. 'arr'). A "
             "range may be\n"
             "                          given for the individual index "
-            "(e.g. '2-5')\n"
+            "(e.g. '2:5')\n"
             "    --index=TIA,II|-I TIA,II    comma separated pair: TIA is "
             "type header\n"
             "                                index or element type "
@@ -1037,8 +1044,8 @@ usage(int help_num)
             " status page in hex\n"
             "    --js-file=JFN|-Q JFN    JFN is a filename to which JSON "
             "output is\n"
-            "                            written (def: stdout); overwrites "
-            "existing\n"
+            "                            written (def: stdout); truncates "
+            "then writes\n"
             "    --list|-l           same as '--enumerate' option\n"
             "    --mask|-M           ignore status element mask in modify "
             "actions\n"
@@ -1082,86 +1089,98 @@ usage(int help_num)
     }
 }
 
-/* Return 0 for okay, else an error */
+/* Parse argument give to '--index='. Return 0 for okay, else an error. If
+ * okay sets op->ind_given, ->ind_indiv, ->ind_indiv_last, ->ind_th,
+ * ->ind_et_inst and ->ind_etp  .  */
 static int
 parse_index(struct opts_t *op)
 {
-    int n, n2;
+    bool m1;
+    int n = 0;
+    int n2 = 0;
     const char * cp;
-    char * mallcp;
     char * c2p;
     const struct element_type_t * etp;
-    char b[64];
-    const int blen = sizeof(b);
+    char b[80];
+    static const int blen = sizeof(b);
+    static const char * bati = "bad argument to '--index=',";
+    static const char * betc = "bad element type code";
+    static const char * beta = "bad element type abbreviation";
+    static const char * enf = "expect number from";
 
     op->ind_given = true;
-    n2 = 0;
+    op->ind_indiv_last = -1;
     if ((cp = strchr(op->index_str, ','))) {
         /* decode number following comma */
-        if (0 == strcmp("-1", cp + 1))
+        const char * cc3p;
+
+        if (0 == strncmp("-1", cp + 1, 2))
             n = -1;
         else {
-            const char * cc3p;
 
             n = sg_get_num_nomult(cp + 1);
             if ((n < 0) || (n > 255)) {
-                pr2serr("bad argument to '--index=', after comma expect "
-                        "number from -1 to 255\n");
+                pr2serr("%s after comma %s -1 to 255\n", bati, enf);
                 return SG_SES_CALL_ENUMERATE;
             }
-            if ((cc3p = strchr(cp + 1, '-'))) {
-                n2 = sg_get_num_nomult(cc3p + 1);
-                if ((n2 < n) || (n2 > 255)) {
-                    pr2serr("bad argument to '--index', after '-' expect "
-                            "number from -%d to 255\n", n);
-                    return SG_SES_CALL_ENUMERATE;
-                }
+        }
+        cc3p = strchr(cp + 2, ':');     /* preferred range indicator */
+        if (NULL == cc3p)
+            cc3p = strchr(cp + 2, '-');
+        if (cc3p) {
+            n2 = sg_get_num_nomult(cc3p + 1);
+            if ((n2 < n) || (n2 > 255)) {
+                pr2serr("%s after ':' %s %d to 255\n", bati, enf, n);
+                return SG_SES_CALL_ENUMERATE;
             }
         }
         op->ind_indiv = n;
-        if (n2 > 0)
+        if (n2 >= 0)
             op->ind_indiv_last = n2;
         n = cp - op->index_str;
         if (n >= (blen - 1)) {
-            pr2serr("bad argument to '--index', string prior to comma too "
-                    "long\n");
+            pr2serr("%s string prior to comma too long\n", bati);
             return SG_SES_CALL_ENUMERATE;
         }
     } else {    /* no comma found in index_str */
         n = strlen(op->index_str);
         if (n >= (blen - 1)) {
-            pr2serr("bad argument to '--index', string too long\n");
+            pr2serr("%s string too long\n", bati);
             return SG_SES_CALL_ENUMERATE;
         }
     }
     snprintf(b, blen, "%.*s", n, op->index_str);
-    if (0 == strcmp("-1", b)) {
-        if (cp) {
-            pr2serr("bad argument to '--index', unexpected '-1' type header "
-                    "index\n");
-            return SG_SES_CALL_ENUMERATE;
-        }
-        op->ind_th = 0;
-        op->ind_indiv = -1;
-    } else if (isdigit((uint8_t)b[0])) {
-        n = sg_get_num_nomult(b);
-        if ((n < 0) || (n > 255)) {
-            pr2serr("bad numeric argument to '--index', expect number from 0 "
-                    "to 255\n");
-            return SG_SES_CALL_ENUMERATE;
-        }
-        if (cp)         /* argument to left of comma */
-            op->ind_th = n;
-        else {          /* no comma found, so 'n' is ind_indiv */
+    m1 = (0 == strncmp("-1", b, 2));
+    if (m1 || isdigit((uint8_t)b[0])) {
+        if (m1) {
+            if (cp) {
+                pr2serr("%s unexpected '-1' type header index\n", bati);
+                return SG_SES_CALL_ENUMERATE;
+            }
             op->ind_th = 0;
-            op->ind_indiv = n;
-            if ((c2p = strchr(b, '-'))) {
-                n2 = sg_get_num_nomult(c2p + 1);
-                if ((n2 < n) || (n2 > 255)) {
-                    pr2serr("bad argument to '--index', after '-' expect "
-                            "number from -%d to 255\n", n);
-                    return SG_SES_CALL_ENUMERATE;
-                }
+            op->ind_indiv = -1;
+            n = 0;
+        } else {
+            n = sg_get_num_nomult(b);
+            if ((n < 0) || (n > 255)) {
+                pr2serr("%s %s 0 to 255\n", bati, enf);
+                return SG_SES_CALL_ENUMERATE;
+            }
+            if (cp)         /* argument to left of comma */
+                op->ind_th = n;
+            else {          /* no comma found, so 'n' is ind_indiv */
+                op->ind_th = 0;
+                op->ind_indiv = n;
+            }
+        }
+        c2p = strchr(b, ':');
+        if (NULL == c2p)
+            c2p = strchr(b + 1, '-');
+        if (c2p) {
+            n2 = sg_get_num_nomult(c2p + 1);
+            if ((n2 < n) || (n2 > 255)) {
+                pr2serr("%s after '-' %s %d to 255\n", bati, enf, n);
+                return SG_SES_CALL_ENUMERATE;
             }
             op->ind_indiv_last = n2;
         }
@@ -1170,22 +1189,17 @@ parse_index(struct opts_t *op)
             *c2p = '\0';        /* subsequent "_" prefixes e.t. index */
         n = sg_get_num_nomult(b + 1);
         if ((n < 0) || (n > 255)) {
-            pr2serr("bad element type code for '--index', expect value from "
-                    "0 to 255\n");
+            pr2serr("%s for '--index', %s 0 to 255\n", betc, enf);
             return SG_SES_CALL_ENUMERATE;
         }
         element_type_by_code.elem_type_code = n;
-        mallcp = (char *)malloc(8);  /* willfully forget about freeing this */
-        if (NULL == mallcp)
-             return sg_convert_errno(ENOMEM);
-        mallcp[0] = '_';
-        snprintf(mallcp + 1, 6, "%d", n);
-        element_type_by_code.abbrev = mallcp;
+        op->tmp_arr[0] = '_';
+        snprintf(op->tmp_arr + 1, 6, "%d", n);
+        element_type_by_code.abbrev = op->tmp_arr;
         if (c2p) {
             n = sg_get_num_nomult(c2p + 1);
             if ((n < 0) || (n > 255)) {
-                pr2serr("bad element type code <num> for '--index', expect "
-                        "<num> from 0 to 255\n");
+                pr2serr("%s <num> for '--index', %s 0 to 255\n", betc, enf);
                 return SG_SES_CALL_ENUMERATE;
             }
             op->ind_et_inst = n;
@@ -1198,20 +1212,18 @@ parse_index(struct opts_t *op)
 
         for (etp = element_type_arr; etp->desc; ++etp) {
             n = strlen(etp->abbrev);
-            if ((n == b_len) && (0 == strncmp(b, etp->abbrev, n)))
+            if ((b_len >= n) && (0 == strncmp(b, etp->abbrev, n)))
                 break;
         }
         if (NULL == etp->desc) {
-            pr2serr("bad element type abbreviation [%s] for '--index'\n"
-                    "'--enumerate' output shown to see available "
-                    "abbreviations\n", b);
+            pr2serr("%s [%s] for '--index'\n'--enumerate' output shown to "
+                    "see available abbreviations\n", beta, b);
             return SG_SES_CALL_ENUMERATE;
         }
         if (b_len > n) {
             n = sg_get_num_nomult(b + n);
             if ((n < 0) || (n > 255)) {
-                pr2serr("bad element type abbreviation <num> for '--index', "
-                        "expect <num> from 0 to 255\n");
+                pr2serr("%s <num> for '--index', %s 0 to 255\n", beta, enf);
                 return SG_SES_CALL_ENUMERATE;
             }
             op->ind_et_inst = n;
@@ -1222,9 +1234,9 @@ parse_index(struct opts_t *op)
     }
     if (op->verbose > 1) {
         if (op->ind_etp)
-            pr2serr("   element type abbreviation: %s, etp_num=%d, "
-                    "individual index=%d\n", op->ind_etp->abbrev,
-                    op->ind_et_inst, op->ind_indiv);
+            pr2serr("   %s abbreviation: %s, etp_num=%d, individual "
+                    "index=%d, last=%d\n", et_s, op->ind_etp->abbrev,
+                    op->ind_et_inst, op->ind_indiv, op->ind_indiv_last);
         else
             pr2serr("   type header index=%d, individual index=%d\n",
                     op->ind_th, op->ind_indiv);
@@ -1260,7 +1272,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         int option_index = 0;
 
         c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fFG:hHiI:jJ::ln:N:m:Mp:"
-                        "qQrRsS:vVwx:X:z", long_options, &option_index);
+                        "qQ:rRsS:vVwx:X:z", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1313,7 +1325,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'd':
             data_arg = optarg;
-            op->do_data = true;
+            op->data_or_inhex = true;
             break;
         case 'D':
             op->desc_name = optarg;
@@ -1374,18 +1386,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             ++op->do_join;
             break;
         case 'J':
-            if (! sgj_init_state(&op->json_st, optarg)) {
-                int bad_char = op->json_st.first_bad_char;
-                char e[1500];
-
-                if (bad_char) {
-                    pr2serr("bad argument to --json= option, unrecognized "
-                            "character '%c'\n\n", bad_char);
-                }
-                sg_json_usage(0, e, sizeof(e));
-                pr2serr("%s", e);
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            op->json_arg = optarg;
             op->do_json = true;
             break;
         case 'l':
@@ -1453,6 +1454,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'Q':
             op->js_file = optarg;
+            op->do_json = true;
             break;
         case 'r':
             ++op->do_raw;
@@ -1487,7 +1489,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->version_given = true;
             return 0;
         case 'w':
-            op->warn = true;
+            op->do_warn = true;
             break;
         case 'x':
             op->dev_slot_num = sg_get_num_nomult(optarg);
@@ -1499,9 +1501,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'X':       /* --inhex=FN for compatibility with other utils */
             inhex_arg = optarg;
-            op->do_data = true;
+            op->data_or_inhex = true;
             break;
-        case 'z':       /* --ALL and -z are synonyms for '--join --join' */
+        case 'z':       /* --ALL */
             /* -A already used for --sas-addr=SA shortened form */
             op->do_join += 2;
             op->do_all = true;
@@ -1528,13 +1530,6 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
          pr2serr("Need configuration dpage to do the join operation\n\n");
          goto err_help;
     }
-    if (op->js_file && (! op->do_json)) {
-        if (! sgj_init_state(&op->json_st, NULL)) {
-            pr2serr("JSON initialization failed\n");
-            goto err_help;
-        }
-        op->do_json = true;
-    }
     if (op->inner_hex > 0) {
         if (op->do_hex > 0) {
             if (op->do_hex > 3) {
@@ -1555,27 +1550,30 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         pr2serr("unable to allocate %u bytes on heap\n", op->mx_arr_len);
         return sg_convert_errno(ENOMEM);
     }
-    if (data_arg || inhex_arg) {        /* same as op->do_data==true */
+    if (op->data_or_inhex) {
         if (inhex_arg) {
             data_arg = inhex_arg;
-            if (read_hex(data_arg, op->data_arr + DATA_IN_OFF,
-                         op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
-                         (op->do_raw < 2), false, op->verbose)) {
+            ret = read_hex(data_arg, op->data_arr + DATA_IN_OFF,
+                           op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
+                           (op->do_raw < 2), false, op->verbose);
+            if (ret) {
                 pr2serr("bad argument, expect '--inhex=FN' or '--inhex=-'\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return ret;
             }
         } else {
-            if (read_hex(data_arg, op->data_arr + DATA_IN_OFF,
-                         op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
-                         (op->do_raw < 2), true, op->verbose)) {
+            ret = read_hex(data_arg, op->data_arr + DATA_IN_OFF,
+                           op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
+                           (op->do_raw < 2), true, op->verbose);
+            if (ret) {
                 pr2serr("bad argument, expect '--data=H,H...', '--data=-' or "
                         "'--data=@FN'\n");
-                return SG_LIB_SYNTAX_ERROR;
+                return ret;
             }
         }
         if ((! op->do_status) && (! op->do_control)) {
             if ((op->do_join > 0) || op->no_config ||
                 (op->inner_hex > 0) ||
+                (! op->page_code_given) ||
                 ((op->page_code_given &&
                  (! dpage_has_control_variant(op->page_code))))) {
                 if (op->verbose > 1)
@@ -1685,30 +1683,13 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     } else if (op->do_control) {
         if (op->nickname_str || op->seid_given)
             ;
-        else if (! op->do_data) {
-            pr2serr("need to give '--data' in control mode\n");
+        else if (! op->data_or_inhex) {
+            pr2serr("need to give '--data' or '--inhex' in control mode\n");
             goto err_help;
         }
     } else if (! op->do_status) {
-#if 0
-        if (op->do_data) {
-            if ((op->do_join > 0) || op->no_config ||
-                (op->inner_hex > 0) ||
-                ((op->page_code_given &&
-                 (! dpage_has_control_variant(op->page_code))))) {
-                if (op->verbose > 1)
-                    pr2serr("Since --join, --all, --page=all, --inner_hex, "
-                            "or --no-config given, assume --status\n");
-                op->dev_name = NULL;    /* quash device name */
-            } else {
-                pr2serr("when user data given, require '--control' or "
-                        "'--status' option\n\n");
-                goto err_help;
-            }
-        }
-#endif
         op->do_status = true;  /* default to receiving status pages */
-    } else if (op->do_status && op->do_data && op->dev_name) {
+    } else if (op->do_status && op->data_or_inhex && op->dev_name) {
         pr2serr(">>> Warning: device name (%s) will be ignored\n",
                 op->dev_name);
         op->dev_name = NULL;    /* quash device name */
@@ -1737,8 +1718,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         pr2serr("    SAS address (in hex): %" PRIx64 "\n",
                 sg_get_unaligned_be64(op->sas_addr + 0));
 
-    if ((! (op->do_data && op->do_status)) && (NULL == op->dev_name)) {
-        pr2serr("missing DEVICE name!\n\n");
+    if ((! (op->data_or_inhex && op->do_status)) && (NULL == op->dev_name)) {
+        if (op->do_control) {
+            cp = ">>> when --control is given, ";
+            if (NULL == op->dev_name)
+                pr2serr("%sa _real_ device name must be supplied\n", cp);
+            else
+                pr2serr("%seither --data or --inhex must be supplied\n", cp);
+        } else
+            pr2serr("missing DEVICE name!\n\n");
         goto err_help;
     }
     return 0;
@@ -1869,16 +1857,6 @@ match_ind_indiv(int index, const struct opts_t * op)
     return false;
 }
 
-#if 0
-static bool
-match_last_ind_indiv(int index, const struct opts_t * op)
-{
-    if (op->ind_indiv_last >= op->ind_indiv)
-        return (index == op->ind_indiv_last);
-    return (index == op->ind_indiv);
-}
-#endif
-
 /* Return of 0 -> success, SG_LIB_CAT_* positive values or -1 -> other
  * failures */
 static int
@@ -1997,53 +1975,6 @@ is_et_used_by_aes(int el_type)
         return false;
 }
 
-#if 0
-static struct join_row_t *
-find_join_row(struct th_es_t * tesp, int index, enum fj_select_t sel)
-{
-    int k;
-    struct join_row_t * jrp = tesp->j_base;
-
-    if (index < 0)
-        return NULL;
-    switch (sel) {
-    case FJ_IOE:     /* index includes overall element */
-        if (index >= tesp->num_j_rows)
-            return NULL;
-        return jrp + index;
-    case FJ_EOE:     /* index excludes overall element */
-        if (index >= tesp->num_j_eoe)
-            return NULL;
-        for (k = 0; k < tesp->num_j_rows; ++k, ++jrp) {
-            if (index == jrp->ei_eoe)
-                return jrp;
-        }
-        return NULL;
-    case FJ_AESS:    /* index includes only AES listed element types */
-        if (index >= tesp->num_j_eoe)
-            return NULL;
-        for (k = 0; k < tesp->num_j_rows; ++k, ++jrp) {
-            if (index == jrp->ei_aess)
-                return jrp;
-        }
-        return NULL;
-    case FJ_SAS_CON: /* index on non-overall SAS connector etype */
-        if (index >= tesp->num_j_rows)
-            return NULL;
-        for (k = 0; k < tesp->num_j_rows; ++k, ++jrp) {
-            if (SAS_CONNECTOR_ETC == jrp->etype) {
-                if (index == jrp->indiv_i)
-                    return jrp;
-            }
-        }
-        return NULL;
-    default:
-        pr2serr("%s: bad selector: %d\n", __func__, (int)sel);
-        return NULL;
-    }
-}
-#endif
-
 static const struct join_row_t *
 find_join_row_cnst(const struct th_es_t * tesp, int index,
                    enum fj_select_t sel)
@@ -2113,7 +2044,7 @@ do_rec_diag(struct sg_pt_base * ptvp, int page_code, uint8_t * rsp_buff,
         snprintf(bb, sizeof(bb), "%s 0x%x", dp_s, page_code);
     cp = bb;
 
-    if (op->data_arr && op->do_data) {  /* user provided data */
+    if (op->data_arr && op->data_or_inhex) {  /* user provided data */
         /* N.B. First 4 bytes in data_arr are not used, user data was read in
          * starting at byte offset 4 */
         bool found = false;
@@ -2507,10 +2438,10 @@ build_type_desc_hdr_arr(struct sg_pt_base * ptvp,
             op->ind_th = k;
         else {
             if (op->ind_et_inst)
-                pr2serr("%s: unable to find element type '%s%d'\n", __func__,
+                pr2serr("%s: unable to find %s '%s%d'\n", __func__, et_s,
                         op->ind_etp->abbrev, op->ind_et_inst);
             else
-                pr2serr("%s: unable to find element type '%s'\n", __func__,
+                pr2serr("%s: unable to find %s '%s'\n", __func__, et_s,
                         op->ind_etp->abbrev);
             ret = -1;
             goto the_end;
@@ -3589,10 +3520,10 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                sgj_opaque_p jop)
 {
     bool got1, match_ind_th, as_json;
-    uint8_t es1;
+    uint8_t es1, et;
     int j, k;
     uint32_t gen_code;
-    // const char * ccp;
+    const char * se_id_s;
     const uint8_t * bp;
     const uint8_t * last_bp;
     sgj_state * jsp = &op->json_st;
@@ -3667,56 +3598,66 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         if ((bp + 3) > last_bp)
             goto truncated;
 
-        if (as_json) {
-            jo2p = sgj_new_unattached_object_r(jsp);
-            if (op->inner_hex < 2) {
-                sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
-                                  NULL, etype_str(tdhp->etype, b, blen));
-                sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
-                                  (0 == tdhp->se_id) ? "primary" : NULL);
-            } else
-                sgj_js_nv_hex_bytes(jsp, jo2p, "overall_status_element",
-                                    bp, 4);
-        }
+        jo2p = NULL;
+        ja2p = NULL;
+        et = tdhp->etype;
+        se_id_s = (0 == tdhp->se_id) ? "primary" : NULL;
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
             sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
-                      etype_str(tdhp->etype, b, blen), si_ss, tdhp->se_id, k);
+                      etype_str(et, b, blen), si_ss, tdhp->se_id, k);
             if (op->inner_hex < 2)
                 sgj_pr_hr(jsp, "      %s:\n", od_s);
-            if (! as_json) {
-                enc_status_helper("        ", bp, tdhp->etype, false, op,
+            if (as_json) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                if (op->inner_hex < 2) {
+                    sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et,
+                                      NULL, etype_str(et, b, blen));
+                    sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id,
+                                      NULL, se_id_s);
+                } else
+                    sgj_js_nv_hex_bytes(jsp, jo2p, "overall_status_element",
+                                        bp, 4);
+                jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
+                enc_status_helper("        ", bp, et, false, op,
+                              jo3p, b, blen);
+            } else {
+                enc_status_helper("        ", bp, et, false, op,
                                   jo2p, b, blen);
                 sgj_pr_hr(jsp, "%s", b);
             }
             got1 = true;
         }
-        if (as_json) {
-            jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
-            enc_status_helper("        ", bp, tdhp->etype, false, op, jo3p,
-                              b, blen);
-            ja2p = sgj_named_subarray_r(jsp, jo2p,
-                                        "individual_status_element_list");
-        }
 
         for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
             if (op->ind_given) {
-                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (! match_ind_indiv(j, op)))
+                if ((! match_ind_th) || (! match_ind_indiv(j, op)))
                     continue;
             }
             if (op->inner_hex < 2)
                 sgj_pr_hr(jsp, "      Element %d descriptor:\n", j);
-            if (as_json)
+            if (as_json) {
+                if (NULL == jo2p) {
+                    jo2p = sgj_new_unattached_object_r(jsp);
+                    if (op->inner_hex < 2) {
+                        sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et,
+                                          NULL, etype_str(et, b, blen));
+                        sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id,
+                                          NULL, se_id_s);
+                    }
+                }
+                if (NULL == ja2p)
+                    ja2p = sgj_named_subarray_r(jsp, jo2p, isel_sn);
                 jo4p = sgj_new_unattached_object_r(jsp);
-            enc_status_helper("        ", bp, tdhp->etype, false, op, jo4p,
+            }
+            enc_status_helper("        ", bp, et, false, op, jo4p,
                               b, blen);
             sgj_pr_hr(jsp, "%s", b);
             if (as_json)
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             got1 = true;
         }
-        if (as_json)
+        if (as_json && jo2p)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }           /* end of outer for loop */
     if (op->ind_given && (! got1)) {
@@ -3741,9 +3682,10 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                  struct opts_t * op, sgj_opaque_p jop)
 {
     bool got1, match_ind_th, as_json;
-    uint8_t as1;
+    uint8_t as1, et;
     int j, k, n;
     uint32_t gen_code;
+    const char * se_id_s;
     const uint8_t * bp;
     const uint8_t * last_bp;
     sgj_state * jsp = &op->json_st;
@@ -3816,51 +3758,63 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         if ((bp + 3) > last_bp)
             goto truncated;
 
-        if (as_json) {
-            jo2p = sgj_new_unattached_object_r(jsp);
-            if (op->do_join > 0) {
-                sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
-                                  NULL, etype_str(tdhp->etype, b, blen));
-                sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
-                                  (0 == tdhp->se_id) ? "primary" : NULL);
-            } else
-                sgj_js_nv_hex_bytes(jsp, jo2p, "overall_status_element",
-                                    bp, 4);
-        }
+        jo2p = NULL;
+        ja2p = NULL;
+        et = tdhp->etype;
+        se_id_s = (0 == tdhp->se_id) ? "primary" : NULL;
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
             sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
-                      etype_str(tdhp->etype, b, blen), si_ss, tdhp->se_id, k);
+                      etype_str(et, b, blen), si_ss, tdhp->se_id, k);
             sgj_pr_hr(jsp, "      %s:\n", od_s);
-            if (! as_json) {
-                enc_status_helper("        ", bp, tdhp->etype, false, op,
+            if (as_json) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                if (op->inner_hex < 2) {
+                    sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et,
+                                      NULL, etype_str(et, b, blen));
+                    sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id,
+                                      NULL, se_id_s);
+                } else
+                    sgj_js_nv_hex_bytes(jsp, jo2p, "overall_status_element",
+                                        bp, 4);
+                jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
+                enc_status_helper("        ", bp, et, false, op,
+                              jo3p, b, blen);
+            } else {
+                enc_status_helper("        ", bp, et, false, op,
                                   jo2p, b, blen);
                 sgj_pr_hr(jsp, "%s", b);
             }
             got1 = true;
         }
-        if (as_json) {
-            jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
-            enc_status_helper("        ", bp, tdhp->etype, false, op, jo3p,
-                              b, blen);
-            ja2p = sgj_named_subarray_r(jsp, jo2p,
-                                        "individual_status_element_list");
-        }
 
         for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
             if (op->ind_given) {
-                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (! match_ind_indiv(j, op)))
+                if ((! match_ind_th) || (! match_ind_indiv(j, op)))
                     continue;
             }
             sgj_pr_hr(jsp, "      Element %d descriptor:\n", j);
+            if (as_json ) {
+                if (NULL == jo2p) {
+                    jo2p = sgj_new_unattached_object_r(jsp);
+                    if (op->inner_hex < 2) {
+                        sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et,
+                                          NULL, etype_str(et, b, blen));
+                        sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id,
+                                          NULL, se_id_s);
+                    }
+                }
+                if (NULL == ja2p)
+                    ja2p = sgj_named_subarray_r(jsp, jo2p, isel_sn);
+                jo4p = sgj_new_unattached_object_r(jsp);
+            }
             if (as_json) {
                 jo4p = sgj_new_unattached_object_r(jsp);
                 if (0 == op->inner_hex)
                     sgj_js_nv_hex_bytes(jsp, jo4p,
                                         "individual_status_element", bp, 4);
             }
-            enc_status_helper("        ", bp, tdhp->etype, false, op, jo4p,
+            enc_status_helper("        ", bp, et, false, op, jo4p,
                               b, blen);
             sgj_pr_hr(jsp, "%s", b);
             if (as_json)
@@ -4057,9 +4011,11 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
               const uint8_t * resp, int resp_len, struct opts_t * op,
               sgj_opaque_p jop)
 {
-    bool got1, match_ind_th, thresh_in_use, as_json;
+    bool got1, match_ind_th, as_json;
+    uint8_t et;
     int j, k;
     uint32_t gen_code;
+    const char * se_id_s;
     const uint8_t * bp;
     const uint8_t * last_bp;
     const struct type_desc_hdr_t * tdhp = tesp ? tesp->th_base : NULL;
@@ -4069,7 +4025,6 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     sgj_opaque_p jo4p = NULL;
     sgj_opaque_p jap = NULL;
     sgj_opaque_p ja2p = NULL;
-    char e[64];
     char b[144];
     static const int blen = sizeof(b);
     static const char * const ti_dp = "Threshold in diagnostic page";
@@ -4131,55 +4086,68 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 pr2serr("%s: element types exhausted, k=%d, finished\n",
                         __func__, k);
             return;
-
         }
         if ((bp + 3) > last_bp)
             goto truncated;
-        thresh_in_use = threshold_used(tdhp->etype);
-        if (as_json && thresh_in_use) {
-            jo2p = sgj_new_unattached_object_r(jsp);
-            sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tdhp->etype,
-                              NULL, etype_str(tdhp->etype, b, blen));
-            sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id, NULL,
-                              (0 == tdhp->se_id) ? "primary" : NULL);
+
+        jo2p = NULL;
+        ja2p = NULL;
+        et = tdhp->etype;
+        se_id_s = (0 == tdhp->se_id) ? "primary" : NULL;
+        if (! threshold_used(et)) {
+            if (op->verbose > 3)
+                pr2serr("%s: skipping %s %u, does not use thresholds\n",
+                        __func__, et_s, et);
+            continue;
         }
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
             sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
-                      etype_str(tdhp->etype, b, blen), si_sn, tdhp->se_id, k);
-            if (! as_json)
+                      etype_str(et, b, blen), si_sn, tdhp->se_id, k);
+            if (as_json) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                if (op->inner_hex < 2) {
+                    sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et,
+                                      NULL, etype_str(et, b, blen));
+                    sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id,
+                                      NULL, se_id_s);
+                } else
+                    sgj_js_nv_hex_bytes(jsp, jo2p, "overall_descriptor",
+                                        bp, 4);
+                jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
+                threshold_helper(otse, "        ", bp, et, op, jo3p);
+            } else
                 threshold_helper("      Overall descriptor:\n", "        ",
-                                 bp, tdhp->etype, op, NULL);
+                                 bp, et, op, NULL);
             got1 = true;
-        }
-        if (as_json && thresh_in_use) {
-            sgj_convert2snake(otse, b, blen);
-            jo3p = sgj_named_subobject_r(jsp, jo2p, b);
-            threshold_helper(otse, "        ", bp, tdhp->etype, op, jo3p);
-            if (tdhp->num_elements > 0) {
-                sgj_convert2snake(itse, e, sizeof(e));
-                snprintf(b, blen, "%s_list", e);
-                ja2p = sgj_named_subarray_r(jsp, jo2p, b);
-            }
         }
 
         for (bp += 4, j = 0; j < tdhp->num_elements; ++j, bp += 4) {
             if (op->ind_given) {
-                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (! match_ind_indiv(j, op)))
+                if ((! match_ind_th) || (! match_ind_indiv(j, op)))
                     continue;
             }
             snprintf(b, blen, "      Element %d descriptor:\n", j);
-            if (! as_json)
-                threshold_helper(b, "        ", bp, tdhp->etype, op, NULL);
-            got1 = true;
-            if (as_json && thresh_in_use) {
+            if (as_json) {
+                if (NULL == jo2p) {
+                    jo2p = sgj_new_unattached_object_r(jsp);
+                    if (op->inner_hex < 2) {
+                        sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et,
+                                          NULL, etype_str(et, b, blen));
+                        sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tdhp->se_id,
+                                          NULL, se_id_s);
+                    }
+                }
+                if (NULL == ja2p)
+                    ja2p = sgj_named_subarray_r(jsp, jo2p, isel_sn);
                 jo4p = sgj_new_unattached_object_r(jsp);
-                threshold_helper(itse, "        ", bp, tdhp->etype, op, jo4p);
+                threshold_helper(itse, "        ", bp, et, op, jo4p);
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
-            }
+            } else
+                threshold_helper(b, "        ", bp, et, op, NULL);
+            got1 = true;
         }
-        if (as_json && thresh_in_use)
+        if (as_json)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }                                   /* end of outer for loop */
     if (op->ind_given && (! got1)) {
@@ -4204,15 +4172,16 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                  struct opts_t * op, sgj_opaque_p jop)
 {
     bool as_json;
+    uint8_t et;
     int j, k, n, desc_len;
     uint32_t gen_code;
     bool got1, match_ind_th;
+    const char * se_id_s;
     const uint8_t * bp;
     const uint8_t * last_bp;
     const struct type_desc_hdr_t * tp;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
-    sgj_opaque_p jo3p = NULL;
     sgj_opaque_p jo4p = NULL;
     sgj_opaque_p jap = NULL;
     sgj_opaque_p ja2p = NULL;
@@ -4275,18 +4244,16 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     for (k = 0, tp = tesp->th_base; k < tesp->num_ths; ++k, ++tp) {
         if ((bp + 3) > last_bp)
             goto truncated;
-        if (as_json) {
-            jo2p = sgj_new_unattached_object_r(jsp);
-            sgj_js_nv_ihexstr(jsp, jo2p, et_sn, tp->etype,
-                              NULL, etype_str(tp->etype, b, blen));
-            sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
-                              (0 == tp->se_id) ? "primary" : NULL);
-        }
+
+        jo2p = NULL;
+        ja2p = NULL;
+        et = tp->etype;
+        se_id_s = (0 == tp->se_id) ? "primary" : NULL;
         desc_len = sg_get_unaligned_be16(bp + 2) + 4;
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
             sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
-                      etype_str(tp->etype, b, blen), si_ss, tp->se_id, k);
+                      etype_str(et, b, blen), si_ss, tp->se_id, k);
             if (desc_len > 4) {
                 if (op->inner_hex > 0) {
                     sgj_pr_hr(jsp, "      %s:\n", od_s);
@@ -4298,23 +4265,26 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                               bp + 4);
             } else
                 sgj_pr_hr(jsp, "      %s: <empty>\n", od_s);
+            if (as_json) {
+                jo2p = sgj_new_unattached_object_r(jsp);
+                if (op->inner_hex < 2) {
+                    sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et,
+                                      NULL, etype_str(et, b, blen));
+                    sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
+                                      se_id_s);
+                    sgj_js_nv_s_len_chk(jsp, jo2p, od_sn, bp + 4,
+                                        desc_len - 4);
+                } else
+                    sgj_js_nv_hex_bytes(jsp, jo2p, od_sn, bp, desc_len);
+            }
             got1 = true;
-        }
-        if (as_json) {
-            jo3p = sgj_named_subobject_r(jsp, jo2p, od_sn);
-            if (op->inner_hex > 0)
-                sgj_js_nv_hex_bytes(jsp, jo3p, d_s, bp, desc_len);
-            else
-                sgj_js_nv_s_len_chk(jsp, jo3p, d_s, bp + 4, desc_len - 4);
-            ja2p = sgj_named_subarray_r(jsp, jo2p, "element_descriptor");
         }
 
         for (bp += desc_len, j = 0; j < tp->num_elements;
              ++j, bp += desc_len) {
             desc_len = sg_get_unaligned_be16(bp + 2) + 4;
             if (op->ind_given) {
-                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (! match_ind_indiv(j, op)))
+                if ((! match_ind_th) || (! match_ind_indiv(j, op)))
                     continue;
             }
             if (desc_len > 4) {
@@ -4330,6 +4300,18 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 sgj_pr_hr(jsp, "      Element %d descriptor: <empty>\n", j);
             got1 = true;
             if (as_json) {
+                if (NULL == jo2p) {
+                    jo2p = sgj_new_unattached_object_r(jsp);
+                    if (op->inner_hex < 2) {
+                        sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et, NULL,
+                                          etype_str(et, b, blen));
+                        sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
+                                          se_id_s);
+                    }
+                }
+                if (NULL == ja2p)
+                    ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                                "element_descriptor");
                 jo4p = sgj_new_unattached_object_r(jsp);
                 if (op->inner_hex > 0)
                     sgj_js_nv_hex_bytes(jsp, jo4p, d_s, bp, desc_len);
@@ -4338,9 +4320,9 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo4p);
             }
         }
-        if (as_json)
+        if (as_json && jo2p)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
-    }                                   /* end of outer for loop */
+    }                                   /* <<< end of outer for loop */
     if (op->ind_given && (! got1)) {
         snprintf(b, blen, "      >>> no match on --index=%d,%d", op->ind_th,
                  op->ind_indiv);
@@ -4900,10 +4882,12 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     sgj_opaque_p jop)
 {
     bool eip, invalid, match_ind_th, my_eiioe_force, skip, as_json;
-    int j, k, desc_len, etype, el_num, ind, elem_count, ei, eiioe, num_elems;
-    int fake_ei, proto;
+    uint8_t et;
+    int j, k, n, desc_len, el_num, ind, elem_count, ei, eiioe;
+    int num_elems, fake_ei, proto;
     uint32_t gen_code;
     const char * ccp;
+    const char * se_id_s;
     const uint8_t * bp;
     const uint8_t * last_bp;
     const struct type_desc_hdr_t * tp = tesp ? tesp->th_base : NULL;
@@ -4946,8 +4930,6 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
     }
     bp = resp + 8;
     if (op->no_config) {
-        int n;
-
         if (op->verbose > 2)
             pr2serr("%s: %s\n", __func__, dwuti);
         sgj_pr_hr(jsp, "  %s:\n", aesdl);
@@ -4999,22 +4981,24 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
         }
         goto fini;
-    } else {
-        sgj_pr_hr(jsp, "  %s:\n", aesbetl);
-        jap = sgj_named_subarray_r(jsp, jop,
-                                   sgj_convert2snake(aesbetl, b, blen));
     }
+    sgj_pr_hr(jsp, "  %s:\n", aesbetl);
+    jap = sgj_named_subarray_r(jsp, jop,
+                               sgj_convert2snake(aesbetl, b, blen));
     if (NULL == tesp) {
         pr2serr("%s: logic error, resp==NULL\n", __func__);
-        return;
+        goto fini;
     }
     my_eiioe_force = op->eiioe_force;
 
     for (k = 0, elem_count = 0; k < tesp->num_ths; ++k, ++tp) {
         fake_ei = -1;
-        etype = tp->etype;
+        et = tp->etype;
+        se_id_s = (0 == tp->se_id) ? "primary" : NULL;
+        jo2p = NULL;
+        ja2p = NULL;
         num_elems = tp->num_elements;
-        if (! is_et_used_by_aes(etype)) {
+        if (! is_et_used_by_aes(et)) {
             elem_count += num_elems;
             continue;   /* skip if not element type of interest */
         }
@@ -5060,7 +5044,7 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 if (op->verbose > 2)
                     pr2serr("skipping etype=0x%x, k=%d due to "
                             "element_index=%d bounds\n  effective eiioe=%d, "
-                            "elem_count=%d, num_elems=%d\n", etype, k,
+                            "elem_count=%d, num_elems=%d\n", et, k,
                             ei, eiioe, elem_count, num_elems);
                 continue;
             }
@@ -5068,16 +5052,7 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         match_ind_th = (op->ind_given && (k == op->ind_th));
         if ((! op->ind_given) || (match_ind_th && (-1 == op->ind_indiv))) {
             sgj_pr_hr(jsp, "    %s: %s, %s: %d [ti=%d]\n", et_s,
-                      etype_str(etype, b, blen), si_ss, tp->se_id, k);
-        }
-        if (as_json) {
-            jo2p = sgj_new_unattached_object_r(jsp);
-            sgj_js_nv_ihexstr(jsp, jo2p, et_sn, etype, NULL,
-                              etype_str(etype, b, blen));
-            sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
-                              (0 == tp->se_id) ? "primary" : NULL);
-            ja2p = sgj_named_subarray_r(jsp, jo2p,
-                                         sgj_convert2snake(aesdl, b, blen));
+                      etype_str(et, b, blen), si_ss, tp->se_id, k);
         }
         el_num = 0;
 
@@ -5092,11 +5067,20 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 ind = eip ? bp[3] : el_num;
             proto = (0xf & bp[0]);
             if (op->ind_given) {
-                if ((! match_ind_th) || (-1 == op->ind_indiv) ||
-                    (! match_ind_indiv(el_num, op)))
+                if ((! match_ind_th) || (! match_ind_indiv(el_num, op)))
                     continue;
             }
             if (as_json) {
+                if (NULL == jo2p) {
+                    jo2p = sgj_new_unattached_object_r(jsp);
+                    sgj_js_nv_ihexstr(jsp, jo2p, et_sn, et, NULL,
+                                      etype_str(et, b, blen));
+                    sgj_js_nv_ihexstr(jsp, jo2p, si_sn, tp->se_id, NULL,
+                                      se_id_s);
+                }
+                if (NULL == ja2p)
+                    ja2p = sgj_named_subarray_r(jsp, jo2p,
+                                         sgj_convert2snake(aesdl, b, blen));
                 jo3p = sgj_new_unattached_object_r(jsp);
                 jo4p = sgj_named_subobject_r(jsp, jo3p, aesd_sn);
                 sgj_js_nv_ihex(jsp, jo4p, "invalid", invalid);
@@ -5117,13 +5101,13 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 sgj_pr_hr(jsp, "        flagged as invalid (no further "
                           "information)\n");
             else
-                additional_elem_helper("        ", bp, desc_len, etype,
+                additional_elem_helper("        ", bp, desc_len, et,
                                        tesp, op, jo4p);
-            if (as_json)
+            if (as_json && jo3p)
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
         }
         elem_count += tp->num_elements;
-        if (jsp->pr_as_json)
+        if (jsp->pr_as_json && jo2p)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }           /* end_for: loop over type descriptor headers */
     goto fini;
@@ -5513,14 +5497,14 @@ truncated:
 
 /* Reads hex data from command line, stdin or a file when in_hex is true.
  * Reads binary from stdin or file when in_hex is false. Returns 0 on
- * success, 1 otherwise. If inp is a file and may_have_at, then the
+ * success. If inp is a file and may_have_at, then the
  * first character is skipped to get filename (since it should be '@'). */
 static int
 read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
          bool in_hex, bool may_have_at, int vb)
 {
     bool has_stdin, split_line;
-    int in_len, k, j, m, off, off_fn;
+    int in_len, e, k, j, m, off, off_fn;
     unsigned int h;
     const char * lcp;
     char * cp;
@@ -5530,7 +5514,7 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
     FILE * fp = NULL;
 
     if ((NULL == inp) || (NULL == arr) || (NULL == arr_len))
-        return 1;
+        return SG_LIB_LOGIC_ERROR;
     off_fn = may_have_at ? 1 : 0;
     lcp = inp;
     in_len = strlen(inp);
@@ -5549,21 +5533,27 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
         else {
             fd = open(inp + off_fn, O_RDONLY);
             if (fd < 0) {
+                e = errno;
                 pr2serr("unable to open binary file %s: %s\n", inp + off_fn,
-                         safe_strerror(errno));
-                return 1;
+                         safe_strerror(e));
+                return sg_convert_errno(e);
             }
         }
         k = read(fd, arr, mx_arr_len);
         if (k <= 0) {
+            int res = SG_LIB_SYNTAX_ERROR;
+
             if (0 == k)
                 pr2serr("read 0 bytes from binary file %s\n", inp + off_fn);
-            else
+            else {
+                e = errno;
                 pr2serr("read from binary file %s: %s\n", inp + off_fn,
-                        safe_strerror(errno));
+                        safe_strerror(e));
+                res = sg_convert_errno(e);
+            }
             if (! has_stdin)
                 close(fd);
-            return 1;
+            return res;
         }
         if ((0 == fstat(fd, &a_stat)) && S_ISFIFO(a_stat.st_mode)) {
             /* pipe; keep reading till error or 0 read */
@@ -5572,11 +5562,12 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
                 if (0 == m)
                    break;
                 if (m < 0) {
+                    e = errno;
                     pr2serr("read from binary pipe %s: %s\n", inp + off_fn,
-                            safe_strerror(errno));
+                            safe_strerror(e));
                     if (! has_stdin)
                         close(fd);
-                    return 1;
+                    return sg_convert_errno(e);
                 }
                 k += m;
             }
@@ -5593,9 +5584,10 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
         else {
             fp = fopen(inp + off_fn, "r");
             if (NULL == fp) {
-                pr2serr("%s: unable to open file: %s\n", __func__,
-                        inp + off_fn);
-                return 1;
+                e = errno;
+                pr2serr("%s: unable to open file: %s [%s]\n", __func__,
+                        inp + off_fn, safe_strerror(e));
+                return sg_convert_errno(e);
             }
         }
         carry_over[0] = 0;
@@ -5725,7 +5717,7 @@ read_hex(const char * inp, uint8_t * arr, int mx_arr_len, int * arr_len,
 err_with_fp:
     if (fp && (fp != stdin))
         fclose(fp);
-    return 1;
+    return SG_LIB_SYNTAX_ERROR;
 }
 
 /* Process all status/in diagnostic pages. Return of 0 is good. */
@@ -6005,54 +5997,60 @@ process_many_status_dpages(struct sg_pt_base * ptvp,  uint8_t * resp,
                            bool with_joinpgs, struct opts_t * op,
                            sgj_opaque_p jop)
 {
-    int k, n, ret, resp_len, page_code;
+    int k, n, ret, resp_len, pg_cd;
+    int defer_err = 0;
     uint8_t pc, prev;
     uint8_t supp_dpg_arr[256];
-    const int s_arr_sz = sizeof(supp_dpg_arr);
+    static const int s_arr_sz = sizeof(supp_dpg_arr);
 
     memset(supp_dpg_arr, 0, s_arr_sz);
-    ret = do_rec_diag(ptvp, SUPPORTED_DPC, resp, op->maxlen, op,
-                      &resp_len);
+    ret = do_rec_diag(ptvp, SUPPORTED_DPC, resp, op->maxlen, op, &resp_len);
     if (ret)        /* SUPPORTED_DPC failed so try SUPPORTED_SES_DPC */
         ret = do_rec_diag(ptvp, SUPPORTED_SES_DPC, resp, op->maxlen, op,
                           &resp_len);
     if (ret)
         return ret;
+    /* build list of dpages to visit */
     for (n = 0, pc = 0; (n < s_arr_sz) && (n < (resp_len - 4)); ++n) {
         prev = pc;
         pc = resp[4 + n];
-        if (prev > pc) {
+        if (prev > pc) {    /* sanity check */
             if (pc) {       /* could be zero pad at end which is ok */
-                pr2serr("%s: Supported (SES) dpage seems corrupt, "
-                        "should ascend\n", __func__);
+                pr2serr("%s: Supported (SES) dpage seems corrupt, should "
+                        "ascend\n", __func__);
                 return SG_LIB_CAT_OTHER;
             }
             break;
         }
-        if (pc > 0x2f)
+        if (pc > 0x2f)  /* non-SES diagnostic pages */
             break;
         supp_dpg_arr[n] = pc;
     }
     for (k = 0; k < n; ++k) {
-        page_code = supp_dpg_arr[k];
-        if ((! with_joinpgs) && dpage_in_join(page_code, op))
+        pg_cd = supp_dpg_arr[k];
+        if ((! with_joinpgs) && dpage_in_join(pg_cd, op))
             continue;
-        ret = do_rec_diag(ptvp, page_code, resp, op->maxlen, op,
-                          &resp_len);
+        ret = do_rec_diag(ptvp, pg_cd, resp, op->maxlen, op, &resp_len);
         if (ret) {
             if (SG_LIB_OK_FALSE == ret)
                 continue;       /* not found in user data */
-            if (op->do_json)
-                continue;       /* page in supported but not in reality? */
-            return ret;
+            if (op->do_warn || with_joinpgs)
+                return ret;
+            defer_err = ret;
+            if (op->verbose)
+                pr2serr("%s: deferring error on page_code=0x%x, continuing\n",
+                        __func__, pg_cd);
+            continue;
         }
-        ret = process_status_dpage(ptvp, page_code, resp, resp_len,
-                                   op, jop);
-        if (ret && (op->verbose > 2))
-            pr2serr("%s: failure decoding page_code=0x%x, ret=%d, "
-                    "continuing\n", __func__, page_code, ret);
+        ret = process_status_dpage(ptvp, pg_cd, resp, resp_len, op, jop);
+        if (ret) {
+            defer_err = ret;
+            if (op->verbose > 2)
+                pr2serr("%s: failure decoding page_code=0x%x, ret=%d, "
+                        "continuing\n", __func__, pg_cd, ret);
+        }
     }
-    return 0;
+    return defer_err;
 }
 
 /* Display "status" page or pages (if op->page_code==0xff) . data-in from
@@ -6079,8 +6077,7 @@ process_1ormore_status_dpages(struct sg_pt_base * ptvp, struct opts_t * op,
         ret = do_rec_diag(ptvp, page_code, resp, op->maxlen, op, &resp_len);
         if (ret)
             goto fini;
-        ret = process_status_dpage(ptvp, page_code, resp, resp_len,
-                                   op, jop);
+        ret = process_status_dpage(ptvp, page_code, resp, resp_len, op, jop);
     }
 
 fini:
@@ -6154,7 +6151,7 @@ join_aes_helper(const uint8_t * ae_bp, const uint8_t * ae_last_bp,
             for (j = 0; j < tdhp->num_elements;
                  ++j, ++aes_i, ae_bp += ae_bp[1] + 2) {
                 if ((ae_bp + 1) > ae_last_bp) {
-                    if (op->verbose || op->warn)
+                    if (op->verbose || op->do_warn)
                         pr2serr("warning: %s: off end of ae page\n",
                                 __func__);
                     return broken_ei;
@@ -6178,7 +6175,7 @@ join_aes_helper(const uint8_t * ae_bp, const uint8_t * ae_last_bp,
                     }
                     devslotnum_and_sasaddr(jr2p, ae_bp);
                     if (jr2p->ae_statp) {
-                        if (op->warn || op->verbose) {
+                        if (op->do_warn || op->verbose) {
                             pr2serr("warning: aes slot already in use, "
                                     "keep existing AES+%s\n\t",
                                     offset_str(jr2p->ae_statp - add_elem_rsp,
@@ -6231,13 +6228,13 @@ try_again:
                                 break;
                             }
                             if ((NULL == jr2p->enc_statp) &&
-                                (op->warn || op->verbose))
+                                (op->do_warn || op->verbose))
                                 pr2serr("warning2: dropping AES+%s [length="
                                         "%d, oi=%d, ei=%d, aes_i=%d]\n",
                                         offset_str(ae_bp - add_elem_rsp, hex,
                                                    b, blen),
                                         ae_bp[1] + 2, k, ei, aes_i);
-                        } else if (op->warn || op->verbose) {
+                        } else if (op->do_warn || op->verbose) {
                             pr2serr("warning3: aes slot already in use, "
                                     "keep existing AES+%s\n\t",
                                     offset_str(jr2p->ae_statp - add_elem_rsp,
@@ -6269,7 +6266,7 @@ try_again:
                     }
                     devslotnum_and_sasaddr(jr2p, ae_bp);
                     if (jr2p->ae_statp) {
-                        if (op->warn || op->verbose) {
+                        if (op->do_warn || op->verbose) {
                             pr2serr("warning3: aes slot already in use, "
                                     "keep existing AES+%s\n\t",
                                     offset_str(jr2p->ae_statp - add_elem_rsp,
@@ -7164,7 +7161,7 @@ ses_set_nickname(struct sg_pt_base * ptvp, struct opts_t * op)
     int res, len;
     int resp_len = 0;
     uint8_t b[64];
-    const int control_plen = 0x24;
+    static const int control_plen = 0x24;
 
     if (NULL == ptvp) {
         pr2serr("%s: ignored when no device name\n", __func__);
@@ -7303,7 +7300,7 @@ int
 main(int argc, char * argv[])
 {
     bool have_cgs = false;
-    bool as_json;
+    bool as_json = false;
     int k, n, d_len, res, resid, vb;
     int sg_fd = -1;
     int pd_type = 0;
@@ -7335,7 +7332,6 @@ main(int argc, char * argv[])
     res = parse_cmd_line(op, argc, argv);
     vb = op->verbose;
     jsp = &op->json_st;
-    as_json = jsp->pr_as_json;
     if (res) {
         if (SG_SES_CALL_ENUMERATE == res) {
             pr2serr("\n");
@@ -7376,8 +7372,23 @@ main(int argc, char * argv[])
         enumerate_work(op);
         goto early_out;
     }
-    if (as_json)
+    if (op->do_json) {
+        if (! sgj_init_state(jsp, op->json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto early_out;
+        }
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+    }
+    as_json = jsp->pr_as_json;
 
     enc_stat_rsp = sg_memalign(op->maxlen, 0, &free_enc_stat_rsp, false);
     if (NULL == enc_stat_rsp) {
@@ -7678,10 +7689,14 @@ main(int argc, char * argv[])
             }
             break;
         default:
-            pr2serr("Setting SES control page 0x%x not supported by this "
-                    "utility\n", op->page_code);
-            pr2serr("That can be done with the sg_senddiag utility with its "
-                    "'--raw=' option\n");
+            if (! op->page_code_given)
+                pr2serr("Must specify --page=PG where PG is modifiable\n");
+            else {
+                pr2serr("Setting SES control page 0x%x not supported by "
+                        "this utility\n", op->page_code);
+                pr2serr("If possible, that may be done with the sg_senddiag "
+                        "utility with its '--raw=' option\n");
+            }
             ret = SG_LIB_SYNTAX_ERROR;
             break;
         }
@@ -7723,19 +7738,28 @@ early_out:
         free(op->free_data_arr);
     if (free_config_dp_resp)
         free(free_config_dp_resp);
+    ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
     if (as_json && jop) {
-        if (op->js_file) {
-            FILE * fp = fopen(op->js_file, "w");   /* truncate if exists */
+        FILE * fp = stdout;
 
-            /* Experiment: send json to file when do_hex > 0 */
-            if (fp) {
-                sgj_js2file(jsp, NULL, ret, fp);
-                fclose(fp);
-            } else
-                pr2serr("unable to open file: %s\n", op->js_file);
-        } else if (0 == op->do_hex)
-            sgj_js2file(jsp, NULL, ret, stdout);
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    int e = errno;
+
+                    pr2serr("unable to open file: %s [%s]\n", op->js_file,
+                            safe_strerror(e));
+                    ret = sg_convert_errno(e);
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, ret, fp);
+        if (op->js_file && fp && (stdout != fp))
+            fclose(fp);
         sgj_finish(jsp);
     }
-    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    return ret;
 }

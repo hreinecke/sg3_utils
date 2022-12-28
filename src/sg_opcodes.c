@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.87 20221222";    /* spc6r06 */
+static const char * version_str = "0.88 20221226";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -63,6 +63,8 @@ static struct option long_options[] = {
         {"inhex", required_argument, 0, 'i'},
         {"in", required_argument, 0, 'i'},
         {"json", optional_argument, 0, 'j'},
+        {"js-file", required_argument, 0, 'J'},
+        {"js_file", required_argument, 0, 'J'},
         {"mask", no_argument, 0, 'm'},
         {"mlu", no_argument, 0, 'M'},           /* added in spc5r20 */
         {"no-inquiry", no_argument, 0, 'n'},
@@ -85,6 +87,7 @@ static struct option long_options[] = {
 struct opts_t {
     bool do_alpha;
     bool do_compact;
+    bool do_json;
     bool do_enumerate;
     bool no_inquiry;
     bool do_mask;
@@ -104,6 +107,8 @@ struct opts_t {
     int verbose;
     const char * device_name;
     const char * inhex_fn;
+    const char * json_arg;
+    const char * js_file;
     sgj_state json_st;
 };
 
@@ -113,13 +118,13 @@ usage()
 {
     pr2serr("Usage:  sg_opcodes [--alpha] [--compact] [--enumerate] "
             "[--help] [--hex]\n"
-            "                   [--inhex=FN] [--json[=JO]] [--mask] [--mlu] "
-            "[--no-inquiry]\n"
-            "                   [--opcode=OP[,SA]] [--pdt=DT] [--raw] "
-            "[--rctd]\n"
-            "                   [--repd] [--sa=SA] [--tmf] [--unsorted] "
-            "[--verbose]\n"
-            "                   [--version] DEVICE\n"
+            "                   [--inhex=FN] [--json[=JO]] [--js-file=JFN] "
+            "[--mask]\n"
+            "                   [--mlu] [--no-inquiry] [--opcode=OP[,SA]] "
+            "[--pdt=DT]\n"
+            "                   [--raw] [--rctd] [--repd] [--sa=SA] [--tmf] "
+            "[--unsorted]\n"
+            "                   [--verbose] [--version] DEVICE\n"
             "  where:\n"
             "    --alpha|-a      output list of operation codes sorted "
             "alphabetically\n"
@@ -340,7 +345,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "acehHi:j::mMnNo:Op:qrRs:tuvV",
+        c = getopt_long(argc, argv, "acehHi:j::J:mMnNo:Op:qrRs:tuvV",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -366,18 +371,12 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->inhex_fn = optarg;
             break;
         case 'j':
-            if (! sgj_init_state(&op->json_st, optarg)) {
-                int bad_char = op->json_st.first_bad_char;
-                char e[1500];
-
-                if (bad_char) {
-                    pr2serr("bad argument to --json= option, unrecognized "
-                            "character '%c'\n\n", bad_char);
-                }
-                sg_json_usage(0, e, sizeof(e));
-                pr2serr("%s", e);
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            op->do_json = true;
+            op->json_arg = optarg;
+            break;
+        case 'J':
+            op->do_json = true;
+            op->js_file = optarg;
             break;
         case 'm':
             op->do_mask = true;
@@ -519,7 +518,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     ++op->do_hex;
                     break;
                 case 'j':    /* don't accept argument with this old syntax */
-                    sgj_init_state(&op->json_st, NULL);
+                    op->do_json = true;
                     break;
                 case 'm':
                     op->do_mask = true;
@@ -1151,10 +1150,22 @@ main(int argc, char * argv[])
         return 0;
     }
     jsp = &op->json_st;
-    as_json = jsp->pr_as_json;
-    if (as_json) {
+    if (op->do_json && (! op->do_enumerate)) {
+        if (! sgj_init_state(jsp, op->json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            return SG_LIB_SYNTAX_ERROR;
+        }
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
     }
+    as_json = jsp->pr_as_json;
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
     if (op->verbose_given && op->version_given) {
@@ -1499,9 +1510,23 @@ err_out:
                     "or '-vv' for more information\n");
     }
     res = (res >= 0) ? res : SG_LIB_CAT_OTHER;
-    if (as_json) {
-        if (0 == op->do_hex)
-            sgj_js2file(jsp, NULL, res, stdout);
+    if (as_json && (! op->do_enumerate)) {
+        FILE * fp = stdout;
+
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    pr2serr("unable to open file: %s\n", op->js_file);
+                    res = SG_LIB_FILE_ERROR;
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, res, fp);
+        if (op->js_file && fp && (stdout != fp))
+            fclose(fp);
         sgj_finish(jsp);
     }
     return res;

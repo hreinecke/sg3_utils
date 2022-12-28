@@ -12,7 +12,6 @@ sg_rbuf \- reads data using SCSI READ BUFFER command
 [\fI\-s=OVERALL_MIB\fR] [\fI\-t\fR] [\fI\-v\fR] [\fI\-V\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-.PP
 This command reads data with the SCSI READ BUFFER command and then discards
 it. Typically the data being read is from a disk's memory cache. It is
 assumed that the data is sourced quickly (although this is not guaranteed
@@ -94,37 +93,24 @@ Various numeric arguments (e.g. \fIOVERALL\fR) may include multiplicative
 suffixes or be given in hexadecimal. See the "NUMERIC ARGUMENTS" section
 in the sg3_utils(8) man page.
 .SH EXAMPLES
-.PP
 On the test system /dev/sg0 corresponds to a fast disk on a U2W SCSI
 bus (max 80 MB/sec). The disk specifications state that its cache is 4 MB.
-.br
    $ time ./sg_rbuf /dev/sg0
-.br
-READ BUFFER reports: buffer capacity=3434944,
-.br
-    offset boundary=6
-.br
-Read 200 MiB (actual 199 MiB, 209531584 bytes),
-.br
-    buffer size=3354 KiB
-.br
-real 0m5.072s, user 0m0.000s, sys 0m2.280s
+   READ BUFFER reports: buffer capacity=3434944,
+     offset boundary=6
+   Read 200 MiB (actual 199 MiB, 209531584 bytes),
+     buffer size=3354 KiB
+   real 0m5.072s, user 0m0.000s, sys 0m2.280s
 .PP
 So that is approximately 40 MB/sec at 40 % utilization. Now with
 the addition of the "\-q" option this throughput improves and the
 utilization drops to 0%.
-.br
    $ time ./sg_rbuf \-q /dev/sg0
-.br
-READ BUFFER reports: buffer capacity=3434944,
-.br
-    offset boundary=6
-.br
-Read 200 MiB (actual 199 MiB, 209531584 bytes),
-.br
-    buffer size=3354 KiB
-.br
-real 0m2.784s, user 0m0.000s, sys 0m0.000s
+   READ BUFFER reports: buffer capacity=3434944,
+     offset boundary=6
+   Read 200 MiB (actual 199 MiB, 209531584 bytes),
+     buffer size=3354 KiB
+   real 0m2.784s, user 0m0.000s, sys 0m0.000s
 .SH EXIT STATUS
 The exit status of sg_rbuf is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.

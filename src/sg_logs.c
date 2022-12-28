@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.16 20221222";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.17 20221226";    /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_logs"
 
@@ -140,48 +140,51 @@ static const char * const unkn_s = "unknown";
 static const char * const lp_sn = "log_page";
 
 static struct option long_options[] = {
-        {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
-        {"ALL", no_argument, 0, 'A'},   /* equivalent to '-aa' */
-        {"all", no_argument, 0, 'a'},
-        {"brief", no_argument, 0, 'b'},
-        {"control", required_argument, 0, 'c'},
-        {"enumerate", no_argument, 0, 'e'},
-        {"exclude", no_argument, 0, 'E'},
-        {"filter", required_argument, 0, 'f'},
-        {"full", no_argument, 0, 'F'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"in", required_argument, 0, 'i'},
-        {"inhex", required_argument, 0, 'i'},
-        {"json", optional_argument, 0, 'j'},
-        {"list", no_argument, 0, 'l'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"name", no_argument, 0, 'n'},
-        {"new", no_argument, 0, 'N'},
-        {"no_inq", no_argument, 0, 'x'},
-        {"no-inq", no_argument, 0, 'x'},
-        {"old", no_argument, 0, 'O'},
-        {"page", required_argument, 0, 'p'},
-        {"paramp", required_argument, 0, 'P'},
-        {"pcb", no_argument, 0, 'q'},
-        {"ppc", no_argument, 0, 'Q'},
-        {"pdt", required_argument, 0, 'D'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'X'},
-        {"reset", no_argument, 0, 'R'},
-        {"sp", no_argument, 0, 's'},
-        {"select", no_argument, 0, 'S'},
-        {"temperature", no_argument, 0, 't'},
-        {"transport", no_argument, 0, 'T'},
-        {"undefined", no_argument, 0, 'u'},
-        {"vendor", required_argument, 0, 'M'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+    {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
+    {"ALL", no_argument, 0, 'A'},   /* equivalent to '-aa' */
+    {"all", no_argument, 0, 'a'},
+    {"brief", no_argument, 0, 'b'},
+    {"control", required_argument, 0, 'c'},
+    {"enumerate", no_argument, 0, 'e'},
+    {"exclude", no_argument, 0, 'E'},
+    {"filter", required_argument, 0, 'f'},
+    {"full", no_argument, 0, 'F'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"in", required_argument, 0, 'i'},
+    {"inhex", required_argument, 0, 'i'},
+    {"json", optional_argument, 0, 'j'},
+    {"js_file", required_argument, 0, 'J'},
+    {"js-file", required_argument, 0, 'J'},
+    {"list", no_argument, 0, 'l'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"name", no_argument, 0, 'n'},
+    {"new", no_argument, 0, 'N'},
+    {"no_inq", no_argument, 0, 'x'},
+    {"no-inq", no_argument, 0, 'x'},
+    {"old", no_argument, 0, 'O'},
+    {"page", required_argument, 0, 'p'},
+    {"paramp", required_argument, 0, 'P'},
+    {"pcb", no_argument, 0, 'q'},
+    {"ppc", no_argument, 0, 'Q'},
+    {"pdt", required_argument, 0, 'D'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'X'},
+    {"reset", no_argument, 0, 'R'},
+    {"sp", no_argument, 0, 's'},
+    {"select", no_argument, 0, 'S'},
+    {"temperature", no_argument, 0, 't'},
+    {"transport", no_argument, 0, 'T'},
+    {"undefined", no_argument, 0, 'u'},
+    {"vendor", required_argument, 0, 'M'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 struct opts_t {
     bool do_full;
+    bool do_json;
     bool do_name;
     bool do_pcb;
     bool do_ppc;
@@ -221,6 +224,8 @@ struct opts_t {
     int undefined_hex;  /* hex format of undefined/unrecognized fields */
     const char * device_name;
     const char * in_fn;
+    const char * json_arg;
+    const char * js_file;
     const char * pg_arg;
     const char * vend_prod;
     const struct log_elem * lep;
@@ -550,15 +555,17 @@ usage(int hval)
            "[--enumerate]\n"
            "               [--exclude] [--filter=FL] [--full] [--help] "
            "[--hex]\n"
-           "               [--in=FN] [--json[=JO]] [--list] [--maxlen=LEN] "
-           "[--name]\n"
-           "               [--no_inq] [--page=PG] [--paramp=PP] [--pcb] "
-           "[--ppc]\n"
-           "               [--pdt=DT] [--raw] [--readonly] [--reset] "
-           "[--select]\n"
-           "               [--sp] [--temperature] [--transport] "
-           "[--undefined]\n"
-           "               [--vendor=VP] [--verbose] [--version] DEVICE\n"
+           "               [--in=FN] [--json[=JO]] [--js_file=JFN] "
+           "[--list]\n"
+           "               [--maxlen=LEN] [--name] [--no_inq] "
+           "[--page=PG]\n"
+           "               [--paramp=PP] [--pcb] [--ppc] [--pdt=DT] "
+           "[--raw]\n"
+           "               [--readonly] [--reset] [--select] [--sp] "
+           "[--temperature]\n"
+           "               [--transport] [--undefined] [--vendor=VP] "
+           "[--verbose]\n"
+           "               [--version] DEVICE\n"
            "  where the main options are:\n"
            "    --ALL|-A        fetch and decode all log pages and "
            "subpages\n"
@@ -588,8 +595,12 @@ usage(int hval)
            "                     or binary if --raw also given. --inhex=FN "
            "also accepted\n"
            "    --json[=JO]|-j[JO]    output in JSON instead of human "
-            "readable\n"
-            "                          test. Use --json=? for JSON help\n"
+           "readable\n"
+           "                          test. Use --json=? for JSON help\n"
+           "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
+           "output is\n"
+           "                            written (def: stdout); truncates "
+           "then writes\n"
            "    --list|-l       list supported log pages; twice: list "
            "supported log\n"
            "                    pages and subpages page; thrice: merge of "
@@ -672,11 +683,11 @@ usage_old()
 {
     printf("Usage: sg_logs [-a] [-A] [-b] [-c=PC] [-D=DT] [-e] [-E] [-f=FL] "
            "[-F]\n"
-           "               [-h] [-H] [-i=FN] [-l] [-L] [-m=LEN] [-M=VP] "
-           "[-n] [-p=PG]\n"
-           "               [-paramp=PP] [-pcb] [-ppc] [-r] [-select] [-sp] "
-           "[-t] [-T]\n"
-           "               [-u] [-v] [-V] [-x] [-X] [-?] DEVICE\n"
+           "               [-h] [-H] [-i=FN] [-j] [-l] [-L] [-m=LEN] [-M=VP] "
+           "[-n]\n"
+           "               [-p=PG] [-paramp=PP] [-pcb] [-ppc] [-r] [-select] "
+           "[-sp]i\n"
+           "               [-t] [-T] [-u] [-v] [-V] [-x] [-X] [-?] DEVICE\n"
            "  where:\n"
            "    -a     fetch and decode all log pages\n"
            "    -A     fetch and decode all log pages and subpages\n"
@@ -694,6 +705,8 @@ usage_old()
            "    -H     output in hex (same as '-h')\n"
            "    -i=FN    FN is a filename containing a log page "
            "in ASCII hex.\n"
+           "    -j     produce JSON output instead of human readable "
+           "form\n"
            "    -l     list supported log page names (equivalent to "
            "'-p=0')\n"
            "    -L     list supported log page and subpages names "
@@ -1007,8 +1020,8 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         int c, n;
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:D:eEf:FhHi:j::lLm:M:nNOp:P:qQrRsStT"
-                        "uvVxX", long_options, &option_index);
+        c = getopt_long(argc, argv, "aAbc:D:eEf:FhHi:j::J:lLm:M:nNOp:P:qQrR"
+                        "sStTuvVxX", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1082,18 +1095,12 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->in_fn = optarg;
             break;
         case 'j':
-           if (! sgj_init_state(&op->json_st, optarg)) {
-                int bad_char = op->json_st.first_bad_char;
-                char e[1500];
-
-                if (bad_char) {
-                    pr2serr("bad argument to --json= option, unrecognized "
-                            "character '%c'\n\n", bad_char);
-                }
-                sg_json_usage(0, e, sizeof(e));
-                pr2serr("%s", e);
-                return SG_LIB_SYNTAX_ERROR;
-            }
+            op->json_arg = optarg;
+            op->do_json = true;
+            break;
+        case 'J':
+            op->js_file = optarg;
+            op->do_json = true;
             break;
         case 'l':
             ++op->do_list;
@@ -1248,6 +1255,9 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'h':
                 case 'H':
                     ++op->do_hex;
+                    break;
+                case 'j':
+                    op->do_json = true;
                     break;
                 case 'l':
                     ++op->do_list;
@@ -9578,8 +9588,19 @@ main(int argc, char * argv[])
         return 0;
     }
     jsp = &op->json_st;
-    as_json = jsp->pr_as_json;
-    if (as_json) {
+    if (op->do_json) {
+        if (! sgj_init_state(jsp, op->json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            return SG_LIB_SYNTAX_ERROR;
+        }
         if (op->do_name) {
             pr2serr(">>> The --json option is superior to the --name "
                     "option.\n");
@@ -9588,6 +9609,8 @@ main(int argc, char * argv[])
         }
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
     }
+    as_json = jsp->pr_as_json;
+
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
     if (op->verbose_given && op->version_given) {
@@ -10110,8 +10133,22 @@ err_out:
                     "more information\n");
     }
     if (as_json) {
-        if (0 == op->do_hex)
-            sgj_js2file(jsp, NULL, ret, stdout);
+        FILE * fp = stdout;
+
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    pr2serr("unable to open file: %s\n", op->js_file);
+                    ret = SG_LIB_FILE_ERROR;
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, ret, fp);
+        if (op->js_file && fp && (stdout != fp))
+            fclose(fp);
         sgj_finish(jsp);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
