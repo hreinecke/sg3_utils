@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2022 Douglas Gilbert.
+ * Copyright (c) 2006-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -54,7 +54,7 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.19 20220425";
+static const char * version_str = "1.20 20230101";
 
 static struct option long_options[] = {
         {"ck-cond", no_argument, 0, 'c'},
@@ -221,8 +221,12 @@ do_identify_dev(int sg_fd, bool do_packet, int cdb_len, bool ck_cond,
     }
     if (0 == res) {
         ok = true;
-        if (verbose > 2)
+        if (verbose > 2) {
             pr2serr("command completed with SCSI GOOD status\n");
+            if (verbose > 2)
+                pr2serr("    requested_length=%d, resid=%d\n",
+                        ID_RESPONSE_LEN, resid);
+        }
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
         if (verbose > 1) {
             pr2serr("ATA pass-through:\n");

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2022 Douglas Gilbert.
+ * Copyright (c) 1999-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -1804,7 +1804,7 @@ sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
              uint8_t * ata_return_dp, int max_ata_return_len,
              int * residp, int vb)
 {
-    int k, res, slen, duration;
+    int k, res, slen;
     int ret = -1;
     uint8_t apt_cdb[ATA_PT_32_CMDLEN];
     uint8_t incoming_apt_cdb[ATA_PT_32_CMDLEN];
@@ -1893,8 +1893,18 @@ sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
             pr2ws("%s: do_scsi_pt: errno=%d\n", cnamep, -res);
     }
 
-    if ((vb > 2) && ((duration = get_scsi_pt_duration_ms(ptvp)) >= 0))
-        pr2ws("      duration=%d ms\n", duration);
+    if (vb > 2) {
+        uint64_t duration = get_pt_duration_ns(ptvp);
+
+        if (duration > 0)
+            pr2ws("      duration=%" PRIu64 " ns\n", duration);
+        else {
+            int d = get_scsi_pt_duration_ms(ptvp);
+
+            if (d != -1)
+                pr2ws("      duration=%u ms\n", (uint32_t)d);
+        }
+    }
 
     switch (get_scsi_pt_result_category(ptvp)) {
     case SCSI_PT_RESULT_GOOD:

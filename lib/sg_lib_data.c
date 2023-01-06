@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2022 Douglas Gilbert.
+ * Copyright (c) 2007-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.96 20221215";
+const char * sg_lib_version_str = "2.97 20230102";
 /* spc6r06, sbc5r03, zbc2r13 */
 
 

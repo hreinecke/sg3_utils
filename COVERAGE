@@ -142,7 +142,7 @@ READ LOG EXT        sg_sat_phy_event, examples/sg__sat_phy_event
 READ LOG DMA EXT    sg_sat_read_gplog
 SET FEATURES        sg_sat_set_features
                     examples/sg__sat_set_features
-SMART READ DATA     examples/sg_sat_smart_rd_data
+SMART READ LOG      sg_sat_read_gplog, examples/sg_sat_smart_rd_data
 
 
 NVMe command        sg3_utils utilities that use this NVMe command
@@ -188,4 +188,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-21 December 2022
+01 January 2023

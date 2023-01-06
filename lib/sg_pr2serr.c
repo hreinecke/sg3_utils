@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Douglas Gilbert.
+ * Copyright (c) 2022-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -603,14 +603,36 @@ sgj_js_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
         return NULL;
 }
 
+#ifndef SG_PRSE_SENSE_DECODE
+static bool
+has_control_char(const uint8_t * up, int len)
+{
+    int k;
+    uint8_t u;
+
+    for (k = 0; k < len; ++k) {
+        u = up[k];
+        if ((u < 0x20) || (0x7f == u))
+            return true;
+    }
+    return false;
+}
+#endif
+
 sgj_opaque_p
 sgj_js_nv_s_len_chk(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
                     const uint8_t * value, int vlen)
 {
     sgj_opaque_p res = NULL;
 
+#ifdef SG_PRSE_SENSE_DECODE
     if (value && (vlen > 0) &&
-        sg_has_control_char(value, vlen)) {
+        sg_has_control_char(value, vlen))
+#else
+    if (value && (vlen > 0) &&
+        has_control_char(value, vlen))
+#endif
+    {
         const int n = vlen * 4 + 4;
         char * p = (char *)malloc(n);
 
@@ -1249,6 +1271,64 @@ sgj_haj_subo_r(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
     }
     return NULL;
 }
+
+/* Convert a byte stream that is meant to be printable ASCII or UTF-8 to
+ * something that is allowable in a JSON string. This means treating the
+ * ASCII control characters (i.e. < 0x20) and DEL as specials. Also '\' and
+ * '"' need to be escaped with a preceding '\'. These C escape codes are used
+ * in JSON: '\b', '\f', '\n', '\r' and '\t'. Other control characters, and DEL
+ * are encoded as '\x<hh>' where <hh> is two hex digits. So the DEL and
+ * null ACSII characters in the input will appear as '\x7f' and '\x00'
+ * respectively in the output. The output serializer will expand those
+ * two to '\\x7f' and '\\x00'. Note that the JSON form of '\u<hhhh>' is
+ * _not_ used. The input is pointed to by 'cup' which is 'ulen' bytes long.
+ * The output is written to 'op' and will not exceed 'olen_max' bytes. If
+ * 'olen_max' is breached, this function returns -1 else it returns the
+ * number of bytes written to 'op'. */
+int
+sgj_conv2json_string(const uint8_t * cup, int ulen, char * op, int olen_max)
+{
+    int k, j;
+
+    for (k = 0, j = 0; k < ulen; k++) {
+        uint8_t u = cup[k];
+
+        /* Treat DEL [0x7f] as non-printable, output: "\\x7f" */
+        if ((u >= 0x20) && (u != 0x7f)) {
+            if (j + 1 >= olen_max)
+                return -1;
+            op[j++] = u;
+        } else {
+            uint8_t u2 = 0;
+
+            switch (u) {
+            case '"': case '\\': u2 = u; break;
+            case '\b': u2 = 'b'; break;
+            case '\f': u2 = 'f'; break;
+            case '\n': u2 = 'n'; break;
+            case '\r': u2 = 'r'; break;
+            case '\t': u2 = 't'; break;
+            }
+            if (u2) {
+                /* the escaping of these is handled by the json_builder's
+                 * output serializer. */
+                if (j + 1 >= olen_max)
+                    return -1;
+                op[j++] = u;    /* not using u2, only that it is != 0 */
+            } else {
+                char b[8];
+
+                if (snprintf(b, sizeof(b), "\\x%02x", u) != 4 ||
+                    j + 4 >= olen_max)
+                    return -1;
+                memcpy(op + j, b, 4);
+                j += 4;
+            }
+        }
+    }
+    return j;
+}
+
 
 #ifdef SG_PRSE_SENSE_DECODE
 
@@ -2057,61 +2137,4 @@ fini:
     return ret;
 }
 
-/* Convert a byte stream that is meant to be printable ASCII or UTF-8 to
- * something that is allowable in a JSON string. This means treating the
- * ASCII control characters (i.e. < 0x20) and DEL as specials. Also '\' and
- * '"' need to be escaped with a preceding '\'. These C escape codes are used
- * in JSON: '\b', '\f', '\n', '\r' and '\t'. Other control characters, and DEL
- * are encoded as '\x<hh>' where <hh> is two hex digits. So the DEL and
- * null ACSII characters in the input will appear as '\x7f' and '\x00'
- * respectively in the output. The output serializer will expand those
- * two to '\\x7f' and '\\x00'. Note that the JSON form of '\u<hhhh>' is
- * _not_ used. The input is pointed to by 'cup' which is 'ulen' bytes long.
- * The output is written to 'op' and will not exceed 'olen_max' bytes. If
- * 'olen_max' is breached, this function returns -1 else it returns the
- * number of bytes written to 'op'. */
-int
-sgj_conv2json_string(const uint8_t * cup, int ulen, char * op, int olen_max)
-{
-    int k, j;
-
-    for (k = 0, j = 0; k < ulen; k++) {
-        uint8_t u = cup[k];
-
-        /* Treat DEL [0x7f] as non-printable, output: "\\x7f" */
-        if ((u >= 0x20) && (u != 0x7f)) {
-            if (j + 1 >= olen_max)
-                return -1;
-            op[j++] = u;
-        } else {
-            uint8_t u2 = 0;
-
-            switch (u) {
-            case '"': case '\\': u2 = u; break;
-            case '\b': u2 = 'b'; break;
-            case '\f': u2 = 'f'; break;
-            case '\n': u2 = 'n'; break;
-            case '\r': u2 = 'r'; break;
-            case '\t': u2 = 't'; break;
-            }
-            if (u2) {
-                /* the escaping of these is handled by the json_builder's
-                 * output serializer. */
-                if (j + 1 >= olen_max)
-                    return -1;
-                op[j++] = u;    /* not using u2, only that it is != 0 */
-            } else {
-                char b[8];
-
-                if (snprintf(b, sizeof(b), "\\x%02x", u) != 4 ||
-                    j + 4 >= olen_max)
-                    return -1;
-                memcpy(op + j, b, 4);
-                j += 4;
-            }
-        }
-    }
-    return j;
-}
-
-#endif
+#endif          /* end of SG_PRSE_SENSE_DECODE conditional */

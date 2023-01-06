@@ -1,48 +1,89 @@
-.TH SG_SAT_READ_GPLOG "8" "April 2015" "sg3_utils\-1.41" SG3_UTILS
+.TH SG_SAT_READ_GPLOG "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
-sg_sat_read_gplog \- use ATA READ LOG EXT command via a SCSI to ATA
-Translation (SAT) layer
+sg_sat_read_gplog \- use ATA READ LOG EXT or SMART READ LOG command via
+a SCSI to ATA Translation (SAT) layer
 .SH SYNOPSIS
 .B sg_sat_read_gplog
-[\fI\-\-ck_cond\fR] [\fI\-\-count=CO\fR] [\fI\-\-dma\fR] [\fI\-\-help\fR]
-[\fI\-\-hex\fR] [\fI\-\-len=\fR{16|12}] [\fI\-\-log=\fRLA]
-[\fI\-\-page=\fRPN] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR]
+[\fI\-\-address=LA_L\fR] [\fI\-\-ck_cond\fR] [\fI\-\-count=CO\fR]
+[\fI\-\-dma\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-len=CMD_LEN\fR]
+[\fI\-\-log=LA_L\fR] [\fI\-\-page=PN\fR] [\fI\-\-ppt=PPT\fR]
+[\fI\-\-readonly\fR] [\fI\-\-smart\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
-This utility sends an ATA READ LOG EXT or an ATA READ LOG DMA EXT command to
-the \fIDEVICE\fR. This command is used to read the general purpose log
-of (S)ATA disks (not ATAPI devices such as DVD driver). Rather than send the
-READ LOG (DMA) EXT command directly to the device it is sent via a SCSI
-transport which is assumed to contain a SCSI to ATA Translation (SAT)
-Layer (SATL). The SATL may be in an operating system driver, in host bus
-adapter (HBA) firmware or in some external enclosure.
+This utility sends an ATA READ LOG EXT, an ATA READ LOG DMA EXT, or an ATA
+SMART READ LOG command to the \fIDEVICE\fR. The default is to send one of
+the first two commands to read "general purpose log" page(s). Only (S)ATA
+devices (e.g. disks) but not ATAPI devices (e.g. DVD readers) support the
+general purpose log pages. Rather than send the READ LOG (DMA) EXT command
+directly to the device it is sent via a SCSI transport which is assumed to
+contain a SCSI to ATA Translation (SAT) Layer (SATL). The SATL may be in an
+operating system driver, in host bus adapter (HBA) firmware or in some
+external enclosure.
 .PP
-This utility does not currently attempt to decode the response from the
-ATA disk, rather it outputs the response in ASCII hexadecimal grouped in
-16 bit words. Following ATA conventions those words are decoded little
-endian (note that SCSI commands use a big endian representation). In the
-future this utility may attempt to decode some log pages, perhaps using
-the \fI\-\-decode\fR option.
+This utility does not currently attempt to decode the response from the ATA
+disk, rather it outputs the response in ASCII hexadecimal grouped in 8 bit
+bytes or 16 bit words. Following ATA conventions those words are decoded
+little endian (note that SCSI commands use a big endian representation). Log
+address 0, page number 0 is the 'directory' log page and it is decoded if no
+\fI\-\-hex\fR option is given. In the future this utility may attempt to
+decode other log pages. Perhaps other ATA utility will be able to decode
+these log pages given hex output from this utility.
 .PP
-The SAT\-2 standard (SAT ANSI INCITS 465-2010, prior draft: sat2r09.pdf at
-www.t10.org) defines two SCSI "ATA PASS\-THROUGH" commands: one using a 16
-byte "cdb" and the other with a 12 byte cdb. This utility defaults to using
-the 16 byte cdb variant.
+Fetching all log pages seems as simple as reading the directory log page
+then accessing those log addresses that have more than zero associated page
+numbers. Unfortunately it is not that simple. Some log addresses (looking
+specifically at 0xe1 ("SCT Data transfer")) need a SCT command executed prior
+to fetching the log page at that log address. Other log addresses might be
+problematic (e.g. it has been suggested that the "Device vendor specific
+logs" 0xa0:0xdf) so maybe they also should be avoided. That is the reason
+the \fI\-\-address=LA_L\fR and \fI\-\-log=LA_L\fR options are designed to
+take a list of ranges.
+.PP
+The SAT\-4 standard (SAT ANSI INCITS 491-201r7 prior draft: sat4r06.pdf at
+www.t10.org) defines three SCSI "ATA PASS\-THROUGH" commands: one using a 12
+byte "cdb", another using a 16 bytes cdb, and the third a 32 byte cdb. This
+utility defaults to using the 16 byte cdb variant.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+\fB\-a\fR, \fB\-\-address\fR=\fILA_L\fR
+where \fILA_L\fR is as single "log address", a range of log addresses, or a
+list of (ranges of) log addresses. A log address is a number between 0 and
+255 (0xff) where log address 0, page number 0, is a directory. A range of
+log addresses has the form "lo:hi" where log address "hi" must be greater
+than or equal to "lo". A log address list is a comma separated list of
+log addresses or log address ranges.
+.br
+Each log address contain up to 256 (SMART log) or 65536 (General purpose
+log) page numbers, starting at page number 0. The number of page numbers
+available for each log address is enumerated in the log directory page.
+.br
+Summary of  \fILA_L\fR syntax: lo:hi,lo2:hi2,lo3:hi3 ...
+.TP
 \fB\-C\fR, \fB\-\-ck_cond\fR
-sets the CK_COND bit in the ATA PASS\-THROUGH SCSI cdb. The
-default setting is clear (i.e. 0). When set the SATL should yield a
-sense buffer containing a ATA Result descriptor irrespective of whether
-the ATA command succeeded or failed. When clear the SATL should only yield
-a sense buffer containing a ATA Result descriptor if the ATA command failed.
+sets the CK_COND bit in the ATA PASS\-THROUGH SCSI cdb. The default setting
+is clear (i.e. 0). When set the SATL should yield a sense buffer containing
+a ATA Result descriptor irrespective of whether the ATA command succeeded or
+failed. When clear the SATL should only yield a sense buffer containing an
+ATA Result descriptor if the ATA command failed.
 .TP
 \fB\-c\fR, \fB\-\-count\fR=\fICO\fR
-the number \fICO\fR is placed in the "count" field in the ATA READ
-LOG EXT command. This specified the number of 512\-byte blocks of
-data to be read from the specified log.
+the number \fICO\fR is placed in the "count" field in the ATA READ LOG EXT
+command. This specified the number of 512\-byte log pages of data to be
+read from the specified log address. The given page address starting at the
+given page number is read. The last page number read will be
+\fIPN\fR + \fICO\fR - 11 if it exists.
+.br
+The maximum value of \fICO\fR is 0xffff (65,535) for general purpose log
+pages and 0xff (255) for SMART log pages.
+.br
+An error is typically reported if the given \fI\-\-page=\fRPN (default 0)
+plus \fICO\fR exceeds the number shown in the log directory (log address
+0) for the given log address.
+.br
+Note that the \fICO\fR only applies to the current log address; in other
+words there is no wrap around to the beginning of the next log address.
 .TP
 \fB\-d\fR, \fB\-\-dma\fR
 use the ATA READ LOG DMA EXT command instead of ATA READ LOG EXT command.
@@ -60,24 +101,52 @@ this option is not given). When given thrice (i.e. '\-HHH') the output
 is in hex, grouped in 16 bit words (without a leading offset and trailing
 ASCII on each line), in a format that is acceptable for 'hdparm \-\-Istdin'
 to process.
+.PP
+If this option is invoked four times (e.g. '\-HHHH') log pages are output
+as hex bytes, with no leading address at the start of each line. That makes
+the hex easier for computers to decode (but not humans). If this option is
+invoked five times then a comment line, starting with a '#' character
+is output before each 512 byte log page. The comment describes the following
+log page.
 .TP
-\fB\-L\fR, \fB\-\-log\fR=\fILA\fR
-the number \fILA\fR is known as the "log address" in the ATA standards and
-is placed in bits 7:0 of the "lba" field of the ATA READ LOG (DMA) EXT
-command. This specifies the log to be returned (See ATA\-ACS for a detailed
-list of available log addresses). The default value placed in the "lba
-field is 0, returning the directory of available logs. The maximum value
-allowed for \fILOG\fR is 0xff.
+\fB\-l\fR, \fB\-\-len\fR=\fICMD_LEN\fR
+where \fICMD_LEN\fR is the command (cdb) length of the SCSI ATA
+PASS\-THROUGH command that is used to tunnel ATA commands. Three values
+are permitted: 12, 16 and 32 (bytes long). The 12 byte variant has the
+most restrictions (e.g. its 'count' field is a single byte) but older
+systems may not permit 16 or 32 byte commands.
+.TP
+\fB\-L\fR, \fB\-\-log\fR=\fILA_L\fR
+see the \fI\-\-address=LA_L\fR option.
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPN\fR
-the number \fIPN\fR is the page number (within the log address) and is
-placed in bits 32:16 of the "lba" field of the ATA READ LOG (DMA) EXT
-command. The default value placed in the "lba" field is 0. The maximum value
-allowed for \fILOG\fR is 0xffff.
+the number \fIPN\fR is the page number (within the log address) and is placed
+in bits 32:16 of the "lba" field of the ATA READ LOG (DMA) EXT command. The
+default value placed in the "lba" field is 0.
+.br
+The maximum value of \fIPN\fR is 0xffff (65,535) for general purpose log
+pages and 0xff (255) for SMART log pages. In the latter case \fIPN\fR must
+be 0 and \fICO\fR is 255.
+.PP
+When multiple log addresses are specified (via the \fILA_L\fR argument) then
+this option is treated differently. With multiple log addresses and if
+\fIPN\fR is greater than 0 then it acts as an upper limit of the number of
+page numbers that will be output for each log address. The actual number of
+512 byte log pages output will also depend on the number of page numbers
+shown in the directory log page for the current log address.
 .TP
-\fB\-l\fR, \fB\-\-len\fR={16|12}
+\fB\-P\fR, \fB\-\-ppt\fR=\fIPPT\fR
+where \fIPPT\fR is the number of pages to transfer from the \fIDEVICE\fR
+per ATA READ LOG EXT or an ATA READ LOG DMA EX command invocation. The
+default value is 128 (or 64 kibiBytes) which is chosen because most OSes
+have an upper limit on the size of transfers to and from a device with
+a single command. When the number of log pages given with the
+\fI\-\-count=CO\fR option is large , it can exceed what an OS will allow
+in a single command invocation. Hence the need for this option.
+.TP
+\fB\-l\fR, \fB\-\-len\fR={32|16|12}
 this is the length of the SCSI cdb used for the ATA PASS\-THROUGH commands.
-The argument can either be 16 or 12. The default is 16. Some SCSI
+The argument can either be 32, 16 or 12. The default is 16. Some SCSI
 transports cannot convey SCSI commands longer than 12 bytes.
 .TP
 \fB\-r\fR, \fB\-\-readonly\fR
@@ -88,6 +157,18 @@ ATA disks are defeated by OS actions on the close() if the \fIDEVICE\fR was
 opened with the read\-write flag (e.g. the OS might think it needs to
 flush something to disk).
 .TP
+\fB\-s\fR, \fB\-\-smart\fR
+in the ATA SMART feature set, "SMART" log pages have been present for a long
+time and pre-date the later addition of the "general purpose" log pages. So
+this utility can be easily be extended to read "SMART" log pages instead of
+the general purpose log pages. That is exactly what this option does.
+.br
+The ATA SMART READ LOG command has no page number field, all fetches start
+from page number 0. Also the number of page numbers (in it log address) is
+limited to a single byte (so 255). The general purpose log directory page
+and the SMART log directory page have the same format (given the single byte
+restriction on the number of page numbers in each SMART log address).
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increases the level or verbosity.
 .TP
@@ -96,6 +177,18 @@ print out version string
 .SH NOTES
 Prior to Linux kernel 2.6.29 USB mass storage limited sense data to 18 bytes
 which made the \fB\-\-ck_cond\fR option yield strange (truncated) results.
+.PP
+There are slight differences in handling when a single log address is being
+fetched, and when multiple log pages are being fetched. In the single log
+address case the log address, the page number and the count going into the
+corresponding fields in the ATA READ LOG EXT or ATA SMART READ LOG command.
+When multiple log addresses are given, the 'directory' log
+page (log_address=0, page_number=0) is first loaded. Then only log addresses
+which the directory indicates have more than zero log page numbers, are
+fetched. The count of log page numbers accessed may be further restricted
+by the \fI\-\-page=PN\fR option if \fIPN\fR is greater than zero.
+.SH EXAMPLES
+To Be Done.
 .SH EXIT STATUS
 The exit status of sg_sat_read_gplog is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.
@@ -104,10 +197,10 @@ Written by Hannes Reinecke and Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014\-2015 Hannes Reinecke, SUSE Linux GmbH
+Copyright \(co 2014\-2023 Hannes Reinecke, SUSE Linux GmbH
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sg_sat_identify(sg3_utils), sg_inq(sg3_utils), sdparm(sdparm),
-.B hdparm(hdparm)
+.B hdparm(hdparm), smartctl(smartmontools)

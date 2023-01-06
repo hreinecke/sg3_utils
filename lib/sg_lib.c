@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2022 Douglas Gilbert.
+ * Copyright (c) 1999-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -128,6 +128,8 @@ void sg_rep_invocation(const char * util_name, const char * ver_str,
             fprintf(fp, "  %s\n", argv[k]);
     } else
         fprintf(fp, "invocation_arguments:<none>\n");
+    fprintf(fp, "^^vv^^vv^^vv^^vv^^vv^^vv^^vv^^vv^^vv^^vv^^vv^^vv^^"
+            "vv^^vv^^vv\n");
 }
 
 /* DSENSE is 'descriptor sense' as opposed to the older 'fixed sense'.
