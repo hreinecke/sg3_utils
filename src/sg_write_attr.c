@@ -35,7 +35,7 @@
  * device and decodes the response. Based on spc5r19.pdf
  */
 
-static const char * version_str = "1.01 20230106";
+static const char * version_str = "1.02 20230106";
 
 #define MAX_ATTR_VALUE_LEN SG_LIB_UNBOUNDED_16BIT
 #define MAX_ATTR_BUFF_LEN (1024 * 1024)
@@ -817,8 +817,8 @@ parse_attributes(char *argv[], const int argc, uint8_t * wabp, int * buf_len,
     avps = (struct attr_value_pair_t *)
                 calloc(argc, sizeof(struct attr_value_pair_t));
     if (NULL == avps) {
-        pr2serr("%s: out of memory allocating %lu bytes\n", __func__,
-                argc * sizeof(struct attr_value_pair_t));
+        pr2serr("%s: out of memory allocating %u bytes\n", __func__,
+                (unsigned int)(argc * sizeof(struct attr_value_pair_t)));
         return sg_convert_errno(ENOMEM);
     }
     /* parse attribute-value pairs */

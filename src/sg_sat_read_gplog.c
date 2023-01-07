@@ -64,7 +64,7 @@
 
 #define MAX_LAR_LIST_ELEMS 8
 
-static const char * version_str = "1.25 20230105";
+static const char * version_str = "1.26 20230106";
 
 struct opts_t {
     bool ck_cond;
