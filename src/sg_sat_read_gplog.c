@@ -501,8 +501,8 @@ decode_la_list(const char * aname, const char * arg, struct opts_t * op)
             }
             n = (mcp - ap);
             if ('\0' == *(mcp + 1)) {
-                pr2serr("%s trailing comma at argument position %ld "
-                        "suggests an error\n", an, (mcp - arg) + 1);
+                pr2serr("%s trailing comma at argument position %d "
+                        "suggests an error\n", an, (int)((mcp - arg) + 1));
                 return false;
             }
         } else
