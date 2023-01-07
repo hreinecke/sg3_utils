@@ -476,12 +476,14 @@ decode_la_list(const char * aname, const char * arg, struct opts_t * op)
     const char * lcp;           /* colon pointer */
     const char * mcp;           /* comma pointer */
     const char * ap = arg;
+    char an[32];
     char e[64];                 /* each element */
     char q[64];                 /* error string */
     static const int elen = sizeof(e);
     static const int qlen = sizeof(q);
     static const char * le_s = "list element";
 
+    snprintf(an, sizeof(an), "%s option:", aname);
     if (strchr(ap, '-')) {
         pr2serr("%s '-' is invalid in this argument\n", aname);
         pr2serr("  use ':' for ranges and ',' as a list separator\n");
@@ -498,6 +500,11 @@ decode_la_list(const char * aname, const char * arg, struct opts_t * op)
                 continue;
             }
             n = (mcp - ap);
+            if ('\0' == *(mcp + 1)) {
+                pr2serr("%s trailing comma at argument position %ld "
+                        "suggests an error\n", an, (mcp - arg) + 1);
+                return false;
+            }
         } else
             n = strlen(ap);
         if (n >= (elen - 1)) {
@@ -564,7 +571,7 @@ decode_la_list(const char * aname, const char * arg, struct opts_t * op)
         ap = mcp + 1;
     }
     if (q[0]) {
-        pr2serr("%s %s\n", aname, q);
+        pr2serr("%s %s\n", an, q);
         return false;
     }
     return true;

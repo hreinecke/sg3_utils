@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021 Douglas Gilbert.
+ * Copyright (c) 2016-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.16 20211114";
+static const char * version_str = "1.17 20230106";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -180,7 +180,7 @@ static struct attr_name_info_t attr_name_arr[] = {
     {0x808, "Media pool", RA_FMT_TEXT, 160, 0},
     {0x809, "Partition user text label", RA_FMT_ASCII, 16, 0},
     {0x80a, "Load/unload at partition", RA_FMT_BINARY, 1, 0},
-    {0x80a, "Application format version", RA_FMT_ASCII, 16, 0},
+    {0x80b, "Application format version", RA_FMT_ASCII, 16, 0},
     {0x80c, "Volume coherency information", RA_FMT_BINARY, -1, 1},
      /* SSC-5 */
     {0x820, "Medium globally unique identifier", RA_FMT_BINARY, 36, 1},

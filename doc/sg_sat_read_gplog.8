@@ -40,7 +40,7 @@ logs" 0xa0:0xdf) so maybe they also should be avoided. That is the reason
 the \fI\-\-address=LA_L\fR and \fI\-\-log=LA_L\fR options are designed to
 take a list of ranges.
 .PP
-The SAT\-4 standard (SAT ANSI INCITS 491-201r7 prior draft: sat4r06.pdf at
+The SAT\-4 standard (SAT ANSI INCITS 491\-201r7 prior draft: sat4r06.pdf at
 www.t10.org) defines three SCSI "ATA PASS\-THROUGH" commands: one using a 12
 byte "cdb", another using a 16 bytes cdb, and the third a 32 byte cdb. This
 utility defaults to using the 16 byte cdb variant.
@@ -72,8 +72,8 @@ ATA Result descriptor if the ATA command failed.
 the number \fICO\fR is placed in the "count" field in the ATA READ LOG EXT
 command. This specified the number of 512\-byte log pages of data to be
 read from the specified log address. The given page address starting at the
-given page number is read. The last page number read will be
-\fIPN\fR + \fICO\fR - 11 if it exists.
+given page number is read. The last page number read will
+be (\fIPN\fR + \fICO\fR \- 1) if it exists.
 .br
 The maximum value of \fICO\fR is 0xffff (65,535) for general purpose log
 pages and 0xff (255) for SMART log pages.
@@ -159,7 +159,7 @@ flush something to disk).
 .TP
 \fB\-s\fR, \fB\-\-smart\fR
 in the ATA SMART feature set, "SMART" log pages have been present for a long
-time and pre-date the later addition of the "general purpose" log pages. So
+time and pre\-date the later addition of the "general purpose" log pages. So
 this utility can be easily be extended to read "SMART" log pages instead of
 the general purpose log pages. That is exactly what this option does.
 .br
@@ -188,7 +188,20 @@ which the directory indicates have more than zero log page numbers, are
 fetched. The count of log page numbers accessed may be further restricted
 by the \fI\-\-page=PN\fR option if \fIPN\fR is greater than zero.
 .SH EXAMPLES
-To Be Done.
+First here is an example avoiding the problematic log addresses noted in the
+DESCRIPTION section above.
+.PP
+  sg_sat_read_gplog \-a 0:0xb,0xd:0x9f,0xe0,0xe2:255 /dev/sdc
+.PP
+The above is using the short form of the \fI\-\-address=LA_L\fR option with
+a list that avoids log addresses 0xc, 0xa0 to 0xdf and 0xe1 . The output
+will include all log addresses, apart from those exclusions, that the
+directory indicates have more than 0 page numbers.
+.br
+The following invocation uses the SMART READ LOG command instead of the READ
+LOG EXT command:
+.PP
+  sg_sat_read_gplog \-\-smart \-a 0:0xb,0xd:0x9f,0xe0,0xe2:255 /dev/sdc
 .SH EXIT STATUS
 The exit status of sg_sat_read_gplog is 0 when it is successful. Otherwise
 see the sg3_utils(8) man page.

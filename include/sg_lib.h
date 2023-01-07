@@ -702,6 +702,11 @@ bool sg_all_ffs(const uint8_t * bp, int b_len);
  * such byte is found by *(up + len - 1) then false is returned. */
 bool sg_has_control_char(const uint8_t * up, int len);
 
+/* Returns true if byte sequence contains only printable ASCII characters
+ * (locale independent), otherwise returns false.
+ *  If bp is NULL or b_len <= 0 returns false. */
+bool sg_all_printable(const uint8_t * bp, int b_len);
+
 /* Extract character sequence from ATA words as in the model string
  * in a IDENTIFY DEVICE response. Returns number of characters
  * written to 'ochars' before 0 character is found or 'num' words

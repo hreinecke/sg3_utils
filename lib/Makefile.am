@@ -78,6 +78,7 @@ endif
 # For C++/clang testing
 ## CC = gcc-9
 ## CXX = g++
+## CC = g++
 ## CC = clang
 ## CXX = clang++
 ## CC = clang++

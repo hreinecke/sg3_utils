@@ -3141,6 +3141,18 @@ sg_all_ffs(const uint8_t * bp, int b_len)
     return true;
 }
 
+bool
+sg_all_printable(const uint8_t * bp, int b_len)
+{
+    if ((NULL == bp) || (b_len <= 0))
+        return false;
+    for (--b_len; b_len >= 0; --b_len) {
+        if (!my_isprint(bp[b_len]))
+            return false;
+    }
+    return true;
+}
+
 static uint16_t
 swapb_uint16(uint16_t u)
 {

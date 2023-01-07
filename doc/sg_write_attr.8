@@ -1,0 +1,253 @@
+.TH SG_WRITE_ATTR "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
+.SH NAME
+sg_write_attr \- send SCSI WRITE ATTRIBUTE command
+.SH SYNOPSIS
+.B sg_write_attr
+[\fI\-\-enumerate\fR] [\fI\-\-element=EA\fR]
+[\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR]
+[\fI\-\-lvn=LVN\fR] [\fI\-\-pn=PN\fR] [\fI\-\-raw\fR]
+[\fI\-\-wtc\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR [\fIattribute=value\fR [\fIattribute:value\fR...]]
+.SH DESCRIPTION
+.\" Add any additional description here
+Sends a SCSI WRITE ATTRIBUTE command to \fIDEVICE\fR among with attribute-value
+pairs specified in command line arguments or read from the input file.
+This command was introduced in SPC\-3 revision 1 and thus is
+applicable to all SCSI devices. In practice it is used mainly for tape
+systems. This utility is based on the SPC\-5 draft standard, revision
+17 (spc5r17.pdf).
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-e\fR, \fB\-\-enumerate\fR
+enumerates all known attributes. Attributes include an identifier,
+length, format and a name as defined by T10, with supplementary acronym
+which may be used instead of identifier. Some attributes may also include
+predefined set of values.
+If \fIDEVICE\fR or \fIattribute=value\fR pairs are given then they are ignored.
+.TP
+\fB\-E\fR, \fB\-\-element\fR=\fIEA\fR
+where \fIEA\fR is an element address which is placed in the WRITE ATTRIBUTE
+cdb. This field is only found in SMC\-2 and SMC\-3 drafts for medium
+changers usually associated with tape libraries. By default this field
+is set to zero.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+used together with the input file (\fB\-i\fR, \fB\-\-in\fR=\fIFN\fR) to
+indicate input contents is in hexadecimal format with no leading address (on
+each line), similar to one produced by \fBsg_read_attr \-HHH\fR output.
+.TP
+\fB\-i\fR, \fB\-\-in\fR=\fIFN\fR
+\fIFN\fR is treated as a file name (or '\-' for stdin) which contains
+attribute-value pairs one per line, ASCII hexadecimal or binary representing
+the payload of the WRITE ATTRIBUTE command. When this option is given then
+\fIattribute=value\fR pairs (if also given) are ignored.
+.br
+By default \fIFN\fR is assumed to contain a list of attribute-value pairs, one
+per line.  Empty lines and lines starting from "#" are ignored.
+If the \fI\-\-hex\fR is given, \fIFN\fR is assumed to contain ASCII hexadecimal
+arranged as bytes which a space, tab or comma delimited. All characters
+from (and including) "#" to the end of line are ignored. If the \fI\-\-raw\fR
+option given then \fIFN\fR is assumed to contain binary data. When both
+\fI\-\-hex\fR and \fI\-\-raw\fR options are given, latter takes precedence.
+.TP
+\fB\-l\fR, \fB\-\-lvn\fR=\fILVN\fR
+where \fILVN\fR is placed in the "logical volume number" field of the cdb.
+The default value is zero which is required to be the logical volume number
+if the device only has one volume.
+.TP
+\fB\-p\fR, \fB\-\-pn\fR=\fIPN\fR
+where \fIPN\fR is placed in the "partition number" field of the cdb. If
+the \fIDEVICE\fR only has one partition then its partition number must be
+zero. The default value of \fIPN\fR is zero.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+used together with the input file (\fB\-i\fR, \fB\-\-in\fR=\fIFN\fR) to
+indicate input format is binary, similar to one produced by
+\fBsg_read_attr \-\-raw\fR output.
+.TP
+\fB\-c\fR, \fB\-\-wtc\fR
+sets the WRITE THROUGH CACHE bit in the WRITE ATTRIBUTE cdb.
+This instructs the device server to return successful status only when
+the attributes have been synchronized with the medium auxiliary memory.
+By default the WTC bit is not set.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SS Attribute-value pair format
+An attribute-value pair comprised of the attribute identifier and attribute
+value, delimited by an equal sign \fB'='\fR or a colon \fB':'\fR.
+Attribute identifier can be specified as a number in decimal, octal (prefixed
+by '0') or hexadecimal (prefixed by '0x') representation, or with an acronym
+if the attribute provides one.  Delimiter sign determines value representation:
+an equal sign denotes values in string or numerical format, or acronym, while
+a colon sign denotes a hex sequence comprised of bytes in hexadecimal form
+separated by a space or comma.
+.br
+String values can be used with attributes in ASCII or text format, while
+numbers and acronyms are suitable for binary attributes.
+Available acronyms can be listed by the \fB\-\-enumerate\fR options. Acronyms
+are case-insensitive.
+.br
+For the fixed-length binary attributes, value length must match attribute
+length exactly. Maximum binary attribute value in numerical representation is
+restricted by the unsigned long long type size on a given platform (8 bytes
+typically), while hexadecimal sequence can be of arbitrary length.
+.br
+Values of ASCII format attributes are left aligned padded with spaces to
+attribute length.
+.br
+Empty value (a delimiter followed by nothing) is used to delete a given
+attribute in device server.
+.br
+Attribute-value pairs in command line arguments containing spaces should be
+quoted or escaped.
+.SH NOTES
+Only tape systems seem to implement the SCSI WRITE ATTRIBUTE command. The vast
+majority of its definition is in the SPC standard so other device types could
+use it.
+.br
+Total buffer length for the attribute list in the SCSI WRITE ATTRIBUTE command
+payload is 1 MiB (1024 KiB).
+.SH EXAMPLES
+Set a tape barcode ASCII attribute specified by acronym and a string value:
+.PP
+\fB# sg_write_attr /dev/sg1 BarCode=BARCODE01\fR
+.PP
+Set a tape barcode ASCII attribute specified by hexadecimal identifier and a
+string value:
+.PP
+\fB# sg_write_attr /dev/sg1 0x806=BARCODE01\fR
+.PP
+Set a user label text attribute with string value containing spaces in quoted
+command line argument:
+.PP
+\fB# sg_write_attr /dev/sg1 "UserLabel=User label 1"\fR
+.PP
+Set a user label text attribute with hex sequence value:
+.PP
+\fB# sg_write_attr /dev/sg1 UserLabel:42,41,52,43,4F,44,45,30,32\fR
+.br
+or
+.br
+\fB# sg_write_attr /dev/sg1 "0x803:42 41 52 43 4F 44 45 30 32"\fR
+.PP
+Set a locale identifier attribute with values specified by acronyms or numbers:
+.PP
+\fB# sg_write_attr /dev/sg1 LocaleId=ascii\fR
+.br
+\fB# sg_write_attr /dev/sg1 LocaleId=utf-8\fR
+.br
+\fB# sg_write_attr /dev/sg1 LocaleId=0x80\fR
+.br
+\fB# sg_write_attr /dev/sg1 LocaleId:81\fR
+.br
+\fB# sg_write_attr /dev/sg1 0x805=iso-8859-9\fR
+.PP
+Set multiple attributes specified in command line arguments:
+.PP
+\fB# sg_write_attr /dev/sg1 BarCode=BARCODE01 "UserLabel=My User Label" LocaleId=iso-8859-1\fR
+.PP
+Set variable-length binary attribute with values in numerical or hex sequence formats:
+.PP
+\fB# sg_write_attr /dev/sg1 VCI=1\fR
+.br
+\fB# sg_write_attr /dev/sg1 VCI=65535\fR
+.br
+\fB# sg_write_attr /dev/sg1 VCI=0x012345\fR
+.br
+\fB# sg_write_attr /dev/sg1 VCI=0x0123456789abcdef\fR
+.br
+\fB# sg_write_attr /dev/sg1 VCI:01,23,45,67,89,ab,cd,ef,20,21,22,23,24,25,26,27,28,29,2a,2b,2c,2d,2e,2f\fR
+.PP
+Set fixed-length binary attribute using value in hex sequence format:
+.PP
+\fB# sg_write_attr /dev/sg1 "MediumGUID:63 38 66 36 62 39 32 32 2d 37 38 38 39 2d 31 31 65 64 2d 38 65 35 31 2d 66 37 36 65 62 32 63 39 38 38 64 31"\fR
+.PP
+Delete an attribute using empty value:
+.PP
+\fB# sg_write_attr /dev/sg1 BarCode=\fR
+.br
+or
+.br
+\fB# sg_write_attr /dev/sg1 BarCode:\fR
+.PP
+Delete multiple attributes:
+.PP
+\fB# sg_write_attr /dev/sg1 UserLabel= BarCode= 0x805=\fR
+.PP
+Set attributes specified in the text input file:
+.PP
+\fB# sg_write_attr \-\-in=attrs.txt /dev/sg1\fR
+.br
+Contents of the "attrs.txt" file:
+.br
+\fIAppVersion=1.02.15
+.br
+UserLabel=User Label 1
+.br
+LastWritten=251120221637
+.br
+Barcode=BARCODE02
+.br
+OwningHost=backup_server
+.br
+MediaPoolName=First Media Pool
+.br
+PartUserLabel=PART01
+.br
+LUatPart=1
+.br
+AppFmtVersion=MTF0125
+.br
+VCI=0x0123456789abcdef
+.br
+MediumGUID:62 64 61 36 62 30 35 34 2d 37 38 38 39 2d 31 31 65 64 2d 39 65 64 30 2d 62 37 31 30 63 32 62 63 30 34 30 39\fR
+.PP
+Set attribute list specified in the hexadecimal format input file:
+.PP
+\fB# sg_write_attr \-\-in=attrs_hex.txt \-\-hex /dev/sg1\fR
+.br
+Contents of the "attrs_hex.txt" file:
+.br
+\fI00 00 00 25 08 06 01 00  20 42 41 52 43 4f 44 45
+.br
+2d 30 32 20 20 20 20 20  20 20 20 20 20 20 20 20
+.br
+20 20 20 20 20 20 20 20  20\fR
+.PP
+Set attribute list specified in the raw binary input file:
+.PP
+\fB# sg_write_attr \-\-in=attrs_raw.bin \-\-raw /dev/sg1\fR
+.br
+Contents of the "attrs_raw.bin" file:
+.br
+\fI$ od -A x -t x1z -v attrs_raw.bin
+.br
+000000 00 00 00 25 08 06 01 00 20 42 41 52 43 4f 44 45  >...%.... BARCODE<
+.br
+000010 2d 30 32 20 20 20 20 20 20 20 20 20 20 20 20 20  >-02             <
+.br
+000020 20 20 20 20 20 20 20 20 20                       >         <
+.br
+000029\fR
+.SH EXIT STATUS
+The exit status of sg_write_attr is 0 when it is successful. Otherwise see
+the sg3_utils(8) man page.
+.SH AUTHORS
+Written by Douglas Gilbert and Boris Fox.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2016\-2020 Douglas Gilbert, 2022\-2023 Boris Fox
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sg_read_attrs(sg3_utils)

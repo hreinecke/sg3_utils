@@ -108,11 +108,11 @@ bin_PROGRAMS = sg_bg_ctl$(EXEEXT) sg_compare_and_write$(EXEEXT) \
 	sg_ses_microcode$(EXEEXT) sg_start$(EXEEXT) sg_stpg$(EXEEXT) \
 	sg_stream_ctl$(EXEEXT) sg_sync$(EXEEXT) sg_timestamp$(EXEEXT) \
 	sg_turs$(EXEEXT) sg_unmap$(EXEEXT) sg_verify$(EXEEXT) \
-	sg_vpd$(EXEEXT) sg_wr_mode$(EXEEXT) sg_write_buffer$(EXEEXT) \
-	sg_write_long$(EXEEXT) sg_write_same$(EXEEXT) \
-	sg_write_verify$(EXEEXT) sg_write_x$(EXEEXT) sg_zone$(EXEEXT) \
-	sg_z_act_query$(EXEEXT) $(am__EXEEXT_1) $(am__EXEEXT_2) \
-	$(am__EXEEXT_3)
+	sg_vpd$(EXEEXT) sg_wr_mode$(EXEEXT) sg_write_attr$(EXEEXT) \
+	sg_write_buffer$(EXEEXT) sg_write_long$(EXEEXT) \
+	sg_write_same$(EXEEXT) sg_write_verify$(EXEEXT) \
+	sg_write_x$(EXEEXT) sg_zone$(EXEEXT) sg_z_act_query$(EXEEXT) \
+	$(am__EXEEXT_1) $(am__EXEEXT_2) $(am__EXEEXT_3)
 @OS_LINUX_TRUE@@PT_DUMMY_FALSE@am__append_1 = \
 @OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_copy_results sg_dd sg_emc_trespass sg_map sg_map26 sg_rbuf \
 @OS_LINUX_TRUE@@PT_DUMMY_FALSE@	sg_read sg_reset sg_scan sg_test_rwbuf sg_xcopy sginfo sgm_dd sgp_dd
@@ -348,6 +348,9 @@ sg_vpd_DEPENDENCIES = ../lib/libsgutils2.la
 sg_wr_mode_SOURCES = sg_wr_mode.c
 sg_wr_mode_OBJECTS = sg_wr_mode.$(OBJEXT)
 sg_wr_mode_DEPENDENCIES = ../lib/libsgutils2.la
+sg_write_attr_SOURCES = sg_write_attr.c
+sg_write_attr_OBJECTS = sg_write_attr.$(OBJEXT)
+sg_write_attr_DEPENDENCIES = ../lib/libsgutils2.la
 sg_write_buffer_SOURCES = sg_write_buffer.c
 sg_write_buffer_OBJECTS = sg_write_buffer.$(OBJEXT)
 sg_write_buffer_DEPENDENCIES = ../lib/libsgutils2.la
@@ -432,12 +435,13 @@ am__depfiles_remade = ./$(DEPDIR)/sg_bg_ctl.Po \
 	./$(DEPDIR)/sg_turs.Po ./$(DEPDIR)/sg_unmap.Po \
 	./$(DEPDIR)/sg_verify.Po ./$(DEPDIR)/sg_vpd.Po \
 	./$(DEPDIR)/sg_vpd_common.Po ./$(DEPDIR)/sg_vpd_vendor.Po \
-	./$(DEPDIR)/sg_wr_mode.Po ./$(DEPDIR)/sg_write_buffer.Po \
-	./$(DEPDIR)/sg_write_long.Po ./$(DEPDIR)/sg_write_same.Po \
-	./$(DEPDIR)/sg_write_verify.Po ./$(DEPDIR)/sg_write_x.Po \
-	./$(DEPDIR)/sg_xcopy.Po ./$(DEPDIR)/sg_z_act_query.Po \
-	./$(DEPDIR)/sg_zone.Po ./$(DEPDIR)/sginfo.Po \
-	./$(DEPDIR)/sgm_dd.Po ./$(DEPDIR)/sgp_dd.Po
+	./$(DEPDIR)/sg_wr_mode.Po ./$(DEPDIR)/sg_write_attr.Po \
+	./$(DEPDIR)/sg_write_buffer.Po ./$(DEPDIR)/sg_write_long.Po \
+	./$(DEPDIR)/sg_write_same.Po ./$(DEPDIR)/sg_write_verify.Po \
+	./$(DEPDIR)/sg_write_x.Po ./$(DEPDIR)/sg_xcopy.Po \
+	./$(DEPDIR)/sg_z_act_query.Po ./$(DEPDIR)/sg_zone.Po \
+	./$(DEPDIR)/sginfo.Po ./$(DEPDIR)/sgm_dd.Po \
+	./$(DEPDIR)/sgp_dd.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -472,10 +476,10 @@ SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c sg_dd.c \
 	sg_seek.c sg_senddiag.c sg_ses.c sg_ses_microcode.c sg_start.c \
 	sg_stpg.c sg_stream_ctl.c sg_sync.c sg_test_rwbuf.c \
 	sg_timestamp.c sg_turs.c sg_unmap.c sg_verify.c \
-	$(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
-	sg_write_long.c sg_write_same.c sg_write_verify.c sg_write_x.c \
-	sg_xcopy.c sg_z_act_query.c sg_zone.c sginfo.c sgm_dd.c \
-	sgp_dd.c
+	$(sg_vpd_SOURCES) sg_wr_mode.c sg_write_attr.c \
+	sg_write_buffer.c sg_write_long.c sg_write_same.c \
+	sg_write_verify.c sg_write_x.c sg_xcopy.c sg_z_act_query.c \
+	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
 	sg_dd.c sg_decode_sense.c sg_emc_trespass.c sg_format.c \
 	sg_get_config.c sg_get_elem_status.c sg_get_lba_status.c \
@@ -491,10 +495,10 @@ DIST_SOURCES = sg_bg_ctl.c sg_compare_and_write.c sg_copy_results.c \
 	$(am__sg_scan_SOURCES_DIST) sg_seek.c sg_senddiag.c sg_ses.c \
 	sg_ses_microcode.c sg_start.c sg_stpg.c sg_stream_ctl.c \
 	sg_sync.c sg_test_rwbuf.c sg_timestamp.c sg_turs.c sg_unmap.c \
-	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_buffer.c \
-	sg_write_long.c sg_write_same.c sg_write_verify.c sg_write_x.c \
-	sg_xcopy.c sg_z_act_query.c sg_zone.c sginfo.c sgm_dd.c \
-	sgp_dd.c
+	sg_verify.c $(sg_vpd_SOURCES) sg_wr_mode.c sg_write_attr.c \
+	sg_write_buffer.c sg_write_long.c sg_write_same.c \
+	sg_write_verify.c sg_write_x.c sg_xcopy.c sg_z_act_query.c \
+	sg_zone.c sginfo.c sgm_dd.c sgp_dd.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -738,6 +742,7 @@ sg_verify_LDADD = ../lib/libsgutils2.la
 sg_vpd_SOURCES = sg_vpd.c sg_vpd_vendor.c sg_vpd_common.c
 sg_vpd_LDADD = ../lib/libsgutils2.la
 sg_wr_mode_LDADD = ../lib/libsgutils2.la
+sg_write_attr_LDADD = ../lib/libsgutils2.la
 sg_write_buffer_LDADD = ../lib/libsgutils2.la
 sg_write_long_LDADD = ../lib/libsgutils2.la
 sg_write_same_LDADD = ../lib/libsgutils2.la
@@ -1081,6 +1086,10 @@ sg_wr_mode$(EXEEXT): $(sg_wr_mode_OBJECTS) $(sg_wr_mode_DEPENDENCIES) $(EXTRA_sg
 	@rm -f sg_wr_mode$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_wr_mode_OBJECTS) $(sg_wr_mode_LDADD) $(LIBS)
 
+sg_write_attr$(EXEEXT): $(sg_write_attr_OBJECTS) $(sg_write_attr_DEPENDENCIES) $(EXTRA_sg_write_attr_DEPENDENCIES) 
+	@rm -f sg_write_attr$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(sg_write_attr_OBJECTS) $(sg_write_attr_LDADD) $(LIBS)
+
 sg_write_buffer$(EXEEXT): $(sg_write_buffer_OBJECTS) $(sg_write_buffer_DEPENDENCIES) $(EXTRA_sg_write_buffer_DEPENDENCIES) 
 	@rm -f sg_write_buffer$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sg_write_buffer_OBJECTS) $(sg_write_buffer_LDADD) $(LIBS)
@@ -1197,6 +1206,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_vpd_common.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_vpd_vendor.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_wr_mode.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_attr.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_buffer.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_long.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sg_write_same.Po@am__quote@ # am--include-marker
@@ -1434,6 +1444,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sg_vpd_common.Po
 	-rm -f ./$(DEPDIR)/sg_vpd_vendor.Po
 	-rm -f ./$(DEPDIR)/sg_wr_mode.Po
+	-rm -f ./$(DEPDIR)/sg_write_attr.Po
 	-rm -f ./$(DEPDIR)/sg_write_buffer.Po
 	-rm -f ./$(DEPDIR)/sg_write_long.Po
 	-rm -f ./$(DEPDIR)/sg_write_same.Po
@@ -1556,6 +1567,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sg_vpd_common.Po
 	-rm -f ./$(DEPDIR)/sg_vpd_vendor.Po
 	-rm -f ./$(DEPDIR)/sg_wr_mode.Po
+	-rm -f ./$(DEPDIR)/sg_write_attr.Po
 	-rm -f ./$(DEPDIR)/sg_write_buffer.Po
 	-rm -f ./$(DEPDIR)/sg_write_long.Po
 	-rm -f ./$(DEPDIR)/sg_write_same.Po
