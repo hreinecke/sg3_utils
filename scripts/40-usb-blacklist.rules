@@ -6,7 +6,7 @@
 ACTION!="add|change", GOTO="usb_blacklist_end"
 KERNEL!="sd*[!0-9]|sr*", GOTO="usb_blacklist_end"
 
-# unkown device
+# unknown device
 ATTRS{idVendor}=="0aec", ATTRS{idProduct}=="3260", ENV{ID_SCSI_INQUIRY}="1"
 # Sony/JMicron port replicator
 ATTRS{idVendor}=="054c", ATTRS{idProduct}=="06a0", ENV{ID_SCSI_INQUIRY}="1"
