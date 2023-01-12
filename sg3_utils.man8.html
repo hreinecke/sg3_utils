@@ -4,7 +4,7 @@ Content-type: text/html; charset=UTF-8
 <HTML><HEAD><TITLE>Man page of SG3_UTILS</TITLE>
 </HEAD><BODY>
 <H1>SG3_UTILS</H1>
-Section: SG3_UTILS (8)<BR>Updated: November 2021<BR><A HREF="#index">Index</A>
+Section: SG3_UTILS (8)<BR>Updated: January 2023<BR><A HREF="#index">Index</A>
 <A HREF="../index.html">Return to Main Contents</A><HR>
 
 <A NAME="lbAB">&nbsp;</A>
@@ -17,14 +17,13 @@ sg3_utils - a package of utilities for sending SCSI commands
 <B>sg_*</B>
 
 [<I>--dry-run</I>] [<I>--enumerate</I>] [<I>--help</I>] [<I>--hex</I>]
-[<I>--in=FN</I>] [<I>--inhex=FN</I>] [<I>--maxlen=LEN</I>] [<I>--raw</I>]
+[<I>--in=FN</I>] [<I>--inhex=FN</I>] [<I>--json[=JO]</I>]
+[<I>--js-file=JFN</I>] [<I>--maxlen=LEN</I>] [<I>--raw</I>]
 [<I>--timeout=SECS</I>] [<I>--verbose</I>] [<I>--version</I>]
-[<I>OTHER_OPTIONS</I>] <I>DEVICE</I>
+[<I>OTHER_OPTIONS</I>] [<I>DEVICE</I>]
 <A NAME="lbAD">&nbsp;</A>
 <H2>DESCRIPTION</H2>
 
-
-<P>
 
 sg3_utils is a package of utilities that send SCSI commands to the given
 <I>DEVICE</I> via a SCSI pass through interface provided by the host
@@ -53,8 +52,8 @@ of the diagram. The highest level (i.e. most abstract) document is the SCSI
 Architecture Model (SAM) with SAM-5 being the most recent standard (ANSI
 INCITS 515-2016) with the most recent draft being SAM-6 revision 4 . SCSI
 commands in common with all device types can be found in SCSI Primary
-Commands (SPC) of which SPC-4 is the most recent standard (ANSI INCITS
-513-2015). The most recent SPC draft is SPC-5 revision 21. Block device
+Commands (SPC) of which SPC-5 is the most recent standard (ANSI INCITS
+502-2020). The most recent SPC draft is SPC-6 revision 6. Block device
 specific commands (e.g. as used by disks) are in SBC, those for tape drives
 in SSC, those for SCSI enclosures in SES and those for CD/DVD/BD drives in
 MMC.
@@ -87,7 +86,7 @@ The <I>DEVICE</I> argument may appear after, between or prior to any options.
 <P>
 
 The older utilities, including as sg_inq, sg_logs, sg_modes, sg_opcode,
-sg_rbuff,  sg_readcap, sg_senddiag, sg_start and sg_turs had individual
+sg_rbuff, sg_readcap, sg_senddiag, sg_start and sg_turs had individual
 command line processing code typically based on a single &quot;-&quot; followed by one
 or more characters. If an argument is needed then it follows a &quot;=&quot; (
 e.g. '-p=1f' in sg_modes with its older interface). Various options can be
@@ -119,12 +118,22 @@ section. It is only for backward compatibility of the command line options
 for older utilities.
 <P>
 
+The SG3_UTILS_INVOCATION environment variable has been implemented on some
+utilities that decode a lot of data. When SG3_UTILS_INVOCATION is set those
+utilities will print out a line of 60 &quot;v&quot; characters. After that the utility
+name and version (which includes a date) followed by a line by line
+breakdown of the command line arguments that the utility was invoked with.
+The command line arguments include the utility name and options in the order
+they were given. The output is sent to stdout. The option is designed to
+help automatic testing of utilities in the package.
+<P>
+
 The SG3_UTILS_DSENSE environment variable may be set to a number. It is
 only used by the embedded SNTL within the library used by the utilities in
 this library. SNTL is a SCSI to NVMe Translation Layer. This environment
 variable defaults to 0 which will lead to any utility that issues a SCSI
 command that is translated to a NVMe command (by the embedded SNTL) that
-fails at the NVMe dvice, to return SCSI sense in 'fixed' format. If this
+fails at the NVMe device, to return SCSI sense in 'fixed' format. If this
 variable is non-zero then then the returned SCSI sense will be in 'descriptor'
 format.
 <P>
@@ -360,10 +369,10 @@ correspond to the SCSI sense key values.
 
 The exit status values listed below can be given to the sg_decode_sense
 utility (which is found in this package) as follows:
-<BR>
+<P>
 
 <BR>&nbsp;&nbsp;sg_decode_sense&nbsp;--err=&lt;exit_status&gt;
-<BR>
+<P>
 
 and a short explanatory string will be output to stdout.
 <P>
@@ -388,6 +397,7 @@ the <I>DEVICE</I> reports that it is not ready for the operation requested.
 The <I>DEVICE</I> may be in the process of becoming ready (e.g.  spinning up
 but not at speed) so the utility may work after a wait. In Linux the
 <I>DEVICE</I> may be temporarily blocked while error recovery is taking place.
+See exit status values 12 and 13 below which refine this exit value.
 <DT><B>3</B>
 
 <DD>
@@ -432,6 +442,16 @@ commands (including WRITE USING TOKEN) may return this sense key.
 the <I>DEVICE</I> reports an aborted command. In some cases aborted
 commands can be retried immediately (e.g. if the transport aborted
 the command due to congestion).
+<DT><B>12</B>
+
+<DD>
+the <I>DEVICE</I> reports a sense key of not ready together with an
+additional sense code of &quot;target port in standby state&quot;.
+<DT><B>13</B>
+
+<DD>
+the <I>DEVICE</I> reports a sense key of not ready together with an
+additional sense code of &quot;target port in unavailable state&quot;.
 <DT><B>14</B>
 
 <DD>
@@ -541,7 +561,7 @@ number returned as the exit status (7 bits).
 a transport error has occurred. This will either be in the driver (e.g. HBA
 driver) or in the interconnect between the host (initiator) and the
 device (target).  For example in SAS an expander can run out of paths and
-thus be unable to return the user data for a READ command.
+thus be unable to return the user data from a READ command.
 <DT><B>36</B>
 
 <DD>
@@ -692,10 +712,14 @@ output the usage message then exit. In a few older utilities the '-h'
 option requests hexadecimal output. In these cases the '-?' option will
 output the usage message then exit.
 <DT><B>-H</B>, <B>--hex</B><DD>
-for SCSI commands that yield a non-trivial response, print out that
-response in ASCII hexadecimal. To produce hexadecimal that can be parsed
-by other utilities (e.g. without a relative address to the left and without
-trailing ASCII) use this option three or four times.
+for SCSI commands that yield a non-trivial response, print out that response
+in ASCII hexadecimal. When used once, 16 bytes are printed on each line,
+prefixed by an relative address, starting at 0 (hex). When used twice, an
+ASCII rendering of the 16 bytes is appended to each line, with non printable
+characters replaced by a '.' . When used three times only the 16 hex bytes
+are printed on each line (hence no address prefix nor ASCII appended). To
+produce hexadecimal that can be parsed by other utilities use this option
+three or four times.
 <DT><B>-i</B>, <B>--in</B>=<I>FN</I><DD>
 many SCSI commands fetch a significant amount of data (returned in the
 data-in buffer) which several of these utilities decode (e.g. sg_vpd and
@@ -728,6 +752,26 @@ perhaps 'inhex' is more descriptive since by default, ASCII hexadecimal is
 expected in the contents of file: <I>FN</I>. Alternatively the short form
 option may be <I>-I</I> or <I>-X</I>. See the &quot;FORMAT OF FILES CONTAINING
 ASCII HEX&quot; section below for more information.
+<DT><B>--json</B>[=<I>JO</I>]<DD>
+The default output of most utilities that decode information returned from
+SCSI devices is designed for human readability. Sometimes a more parseable
+form of output is required and JSON is a popular way to do this. Only
+utilities that decode a significant amount of SCSI data support this option.
+<BR>
+
+The corresponding short option is usually <I>-j[JO]</I> but maybe
+<I>-J[JO]</I> if <I>-j</I> is already in use. Note that in all cases <I>JO</I>
+argument is itself optional. See the sg3_utils_json manpage for more
+information.
+<DT><B>-J</B>, <B>--js-file</B>=<I>JFN</I><DD>
+output is in JSON format and it is sent to a file named <I>JFN</I>. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+<BR>
+
+When this option is given, the <I>--json[=JO]</I> option is implied and
+need not be given. The <I>--json[=JO]</I> option may still be needed to
+set the <I>JO</I> parameter to non-default values.
 <DT><B>-m</B>, <B>--maxlen</B>=<I>LEN</I><DD>
 several important SCSI commands (e.g. INQUIRY and MODE SENSE) have response
 lengths that vary depending on many factors, only some of which these
@@ -802,41 +846,17 @@ strings appended directly after the number to which they apply:
 <P>
 
 <BR>&nbsp;&nbsp;&nbsp;c&nbsp;C&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;w&nbsp;W&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*2
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;b&nbsp;B&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*512
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;k&nbsp;K&nbsp;KiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1024
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;KB&nbsp;kB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1000
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;m&nbsp;M&nbsp;MiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1048576
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;MB&nbsp;mB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*1000000
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;g&nbsp;G&nbsp;GiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(2^30)
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;GB&nbsp;gB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(10^9)
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;t&nbsp;T&nbsp;TiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(2^40)
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;TB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(10^12)
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;p&nbsp;P&nbsp;PiB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(2^50)
-<BR>
-
 <BR>&nbsp;&nbsp;&nbsp;PB&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*(10^15)
 <P>
 
@@ -874,15 +894,30 @@ be given as &quot;0x100&quot; or &quot;100h&quot;.
 
 Such a file is assumed to contain a sequence of one or two digit ASCII
 hexadecimal values separated by whitespace. &quot;Whitespace consists of either
-spaces, tabs, blank lines, or any combination thereof&quot;. Each one or two digit
-ASCII hex pair is decoded into a byte (i.e. 8 bits). The following will be
-decoded to valid (ascending valued)
-bytes: '0', '01', '3', 'c', 'F', '4a', 'cC', 'ff'.
-Lines containing only whitespace are ignored. The contents of any line
-containing a hash mark ('#') is ignored from that point until the end of that
-line. Users are encouraged to use hash marks to introduce comments in hex
-files. The author uses the extension'.hex' on such files. Examples can be
-found in the 'inhex' directory.
+spaces, tabs, blank lines, or any combination thereof&quot;. Hyphens (e.g. '-')
+are also allowed as separators. Each one or two digit ASCII hex pair is
+decoded into a byte (i.e. 8 bits). The following will be decoded to
+valid (ascending valued) bytes: '0', '01', '3', 'c', 'F', '4a', 'cC'
+and 'ff'. Lines containing only whitespace are ignored. The contents of any
+line containing a hash mark ('#') are ignored from that point until the end
+of that line. Users are encouraged to use hash marks to introduce comments
+in hex files. The author uses the extension '.hex' on such files. Examples
+can be found in the 'inhex' directory. Note that this format does _not_
+have an index (counter) value at the beginning of each line (like, for
+example, the hexdump utility outputs).
+<P>
+
+The hexadecimal format described in the previous paragraph can be converted
+to binary using the sg_decode_sense utility with these
+options: &quot;<I>--inhex=HFN --nodecode --write=WFN</I>&quot;. The input (in
+hex) is in the <I>HFN</I> file while the output is placed in the <I>WFN</I>
+file.
+<P>
+
+To convert a binary file into a hexadecimal form that can be given as input
+to various sg3_utils utilities, the sg_decode_sense utility can also be
+used with these options: &quot;<I>--binary=BFN --nodecode -HHH</I>&quot; and the
+hex output will be sent to the console (stdout).
 <A NAME="lbAO">&nbsp;</A>
 <H2>MICROCODE AND FIRMWARE</H2>
 
@@ -915,6 +950,60 @@ Windows may open a file in text rather than binary mode).
 Some utilities that the author has found useful have been placed in
 the 'utils' subdirectory.
 <A NAME="lbAQ">&nbsp;</A>
+<H2>DEBUGGING</H2>
+
+Each utility and most scripts have a <I>--verbose</I> option (short
+form: <I>-v</I>) that can be used multiple times to increase the verbosity
+of the output to aid debugging. Normal output (if any) is sent to stdout
+while verbose output (and error output) is sent to stderr. This may be
+important when the (normal output) of a utility is being piped to another
+command (e.g. the grep command to find a particular field in the output).
+<P>
+
+The Linux SCSI subsystem has a pseudo file for getting and changing the SCSI
+logging level: /proc/sys/dev/scsi/logging_level . The scsi_logging_level
+script in this package can be used to manipulate the logging level in a
+command line friendly way. See its manpage.
+<P>
+
+The logging level runs from 0 (no logging and the default) to 7 (lots of
+logging) and applies to all storage devices that use the SCSI subsystem.
+The logging output goes to &quot;the log&quot; which is often the /var/log/syslog
+file.
+<P>
+
+The Linux SCSI generic (sg) driver is often used under the utilities in
+this package. It uses a seldom (otherwise) used logging type of
+SCSI_LOG_TIMEOUT. An example of its use to turn on full debugging is:
+<P>
+
+<BR>&nbsp;&nbsp;scsi_logging_level&nbsp;-s&nbsp;-T&nbsp;7
+<P>
+
+To reduce the amount of output to only error paths, the following is
+suggested:
+<P>
+
+<BR>&nbsp;&nbsp;scsi_logging_level&nbsp;-s&nbsp;-T&nbsp;3
+<P>
+
+And to turn off logging in the sg driver:
+<P>
+
+<BR>&nbsp;&nbsp;scsi_logging_level&nbsp;-s&nbsp;-T&nbsp;0
+<P>
+
+For analyzing machine crashes associated with a SCSI command, nothing beats
+a real serial port. By &quot;real&quot; means that it is _not_ a USB serial port.
+The reason is that like SCSI, USB needs a functioning software stack within
+the OS kernel, the very thing that may be crippled during a machine crash.
+<P>
+
+Modern laptops do not have real serial ports and many server machines
+don't either (or it is an optional extra). In Linux the netconsole module
+does a pretty good job by sending log entries to another machine (on the
+same sub-net)) using the UDP (&quot;fire and forget&quot;) network protocol .
+<A NAME="lbAR">&nbsp;</A>
 <H2>WEB SITE</H2>
 
 There is a web page discussing this package at
@@ -924,36 +1013,42 @@ package on various operating systems is discussed at:
 <A HREF="https://github.com/hreinecke/sg3_utils">https://github.com/hreinecke/sg3_utils</A> . The principle code repository
 uses subversion and is on the author's equipment. The author keeps track
 of this via the subversion revision number which is an ascending integer
-(currently at 774 for this package). The github mirror gets updated
+(currently at 922 for this package). The github mirror gets updated
 periodically from the author's repository. Depending on the time of
 update, the above Downloads section at sg.danny.cz may be more up to
 date than the github mirror.
-<A NAME="lbAR">&nbsp;</A>
+<A NAME="lbAS">&nbsp;</A>
 <H2>AUTHORS</H2>
 
 Written by Douglas Gilbert. Some utilities have been contributed, see the
 CREDITS file and individual source files (in the 'src' directory).
-<A NAME="lbAS">&nbsp;</A>
+<A NAME="lbAT">&nbsp;</A>
 <H2>REPORTING BUGS</H2>
 
 Report bugs to &lt;dgilbert at interlog dot com&gt;.
-<A NAME="lbAT">&nbsp;</A>
+<A NAME="lbAU">&nbsp;</A>
 <H2>COPYRIGHT</H2>
 
-Copyright &#169; 1999-2021 Douglas Gilbert
+Copyright &#169; 1999-2023 Douglas Gilbert
 <BR>
 
-Some utilities are distributed under a GPL version 2 license while
-others, usually more recent ones, are under a FreeBSD license. The files
+Some utilities are distributed under a GPL version 2 license while others,
+usually more recent ones, are under a BSD-2-Clause license. The files
 that are common to almost all utilities and thus contain the most reusable
 code, namely sg_lib.[hc], sg_cmds_basic.[hc] and sg_cmds_extra.[hc] are
-under a FreeBSD license. There is NO warranty; not even for MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.
-<A NAME="lbAU">&nbsp;</A>
+under a BSD-2-Clause license. There is NO warranty; not even for
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+<A NAME="lbAV">&nbsp;</A>
 <H2>SEE ALSO</H2>
 
-<B>sdparm(sdparm), ddpt(ddpt), lsscsi(lsscsi), <A HREF="../man1/dmesg.1.html">dmesg</A>(1), <A HREF="../man1/mt.1.html">mt</A>(1)</B>
+<B>sg3_utils_json,sg_decode_sense(sg3_utils), sdparm(sdparm), ddpt(ddpt),</B>
 
+<B>lsscsi(lsscsi), <A HREF="../man1/dmesg.1.html">dmesg</A>(1), <A HREF="../man1/mt.1.html">mt</A>(1)</B>
+
+<BR>
+
+The format of this section is: &lt;utility_name&gt;(&lt;package_containing_utility&gt;)
+or &lt;utility_name&gt;(&lt;manpage_section_number_containing_utility&gt;) .
 <P>
 
 <HR>
@@ -974,16 +1069,17 @@ or FITNESS FOR A PARTICULAR PURPOSE.
 <DT><A HREF="#lbAN">FORMAT OF FILES CONTAINING ASCII HEX</A><DD>
 <DT><A HREF="#lbAO">MICROCODE AND FIRMWARE</A><DD>
 <DT><A HREF="#lbAP">SCRIPTS, EXAMPLES and UTILS</A><DD>
-<DT><A HREF="#lbAQ">WEB SITE</A><DD>
-<DT><A HREF="#lbAR">AUTHORS</A><DD>
-<DT><A HREF="#lbAS">REPORTING BUGS</A><DD>
-<DT><A HREF="#lbAT">COPYRIGHT</A><DD>
-<DT><A HREF="#lbAU">SEE ALSO</A><DD>
+<DT><A HREF="#lbAQ">DEBUGGING</A><DD>
+<DT><A HREF="#lbAR">WEB SITE</A><DD>
+<DT><A HREF="#lbAS">AUTHORS</A><DD>
+<DT><A HREF="#lbAT">REPORTING BUGS</A><DD>
+<DT><A HREF="#lbAU">COPYRIGHT</A><DD>
+<DT><A HREF="#lbAV">SEE ALSO</A><DD>
 </DL>
 <HR>
 This document was created by
 <A HREF="/cgi-bin/man/man2html">man2html</A>,
 using the manual pages.<BR>
-Time: 03:12:28 GMT, November 11, 2021
+Time: 03:17:32 GMT, January 10, 2023
 </BODY>
 </HTML>

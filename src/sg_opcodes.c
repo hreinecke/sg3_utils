@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2022 D. Gilbert
+ *  Copyright (C) 2004-2023 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.88 20221226";    /* spc6r06 */
+static const char * version_str = "0.89 20230111";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -48,6 +48,9 @@ static const char * version_str = "0.88 20221226";    /* spc6r06 */
 #define MX_ALLOC_LEN 8192
 
 #define NAME_BUFF_SZ 128
+
+#define RSOC_ALL_BYTES_CTDP_0 8
+#define RSOC_ALL_BYTES_CTDP_1 20
 
 #define SEAGATE_READ_UDS_DATA_CMD 0xf7  /* may start reporting vendor cmds */
 
@@ -711,8 +714,8 @@ static int
 list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                struct sg_pt_base * ptvp)
 {
-    bool sa_v;
-    int k, j, m, n, cd_len, serv_act, len, act_len, opcode, res;
+    bool sa_v, ctdp;
+    int k, j, m, n, cd_len, serv_act, len, bump, act_len, opcode, res;
     uint8_t byt5;
     unsigned int timeout;
     uint8_t * bp;
@@ -785,7 +788,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
     }
 
     jap = sgj_named_subarray_r(jsp, jsp->basep, "all_command_descriptor");
-    for (k = 0, j = 0; k < cd_len; ++j, k += len) {
+    for (k = 0, j = 0; k < cd_len; ++j, k += bump) {
         jop = sgj_new_unattached_object_r(jsp);
 
         if (op->do_unsorted)
@@ -797,9 +800,10 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             return sg_convert_errno(EDOM);
         }
         byt5 = bp[5];
-        len = (byt5 & 0x2) ? 20 : 8;
+        ctdp = !! (byt5 & 0x2);
+        bump = ctdp ? RSOC_ALL_BYTES_CTDP_1 : RSOC_ALL_BYTES_CTDP_0;
         opcode = bp[0];
-        sa_v = !!(byt5 & 1);    /* service action valid */
+        sa_v = !! (byt5 & 1);    /* service action valid */
         serv_act = 0;
         name_buff[0] = '\0';
         if (sa_v) {
@@ -816,7 +820,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
         }
         if (op->do_rctd) {
             n = 0;
-            if (byt5 & 0x2) {          /* CTDP set */
+            if (ctdp) {
                 /* don't show CDLP because it makes line too long */
                 if (op->do_compact)
                     n += sg_scnpr(b + n, blen - n, " %.2x%c%.4s", opcode,
@@ -874,8 +878,8 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             sgj_js_nv_i(jsp, jop, "rwcdlp", (byt5 >> 6) & 0x1);
             sgj_js_nv_i(jsp, jop, "mlu", (byt5 >> 4) & 0x3);
             sgj_js_nv_i(jsp, jop, "cdlp", (byt5 >> 2) & 0x3);
-            sgj_js_nv_i(jsp, jop, "ctdp", (byt5 >> 1) & 0x1);
-            sgj_js_nv_i(jsp, jop, "servactv", byt5 & 0x1);
+            sgj_js_nv_i(jsp, jop, "ctdp", (int)ctdp);
+            sgj_js_nv_i(jsp, jop, "servactv", (int)sa_v);
             sgj_js_nv_i(jsp, jop, "cdb_length",
                         sg_get_unaligned_be16(bp + 6));
 
@@ -922,7 +926,7 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             } else
                 goto err_out;
         }
-    }
+    }                   /* <<<<<< end of loop over all supported commands */
     res = 0;
 err_out:
     if (sort_arr)

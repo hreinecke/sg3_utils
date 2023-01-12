@@ -11,11 +11,17 @@ Basic Installation
 ==================
 
 Briefly, the shell commands './configure; make; make install' should
-configure, build, and install this package. If that fails try
-doing './autogen.sh' first and then repeat the above sequence. The
-autogen.sh script may require some autotools packages to be loaded.
-Note that some autotools packages use the script name 'bootstrap'
-instead of 'autogen.sh', they both have similar functions.
+configure, build, and install this package. To save space, subversion
+and git repositories now minimize the number of generated/boilerplate
+files held under version control. This means that the configure script
+may not even be present. In that case (or if ./configure fails) the
+./autogen.sh script should be executed. If autogen.sh succeeds it
+will generate the configure script so then './configure; make;
+make install' sequence should succeed. Tarballs of this package should
+include the configure script so the ./autogen.sh step may not be needed.
+Other autotools base packages use the script name 'bootstrap' instead
+of 'autogen.sh', so for compatability a bootstrap script has been added
+to this package which simply calls ./autogen.sh .
 
 The following more detailed instructions are generic; see the `README'
 file for instructions specific to this package.

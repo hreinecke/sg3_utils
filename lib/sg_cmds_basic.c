@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2022 Douglas Gilbert.
+ * Copyright (c) 1999-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -42,7 +42,7 @@
 #endif
 
 
-static const char * const version_str = "2.00 20220118";
+static const char * const version_str = "2.01 20230110";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */

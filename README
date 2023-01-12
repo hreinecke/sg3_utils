@@ -68,9 +68,33 @@ SCSI or NVMe.
 
 The sg_raw utility may send NVMe Admin or NVM commands (as well as SCSI
 commands). One difficulty with a command-line utility invoking NVME
-commands is that those commands contain memory addresses for data-in (from
-the storage device) or data-out (toward the storage device) transfers. See
-the sg_raw manpage for how this difficulty is addressed.
+commands is that those commands contain memory addresses for data-in (i.e.
+data from the storage device) or data-out (i.e. data sent toward the
+storage device) transfers. See the sg_raw manpage for how this difficulty
+is addressed.
+
+JSON
+----
+Taking a lead from smartmontools project, JSON is slowly being added to
+those utilities that decode a significant amount of (meta-)data supplied
+by storage devices. Human readable output is still the default with the
+'--json' option changing the output to JSON. The '--json' option itself
+takes an optional argument which is a string where each character turns
+on (or off, if preceded by a '-') some attribute of the JSON output
+(e.g. '--json=h-e').
+
+One difficulty with JSON (or the json_builder library) is that its integer
+representation is signed, 64 bit in size, and rendered in decimal, with a
+leading negative sign if needed. However storage metadata tends to use
+hexadecimal for large values (e.g. Logical Block Addresses (LBAs)). This
+issue is addressed with the 'h' argument (e.g. '--json=h') which changes
+decimal rendered numbers into a JSON subobject with two name-value pairs:
+one name is 'i' whose value is the same decimal rendered integer, and the
+other name 'hex' whose value is a JSON string with that integer rendered
+in (unsigned) hexadecimal in that string.
+
+There is a manual page called "sg3_utils_json" that contains more
+information.
 
 Documentation
 -------------
@@ -110,4 +134,4 @@ is mirrored in git (using "git svn" tools) here:
 
 
 Douglas Gilbert
-31st December 2021
+9th January 2022

@@ -1947,6 +1947,20 @@ sg_ll_ata_pt(int sg_fd, const uint8_t * cdbp, int cdb_len,
         if (vb)
             pr2ws("%s: transport error: %s\n", cnamep,
                   get_scsi_pt_transport_err_str(ptvp, sizeof(b), b));
+        {
+            bool favour_sense = ((SAM_STAT_CHECK_CONDITION ==
+                    get_scsi_pt_status_response(ptvp)) && (slen > 0));
+
+            if (favour_sense) {
+                char e[512];
+                static const int elen = sizeof(e);
+
+                e[0] = '\0';
+                sg_get_sense_str("    ", sensep, slen, true, elen, e);
+                if (e[0])
+                    pr2ws("%s:\n%s\n", cnamep, e);
+            }
+        }
         break;
     case SCSI_PT_RESULT_OS_ERR:
         if (vb)

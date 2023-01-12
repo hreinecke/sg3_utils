@@ -47,6 +47,7 @@ developing applications.
 %setup -q
 
 %build
+./autogen.sh
 %configure
 
 # Don't use rpath!
@@ -83,7 +84,7 @@ fi
 %{_libdir}/*.a
 
 %changelog
-* Fri Jan 06 2023 - dgilbert at interlog dot com
+* Tue Jan 10 2023 - dgilbert at interlog dot com
 - track t10 changes
   * sg3_utils-1.48
 

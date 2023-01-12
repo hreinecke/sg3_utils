@@ -17,7 +17,7 @@ Bean Huo <beanhuo dot micron dot com>
         sg_write_buffer: patch to allow comma or period separated bytes
         (in decimal or hex) to be decoded when given as standard input.
 
-Boris Fox <email_address ?>
+Boris Fox <boris at borisfox dot com>
         Contributed sg_write_attr utility [20221125]
 
 Brian Bunker <Brian dot Bunker at netapp dot com> contributed
@@ -163,4 +163,4 @@ Xose Vazquez Perez <xose dot vazquez at gmail dot com>
 
 
 Douglas Gilbert
-6th January 2023
+10th January 2023
