@@ -35,8 +35,8 @@ Syntax checking
 ===============
 Use 'mandoc -W style {man_page} > /dev/null'
 
-The 'cannot parse date, using it verbatim: TH February 2019' warning
+The: 'cannot parse date, using it verbatim: TH February 2019' warning
 is ignored.
 
 Douglas Gilbert
-26th December 2022
+19th January 2023

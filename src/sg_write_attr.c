@@ -35,7 +35,7 @@
  * device and decodes the response. Based on spc5r19.pdf
  */
 
-static const char * version_str = "1.02 20230106";
+static const char * version_str = "1.03 20230121";
 
 #define MAX_ATTR_VALUE_LEN SG_LIB_UNBOUNDED_16BIT
 #define MAX_ATTR_BUFF_LEN (1024 * 1024)
@@ -626,7 +626,7 @@ parse_attr_value(const char * attr_value, const bool do_hex,
     }
     /* see SCP-5 clause 4.3.1 ASCII data field requirements */
     if (RA_FMT_ASCII == anip->format &&
-        !sg_all_printable(avp->value, avp->val_len)) {
+        (avp->val_len != sg_first_non_printable(avp->value, avp->val_len))) {
         pr2serr("%s: ASCII attribute id 0x%04x %s #%d contains non-printable "
                 "or non-ASCII characters\n", __func__, anip->id, iavp_s,
                 attr_no);

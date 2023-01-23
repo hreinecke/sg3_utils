@@ -1,4 +1,4 @@
-.TH SG_OPCODES "8" "September 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_OPCODES "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_opcodes \- report supported SCSI commands or task management functions
 .SH SYNOPSIS
@@ -151,6 +151,9 @@ option is not given then all available SCSI commands supported by the
 where \fIDT\fR is the peripheral device type. This is used together with
 the \fI\-\-enumerate\fR to differentiate when a command opcode (and perhaps
 service action) is shared by multiple device types.
+.br
+Numerical values between -1 and 31 (inclusive) may be used where -1 implies
+what is in SPC. Names like 'tape', 'disk' and 'processor' may also be given.
 .br
 This option may also be used with the \fI\-\-no-inquiry\fR option to
 suppress this utility doing an INQUIRY command since the main reason
@@ -329,7 +332,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2022 Douglas Gilbert
+Copyright \(co 2004\-2023 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

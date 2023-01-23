@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "December 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_LOGS "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -291,8 +291,9 @@ available from the \fIDEVICE\fR. There are two main cases of this: with
 the \fI\-\-pdt=DT\fR without a \fIDEVICE\fR (e.g. when \fI\-\-in=FN\fR
 is used) and when \fI\-\-no_inq\fR is used with a \fIDEVICE\fR.
 .br
-\fIDT\fR may be -1 . This value may select any device type but favours the
-lower numbers (e.g. the PDT of disks is 0).
+Numerical values between -1 and 31 (inclusive) may be used where -1 implies
+what is in SPC. Names like 'tape', 'disk' and 'processor' may also be given.
+The default is 0 or 'disk' for SBC.
 .br
 The default value of \fIDT\fR is zero which is the device type of disks.
 .TP
@@ -571,7 +572,7 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2002\-2022 Douglas Gilbert
+Copyright \(co 2002\-2023 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -2,7 +2,7 @@
 #define SG_LIB_H
 
 /*
- * Copyright (c) 2004-2022 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -424,6 +424,11 @@ void sg_build_sense_buffer(bool desc, uint8_t *sbp, uint8_t skey,
  * PDT_DISK (0) is _not_ the upper value in a compound pdt_s. */
 bool sg_pdt_s_eq(int l_pdt_s, int r_pdt_s);
 
+/* Attempts to match acronym or abbreviation in 'acron' to a pdt. If 'spc'
+ * given returns -1, if there is an other match returns 0 to 0x1f. If no
+ * match returns -2 . */
+int sg_get_pdt_from_acronym(const char * acron);
+
 extern FILE * sg_warnings_strm;
 
 void sg_set_warnings_strm(FILE * warnings_strm);
@@ -702,10 +707,9 @@ bool sg_all_ffs(const uint8_t * bp, int b_len);
  * such byte is found by *(up + len - 1) then false is returned. */
 bool sg_has_control_char(const uint8_t * up, int len);
 
-/* Returns true if byte sequence contains only printable ASCII characters
- * (locale independent), otherwise returns false.
- *  If bp is NULL or b_len <= 0 returns false. */
-bool sg_all_printable(const uint8_t * bp, int b_len);
+/* Returns index (origin 0) of first non printable (7 bit ASCII) character.
+ * If all printable returns b_len . */
+int sg_first_non_printable(const uint8_t * bp, int b_len);
 
 /* Extract character sequence from ATA words as in the model string
  * in a IDENTIFY DEVICE response. Returns number of characters
@@ -806,7 +810,7 @@ int sg_convert_errno(int os_err_num);
 /* Report utility name, version string and invocation arguments to the file
  * pointed to be fp. If fp is NULL, outputs to stdout. */
 void sg_rep_invocation(const char * util_name, const char * ver_str,
-		       int argc, char *argv[], FILE * fp);
+                       int argc, char *argv[], FILE * fp);
 
 
 /* <<< Architectural support functions [is there a better place?] >>> */

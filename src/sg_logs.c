@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2000-2022 D. Gilbert
+ *  Copyright (C) 2000-2023 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.17 20221226";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.18 20230122";    /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_logs"
 
@@ -135,9 +135,17 @@ static const char * const param_s = "parameter";
 static const char * const rstrict_s = "restricted";
 static const char * const rsv_s = "reserved";
 static const char * const vend_spec = "vendor specific";
-static const char * const s_key = "sense key";
+static const char * const sns_key_s = "sense key";
+static const char * const sns_key_sn = "sense_key";
+static const char * const asc_s = "Additional sense code";
+static const char * const asc_sn = "additional_sense_code";
+static const char * const ass_sn = "additional_sense_string";
+static const char * const qual_s = "qualifier";
+static const char * const acsq_sn = "additional_sense_code_qualifier";
 static const char * const unkn_s = "unknown";
 static const char * const lp_sn = "log_page";
+static const char * const tims_s = "Timestamp";
+static const char * const tims_sn = "timestamp";
 
 static struct option long_options[] = {
     {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
@@ -321,9 +329,9 @@ static bool show_lps_misalignment_page(const uint8_t * resp, int len,
                                        struct opts_t * op, sgj_opaque_p jop);
 static bool show_element_stats_page(const uint8_t * resp, int len,
                                     struct opts_t * op, sgj_opaque_p jop);
-static bool show_service_buffer_info_page(const uint8_t * resp, int len,
-                                          struct opts_t * op,
-                                          sgj_opaque_p jop);
+static bool show_service_buffers_info_page(const uint8_t * resp, int len,
+                                           struct opts_t * op,
+                                           sgj_opaque_p jop);
 static bool show_ata_pt_results_page(const uint8_t * resp, int len,
                                      struct opts_t * op, sgj_opaque_p jop);
 static bool show_tape_diag_data_page(const uint8_t * resp, int len,
@@ -447,7 +455,7 @@ static struct log_elem log_arr[] = {
     {0x15, 0, 0, PDT_MCHANGER, MVP_STD, "Element statistics", "els",
      show_element_stats_page},          /* 0x15, 0x0  SMC */
     {0x15, 0, 0, PDT_ADC, MVP_STD, "Service buffers information", "sbi",
-     show_service_buffer_info_page},    /* 0x15, 0x0  ADC */
+     show_service_buffers_info_page},   /* 0x15, 0x0  ADC */
     {BACKGROUND_SCAN_LPAGE, PENDING_DEFECTS_SUBPG, 0, 0, MVP_STD,
      "Pending defects", "pd", show_pending_defects_page}, /* 0x15, 0x1  SBC */
     {SAT_ATA_RESULTS_LPAGE, 0, 0, 0, MVP_STD, "ATA pass-through results",
@@ -837,7 +845,14 @@ enumerate_pages(const struct opts_t * op)
     int j;
     struct log_elem * lep;
     struct log_elem ** lep_arr;
+    char b[128];
+    static const int blen = sizeof(b);
+    static const char * lpi = "log pages in";
 
+    if (0 == (op->do_enumerate % 2))
+        snprintf(b, blen, "T10 (but no vendor) %s", lpi);
+    else
+        snprintf(b, blen, "All %s", lpi);
     if (op->do_enumerate < 3) { /* -e, -ee: sort by acronym */
         int k;
         struct log_elem ** lepp;
@@ -854,12 +869,12 @@ enumerate_pages(const struct opts_t * op)
             lep_arr[k] = lep;
         lep_arr[k++] = lep;     /* put sentinel on end */
         qsort(lep_arr, k, sizeof(struct log_elem *), asort_comp);
-        printf("Known log pages in acronym order:\n");
+        printf("%s acronym order:\n", b);
         for (lepp = lep_arr, j = 0; (*lepp)->pg_code >=0; ++lepp, ++j)
             enumerate_helper(*lepp, (0 == j), op);
         free(lep_arr);
     } else {    /* -eee, -eeee numeric sort (as per table) */
-        printf("Known log pages in numerical order:\n");
+        printf("%s numerical order:\n", b);
         for (lep = log_arr, j = 0; lep->pg_code >=0; ++lep, ++j)
             enumerate_helper(lep, (0 == j), op);
     }
@@ -1046,15 +1061,21 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'D':
             if (0 == memcmp("-1", optarg, 3))
-                op->dev_pdt = -1;
-            else {
+                n = -1;       /* SPC */
+            else if (isdigit(*optarg)) {
                 n = sg_get_num(optarg);
                 if ((n < 0) || (n > 31)) {
-                    pr2serr("bad argument to '--pdt='\n");
+                    pr2serr("bad numeric argument to '--pdt='\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
-                op->dev_pdt = n;
+            } else {
+                n = sg_get_pdt_from_acronym(optarg);
+                if (n < -1) {
+                    pr2serr("bad acronym in argument to '--pdt='\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
             }
+            op->dev_pdt = n;
             break;
         case 'e':
             ++op->do_enumerate;
@@ -2853,15 +2874,17 @@ show_tape_usage_page(const uint8_t * resp, int len, struct opts_t * op,
                      sgj_opaque_p jop)
 {
     int k, num, extra;
-    uint32_t u;
     uint64_t ull;
+    const char * ccp;
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
-    char b[168];
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
+    char b[256];
     static const int blen = sizeof(b);
     static const char * tu_lp = "Tape usage log page";
 
-if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -2870,6 +2893,11 @@ if (jop) { };
     }
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         sgj_pr_hr(jsp, "%s  (LTO-5 and LTO-6 specific) [0x30]\n", tu_lp);
+   if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, tu_lp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p, "tape_usage_log_parameters");
+    }
+
     for (k = num; k > 0; k -= extra, bp += extra) {
         int pc = sg_get_unaligned_be16(bp + 0);
 
@@ -2885,73 +2913,87 @@ if (jop) { };
             hex2stdout(bp, extra, op->dstrhex_no_ascii);
             goto skip;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, NULL);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
         ull = 0;
-        u = 0;
+
         switch (bp[3]) {
         case 2:
-            u = sg_get_unaligned_be16(bp + 4);
+            ull = sg_get_unaligned_be16(bp + 4);
             break;
         case 4:
-            u = sg_get_unaligned_be32(bp + 4);
+            ull = sg_get_unaligned_be32(bp + 4);
             break;
         case 8:
             ull = sg_get_unaligned_be64(bp + 4);
             break;
         }
+        ccp = NULL;
         switch (pc) {
         case 0x01:
             if (extra == 8)
-                snprintf(b, blen, "  Thread count: %u", u);
+                ccp = "Thread count";
             break;
         case 0x02:
             if (extra == 12)
-                snprintf(b, blen, "  Total data sets written: %" PRIu64, ull);
+                ccp = "Total data sets written";
             break;
         case 0x03:
             if (extra == 8)
-                snprintf(b, blen, "  Total write retries: %u", u);
+                ccp = "Total write retries";
             break;
         case 0x04:
             if (extra == 6)
-                snprintf(b, blen, "  Total unrecovered write errors: %u", u);
+                ccp = "Total unrecovered write errors";
             break;
         case 0x05:
             if (extra == 6)
-                snprintf(b, blen, "  Total suspended writes: %u", u);
+                ccp = "Total suspended writes";
             break;
         case 0x06:
             if (extra == 6)
-                snprintf(b, blen, "  Total fatal suspended writes: %u", u);
+                ccp = "Total fatal suspended writes";
             break;
         case 0x07:
             if (extra == 12)
-                snprintf(b, blen, "  Total data sets read: %" PRIu64, ull);
+                ccp = "Total data sets read";
             break;
         case 0x08:
             if (extra == 8)
-                snprintf(b, blen, "  Total read retries: %u", u);
+                ccp = "Total read retries";
             break;
         case 0x09:
             if (extra == 6)
-                snprintf(b, blen, "  Total unrecovered read errors: %u", u);
+                ccp = "Total unrecovered read errors";
             break;
         case 0x0a:
             if (extra == 6)
-                snprintf(b, blen, "  Total suspended reads: %u", u);
+                ccp = "Total suspended reads";
             break;
         case 0x0b:
             if (extra == 6)
-                snprintf(b, blen, "  Total fatal suspended reads: %u", u);
+                ccp = "Total fatal suspended reads";
             break;
         default:
-            snprintf(b, blen, "  unknown %s = 0x%x, contents in hex:\n",
-                     param_c, pc);
-            hex2str(bp,extra, "    ", op->h2s_oformat, blen, b);
+            sgj_pr_hr(jsp, "  %s %s = 0x%x, contents in hex:\n", unkn_s,
+                      param_c, pc);
+            hex2str(bp, extra, "    ", op->h2s_oformat, blen, b);
+            sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json)
+                sgj_js_nv_hex_bytes(jsp, jo3p, in_hex, bp, extra);
             break;
         }
-        sgj_pr_hr(jsp, "%s\n", b);
+        if (ccp)
+            sgj_haj_vi(jsp, jo3p, 2, ccp, SGJ_SEP_COLON_1_SPACE, ull,
+                       false);
         if (op->do_pcb)
             sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2], b, blen));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
 skip:
         if (op->filter_given)
             break;
@@ -3049,13 +3091,16 @@ show_tape_capacity_page(const uint8_t * resp, int len,
 {
     int k, num, extra;
     uint32_t u;
+    const char * ccp;
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char b[144];
     static const int blen = sizeof(b);
     static const char * tc_lp = "Tape capacity log page";
 
-if (jop) { };
     num = len - 4;
     bp = &resp[0] + 4;
     if (num < 4) {
@@ -3064,6 +3109,11 @@ if (jop) { };
     }
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
         sgj_pr_hr(jsp, "%s  (LTO-5 and LTO-6 specific) [0x31]\n", tc_lp);
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, tc_lp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p, "tape_capacity_log_parameters");
+    }
+
     for (k = num; k > 0; k -= extra, bp += extra) {
         int pc = sg_get_unaligned_be16(bp + 0);
 
@@ -3079,37 +3129,50 @@ if (jop) { };
             hex2stdout(bp, extra, op->dstrhex_no_ascii);
             goto skip;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, NULL);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
         if (extra != 8)
             continue;
         u = sg_get_unaligned_be32(bp + 4);
         snprintf(b, blen, "  ");
 
+        ccp = NULL;
         switch (pc) {
         case 0x01:
-            snprintf(b + 2, blen - 2, "Main partition remaining capacity "
-                     "(in MiB): %u", u);
+            ccp = "Main partition remaining capacity";
             break;
         case 0x02:
-            snprintf(b + 2, blen - 2, "Alternate partition remaining "
-                     "capacity (in MiB): %u", u);
+            ccp = "Alternate partition remaining capacity";
             break;
         case 0x03:
-            snprintf(b + 2, blen - 2, "Main partition maximum capacity (in "
-                     "MiB): %u", u);
+            ccp = "Main partition maximum capacity";
             break;
         case 0x04:
-            snprintf(b + 2, blen - 2, "Alternate partition maximum capacity "
-                     "(in MiB): %u", u);
+            ccp= "Alternate partition maximum capacity";
             break;
         default:
             sgj_pr_hr(jsp, "  unknown %s = 0x%x, contents in hex:\n",
                       param_c, pc);
             hex2str(bp, extra, "    ", op->h2s_oformat, blen, b);
+            sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json)
+                sgj_js_nv_hex_bytes(jsp, jo3p, in_hex, bp, extra);
             break;
         }
-        sgj_pr_hr(jsp, "%s\n", b);
+        if (ccp) {
+            sgj_pr_hr(jsp, "  %s (in MiB): %u\n", ccp, u);
+            if (jsp->pr_as_json)
+                sgj_js_nv_ihex_nex(jsp, jo3p, sgj_convert2snake(ccp, b, blen),
+                                   u, false, "[unit: MibiByte]");
+        }
         if (op->do_pcb)
             sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2], b, blen));
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
 skip:
         if (op->filter_given)
             break;
@@ -3136,6 +3199,7 @@ show_data_compression_page(const uint8_t * resp, int len,
     static const int blen = sizeof(b);
     static const char * const dc_lp = "Data compression log page";
 
+// yyyyyyyyyyyyyyyyyyyyy
     pg_code = resp[0] & 0x3f;
     num = len - 4;
     bp = &resp[0] + 4;
@@ -3773,9 +3837,9 @@ show_self_test_page(const uint8_t * resp, int len, struct opts_t * op,
         if (v) {
             if (op->do_brief)
                 sgj_pr_hr(jsp, "    %s = 0x%x , asc = 0x%x, ascq = 0x%x\n",
-                          s_key, v, bp[17], bp[18]);
+                          sns_key_s, v, bp[17], bp[18]);
             else {
-                sgj_pr_hr(jsp, "    %s = 0x%x [%s]\n", s_key, v,
+                sgj_pr_hr(jsp, "    %s = 0x%x [%s]\n", sns_key_s, v,
                           sg_get_sense_key_str(v, blen, b));
 
                 sgj_pr_hr(jsp, "      asc = 0x%x, ascq = 0x%x [%s]\n",
@@ -3796,13 +3860,12 @@ show_self_test_page(const uint8_t * resp, int len, struct opts_t * op,
                    (0xffff == n ? "65535 hours or more" : NULL), NULL);
             sgj_js_nv_ihexstr(jsp, jo3p, "address_of_first_failure", pc, NULL,
                               addr_all_ffs ? "no errors detected" : NULL);
-            sgj_js_nv_ihexstr(jsp, jo3p, "sense_key", v, NULL,
+            sgj_js_nv_ihexstr(jsp, jo3p, sns_key_sn, v, NULL,
                               sg_get_sense_key_str(v, blen, b));
-            sgj_js_nv_ihexstr(jsp, jo3p, "additional_sense_code", bp[17],
-                              NULL, NULL);
-            sgj_js_nv_ihexstr(jsp, jo3p, "additional_sense_code_qualifier",
-                              bp[18], NULL, sg_get_asc_ascq_str(bp[17],
-                              bp[18], blen, b));
+            sgj_js_nv_ihexstr(jsp, jo3p, asc_sn, bp[17], NULL, NULL);
+            sgj_js_nv_ihexstr(jsp, jo3p, acsq_sn, bp[18], NULL,
+                      sg_get_additional_sense_str(bp[17], bp[18], false,
+                                                  blen, b));
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         }
         if (op->filter_given)
@@ -4298,7 +4361,7 @@ show_ie_page(const uint8_t * resp, int len, struct opts_t * op,
                                           NULL);
                         snprintf(b, sizeof(b), "%s_qualifier", ieasc);
                         sgj_js_nv_ihexstr(jsp, jo3p, b, bp[5], NULL,
-                                          sg_get_asc_ascq_str(bp[4], bp[5],
+                          sg_get_additional_sense_str(bp[4], bp[5], false,
                                           sizeof(bb), bb));
                     }
                 }
@@ -6977,19 +7040,18 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                                        ok ? reassign_status[j] : NULL, NULL);
             n = 0xf & bp[8];
             sgj_pr_hr(jsp, "    %s: %s  [sk,asc,ascq: 0x%x,0x%x,0x%x]\n",
-                      s_key, sg_get_sense_key_str(n, blen, b), n, bp[9],
-                                                  bp[10]);
+                      sns_key_s, sg_get_sense_key_str(n, blen, b), n, bp[9],
+                                                      bp[10]);
             if (bp[9] || bp[10])
                 sgj_pr_hr(jsp, "      %s\n",
                           sg_get_asc_ascq_str(bp[9], bp[10], blen, b));
             if (jsp->pr_as_json) {
-                sgj_js_nv_ihexstr(jsp, jo3p, "sense_key", n, NULL,
+                sgj_js_nv_ihexstr(jsp, jo3p, sns_key_sn, n, NULL,
                                   sg_get_sense_key_str(n, blen, b));
-                sgj_js_nv_ihexstr(jsp, jo3p, "additional_sense_code", bp[9],
-                                  NULL, NULL);
-                sgj_js_nv_ihexstr(jsp, jo3p, "additional_sense_code_qualifier",
-                                  bp[10], NULL, sg_get_asc_ascq_str(bp[9],
-                                  bp[10], blen, b));
+                sgj_js_nv_ihexstr(jsp, jo3p, asc_sn, bp[9], NULL, NULL);
+                sgj_js_nv_ihexstr(jsp, jo3p, acsq_sn, bp[10], NULL,
+                          sg_get_additional_sense_str(bp[9], bp[10], false,
+                                                      blen, b));
             }
             if (op->verbose) {
                 n = sg_scnpr(b, blen, "    vendor bytes [11 -> 15]: ");
@@ -7583,23 +7645,33 @@ skip:
     return true;
 }
 
-/* Service buffer information [0x15] <sbi> (adc) */
+/* Service buffers information [0x15] <sbi> (adc) */
 static bool
-show_service_buffer_info_page(const uint8_t * resp, int len,
-                              struct opts_t * op, sgj_opaque_p jop)
+show_service_buffers_info_page(const uint8_t * resp, int len,
+                               struct opts_t * op, sgj_opaque_p jop)
 {
     bool evsm_output = false;
-    int num, pl, pc;
+    int num, pl, pc, n;
+    const char * ccp;
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
+    struct opts_t * jo2p = NULL;
+    struct opts_t * jo3p = NULL;
+    struct opts_t * jap = NULL;
     char b[256];
     static const int blen = sizeof(b);
+    static const char * sbi_lp = "Service buffers information log page";
 
-if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "Service buffer information page (adc-3) [0x15]\n");
+        sgj_pr_hr(jsp, "%s (adc-3) [0x15]\n", sbi_lp);
     num = len - 4;
     bp = &resp[0] + 4;
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, sbi_lp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                           "service_buffers_information_log_parameters");
+    }
+
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
         pl = bp[3] + 4;
@@ -7614,20 +7686,47 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             goto filter_chk;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+        }
         if (pc < 0x100) {
-            sgj_pr_hr(jsp, "  Service buffer identifier: 0x%x\n", pc);
-            sgj_pr_hr(jsp, "    Buffer id: 0x%x, tu=%d, nmp=%d, nmm=%d, "
-                      "offline=%d\n", bp[4], !!(0x10 & bp[5]),
+            sgj_js_nv_ihex(jsp, jo3p, param_c_sn, pc);
+            sgj_haj_vi(jsp, jo3p, 2, "Service buffer identifier",
+                       SGJ_SEP_COLON_1_SPACE, pc, true);
+            sgj_pr_hr(jsp, "    Buffer id: 0x%x, TU=%d, NMP=%d, NMM=%d, "
+                      "OFFLINE=%d\n", bp[4], !!(0x10 & bp[5]),
                       !!(0x8 & bp[5]), !!(0x4 & bp[5]), !!(0x2 & bp[5]));
+            n = 0xf & bp[6];
+            ccp = sg_get_desig_code_set_str(n);
+            if (jsp->pr_as_json) {
+                sgj_js_nv_ihex(jsp, jo3p, "buffer_id", bp[4]);
+                sgj_js_nv_ihex(jsp, jo3p, "tu", !!(0x10 & bp[5]));
+                sgj_js_nv_ihex(jsp, jo3p, "nmp", !!(0x8 & bp[5]));
+                sgj_js_nv_ihex(jsp, jo3p, "nmm", !!(0x4 & bp[5]));
+                sgj_js_nv_ihex(jsp, jo3p, "offline", !!(0x2 & bp[5]));
+                sgj_js_nv_ihex(jsp, jo3p, "pd", !!(0x1 & bp[5]));
+                sgj_js_nv_ihexstr(jsp, jo3p, "code_set", n, NULL, ccp);
+            }
             sgj_pr_hr(jsp, "    pd=%d, code_set: %s, Service buffer title:\n",
-                      !!(0x1 & bp[5]),
-                      sg_get_desig_code_set_str(0xf & bp[6]));
-            sgj_pr_hr(jsp, "      %.*s\n", pl - 8, bp + 8);
+                      !!(0x1 & bp[5]), ccp);
+            n = sg_first_non_printable(bp + 8, pl - 8);
+            if (n > 0) {
+                sgj_pr_hr(jsp, "      %.*s\n", pl - 8, bp + 8);
+                if (jsp->pr_as_json)
+                    sgj_js_nv_s_len(jsp, jo3p, "service_buffer_title",
+                                    (const char *)(bp + 8), n);
+            }
         } else if (pc < 0x8000) {
             sgj_pr_hr(jsp, "  parameter_code=0x%x, Reserved, parameter in "
                       "hex:\n", pc);
             hex2str(bp + 4, pl - 4, "    ", op->h2s_oformat, blen, b);
             sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json) {
+                sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, rsv_s);
+                sgj_js_nv_hex_bytes(jsp, jo3p, in_hex, bp + 4, pl - 4);
+            }
         } else {
             if (op->exclude_vendor) {
                 if ((op->verbose > 0) && (0 == op->do_brief) &&
@@ -7641,8 +7740,15 @@ if (jop) { };
                           "parameter in hex:\n", pc);
                 hex2str(bp + 4, pl - 4, "    ", op->h2s_oformat, blen, b);
                 sgj_pr_hr(jsp, "%s\n", b);
+                if (jsp->pr_as_json) {
+                    sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL,
+                                      vend_spec);
+                    sgj_js_nv_hex_bytes(jsp, jo3p, in_hex, bp + 4, pl - 4);
+                }
             }
         }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->do_pcb)
             sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2], b, blen));
 filter_chk:
@@ -8039,8 +8145,8 @@ show_device_stats_page(const uint8_t * resp, int len,
             if (vl_num) {
                 ull = sg_get_unaligned_be(pl - 4, bp + 4);
                 if (cc2p) {
-                    sgj_pr_hr(jsp, "  %s\n    %s: %" PRIu64 "\n", ccp, cc2p,
-                              ull);
+                    sgj_pr_hr(jsp, "  %s\n", ccp);
+                    sgj_pr_hr(jsp, "    %s: %" PRIu64 "\n", cc2p, ull);
                     cc2p = NULL;
                 } else
                     sgj_pr_hr(jsp, "  %s: %" PRIu64 "\n", ccp, ull);
@@ -8320,18 +8426,30 @@ static bool
 show_tape_diag_data_page(const uint8_t * resp, int len,
                          struct opts_t * op, sgj_opaque_p jop)
 {
+    bool printable;
     int k, n, num, pl, pc;
     unsigned int v;
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
+    sgj_state * jo2p = NULL;
+    sgj_state * jo3p = NULL;
+    sgj_state * jap = NULL;
     char b[512];
     static const int blen = sizeof(b);
+    static const char * tdd_lp = "Tape diagnostics data log page";
+    static const char * min_s = "Medium id number";
+    static const char * min_sn = "medium_id_number";
 
-if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "Tape diagnostics data page (ssc-3) [0x16]\n");
+        sgj_pr_hr(jsp, "%s (ssc-3) [0x16]\n", tdd_lp);
     num = len - 4;
     bp = &resp[0] + 4;
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, tdd_lp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                                   "tape_diagnostic_data_log_parameters");
+    }
+
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
         pl = bp[3] + 4;
@@ -8346,43 +8464,88 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             goto filter_chk;
         }
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+            sgj_js_nv_ihex(jsp, jo3p, param_c_sn, pc);
+        }
         sgj_pr_hr(jsp, "  %s: %d\n", param_c, pc);
-        sgj_pr_hr(jsp, "    Density code: 0x%x\n", bp[6]);
-        sgj_pr_hr(jsp, "    Medium type: 0x%x\n", bp[7]);
-        v = sg_get_unaligned_be32(bp + 8);
-        sgj_pr_hr(jsp, "    Lifetime media motion hours: %u\n", v);
-        sgj_pr_hr(jsp, "    Repeat: %d\n", !!(bp[13] & 0x80));
+        sgj_haj_vi(jsp, jo3p, 4, "Density code", SGJ_SEP_COLON_1_SPACE,
+                   bp[6], true);
+        sgj_haj_vi(jsp, jo3p, 4, "Medium type", SGJ_SEP_COLON_1_SPACE,
+                   bp[7], true);
+        sgj_haj_vi(jsp, jo3p, 4, "Lifetime media motion hours",
+                   SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be32(bp + 8), false);
+        sgj_haj_vi(jsp, jo3p, 4, "Repeat", SGJ_SEP_COLON_1_SPACE,
+                   !!(bp[13] & 0x80), false);
         v = bp[13] & 0xf;
-        sgj_pr_hr(jsp, "    Sense key: 0x%x [%s]\n", v,
-                  sg_get_sense_key_str(v, blen, b));
-        sgj_pr_hr(jsp, "    Additional sense code: 0x%x\n", bp[14]);
-        sgj_pr_hr(jsp, "    Additional sense code qualifier: 0x%x\n", bp[15]);
+        sg_get_sense_key_str(v, blen, b);
+        sgj_haj_vistr(jsp, jo3p, 4, sns_key_s, SGJ_SEP_COLON_1_SPACE, v,
+                      true, b);
+        sgj_haj_vi(jsp, jo3p, 4, asc_s, SGJ_SEP_COLON_1_SPACE, bp[14], true);
+        snprintf(b, blen, "%s %s", asc_s, qual_s);
+        sgj_haj_vi(jsp, jo3p, 4, b, SGJ_SEP_COLON_1_SPACE, bp[15], true);
+        sg_get_additional_sense_str(bp[14], bp[15], false, blen, b);
         if (bp[14] || bp[15])
-            sgj_pr_hr(jsp, "      [%s]\n", sg_get_asc_ascq_str(bp[14], bp[15],
-                      blen, b));
-        v = sg_get_unaligned_be32(bp + 16);
-        sgj_pr_hr(jsp, "    Vendor specific code qualifier: 0x%x\n", v);
-        v = sg_get_unaligned_be32(bp + 20);
-        sgj_pr_hr(jsp, "    Product revision level: %u\n", v);
+            sgj_pr_hr(jsp, "      [%s]\n", b);
+        if (jsp->pr_as_json)
+            sgj_js_nv_s(jsp, jo3p, ass_sn, b);
+
+        snprintf(b, blen, "Vendor specific code %s", qual_s);
+        sgj_haj_vi(jsp, jo3p, 4, b, SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be32(bp + 16), true);
+        sgj_haj_vi(jsp, jo3p, 4, "Product revision level",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 20),
+                   false);
         v = sg_get_unaligned_be32(bp + 24);
-        sgj_pr_hr(jsp, "    Hours since last clean: %u\n", v);
-        sgj_pr_hr(jsp, "    Operation code: 0x%x\n", bp[28]);
-        sgj_pr_hr(jsp, "    Service action: 0x%x\n", bp[29] & 0xf);
+        sgj_haj_vi(jsp, jo3p, 4, "Hours since last clean",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 24),
+                   false);
+        sgj_haj_vi(jsp, jo3p, 4, "Operation code", SGJ_SEP_COLON_1_SPACE,
+                   bp[28], true);
+        sgj_haj_vi(jsp, jo3p, 4, "Service action", SGJ_SEP_COLON_1_SPACE,
+                   bp[29] & 0x1f, true);
         // Check Medium id number for all zeros
         // ssc4r03.pdf does not define this field, why? xxxxxx
-        if (sg_all_zeros(bp + 32, 32))
-            sgj_pr_hr(jsp, "    Medium id number is 32 bytes of zero\n");
+        n = sg_first_non_printable(bp + 32, 32);
+        if (32 == n)
+            sgj_pr_hr(jsp, "    %s: %.*s", min_s, 32, bp + 32);
+        else if (sg_all_zeros(bp + 32, 32))
+            sgj_pr_hr(jsp, "    %s is 32 bytes of zero\n", min_s);
+        else if (n > 5)
+            sgj_pr_hr(jsp, "    %s: %.*s", min_s, n, bp + 32);
         else {
             hex2str(bp + 32, 32, "      ", 0 /* with ASCII */, blen, b);
-            sgj_pr_hr(jsp, "    Medium id number (in hex):\n%s", b);
+            sgj_pr_hr(jsp, "    %s (in hex):\n%s", min_s, b);
         }
-        sgj_pr_hr(jsp, "    Timestamp origin: 0x%x\n", bp[64] & 0xf);
+        if (jsp->pr_as_json) {
+            if (n > 5)
+                sgj_js_nv_s_len(jsp, jo3p, min_sn, (const char *)(bp + 32),
+                                n);
+            else
+                sgj_js_nv_hex_bytes(jsp, jo3p, min_sn, bp + 32, 32);
+        }
+        sgj_haj_vi(jsp, jo3p, 4, "Timestamp origin", SGJ_SEP_COLON_1_SPACE,
+                   bp[64] & 0x7, true);
         // Check Timestamp for all zeros
+        printable = false;
         if (sg_all_zeros(bp + 66, 6))
-            sgj_pr_hr(jsp, "    Timestamp is all zeros:\n");
-        else {
+            sgj_pr_hr(jsp, "    %s is all zeros:\n", tims_s);
+        else if (6 == sg_first_non_printable(bp + 66, 6)) {
+            printable = true;
+            sgj_pr_hr(jsp, "    %s: %.*s", tims_s, 6, bp + 66);
+        } else {
             hex2str(bp + 66, 6, NULL, op->h2s_oformat, blen, b);
-            sgj_pr_hr(jsp, "    Timestamp: %s\n", b);
+            sgj_pr_hr(jsp, "    %s: %s\n", tims_s, b);
+        }
+        if (jsp->pr_as_json) {
+            if (printable)
+                sgj_js_nv_s_len(jsp, jo3p, tims_sn, (const char *)(bp + 66),
+                                6);
+            else
+                sgj_js_nv_hex_bytes(jsp, jo3p, tims_sn, bp + 66, 6);
         }
         if (pl > 72) {
             n = pl - 72;
@@ -8393,6 +8556,8 @@ if (jop) { };
             else
                 sgj_pr_hr(jsp, "%s\n", b);
         }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->do_pcb)
             sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2], b, blen));
 filter_chk:
@@ -8410,17 +8575,29 @@ static bool
 show_mchanger_diag_data_page(const uint8_t * resp, int len,
                              struct opts_t * op, sgj_opaque_p jop)
 {
+    bool printable;
     int num, pl, pc;
     unsigned int v;
     const uint8_t * bp;
-    char str[PCB_STR_LEN];
+    sgj_state * jsp = &op->json_st;
+    sgj_state * jo2p = NULL;
+    sgj_state * jo3p = NULL;
+    sgj_state * jap = NULL;
     char b[512];
+    static const int blen = sizeof(b);
+    static const char * const mcdd_lp =
+                        "Media changer diagnostics data log page";
 
-if (jop) { };
     if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Media changer diagnostics data page (smc-3) [0x16]\n");
+        sgj_pr_hr(jsp, "%s (smc-3) [0x16]\n", mcdd_lp);
     num = len - 4;
     bp = &resp[0] + 4;
+    if (jsp->pr_as_json) {
+        jo2p = sg_log_js_hdr(jsp, jop, mcdd_lp, resp);
+        jap = sgj_named_subarray_r(jsp, jo2p,
+                           "medium_changer_diagnostic_data_log_parameters");
+    }
+
     while (num > 3) {
         pc = sg_get_unaligned_be16(bp + 0);
         pl = bp[3] + 4;
@@ -8435,60 +8612,113 @@ if (jop) { };
             hex2stdout(bp, pl, op->dstrhex_no_ascii);
             goto filter_chk;
         }
-        printf("  %s: %d\n", param_c, pc);
-        printf("    Repeat: %d\n", !!(bp[5] & 0x80));
+        if (jsp->pr_as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            if (op->do_pcb)
+                js_pcb(jsp, jo3p, bp[2]);
+            sgj_js_nv_ihex(jsp, jo3p, param_c_sn, pc);
+        }
+        sgj_pr_hr(jsp, "  %s: %d\n", param_c, pc);
+        sgj_haj_vi(jsp, jo3p, 4, "Repeat", SGJ_SEP_COLON_1_SPACE,
+                   !!(bp[5] & 0x80), false);
         v = bp[5] & 0xf;
-        printf("    Sense key: 0x%x [%s]\n", v,
-               sg_get_sense_key_str(v, sizeof(b), b));
-        printf("    Additional sense code: 0x%x\n", bp[6]);
-        printf("    Additional sense code qualifier: 0x%x\n", bp[7]);
+        sg_get_sense_key_str(v, blen, b);
+        sgj_haj_vistr(jsp, jo3p, 4, sns_key_s, SGJ_SEP_COLON_1_SPACE, v,
+                      true, b);
+        sgj_haj_vi(jsp, jo3p, 4, asc_s, SGJ_SEP_COLON_1_SPACE, bp[6], true);
+        snprintf(b, blen, "%s %s", asc_s, qual_s);
+        sgj_haj_vi(jsp, jo3p, 4, b, SGJ_SEP_COLON_1_SPACE, bp[7], true);
+        sg_get_additional_sense_str(bp[6], bp[7], false, blen, b);
         if (bp[6] || bp[7])
-            printf("      [%s]\n", sg_get_asc_ascq_str(bp[6], bp[7],
-                   sizeof(b), b));
-        v = sg_get_unaligned_be32(bp + 8);
-        printf("    Vendor specific code qualifier: 0x%x\n", v);
-        v = sg_get_unaligned_be32(bp + 12);
-        printf("    Product revision level: %u\n", v);
-        v = sg_get_unaligned_be32(bp + 16);
-        printf("    Number of moves: %u\n", v);
-        v = sg_get_unaligned_be32(bp + 20);
-        printf("    Number of pick: %u\n", v);
-        v = sg_get_unaligned_be32(bp + 24);
-        printf("    Number of pick retries: %u\n", v);
-        v = sg_get_unaligned_be32(bp + 28);
-        printf("    Number of places: %u\n", v);
-        v = sg_get_unaligned_be32(bp + 32);
-        printf("    Number of place retries: %u\n", v);
-        v = sg_get_unaligned_be32(bp + 36);
-        printf("    Number of determined volume identifiers: %u\n", v);
-        v = sg_get_unaligned_be32(bp + 40);
-        printf("    Number of unreadable volume identifiers: %u\n", v);
-        printf("    Operation code: 0x%x\n", bp[44]);
-        printf("    Service action: 0x%x\n", bp[45] & 0xf);
-        printf("    Media changer error type: 0x%x\n", bp[46]);
-        printf("    MTAV: %d\n", !!(bp[47] & 0x8));
-        printf("    IAV: %d\n", !!(bp[47] & 0x4));
-        printf("    LSAV: %d\n", !!(bp[47] & 0x2));
-        printf("    DAV: %d\n", !!(bp[47] & 0x1));
-        v = sg_get_unaligned_be16(bp + 48);
-        printf("    Medium transport address: 0x%x\n", v);
-        v = sg_get_unaligned_be16(bp + 50);
-        printf("    Initial address: 0x%x\n", v);
-        v = sg_get_unaligned_be16(bp + 52);
-        printf("    Last successful address: 0x%x\n", v);
-        v = sg_get_unaligned_be16(bp + 54);
-        printf("    Destination address: 0x%x\n", v);
+            sgj_pr_hr(jsp, "      [%s]\n", b);
+        if (jsp->pr_as_json)
+            sgj_js_nv_s(jsp, jo3p, ass_sn, b);
+        snprintf(b, blen, "Vendor specific code %s", qual_s);
+        sgj_haj_vi(jsp, jo3p, 4, b, SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be32(bp + 8), true);
+        sgj_haj_vi(jsp, jo3p, 4, "Product revision level",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 12),
+                   false);
+        sgj_haj_vi(jsp, jo3p, 4, "Number of moves", SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be32(bp + 16), false);
+        sgj_haj_vi(jsp, jo3p, 4, "Number of picks", SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be32(bp + 20), false);
+        sgj_haj_vi(jsp, jo3p, 4, "Number of pick retries",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 24),
+                   false);
+        sgj_haj_vi(jsp, jo3p, 4, "Number of places", SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be32(bp + 28), false);
+        sgj_haj_vi(jsp, jo3p, 4, "Number of place retries",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 32),
+                   false);
+        sgj_haj_vi(jsp, jo3p, 4, "Number of determined volume identifiers",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 36),
+                   false);
+        sgj_haj_vi(jsp, jo3p, 4, "Number of unreadable volume identifiers",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 40),
+                   false);
+        sgj_haj_vi(jsp, jo3p, 4, "Operation code", SGJ_SEP_COLON_1_SPACE,
+                   bp[44], true);
+        sgj_haj_vi(jsp, jo3p, 4, "Service action", SGJ_SEP_COLON_1_SPACE,
+                   bp[45] & 0x1f, true);
+        sgj_haj_vi(jsp, jo3p, 4, "Media changer error type",
+                   SGJ_SEP_COLON_1_SPACE, bp[46], true);
+        sgj_haj_vi_nex(jsp, jo3p, 4, "MTAV", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[47] & 0x8), false,
+                       "Medium Transport Address Valid");
+        sgj_haj_vi_nex(jsp, jo3p, 4, "IAV", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[47] & 0x4), false,
+                       "Initial Address Valid");
+        sgj_haj_vi_nex(jsp, jo3p, 4, "LSAV", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[47] & 0x2), false,
+                       "Last Successful Address Valid");
+        sgj_haj_vi_nex(jsp, jo3p, 4, "DAV", SGJ_SEP_COLON_1_SPACE,
+                       !!(bp[47] & 0x1), false,
+                       "Destination Address Valid");
+        sgj_haj_vi(jsp, jo3p, 4, "Medium transport address",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be16(bp + 48),
+                   true);
+        sgj_haj_vi(jsp, jo3p, 4, "Initial address", SGJ_SEP_COLON_1_SPACE,
+                   sg_get_unaligned_be16(bp + 50), true);
+        sgj_haj_vi(jsp, jo3p, 4, "Last successful address",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be16(bp + 52),
+                   true);
+        sgj_haj_vi(jsp, jo3p, 4, "Destinationl address",
+                   SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be16(bp + 54),
+                   true);
         if (pl > 91) {
-            printf("    Volume tag information:\n");
-            hex2fp(bp + 56, 36, "    ", op->h2s_oformat, stdout);
+            hex2str(bp + 56, 36, "      ", op->h2s_oformat, blen, b);
+            sgj_pr_hr(jsp, "    Volume tag information:\n");
+            sgj_pr_hr(jsp, "%s\n", b);
+            if (jsp->pr_as_json)
+                sgj_js_nv_hex_bytes(jsp, jo3p, "volume_tag_information",
+                                    bp + 56, 36);
         }
         if (pl > 99) {
-            printf("    Timestamp origin: 0x%x\n", bp[92] & 0xf);
-            printf("    Timestamp:\n");
-            hex2fp(bp + 94, 6, "    ", op->h2s_oformat, stdout);
+            sgj_haj_vi(jsp, jo3p, 4, "Timestamp origin",
+                       SGJ_SEP_COLON_1_SPACE, bp[92] & 0xf, true);
+            printable = false;
+            if (sg_all_zeros(bp + 66, 6))
+                sgj_pr_hr(jsp, "    %s is all zeros:\n", tims_s);
+            else if (6 == sg_first_non_printable(bp + 66, 6)) {
+                printable = true;
+                sgj_pr_hr(jsp, "    %s: %.*s", tims_s, 6, bp + 66);
+            } else {
+                hex2str(bp + 66, 6, NULL, op->h2s_oformat, blen, b);
+                sgj_pr_hr(jsp, "    %s: %s\n", tims_s, b);
+            }
+            if (jsp->pr_as_json) {
+                if (printable)
+                    sgj_js_nv_s_len(jsp, jo3p, tims_sn,
+                                    (const char *)(bp + 66), 6);
+                else
+                    sgj_js_nv_hex_bytes(jsp, jo3p, tims_sn, bp + 66, 6);
+            }
         }
+        if (jsp->pr_as_json)
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         if (op->do_pcb)
-            printf("        <%s>\n", get_pcb_str(bp[2], str, sizeof(str)));
+            sgj_pr_hr(jsp, "        <%s>\n", get_pcb_str(bp[2], b, blen));
 filter_chk:
         if (op->filter_given)
             break;
@@ -9654,6 +9884,13 @@ main(int argc, char * argv[])
         }
     }
     vb = op->verbose;
+    if (vb > 4)
+        pr2serr("device_name=%s, in_file=%s, pg_arg=%s, vend_prod=%s, "
+                "pdt=0x%x\n", op->device_name ? op->device_name : "",
+                op->in_fn ? op->in_fn : "",
+                op->pg_arg ? op->pg_arg : "",
+                op->vend_prod ? op->vend_prod : "",
+                op->dev_pdt);
     if (op->vend_prod) {
         if (0 == memcmp("-1", op->vend_prod,3))
             k = VP_NONE;

@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.89 20230111";    /* spc6r06 */
+static const char * version_str = "0.89 20230121";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -153,8 +153,8 @@ usage()
             "    --opcode=OP[,SA]|-o OP[,SA]    opcode (OP) and service "
             "action (SA)\n"
             "    --pdt=DT|-p DT    give peripheral device type for "
-            "'--no-inquiry'\n"
-            "                      '--enumerate'\n"
+            "'--no-inquiry',\n"
+            "                      '--enumerate' and '--inhex=FN'\n"
             "    --raw|-r        output response in binary to stdout unless "
             "--inhex=FN\n"
             "                    is given then FN is parsed as binary "
@@ -433,6 +433,8 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 n = sg_get_num(optarg);
             else if ((2 == strlen(optarg)) && (0 == strcmp("-1", optarg)))
                 n = -1;
+	    else
+		n = sg_get_pdt_from_acronym(optarg);
             if ((n < -1) || (n > PDT_MAX)) {
                 pr2serr("bad argument to '--pdt=DT', expect -1 to 31\n");
                 return SG_LIB_SYNTAX_ERROR;

@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.97 20230102";
+const char * sg_lib_version_str = "2.98 20230122";
 /* spc6r06, sbc5r03, zbc2r13 */
 
 
@@ -1600,6 +1600,41 @@ const char * sg_lib_pdt_strs[32] = {    /* should have 2**5 elements */
     "well known logical unit",
     "unknown or no device type", /* coupled with PQ=3 for not accessible
                                     via this lu's port (try the other) */
+};
+
+struct sg_aux_info_t sg_lib_pdt_aux_a[32] = {
+    {"disk", 3, 0, 0, 0},
+    {"tape", 3, 0, 0, 0},
+    {"printer", 5, 0, 0, 0},
+    {"processor", 4, 0, 0, 0},
+    {"wo_opt", 5, 0, 0, 0},
+    /* 5 */ {"dvd;cd;bd", 2, 0, 0, 0},
+    {"scanner", 4, 0, 0, 0},
+    {"optical", 3, 0, 0, 0},
+    {"changer;mch", 3, 0, 0, 0},
+    {"comms", 3, 0, 0, 0},
+    /* 0xa */ {"graphics", 3, 0, 0, 0},
+    {"grb", 3, 0, 0, 0},
+    {"array", 3, 0, 0, 0},
+    {"enc;ses", 3, 0, 0, 0},
+    {"simplified;rbc", 3, 0, 0, 0},
+    {"ocrw", 3, 0, 0, 0},
+    {/* 0x10 */ "bridge", 3, 0, 0, 0},
+    {"obs;object", 3, 0, 0, 0},
+    {"adc", 3, 0, 0, 0},
+    {"security", 3, 0, 0, 0},
+    {"hostm;zone", 4, 0, 0, 0},
+    {"0x15", 4, 0, 0, 0},
+    {"0x16", 4, 0, 0, 0},
+    {"0x17", 4, 0, 0, 0},
+    {"0x18", 4, 0, 0, 0},
+    {"0x19", 4, 0, 0, 0},
+    {"0x1a", 4, 0, 0, 0},
+    {"0x1b", 4, 0, 0, 0},
+    {"0x1c", 4, 0, 0, 0},
+    {"0x1d", 4, 0, 0, 0},
+    {"wlun;well", 4, 0, 0, 0},
+    {"unknown", 3, 0, 0, 0},
 };
 
 const char * sg_lib_transport_proto_strs[] =

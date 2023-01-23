@@ -2,7 +2,7 @@
 #define SG_LIB_DATA_H
 
 /*
- * Copyright (c) 2007-2021 Douglas Gilbert.
+ * Copyright (c) 2007-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -98,6 +98,14 @@ struct sg_cmd_response_t {
     const uint8_t * sbp;
 };
 
+struct sg_aux_info_t {
+    const char * acron;
+    uint8_t min_match_len;
+    uint8_t spare2;
+    uint8_t spare3;
+    uint8_t spare4;
+};
+
 
 extern const char * sg_lib_version_str;
 
@@ -127,6 +135,7 @@ extern struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];
 extern struct sg_lib_value_name_t sg_lib_scsi_feature_sets[];
 extern const char * sg_lib_sense_key_desc[];
 extern const char * sg_lib_pdt_strs[];
+extern struct sg_aux_info_t sg_lib_pdt_aux_a[];
 extern const char * sg_lib_transport_proto_strs[];
 extern const char * sg_lib_tapealert_strs[];
 extern int sg_lib_pdt_decay_arr[];

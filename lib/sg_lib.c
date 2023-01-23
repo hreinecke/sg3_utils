@@ -620,6 +620,40 @@ sg_get_pdt_str(int pdt, int buff_len, char * buff)
     return buff;
 }
 
+int
+sg_get_pdt_from_acronym(const char * acron)
+{
+    int k;
+    int len = strlen(acron);
+    struct sg_aux_info_t * aip;
+    const char * cc0p;
+    const char * ccp;
+    char b[32];
+    static const int blen = sizeof(b);
+
+    if (len >= blen)
+        len = blen - 1;
+    for (k = 0; k < len; ++k)
+        b[k] = tolower(acron[k]);
+    b[k] = '\0';
+    if (0 == memcmp("spc", b, 3))
+        return -1;
+
+    for (k = 0, aip = sg_lib_pdt_aux_a; k < 0x20; ++k, ++aip) {
+        if (len < aip->min_match_len)
+            continue;   /* acron too short to match this item */
+        cc0p = aip->acron;
+        while ((ccp = strchr(cc0p, ';'))) {
+            if (0 == memcmp(b, cc0p, aip->min_match_len))
+                return k;
+            cc0p = ccp + 1;
+        }
+        if (0 == memcmp(b, cc0p, aip->min_match_len))
+            return k;
+    }
+    return -2;
+}
+
 /* Returns true if left argument is "equal" to the right argument. l_pdt_s
  * is a compound PDT (SCSI Peripheral Device Type) or a negative number
  * which represents a wildcard (i.e. match anything). r_pdt_s has a similar
@@ -3141,16 +3175,19 @@ sg_all_ffs(const uint8_t * bp, int b_len)
     return true;
 }
 
-bool
-sg_all_printable(const uint8_t * bp, int b_len)
+/* If its all printable then return value equals b_len */
+int
+sg_first_non_printable(const uint8_t * bp, int b_len)
 {
-    if ((NULL == bp) || (b_len <= 0))
-        return false;
-    for (--b_len; b_len >= 0; --b_len) {
-        if (!my_isprint(bp[b_len]))
-            return false;
+    int k;
+
+    if (NULL == bp)
+        return 0;
+    for (k = 0; k < b_len; ++k) {
+        if (!my_isprint(bp[k]))
+            return k;
     }
-    return true;
+    return k;
 }
 
 static uint16_t
