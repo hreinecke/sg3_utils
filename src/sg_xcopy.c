@@ -1,7 +1,7 @@
 /* A utility program for copying files. Similar to 'dd' but using
  * the 'Extended Copy' command.
  *
- *  Copyright (c) 2011-2022 Hannes Reinecke, SUSE Labs
+ *  Copyright (c) 2011-2023 Hannes Reinecke, SUSE Labs
  *
  *  Largely taken from 'sg_dd', which has the
  *
@@ -69,7 +69,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.73 20220118";
+static const char * version_str = "0.74 20230126";
 
 #define ME "sg_xcopy: "
 
@@ -202,6 +202,8 @@ static struct xcopy_fp_t oxcf;
 static const char * read_cap_str = "Read capacity";
 static const char * rec_copy_op_params_str = "Receive copy operating "
                                              "parameters";
+static const char * tawvv_s =
+                "try again with '-vv' option for more information";
 
 static void calc_duration_throughput(int contin);
 
@@ -628,6 +630,7 @@ scsi_extended_copy(int sg_fd, uint8_t list_id,
     int verb, res;
     char b[80];
 
+
     verb = (verbose > 1) ? (verbose - 2) : 0;
     memset(xcopyBuff, 0, 256);
     xcopyBuff[0] = list_id;
@@ -650,6 +653,11 @@ scsi_extended_copy(int sg_fd, uint8_t list_id,
     if (res) {
         sg_get_category_sense_str(res, sizeof(b), b, verb);
         pr2serr("Xcopy(LID1): %s\n", b);
+        if (SG_LIB_CAT_ILLEGAL_REQ == res)
+            pr2serr(" ... problem with cdb, %s\n", tawvv_s);
+        else if (SG_LIB_CAT_INVALID_PARAM == res)
+            pr2serr(" ... problem with field in parameter list, %s\n",
+                    tawvv_s);
     }
     return res;
 }
@@ -1039,7 +1047,7 @@ desc_from_vpd_id(int sg_fd, uint8_t *desc, int desc_len,
         else {
             sg_get_category_sense_str(res, sizeof(b), b, verbose);
             pr2serr("VPD inquiry (Device ID): %s\n", b);
-            pr2serr("   try again with '-vv'\n");
+            pr2serr("   %s\n", tawvv_s);
         }
         return res;
     } else if (rcBuff[1] != VPD_DEVICE_ID) {
@@ -1927,8 +1935,7 @@ fini:
     /* file handles not explicitly closed; let process cleanup do that */
     if (0 == verbose) {
         if (! sg_if_can2stderr("sg_xcopy failed: ", ret))
-            pr2serr("Some error occurred, try again with '-v' or '-vv' for "
-                    "more information\n");
+            pr2serr("Some error occurred, %s\n", tawvv_s);
     }
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

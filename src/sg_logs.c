@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.18 20230122";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.19 20230130";    /* spc6r06 + sbc5r03 */
 
 #define MY_NAME "sg_logs"
 
@@ -7655,9 +7655,9 @@ show_service_buffers_info_page(const uint8_t * resp, int len,
     const char * ccp;
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
-    struct opts_t * jo2p = NULL;
-    struct opts_t * jo3p = NULL;
-    struct opts_t * jap = NULL;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char b[256];
     static const int blen = sizeof(b);
     static const char * sbi_lp = "Service buffers information log page";
@@ -8431,9 +8431,9 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
     unsigned int v;
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
-    sgj_state * jo2p = NULL;
-    sgj_state * jo3p = NULL;
-    sgj_state * jap = NULL;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char b[512];
     static const int blen = sizeof(b);
     static const char * tdd_lp = "Tape diagnostics data log page";
@@ -8499,7 +8499,6 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
         sgj_haj_vi(jsp, jo3p, 4, "Product revision level",
                    SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 20),
                    false);
-        v = sg_get_unaligned_be32(bp + 24);
         sgj_haj_vi(jsp, jo3p, 4, "Hours since last clean",
                    SGJ_SEP_COLON_1_SPACE, sg_get_unaligned_be32(bp + 24),
                    false);
@@ -8580,9 +8579,9 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
     unsigned int v;
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
-    sgj_state * jo2p = NULL;
-    sgj_state * jo3p = NULL;
-    sgj_state * jap = NULL;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char b[512];
     static const int blen = sizeof(b);
     static const char * const mcdd_lp =
@@ -9801,6 +9800,7 @@ main(int argc, char * argv[])
     uint8_t supp_pgs_rsp[256];
     char b[128];
     static const int blen = sizeof(b);
+    static const char * log_sel = "log_select:";
 
     op = &opts;
     if (getenv("SG3_UTILS_INVOCATION"))
@@ -10177,18 +10177,21 @@ main(int argc, char * argv[])
                              rsp_buff, ((in_len > 0) ? in_len : 0), true, vb);
         if (k) {
             if (SG_LIB_CAT_NOT_READY == k)
-                pr2serr("log_select: device not ready\n");
+                pr2serr("%s device not ready\n", log_sel);
             else if (SG_LIB_CAT_ILLEGAL_REQ == k)
-                pr2serr("log_select: field in cdb illegal\n");
+                pr2serr("%s field in cdb illegal\n", log_sel);
+            else if (SG_LIB_CAT_INVALID_PARAM == k)
+                pr2serr("%s invalid field in data-out associated with cd\n",
+                        log_sel);
             else if (SG_LIB_CAT_INVALID_OP == k)
-                pr2serr("log_select: not supported\n");
+                pr2serr("%s not supported\n", log_sel);
             else if (SG_LIB_CAT_UNIT_ATTENTION == k)
-                pr2serr("log_select: unit attention\n");
+                pr2serr("%s unit attention\n", log_sel);
             else if (SG_LIB_CAT_ABORTED_COMMAND == k)
-                pr2serr("log_select: aborted command\n");
+                pr2serr("%s aborted command\n", log_sel);
             else
-                pr2serr("log_select: failed (%d), try '-v' for more "
-                        "information\n", k);
+                pr2serr("%s failed (%d), try '-v' for more information\n",
+                        log_sel, k);
         }
         ret = (k >= 0) ?  k : SG_LIB_CAT_OTHER;
         goto err_out;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2022 Douglas Gilbert.
+ * Copyright (c) 2009-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -36,7 +36,7 @@
  * logical blocks. Note that DATA MAY BE LOST.
  */
 
-static const char * version_str = "1.19 20220813";
+static const char * version_str = "1.20 20230126";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -379,6 +379,7 @@ main(int argc, char * argv[])
     uint64_t addr_arr[MAX_NUM_ADDR];
     uint32_t num_arr[MAX_NUM_ADDR];
     uint8_t param_arr[8 + (MAX_NUM_ADDR * 16)];
+    static const char * tryvv_s = ", try '-vv' for more information";
 
     while (1) {
         int option_index = 0;
@@ -768,7 +769,10 @@ retry:
             pr2serr("UNMAP not supported\n");
             break;
         case SG_LIB_CAT_ILLEGAL_REQ:
-            pr2serr("bad field in UNMAP cdb\n");
+            pr2serr("bad field in UNMAP cdb%s\n", tryvv_s);
+            break;
+        case SG_LIB_CAT_INVALID_PARAM:
+            pr2serr("bad field in UNMAP parameter list%s\n", tryvv_s);
             break;
         default:
             err_printed = false;

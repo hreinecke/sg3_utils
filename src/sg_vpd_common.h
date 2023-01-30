@@ -2,7 +2,7 @@
 #define SG_VPD_H
 
 /*
- * Copyright (c) 2022 Douglas Gilbert.
+ * Copyright (c) 2022-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -64,6 +64,7 @@ extern "C" {
 #define VPD_BLOCK_LIMITS_EXT 0xb7       /* sbc4r08 */
 #define VPD_FORMAT_PRESETS 0xb8         /* sbc4r18 */
 #define VPD_CON_POS_RANGE 0xb9          /* sbc5r01 */
+#define VPD_CAP_PROD_ID 0xba            /* sbc5r04 */
 #define VPD_NOPE_WANT_STD_INQ -2        /* request for standard inquiry */
 
 /* vendor/product identifiers */
@@ -124,6 +125,7 @@ struct opts_t {
     bool do_all;                /* sg_vpd */
     bool do_ata;                /* sg_inq */
     bool do_decode;             /* sg_inq */
+    bool do_debug;              /* sg_inq + sg_vpd (hidden) */
     bool do_descriptors;        /* sg_inq */
     bool do_enum;               /* sg_enum */
     bool do_export;             /* sg_inq */
@@ -223,6 +225,8 @@ void decode_referrals_vpd(const uint8_t * buff, int len, struct opts_t * op,
                           sgj_opaque_p jop);
 void decode_sup_block_lens_vpd(const uint8_t * buff, int len,
                                struct opts_t * op, sgj_opaque_p jap);
+void decode_cap_prod_id_vpd(const uint8_t * buff, int len, struct opts_t * op,
+                            sgj_opaque_p jap);
 void decode_block_dev_char_ext_vpd(const uint8_t * buff, int len,
                                    struct opts_t * op, sgj_opaque_p jop);
 void decode_zbdch_vpd(const uint8_t * buff, int len, struct opts_t * op,
@@ -284,6 +288,45 @@ extern const char * product_id_hr;
 extern const char * product_id_js;
 extern const char * product_rev_lev_hr;
 extern const char * product_rev_lev_js;
+extern const char * vpd_pg_s;
+extern const char * lts_s;
+
+extern const char * svp_vpdp;
+extern const char * usn_vpdp;
+extern const char * di_vpdp;
+extern const char * mna_vpdp;
+extern const char * eid_vpdp;
+extern const char * mpp_vpdp;
+extern const char * sp_vpdp;
+extern const char * ai_vpdp;
+extern const char * pc_vpdp;
+extern const char * dc_vpdp;
+extern const char * cp_vpdp;
+extern const char * psm_vpdp;
+extern const char * tpc_vpdp;
+extern const char * pslu_vpdp;
+extern const char * psp_vpdp;
+extern const char * sfs_vpdp;
+extern const char * bl_vpdp;
+extern const char * sad_vpdp;
+extern const char * osdi_vpdp;
+extern const char * bdc_vpdp;
+extern const char * masn_vpdp;
+extern const char * st_vpdp;
+extern const char * lbpv_vpdp;
+extern const char * tas_vpdp;
+extern const char * ref_vpdp;
+extern const char * adsn_vpdp;
+extern const char * sbl_vpdp;
+extern const char * dtde_vpdp;
+extern const char * bdce_vpdp;
+extern const char * lbpro_vpdp;
+extern const char * zbdc_vpdp;
+extern const char * ble_vpdp;
+extern const char * fp_vpdp;
+extern const char * cpr_vpdp;
+extern const char * cap_vpdp;
+
 extern struct svpd_vp_name_t vp_arr[];
 extern struct svpd_values_name_t vendor_vpd_pg[];
 

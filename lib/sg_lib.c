@@ -2322,6 +2322,8 @@ sg_err_category_sense(const uint8_t * sbp, int sb_len)
                 return SG_LIB_CAT_INVALID_OP;
             else if ((0x21 == ssh.asc) && (0x0 == ssh.ascq))
                 return SG_LIB_LBA_OUT_OF_RANGE;
+            else if ((0x26 == ssh.asc) && (0x0 == ssh.ascq))
+                return SG_LIB_CAT_INVALID_PARAM;
             else
                 return SG_LIB_CAT_ILLEGAL_REQ;
             break;

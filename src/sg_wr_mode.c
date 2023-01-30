@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2021 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -32,7 +32,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.27 20210610";
+static const char * version_str = "1.28 20230126";
 
 #define ME "sg_wr_mode: "
 
@@ -43,6 +43,7 @@ static const char * version_str = "1.27 20210610";
 
 
 static struct option long_options[] = {
+        {"cfile", required_argument, 0, 'C'},
         {"contents", required_argument, 0, 'c'},
         {"dbd", no_argument, 0, 'd'},
         {"force", no_argument, 0, 'f'},
@@ -50,6 +51,7 @@ static struct option long_options[] = {
         {"len", required_argument, 0, 'l'},
         {"mask", required_argument, 0, 'm'},
         {"page", required_argument, 0, 'p'},
+        {"raw", no_argument, 0, 'r'},
         {"rtd", no_argument, 0, 'R'},
         {"save", no_argument, 0, 's'},
         {"six", no_argument, 0, '6'},
@@ -62,14 +64,14 @@ static struct option long_options[] = {
 static void
 usage()
 {
-    pr2serr("Usage: sg_wr_mode [--contents=H,H...] [--dbd] [--force] "
-            "[--help]\n"
-            "                  [--len=10|6] [--mask=M,M...] "
-            "[--page=PG_H[,SPG_H]]\n"
-            "                  [--rtd] [--save] [--six] [--verbose] "
-            "[--version]\n"
-            "                  DEVICE\n"
+    pr2serr("Usage: sg_wr_mode [--cfile=CF] [--contents=H,H...] [--dbd] "
+            "[--force]\n"
+            "                  [--help] [--len=10|6] [--mask=M,M...]\n"
+            "                  [--page=PG_H[,SPG_H]] [--raw] [--rtd] "
+            "[--save]\n"
+            "                  [--six] [--verbose] [--version] DEVICE\n"
             "  where:\n"
+            "    --cfile=CF | -C CF    contents in a file called CF\n"
             "    --contents=H,H... | -c H,H...    comma separated string "
             "of hex numbers\n"
             "                                     that is mode page contents "
@@ -91,6 +93,8 @@ usage()
             "    --page=PG_H,SPG_H | -p PG_H,SPG_H    page and subpage code "
             "to be\n"
             "                                         written (in hex)\n"
+            "    --raw | -r            contents of CF file decoded as "
+            "binary\n"
             "    --rtd | -R            set RTD bit (revert to defaults) in "
             "cdb\n"
             "    --save | -s           set 'save page' (SP) bit; default "
@@ -111,10 +115,10 @@ usage()
  * one entry per line, a comma separated list or space separated list.
  * Returns 0 if ok, or sg3_utils error code if error. */
 static int
-build_mode_page(const char * inp, uint8_t * mp_arr, int * mp_arr_len,
-                int max_arr_len)
+build_mode_page(const char * inp, bool is_file, bool as_binary,
+                uint8_t * mp_arr, int * mp_arr_len, int max_arr_len)
 {
-    int in_len, k, j, m;
+    int in_len, k;
     unsigned int h;
     const char * lcp;
     char * cp;
@@ -127,96 +131,9 @@ build_mode_page(const char * inp, uint8_t * mp_arr, int * mp_arr_len,
     in_len = strlen(inp);
     if (0 == in_len)
         *mp_arr_len = 0;
-    if ('-' == inp[0]) {        /* read from stdin */
-        bool split_line;
-        int off = 0;
-        char carry_over[4];
-        char line[512];
-
-        carry_over[0] = 0;
-        for (j = 0; j < 512; ++j) {
-            if (NULL == fgets(line, sizeof(line), stdin))
-                break;
-            in_len = strlen(line);
-            if (in_len > 0) {
-                if ('\n' == line[in_len - 1]) {
-                    --in_len;
-                    line[in_len] = '\0';
-                    split_line = false;
-                } else
-                    split_line = true;
-            }
-            if (in_len < 1) {
-                carry_over[0] = 0;
-                continue;
-            }
-            if (carry_over[0]) {
-                if (isxdigit((uint8_t)line[0])) {
-                    carry_over[1] = line[0];
-                    carry_over[2] = '\0';
-                    if (1 == sscanf(carry_over, "%x", &h))
-                        mp_arr[off - 1] = h;       /* back up and overwrite */
-                    else {
-                        pr2serr("%s: carry_over error ['%s'] around line "
-                                "%d\n", __func__, carry_over, j + 1);
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                    lcp = line + 1;
-                    --in_len;
-                } else
-                    lcp = line;
-                carry_over[0] = 0;
-            } else
-                lcp = line;
-            m = strspn(lcp, " \t");
-            if (m == in_len)
-                continue;
-            lcp += m;
-            in_len -= m;
-            if ('#' == *lcp)
-                continue;
-            k = strspn(lcp, "0123456789aAbBcCdDeEfF ,\t");
-            if ((k < in_len) && ('#' != lcp[k])) {
-                pr2serr("%s: syntax error at line %d, pos %d\n", __func__,
-                        j + 1, m + k + 1);
-                return SG_LIB_SYNTAX_ERROR;
-            }
-            for (k = 0; k < 1024; ++k) {
-                if (1 == sscanf(lcp, "%x", &h)) {
-                    if (h > 0xff) {
-                        pr2serr("%s: hex number larger than 0xff in line %d, "
-                                "pos %d\n", __func__, j + 1,
-                                (int)(lcp - line + 1));
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                    if (split_line && (1 == strlen(lcp))) {
-                        /* single trailing hex digit might be a split pair */
-                        carry_over[0] = *lcp;
-                    }
-                    if ((off + k) >= max_arr_len) {
-                        pr2serr("%s: array length exceeded\n", __func__);
-                        return SG_LIB_SYNTAX_ERROR;
-                    }
-                    mp_arr[off + k] = h;
-                    lcp = strpbrk(lcp, " ,\t");
-                    if (NULL == lcp)
-                        break;
-                    lcp += strspn(lcp, " ,\t");
-                    if ('\0' == *lcp)
-                        break;
-                } else {
-                    if ('#' == *lcp) {
-                        --k;
-                        break;
-                    }
-                    pr2serr("%s: error in line %d, at pos %d\n", __func__,
-                            j + 1, (int)(lcp - line + 1));
-                    return SG_LIB_SYNTAX_ERROR;
-                }
-            }
-            off += (k + 1);
-        }
-        *mp_arr_len = off;
+    if (is_file || ('-' == inp[0])) {
+        return sg_f2hex_arr(inp, as_binary, false, mp_arr, mp_arr_len,
+                            max_arr_len);
     } else {        /* hex string on command line */
         k = strspn(inp, "0123456789aAbBcCdDeEfF, ");
         if (in_len != k) {
@@ -321,6 +238,7 @@ int
 main(int argc, char * argv[])
 {
     bool dbd = false;
+    bool do_raw = false;
     bool force = false;
     bool got_contents = false;
     bool got_mask = false;
@@ -339,6 +257,8 @@ main(int argc, char * argv[])
     int ret = 0;
     unsigned u, uu;
     const char * device_name = NULL;
+    const char * cfile_arg = NULL;
+    const char * contents_arg = NULL;
     uint8_t read_in[MX_ALLOC_LEN];
     uint8_t mask_in[MX_ALLOC_LEN];
     uint8_t ref_md[MX_ALLOC_LEN];
@@ -346,11 +266,14 @@ main(int argc, char * argv[])
     char errStr[128];
     char b[80];
     struct sg_simple_inquiry_resp inq_data;
+    static const int read_in_sz = sizeof(read_in);
+    static const int mask_in_sz = sizeof(mask_in);
+    static const int ref_md_sz = sizeof(ref_md);
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "6c:dfhl:m:p:RsvV", long_options,
+        c = getopt_long(argc, argv, "6c:C:dfhl:m:p:rRsvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -360,13 +283,10 @@ main(int argc, char * argv[])
             mode_6 = true;
             break;
         case 'c':
-            memset(read_in, 0, sizeof(read_in));
-            if ((ret = build_mode_page(optarg, read_in, &read_in_len,
-                                       sizeof(read_in)))) {
-                pr2serr("bad argument to '--contents='\n");
-                return ret;
-            }
-            got_contents = true;
+            contents_arg = optarg;
+            break;
+        case 'C':
+            cfile_arg = optarg;
             break;
         case 'd':
             dbd = true;
@@ -388,9 +308,9 @@ main(int argc, char * argv[])
             }
             break;
         case 'm':
-            memset(mask_in, 0xff, sizeof(mask_in));
+            memset(mask_in, 0xff, mask_in_sz);
             if (0 != build_mask(optarg, mask_in, &mask_in_len,
-                                sizeof(mask_in))) {
+                                mask_in_sz)) {
                 pr2serr("bad argument to '--mask'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -418,6 +338,9 @@ main(int argc, char * argv[])
                         "'--page' switch\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
+            break;
+        case 'r':
+            do_raw = true;
             break;
         case 'R':
             rtd = true;
@@ -449,6 +372,20 @@ main(int argc, char * argv[])
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
+    }
+    if (cfile_arg || contents_arg) {
+        if (cfile_arg && contents_arg) {
+            pr2serr("Cannot have both --contents= and --cfile= options\n");
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        memset(read_in, 0, read_in_sz);
+        if ((ret = build_mode_page(optarg, !! cfile_arg, do_raw, read_in,
+                                   &read_in_len, read_in_sz))) {
+            pr2serr("bad argument to '%s'\n", cfile_arg ? "--cfile=" :
+                                                          "--contents=");
+            return ret;
+        }
+        got_contents = true;
     }
 
 #ifdef DEBUG
@@ -505,7 +442,7 @@ main(int argc, char * argv[])
         pdt = PDT_UNKNOWN;
 
     /* do MODE SENSE to fetch current values */
-    memset(ref_md, 0, MX_ALLOC_LEN);
+    memset(ref_md, 0, ref_md_sz);
     snprintf(errStr, sizeof(errStr), "MODE SENSE (%d): ", mode_6 ? 6 : 10);
     alloc_len = mode_6 ? SHORT_ALLOC_LEN : MX_ALLOC_LEN;
     if (mode_6)

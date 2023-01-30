@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999 - 2022 D. Gilbert
+ *  Copyright (C) 1999 - 2023 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -271,7 +271,7 @@ int main(int argc, char * argv[])
 
     flags = O_NONBLOCK | (writeable ? O_RDWR : O_RDONLY);
 
-    for (k = 0, res = 0, j = 0, sg_fd = -1;
+    for (k = 0, res = 0, j = 0;
          (k < max_file_args)  && (has_file_args || (num_errors < MAX_ERRORS));
          ++k, res = ((sg_fd >= 0) ? close(sg_fd) : 0)) {
         if (res < 0) {
@@ -385,7 +385,7 @@ int main(int argc, char * argv[])
                     ++num_errors;
             }
         }
-    }
+    }           /* end of large for loop <<<<<<<<<<<<<<<<< */
     if ((num_errors >= MAX_ERRORS) && (num_silent < num_errors) &&
         (! has_file_args)) {
         printf("Stopping because there are too many error\n");

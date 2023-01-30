@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.89 20230121";    /* spc6r06 */
+static const char * version_str = "0.90 20230130";    /* spc6r06 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -428,7 +428,6 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->opt_new = false;
             return 0;
         case 'p':
-            n = -2;
             if (isdigit((uint8_t)optarg[0]))
                 n = sg_get_num(optarg);
             else if ((2 == strlen(optarg)) && (0 == strcmp("-1", optarg)))

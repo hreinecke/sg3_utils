@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2022 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.71 20221227";    /* ses4r04 */
+static const char * version_str = "2.72 20230130";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -7301,7 +7301,7 @@ main(int argc, char * argv[])
 {
     bool have_cgs = false;
     bool as_json = false;
-    int k, n, d_len, res, resid, vb;
+    int k, n, d_len, res, resid, vb, dhex;
     int sg_fd = -1;
     int pd_type = 0;
     int ret = 0;
@@ -7342,6 +7342,16 @@ main(int argc, char * argv[])
         ret = res;
         goto early_out;
     }
+    /* Swap the meaning of '-H' and '-HH' for compatibility with other
+     * sg3_utils where '-H' means hex with no ASCII rendering to the right
+     * and '-HH' means that we want ASCII rendering to the right */
+    dhex = op->do_hex;
+    if (1 == dhex)
+        op->do_hex = 2;
+    else if (2 == dhex)
+        op->do_hex = 1;
+    /* end of '-H', '-HH' swap code <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
+
     if (op->do_help) {
         usage(op->do_help);
         goto early_out;

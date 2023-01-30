@@ -1,4 +1,4 @@
-.TH SG_SES "8" "December 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_SES "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -244,11 +244,14 @@ option. And like this option it has a "given twice" form: '\-ee'.
 \fB\-H\fR, \fB\-\-hex\fR
 If the \fI\-\-get=STR\fR option is given then output the value found (if
 any) in hexadecimal, with a leading "0x". Otherwise output the response
-in hexadecimal; with trailing ASCII if given once, without it if given
-twice, and simple hex if given three or more times. Ignored when all
-elements from several dpages are being accessed (e.g. when the \fI\-\-join\fR
-option is used). Also see the \fI\-\-raw\fR option which may be used
-with this option.
+in hexadecimal; with a leading hex address/index at the start of each line.
+If given twice an ASCII rendering is given to the right of each line. If
+given three or more times, the hexadecimal bytes only are output, 16
+bytes (or less) on each line.
+.br
+Ignored when all elements from several dpages are being accessed (e.g. when
+the \fI\-\-join\fR option is used). Also see the \fI\-\-raw\fR option which
+may be used with this option.
 .br
 To dump one of more dpage responses to stdout in ASCII parsable hexadecimal
 use \fI\-HHH\fR or \fI\-HHHH\fR. The triple H form only outputs hexadecimals
@@ -264,6 +267,10 @@ If the \fI\-\-inner\-hex\fR option is also given it changes the action of
 this option. See the description of the \fI\-\-inner\-hex\fR option. Giving
 both \fI\-HHHH\fR (or greater) and the \fI\-\-inner\-hex\fR option is
 reported as an error.
+.br
+Note that the meaning of '-H' and '-HH' have been swapped in
+version "2.72 20230130" for compatibility with other utilities in this
+package and the description of this option in the sg3_utils(8) manpage.
 .TP
 \fB\-I\fR, \fB\-\-index\fR=\fIIIA\fR
 where \fIIIA\fR is either an individual index (II) or an Element type

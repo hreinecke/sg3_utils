@@ -64,7 +64,7 @@
 
 #define MAX_LAR_LIST_ELEMS 8
 
-static const char * version_str = "1.26 20230106";
+static const char * version_str = "1.27 20230130";
 
 struct opts_t {
     bool ck_cond;
@@ -176,7 +176,7 @@ show_x_log_directory(int ata_cmd, const uint8_t * buff, int num_bytes)
 
 /* Return of 0 is good. If read broken into multiple pieces due to
  * --count=CO being > --ppt=PPT then inbuff will contain the last piece
- * read and *inbuff_wr_bytesp wil hold its length in bytes. */
+ * read and *inbuff_wr_bytesp will hold its length in bytes. */
 static int
 do_read_gplog(int sg_fd, int ata_cmd, uint8_t la, uint8_t * inbuff,
               int * inbuff_wr_bytesp, const struct opts_t * op)
@@ -610,7 +610,8 @@ main(int argc, char * argv[])
     bool verbose_given = false;
     bool version_given = false;
     uint8_t la = 0;
-    int c, k, ret, res, n, bytes_fetched;
+    int c, k, res, n, bytes_fetched;
+    int ret = 0;
     int sg_fd = -1;
     int ata_cmd = ATA_READ_LOG_EXT;
     const char *ccp;
@@ -810,7 +811,6 @@ main(int argc, char * argv[])
             goto fini;
         else if (la_val > 0)
             op->no_output = true;
-        la = la_val;
         op->count = 1;
         la = DIRECTORY_LOG_ADDR;
         op->pn = 0;

@@ -1,10 +1,11 @@
-.TH SG_WR_MODE "8" "April 2018" "sg3_utils\-1.43" SG3_UTILS
+.TH SG_WR_MODE "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_wr_mode \- write (modify) SCSI mode page
 .SH SYNOPSIS
 .B sg_wr_mode
-[\fI\-\-contents=H,H...\fR] [\fI\-\-dbd\fR] [\fI\-\-force\fR] [\fI\-\-help\fR]
-[\fI\-\-len=10|6\fR] [\fI\-\-mask=M,M...\fR] [\fI\-\-page=PG_H[,SPG_H]\fR]
+[\fI\-\-cfile=CF\fR] [\fI\-\-contents=H,H...\fR] [\fI\-\-dbd\fR]
+[\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-len=10|6\fR]
+[\fI\-\-mask=M,M...\fR] [\fI\-\-page=PG_H[,SPG_H]\fR] [\fI\-\-raw\fR]
 [\fI\-\-rtd\fR] [\fI\-\-save\fR] [\fI\-\-six\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
@@ -27,7 +28,7 @@ page has the RTD_SUP bit to indicate whether the \fIDEVICE\fR supports the
 RTD bit in the MODE SELECT(6 and 10) commands. When the \fI\-\-rtd\fR option
 is given the rest of this section can be ignored.
 .PP
-If a contents argument is not given then the various components (i.e.
+If a contents option is not given then the various components (i.e.
 header, block descriptor(s) and mode page) of the "current" values of
 the existing mode page are printed out. In this case the mode page is
 not altered on the device.
@@ -59,6 +60,12 @@ numerical descriptor.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
+\fB\-C\fR, \fB\-\-cfile\fR=\fICF\fR
+where \fICF\fR is a file name containing the mode page. See the "FORMAT OF
+FILES CONTAINING ASCII HEX" section in the sg3_utils manpage for more
+information. If the \fI\-\-raw\fR option is also given then the contents of
+\fIFN\fR are treated as binary.
+.TP
 \fB\-c\fR, \fB\-\-contents\fR=\fIH,H...\fR
 where \fIH,H...\fR is a string of comma separated hex numbers each of
 which should resolve to a byte value (i.e. 0 to ff inclusive). A (single)
@@ -67,12 +74,7 @@ be in quotes. This is the new contents of the mode page to be written to
 \fIDEVICE\fR, potentially filtered by the mask string.
 .TP
 \fB\-c\fR, \fB\-\-contents\fR=-
-reads contents string from stdin. The hex numbers in the string may be comma,
-space, tab or linefeed (newline) separated. If a line contains "#" then the
-remaining characters on that line are ignored. Otherwise each non separator
-character should resolve to a byte value (i.e. 0 to ff inclusive). This
-forms the new contents of the mode page to be written to \fIDEVICE\fR,
-potentially filtered by the mask string.
+reads contents string from stdin. See the \fI\-\-cfile=CF\fR option above.
 .TP
 \fB\-d\fR, \fB\-\-dbd\fR
 disable block descriptors (DBD flag in cdb). Some device types include
@@ -118,6 +120,10 @@ value to fetch and modify. Both values are in hex. The subpage code should
 be between 0 and fe inclusive. Notice that subpage code ff to fetch all
 mode subpages (for a given mode page or all mode pages in the case of 3f,ff)
 is disallowed.
+.TP
+\fB\-r\fR, \fB\-\-raw\fR
+when this option is given then the file given by the \fI\-\-cfile=CF\fR
+option is treated as binary (the default is to treat it as ASCII hexadecimal).
 .TP
 \fB\-R\fR, \fB\-\-rtd\fR
 when this option is given most other actions are bypassed and a MODE
@@ -187,7 +193,7 @@ manufacturer of the device) as both the current and saved mode page
 values the following sequence could be used:
 .PP
   $ sg_modes \-\-control=2 \-\-page=1a \-r /dev/sda > t
-  
+
   $ sg_wr_mode \-\-page=1a \-\-contents=\- \-\-save /dev/sda < t
 .PP
 Next is an example of using a mask to modify the "idle condition counter"
@@ -212,7 +218,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2018 Douglas Gilbert
+Copyright \(co 2004\-2023 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -1,10 +1,10 @@
-.TH SG_FORMAT "8" "February 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_FORMAT "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_format \- format, format with preset, resize SCSI disk; format tape
 .SH SYNOPSIS
 .B sg_format
-[\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR] [\fI\-\-dcrt\fR]
-[\fI\-\-dry\-run\fR] [\fI\-\-early\fR] [\fI\-\-ffmt=FFMT\fR]
+[\fI\-\-cappid\fR] [\fI\-\-cmplst=\fR{0|1}] [\fI\-\-count=COUNT\fR]
+[\fI\-\-dcrt\fR] [\fI\-\-dry\-run\fR] [\fI\-\-early\fR] [\fI\-\-ffmt=FFMT\fR]
 [\fI\-\-fmtmaxlba\R] [\fI\-\-fmtpinfo=FPI\fR] [\fI\-\-format\fR]
 [\fI\-\-help\fR] [\fI\-\-ip\-def\fR] [\fI\-\-long\fR] [\fI\-\-mode=MP\fR]
 [\fI\-\-pfu=PFU\fR] [\fI\-\-pie=PIE\fR] [\fI\-\-pinfo\fR] [\fI\-\-poll=PT\fR]
@@ -79,6 +79,22 @@ of available Format preset identifiers and their associated data.
 Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
 option name.
+.TP
+\fB\-a\fR, \fB\-\-cappid\fR
+this option sets the CAPPID bit in the MODE SELECT header which is part of
+that command's parameter list. A MODE SELECT command is needed when the
+\fICOUNT\fR (i.e. number of logical blocks) is being changed. The MODE
+SELECT command needs to complete successfully before FORMAT UNIT command
+is performed. The CAPPID bit (introduced in SBC\-5 revision 4) is closely
+related to the Capacity/Product identification mapping VPD page (0xba).
+If that VPD page is not present, then the CAPPID bit is not set unless the
+option is given twice. If the CAPPID bit is not supported a sense key of
+illegal request with an additional sense of "invalid field in parameter
+list" should be reported.
+.br
+If successful, this option may lead to the standard INQUIRY response Product
+identification field being changed. If so, a Unit attention condition is
+set with an additional sense of "Inquiry data has changed".
 .TP
 \fB\-C\fR, \fB\-\-cmplst\fR={0|1}
 sets the CMPLST ("complete list") bit in the FORMAT UNIT cdb to 0 or 1.
@@ -690,7 +706,7 @@ Written by Grant Grundler, James Bottomley and Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2022 Grant Grundler, James Bottomley and Douglas Gilbert
+Copyright \(co 2005\-2023 Grant Grundler, James Bottomley and Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -391,6 +391,11 @@ the \fIDEVICE\fR reports a medium or hardware error (or a blank check)
 with a flag indicating the Info field is valid. This is often a LBA (of
 the first encountered error) but its meaning is command specific.
 .TP
+.B 19
+the \fIDEVICE\fR reports an illegal request with an additional sense code
+of "invalid field in parameter list". The parameter list is extra data sent
+to the \fIDEVICE\fR for some commands (e.g. FORMAT UNIT)
+.TP
 .B 20
 the \fIDEVICE\fR reports it has a check condition but "no sense"
 and non\-zero information in its additional sense codes. Some polling
@@ -594,13 +599,21 @@ output the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
 for SCSI commands that yield a non\-trivial response, print out that response
-in ASCII hexadecimal. When used once, 16 bytes are printed on each line,
-prefixed by an relative address, starting at 0 (hex). When used twice, an
-ASCII rendering of the 16 bytes is appended to each line, with non printable
-characters replaced by a '.' . When used three times only the 16 hex bytes
-are printed on each line (hence no address prefix nor ASCII appended). To
-produce hexadecimal that can be parsed by other utilities use this option
-three or four times.
+as a series ASCII hexadecimal bytes. When used once, 16 bytes are printed on
+each line, prefixed by a relative address, starting at 0 (hex). When used
+twice, an ASCII rendering of the 16 bytes is appended to each line, with
+non\-printable characters replaced by a '.' . When used three times only the
+16 hex bytes are printed on each line (hence no address prefix nor ASCII
+appended). To produce hexadecimal that can be parsed by other utilities use
+this option three, four or five times.
+.br
+The use of this option, especially when used multiple times has evolved over
+time as it has become more powerful. So check this option's description in
+the manpage of the utility being used. An example of a corner case with
+the '\-HHH' option is with the sg_inq utility and the ATA Information VPD
+page. The sg_inq utility does not decode the ATA IDENTIFY DEVICE command
+response but instead outputs hexadecimal 16 bit works (little endian)
+suitable for the hdparm utility to decode.
 .TP
 \fB\-i\fR, \fB\-\-in\fR=\fIFN\fR
 many SCSI commands fetch a significant amount of data (returned in the
@@ -882,7 +895,7 @@ under a BSD\-2\-Clause license. There is NO warranty; not even for
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sg3_utils_json,sg_decode_sense(sg3_utils), sdparm(sdparm), ddpt(ddpt),
-.B lsscsi(lsscsi), dmesg(1), mt(1)
+.B lsscsi(lsscsi), dmesg(1), mt(1), hdparm(hdparm)
 .br
 The format of this section is: <utility_name>(<package_containing_utility>)
 or <utility_name>(<manpage_section_number_containing_utility>) .

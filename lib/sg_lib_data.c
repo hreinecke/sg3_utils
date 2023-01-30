@@ -1946,12 +1946,15 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
     {10, "Copy aborted", "type: sense key"},
     {11, "Aborted command",
          "type: sense key, other than protection related (asc=0x10)"},
-    {12, "Device not ready, standby", "type: sense key"},
-    {13, "Device not ready, unavailable", "type: sense key"},
+    {12, "Device not ready, standby", "type: sense key + asc,ascq=0x4,0xb"},
+    {13, "Device not ready, unavailable", "type: sense key + asc,ascq=0x4,"
+	  "0xc"},
     {14, "Miscompare", "type: sense key"},
     {15, "File error", NULL},
     {17, "Illegal request with Info field", NULL},
     {18, "Medium or hardware error with Info", NULL},
+    {19, "Illegal request, Invalid field in parameter list",
+	 "type: sense key + asc,ascq=0x26,0"},
     {20, "No sense key", "type: probably additional sense code"},
     {21, "Recovered error (warning)", "type: sense key"},
          /* N.B. this is a warning not error */

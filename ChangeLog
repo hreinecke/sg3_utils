@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230122] [svn: r998]
+Changelog for pre-release sg3_utils-1.48 [20230130] [svn: r999]
   - decoding utilities: add --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -12,6 +12,8 @@ Changelog for pre-release sg3_utils-1.48 [20230122] [svn: r998]
     elements
   - sg_write_attr: new utility, Write Attribute is a SPC
     command that is used mainly by tape drives (ssc)
+  - --hex option cleanup, especially in sg_inq and sg_vpd
+    - swap meaning of '-H' and '-HH' in sg_ses
   - sg_rtpg: https://github.com/hreinecke/sg3_utils/pull/79
     applied
   - rescan-scsi-bus.sh: with '-r' it crashed due to change in
@@ -62,6 +64,7 @@ Changelog for pre-release sg3_utils-1.48 [20230122] [svn: r998]
   - sg_modes: improve handling of zbc disks with pdt=0x14
   - sg_inq, sg_vpd: merge VPD page processing for T10
     defined pages, VS pages still differ
+    - add Capacity/Product identification mapping VPD page
     - Device Identication VPD page, change
       "IEEE Company_id" to "AOI" as per spc6r06.pdf
     - add support for Hitachi/HP open-v ldev names
@@ -114,6 +117,7 @@ Changelog for pre-release sg3_utils-1.48 [20230122] [svn: r998]
       with tweaks; adds SG_LIB_CAT_STANDBY and
       SG_LIB_CAT_UNAVAILABLE which refine the 'not ready'
       exit status. Useful for sg_turs
+    - add SG_LIB_CAT_INVALID_PARAM exit status
   - initialize all sense buffers to 0
   - linux: replace references to /proc/scsi/sg with
     /sys/module/sg/parameters/

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2022 Douglas Gilbert.
+ * Copyright (c) 2011-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.19 20220608";
+static const char * version_str = "1.20 20230126";
 
 #define ME "sg_sanitize: "
 
@@ -256,6 +256,11 @@ do_sanitize(int sg_fd, const struct opts_t * op, const void * param_lstp,
                     pr2serr("Medium or hardware error starting at "
                             "lba=%" PRIu64 " [0x%" PRIx64 "]\n", ull, ull);
             }
+            ret = sense_cat;
+            break;
+        case SG_LIB_CAT_INVALID_PARAM:
+            pr2serr("Invalid field in parameter list, add '-vv' to find "
+                    "invalid field location\n");
             ret = sense_cat;
             break;
         default:

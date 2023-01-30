@@ -6,7 +6,7 @@
  *
  * Copyright (C) 2003  Grant Grundler    grundler at parisc-linux dot org
  * Copyright (C) 2003  James Bottomley       jejb at parisc-linux dot org
- * Copyright (C) 2005-2022  Douglas Gilbert   dgilbert at interlog dot com
+ * Copyright (C) 2005-2023  Douglas Gilbert   dgilbert at interlog dot com
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.68 20220609";
+static const char * version_str = "1.70 20230130";
 
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
@@ -69,6 +69,8 @@ static const char * version_str = "1.68 20220609";
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 
 struct opts_t {
+        bool cappid;            /* -a */
+        bool cappid_twice;      /* -aa */
         bool cmplst;            /* -C value */
         bool cmplst_given;
         bool dry_run;           /* -d */
@@ -110,6 +112,7 @@ struct opts_t {
 
 
 static struct option long_options[] = {
+        {"cappid", no_argument, 0, 'a'},
         {"count", required_argument, 0, 'c'},
         {"cmplst", required_argument, 0, 'C'},
         {"dcrt", no_argument, 0, 'D'},
@@ -145,29 +148,35 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
+static bool has_cappid_vpd = false;
+static bool has_fpresets_vpd = false;
 static const char * fu_s = "Format unit";
 static const char * fm_s = "Format medium";
 static const char * fwp_s = "Format with preset";
+static const char * tawvv_s =
+                "try again with '-v' or '-vv' option for more information";
 
 
 static void
 usage()
 {
         printf("Usage:\n"
-               "  sg_format [--cmplst=0|1] [--count=COUNT] [--dcrt] "
-               "[--dry-run] [--early]\n"
-               "            [--ffmt=FFMT] [--fmtmaxlba] [--fmtpinfo=FPI] "
-               "[--format] [--help]\n"
-               "            [--ip-def] [--long] [--mode=MP] [--pfu=PFU] "
-               "[--pie=PIE]\n"
-               "            [--pinfo] [--poll=PT] [--preset=ID] [--quick] "
-               "[--resize]\n"
-               "            [--rto_req] [--security] [--six] [--size=LB_SZ] "
-               "[--tape=FM]\n"
-               "            [--timeout=SECS] [--verbose] [--verify] "
-               "[--version] [--wait]\n"
-               "            DEVICE\n"
+               "  sg_format [--cappid] [--cmplst=0|1] [--count=COUNT] "
+               "[--dcrt] [--dry-run]\n"
+               "            [--early] [--ffmt=FFMT] [--fmtmaxlba] "
+               "[--fmtpinfo=FPI]\n"
+               "            [--format] [--help] [--ip-def] [--long] "
+               "[--mode=MP] [--pfu=PFU]\n"
+               "            [--pie=PIE] [--pinfo] [--poll=PT] [--preset=ID] "
+               "[--quick]\n"
+               "            [--resize] [--rto_req] [--security] [--six] "
+               "[--size=LB_SZ]\n"
+               "            [--tape=FM] [--timeout=SECS] [--verbose] "
+               "[--verify] [--version]\n"
+               "            [--wait] DEVICE\n"
                "  where:\n"
+               "    --cappid|-a     set CAPPID bit in Mode Select if count "
+               "change\n"
                "    --cmplst=0|1\n"
                "      -C 0|1        sets CMPLST bit in format cdb "
                "(def: 1; if FFMT: 0)\n"
@@ -189,14 +198,14 @@ usage()
                "1: after\n"
                "                           format, unwritten data read "
                "without error\n"
+               "    --fmtmaxlba|-b    sets FMTMAXLBA field in FORMAT WITH "
+               "PRESET\n"
                "    --fmtpinfo=FPI|-f FPI    FMTPINFO field value "
                "(default: 0)\n"
                "    --format|-F     do FORMAT UNIT (default: report current "
                "count and size)\n"
                "                    use thrice for FORMAT UNIT command "
                "only\n"
-               "    --fmtmaxlba|-b    sets FMTMAXLBA field in FORMAT WITH "
-               "PRESET\n"
                "    --help|-h       prints out this usage message\n"
                "    --ip-def|-I     use default initialization pattern\n"
                "    --long|-l       allow for 64 bit lbas (default: assume "
@@ -469,6 +478,15 @@ scsi_format_unit(int fd, const struct opts_t * op)
             free(free_param);
 
         if (res) {
+                if ((SG_LIB_CAT_INVALID_OP == res) && has_fpresets_vpd)
+                        pr2serr("FORMAT UNIT is not supported but maybe "
+                                "FORMAT WITH PRESET is, see '--preset='\n");
+                else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+                        pr2serr("Problem with FORMAT UNIT cdb, %s\n",
+                                tawvv_s);
+                else if (SG_LIB_CAT_INVALID_PARAM == res)
+                        pr2serr("Problem with FORMAT UNIT parameter list, "
+                                "%s\n", tawvv_s);
                 sg_get_category_sense_str(res, sizeof(b), b, vb);
                 pr2serr("%s command: %s\n", fu_s, b);
                 return res;
@@ -804,7 +822,7 @@ scsi_format_with_preset(int fd, const struct opts_t * op)
         return 0;
 }
 
-#define VPD_DEVICE_ID 0x83
+// #define VPD_DEVICE_ID 0x83
 #define VPD_ASSOC_LU 0
 #define VPD_ASSOC_TPORT 1
 #define TPROTO_ISCSI 5
@@ -868,13 +886,17 @@ get_lu_name(const uint8_t * bp, int u_len, char * b, int b_len)
 #define VPD_SUPPORTED_VPDS 0x0
 #define VPD_UNIT_SERIAL_NUM 0x80
 #define VPD_DEVICE_ID 0x83
+#define VPD_FORMAT_PRESETS 0xb8
+#define VPD_CAP_PROD_ID 0xba            /* sbc5r04 */
 #define MAX_VPD_RESP_LEN 256
 
 static int
 print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
              const struct opts_t * op)
 {
-        int k, n, verb, pdt, has_sn, has_di;
+        bool has_sn = false;
+        bool has_di = false;
+        int k, n, verb, pdt;
         int res = 0;
         uint8_t  * b;
         uint8_t  * free_b = NULL;
@@ -930,12 +952,16 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
         n = sg_get_unaligned_be16(b + 2);
         if (n > (SAFE_STD_INQ_RESP_LEN - 4))
                 n = (SAFE_STD_INQ_RESP_LEN - 4);
-        for (k = 0, has_sn = 0, has_di = 0; k < n; ++k) {
-                if (VPD_UNIT_SERIAL_NUM == b[4 + k])
-                        ++has_sn;
-                else if (VPD_DEVICE_ID == b[4 + k]) {
-                        ++has_di;
-                        break;
+        for (k = 0; k < n; ++k) {
+                if (VPD_UNIT_SERIAL_NUM == b[4 + k])            /* 0x80 */
+                        has_sn = true;
+                else if (VPD_DEVICE_ID == b[4 + k])             /* 0x83 */
+                        has_di = true;
+                else if (VPD_FORMAT_PRESETS == b[4 + k])        /* 0xb8 */
+                        has_fpresets_vpd = true;
+                else if (VPD_CAP_PROD_ID == b[4 + k]) {         /* 0xba */
+                        has_cappid_vpd = true;
+                        break;          /* should be in ascending order */
                 }
         }
         if (has_sn) {
@@ -982,6 +1008,10 @@ print_dev_id(int fd, uint8_t * sinq_resp, int max_rlen,
                         printf("      LU name: %.*s\n", n, a);
         }
 out:
+        if (has_cappid_vpd)
+                pr2serr("Capacity/Product identification mapping VPD page "
+                        "present.\nIf changing size --cappid option may be "
+                        "needed, see 'sg_vpd -p cap'\n");
         if (free_b)
                 free(free_b);
         return res;
@@ -1268,12 +1298,17 @@ parse_cmd_line(struct opts_t * op, int argc, char **argv)
                 int c;
 
                 c = getopt_long(argc, argv,
-                                "bc:C:dDeE:f:FhIlm:M:pP:q:QrRs:St:T:vVwx:y6",
+                                "abc:C:dDeE:f:FhIlm:M:pP:q:QrRs:St:T:vVwx:y6",
                                 long_options, &option_index);
                 if (c == -1)
                         break;
 
                 switch (c) {
+                case 'a':
+                        if (op->cappid)
+                                op->cappid_twice = true;
+                        op->cappid = true;
+                        break;
                 case 'b':
                         op->fmtmaxlba = true;
                         break;
@@ -1620,15 +1655,41 @@ again_sp_false:
                                 res = sg_ll_mode_select6(fd, true /* PF */,
                                                          sp, dbuff, calc_len,
                                                          true, vb);
-                        else
+                        else {
+                                if (op->cappid) {
+                                        uint8_t dsp_blk = 0x20;
+
+                                        if ((! has_cappid_vpd) &&
+                                            (! op->cappid_twice))
+                                                dsp_blk = 0x0;
+                                        if (calc_len > 3)
+                                                dbuff[3] |= dsp_blk;
+                                }
                                 res = sg_ll_mode_select10(fd, true /* PF */,
                                                           sp, dbuff, calc_len,
                                                           true, vb);
+                        }
                         if ((SG_LIB_CAT_ILLEGAL_REQ == res) && sp) {
                                 pr2serr("Try MODE SELECT again with SP=0 "
                                         "this time\n");
                                 sp = false;
                                 goto again_sp_false;
+                        }
+                        if (SG_LIB_CAT_INVALID_PARAM == res) {
+                                pr2serr("mode select, bad parameter list: ");
+                                if (has_cappid_vpd && op->cappid)
+                                        pr2serr("check COUNT against "
+                                                "'sg_vpd -p cap'\n");
+                                else if (has_cappid_vpd)
+                                        pr2serr("may need '--cappid' "
+                                                "option\n");
+                                else if (op->cappid)
+                                        pr2serr("try removing '--cappid' "
+                                                "option\n");
+                                else
+                                        pr2serr("see manufacturer's "
+                                                "manual\n");
+
                         }
                 }
                 ret = res;
@@ -1722,8 +1783,7 @@ out:
         }
         if (0 == vb) {
                 if (! sg_if_can2stderr("sg_format failed: ", ret))
-                        pr2serr("Some error occurred, try again with '-v' "
-                                "or '-vv' for more information\n");
+                        pr2serr("Some error occurred, %s\n", tawvv_s);
         }
         return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

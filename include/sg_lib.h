@@ -518,6 +518,8 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
                                   *       [sk,asc,ascq: 0xe,*,*] */
 #define SG_LIB_FILE_ERROR 15    /* device or other file problem */
 /* for 17 and 18, see below */
+#define SG_LIB_CAT_INVALID_PARAM 19 /* illegal req, invalid field in parameter
+				     * list [sk,asc,ascq: 0x5,0x26,0x0] */
 #define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense"
                                  *       [sk,asc,ascq: 0x0,*,*] */
 #define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err

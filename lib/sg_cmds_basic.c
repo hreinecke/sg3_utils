@@ -119,6 +119,7 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
     case SG_LIB_CAT_NOT_READY:
     case SG_LIB_CAT_INVALID_OP:
     case SG_LIB_CAT_ILLEGAL_REQ:
+    case SG_LIB_CAT_INVALID_PARAM:
     case SG_LIB_LBA_OUT_OF_RANGE:
     case SG_LIB_CAT_ABORTED_COMMAND:
     case SG_LIB_CAT_COPY_ABORTED:

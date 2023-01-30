@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2022 D. Gilbert
+ *  Copyright (C) 2004-2023 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -35,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.70 20221123";
+static const char * version_str = "0.71 20230126";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -181,6 +181,9 @@ static const char * pr_type_strs[] = {
     "obsolete [0xd]", "obsolete [0xe]", "obsolete [0xf]",
 };
 
+static const char * const prout_s = "PR out";
+static const char * const prin_s = "PR in";
+
 
 static void
 usage(int help)
@@ -300,13 +303,13 @@ prin_work(int sg_fd, const struct opts_t * op)
             snprintf(b, sizeof(b), "service action=0x%x", op->prin_sa);
 
         if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("PR in (%s): command not supported\n", b);
+            pr2serr("%s (%s): command not supported\n", prin_s, b);
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("PR in (%s): bad field in cdb or parameter list (perhaps "
-                    "unsupported service action)\n", b);
+            pr2serr("%s (%s): bad field in cdb or parameter list (perhaps "
+                    "unsupported service action)\n", prin_s, b);
         else {
             sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
-            pr2serr("PR in (%s): %s\n", b, bb);
+            pr2serr("%s (%s): %s\n", prin_s, b, bb);
         }
         goto fini;
     }
@@ -516,17 +519,19 @@ prout_work(int sg_fd, struct opts_t * op)
             snprintf(b, sizeof(b), "service action=0x%x", op->prout_sa);
         if (res) {
             if (SG_LIB_CAT_INVALID_OP == res)
-                pr2serr("PR out (%s): command not supported\n", b);
+                pr2serr("%s (%s): command not supported\n", prout_s, b);
             else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-                pr2serr("PR out (%s): bad field in cdb or parameter list "
-                        "(perhaps unsupported service action)\n", b);
+                pr2serr("%s (%s): bad field in cdb (perhaps unsupported "
+                        "service action)\n", prout_s, b);
+            else if (SG_LIB_CAT_INVALID_PARAM == res)
+                pr2serr("%s (%s): bad field parameter list\n", prout_s, b);
             else {
                 sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
-                pr2serr("PR out (%s): %s\n", b, bb);
+                pr2serr("%s (%s): %s\n", prout_s, b, bb);
             }
             goto fini;
         } else if (op->verbose)
-            pr2serr("PR out: command (%s) successful\n", b);
+            pr2serr("%s: command (%s) successful\n", prout_s, b);
     }
 fini:
     if (free_pr_buff)
@@ -541,6 +546,7 @@ prout_reg_move_work(int sg_fd, struct opts_t * op)
     int res = 0;
     uint8_t * pr_buff = NULL;
     uint8_t * free_pr_buff = NULL;
+    static const char * ram_s = "register and move";
 
     t_arr_len = compact_transportid_array(op);
     pr_buff = sg_memalign(op->alloc_len, 0 /* page aligned */, &free_pr_buff,
@@ -568,19 +574,21 @@ prout_reg_move_work(int sg_fd, struct opts_t * op)
                                        pr_buff, len, true, op->verbose);
     if (res) {
        if (SG_LIB_CAT_INVALID_OP == res)
-            pr2serr("PR out (register and move): command not supported\n");
+            pr2serr("%s (%s): command not supported\n", prout_s, ram_s);
         else if (SG_LIB_CAT_ILLEGAL_REQ == res)
-            pr2serr("PR out (register and move): bad field in cdb or "
-                    "parameter list (perhaps unsupported service action)\n");
+            pr2serr("%s (%s): bad field in cdb (perhaps unsupported "
+                    "service action)\n", prout_s, ram_s);
+        else if (SG_LIB_CAT_INVALID_PARAM == res)
+            pr2serr("%s (%s): bad field in parameter list\n", prout_s, ram_s);
         else {
             char bb[80];
 
             sg_get_category_sense_str(res, sizeof(bb), bb, op->verbose);
-            pr2serr("PR out (register and move): %s\n", bb);
+            pr2serr("%s (%s): %s\n", prout_s, ram_s, bb);
         }
         goto fini;
     } else if (op->verbose)
-        pr2serr("PR out: 'register and move' command successful\n");
+        pr2serr("%s (%s): command successful\n", prout_s, ram_s);
 fini:
     if (free_pr_buff)
         free(free_pr_buff);
