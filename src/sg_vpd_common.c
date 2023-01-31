@@ -1225,27 +1225,6 @@ decode_cga_profile_vpd(const uint8_t * buff, int len, struct opts_t * op,
     }
 }
 
-/* Assume index is less than 16 */
-static const char * sg_ansi_version_arr[16] =
-{
-    "no conformance claimed",
-    "SCSI-1",           /* obsolete, ANSI X3.131-1986 */
-    "SCSI-2",           /* obsolete, ANSI X3.131-1994 */
-    "SPC",              /* withdrawn, ANSI INCITS 301-1997 */
-    "SPC-2",            /* ANSI INCITS 351-2001, ISO/IEC 14776-452 */
-    "SPC-3",            /* ANSI INCITS 408-2005, ISO/IEC 14776-453 */
-    "SPC-4",            /* ANSI INCITS 513-2015 */
-    "SPC-5",            /* ANSI INCITS 502-2020 */
-    "ecma=1, [8h]",
-    "ecma=1, [9h]",
-    "ecma=1, [Ah]",
-    "ecma=1, [Bh]",
-    "reserved [Ch]",
-    "reserved [Dh]",
-    "reserved [Eh]",
-    "reserved [Fh]",
-};
-
 static const char *
 hot_pluggable_str(int hp)
 {
@@ -1289,7 +1268,9 @@ std_inq_decode_js(const uint8_t * b, int len, struct opts_t * op,
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     char c[256];
+    char d[64];
     static const int clen = sizeof(c);
+    static const int dlen = sizeof(d);
 
     jo2p = sgj_named_subobject_r(jsp, jop, "standard_inquiry_data_format");
     sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_qualifier", pqual, NULL,
@@ -1303,7 +1284,7 @@ std_inq_decode_js(const uint8_t * b, int len, struct opts_t * op,
     sgj_js_nv_ihexstr(jsp, jo2p, "hot_pluggable", hp, NULL,
                       hot_pluggable_str(hp));
     snprintf(c, clen, "%s", (ver > 0xf) ? "old or reserved version code" :
-                                          sg_ansi_version_arr[ver]);
+                  sg_get_scsi_ansi_version_str(ver, dlen, d));
     sgj_js_nv_ihexstr(jsp, jo2p, "version", ver, NULL, c);
     sgj_js_nv_ihex_nex(jsp, jo2p, "aerc", !!(b[3] & 0x80), false,
                        "Asynchronous Event Reporting Capability (obsolete "

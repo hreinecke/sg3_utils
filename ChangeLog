@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230130] [svn: r999]
+Changelog for pre-release sg3_utils-1.48 [20230130] [svn: r1000]
   - decoding utilities: add --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -104,6 +104,7 @@ Changelog for pre-release sg3_utils-1.48 [20230130] [svn: r999]
     - add hex2fp(), similar to hex2str() but outputs to FILE
     - add sg_has_control_char(), true when < 0x20 or DEL
     - add sg_first_non_printable() based on 7 bit ASCII
+    - add sg_get_scsi_ansi_version_str()
     - cleanup masks for PDT [0x1f] and group_number [0x3f]
     - new sg_json_builder.[hc] files local to lib folder
     - document internal json interface in include/sg_pr2serr.h

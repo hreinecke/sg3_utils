@@ -192,6 +192,11 @@ char * sg_get_nvme_opcode_name(uint8_t cmd_byte0, bool admin, int buff_len,
 /* Fetch scsi status string. */
 void sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff);
 
+/* Fetch SCSI ANSI version string. It is usually a version of the SPC
+ * standard. This field is found in the SCSI standard INQUIRY command
+ * response (byte 2). */
+char * sg_get_scsi_ansi_version_str(uint8_t ansi_ver, int blen, char * b);
+
 /* This is a slightly stretched SCSI sense "descriptor" format header.
  * The addition is to allow the 0x70 and 0x71 response codes. The idea
  * is to place the salient data of both "fixed" and "descriptor" sense
@@ -519,7 +524,7 @@ bool sg_exit2str(int exit_status, bool longer, int b_len, char * b);
 #define SG_LIB_FILE_ERROR 15    /* device or other file problem */
 /* for 17 and 18, see below */
 #define SG_LIB_CAT_INVALID_PARAM 19 /* illegal req, invalid field in parameter
-				     * list [sk,asc,ascq: 0x5,0x26,0x0] */
+                                     * list [sk,asc,ascq: 0x5,0x26,0x0] */
 #define SG_LIB_CAT_NO_SENSE 20  /* sense data with key of "no sense"
                                  *       [sk,asc,ascq: 0x0,*,*] */
 #define SG_LIB_CAT_RECOVERED 21 /* Successful command after recovered err

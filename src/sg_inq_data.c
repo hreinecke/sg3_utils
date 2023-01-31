@@ -24,26 +24,6 @@
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 
-/* Assume index is less than 16 */
-const char * sg_ansi_version_arr[16] =
-{
-    "no conformance claimed",
-    "SCSI-1",           /* obsolete, ANSI X3.131-1986 */
-    "SCSI-2",           /* obsolete, ANSI X3.131-1994 */
-    "SPC",              /* withdrawn, ANSI INCITS 301-1997 */
-    "SPC-2",            /* ANSI INCITS 351-2001, ISO/IEC 14776-452 */
-    "SPC-3",            /* ANSI INCITS 408-2005, ISO/IEC 14776-453 */
-    "SPC-4",            /* ANSI INCITS 513-2015 */
-    "SPC-5",            /* ANSI INCITS 502-2020 */
-    "ecma=1, [8h]",
-    "ecma=1, [9h]",
-    "ecma=1, [Ah]",
-    "ecma=1, [Bh]",
-    "reserved [Ch]",
-    "reserved [Dh]",
-    "reserved [Eh]",
-    "reserved [Fh]",
-};
 
 /* table from SPC-5 revision 16 [sorted numerically (from Annex E.9)] */
 /* Can also be obtained from : https://www.t10.org/lists/stds.txt 20170114 */

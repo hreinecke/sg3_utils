@@ -306,6 +306,38 @@ sg_get_scsi_status_str(int scsi_status, int buff_len, char * buff)
         sg_scnpr(buff, buff_len, "Unknown status [0x%x]", scsi_status);
 }
 
+static const char * sg_lib_ansi_version_arr[16] = {
+    "no conformance claimed",
+    "SCSI-1",           /* obsolete, ANSI X3.131-1986 */
+    "SCSI-2",           /* obsolete, ANSI X3.131-1994 */
+    "SPC",              /* withdrawn, ANSI INCITS 301-1997 */
+    "SPC-2",            /* ANSI INCITS 351-2001, ISO/IEC 14776-452 */
+    "SPC-3",            /* ANSI INCITS 408-2005, ISO/IEC 14776-453 */
+    "SPC-4",            /* ANSI INCITS 513-2015 */
+    "SPC-5",            /* ANSI INCITS 502-2020 */
+    "ecma=1, [8h]",
+    "ecma=1, [9h]",
+    "ecma=1, [Ah]",
+    "ecma=1, [Bh]",
+    "SPC-6",            /* T10/BSR INCITS 566, proposed value in 23-015r0 */
+    "reserved [Dh]",
+    "reserved [Eh]",
+    "reserved [Fh]",
+};
+
+char *
+sg_get_scsi_ansi_version_str(uint8_t ansi_ver, int blen, char * b)
+{
+
+    if ((NULL == b) || (blen < 1))
+        return b;
+    if (ansi_ver < SG_ARRAY_SIZE(sg_lib_ansi_version_arr))
+        sg_scnpr(b, blen, "%s", sg_lib_ansi_version_arr[ansi_ver]);
+    else
+        sg_scnpr(b, blen, "%s", sg_lib_ansi_version_arr[0]);
+    return b;
+}
+
 void
 sg_print_scsi_status(int scsi_status)
 {

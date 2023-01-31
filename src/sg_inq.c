@@ -2100,21 +2100,11 @@ decode_b3_vpd(uint8_t * buff, int len, struct opts_t * op, sgj_opaque_p jop)
     }
 }
 
-extern const char * sg_ansi_version_arr[];
-
-static const char *
-get_ansi_version_str(int version, char * b, int blen)
-{
-    version &= 0xf;
-    b[blen - 1] = '\0';
-    strncpy(b, sg_ansi_version_arr[version], blen - 1);
-    return b;
-}
-
 static void
 std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
 {
-    int len, pqual, pdt, ansi_version, k, j;
+    uint8_t ansi_version;
+    int len, pqual, pdt, k, j;
     sgj_state * jsp = &op->json_st;
     bool as_json = jsp->pr_as_json;
     const char * cp;
@@ -2152,7 +2142,7 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
     /* N.B. rp[2] full byte is 'version' in SPC-2,3,4 but in SPC
      * [spc-r11a (1997)] bits 6,7: ISO/IEC version; bits 3-5: ECMA
      * version; bits 0-2: SCSI version */
-    ansi_version = rp[2] & 0x7;       /* Only take SCSI version */
+    ansi_version = rp[2] & 0xf;
     pdt = rp[0] & PDT_MASK;
     if (op->do_export) {
         printf("SCSI_TPGS=%d\n", (rp[5] & 0x30) >> 4);
@@ -2164,8 +2154,8 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
                   "hot_pluggable=%d  version=0x%02x ", pqual, pdt,
                   !!(rp[1] & 0x80), !!(rp[1] & 0x40), (rp[1] >> 4) & 0x3,
                   (unsigned int)rp[2]);
-        sgj_pr_hr(jsp, " [%s]\n", get_ansi_version_str(ansi_version, b,
-                                                       blen));
+        sgj_pr_hr(jsp, " [%s]\n",
+                  sg_get_scsi_ansi_version_str(ansi_version, blen, b));
         sgj_pr_hr(jsp, "  [AERC=%d]  [TrmTsk=%d]  NormACA=%d  HiSUP=%d "
                   " Resp_data_format=%d\n  SCCS=%d  ", !!(rp[3] & 0x80),
                   !!(rp[3] & 0x40), !!(rp[3] & 0x20), !!(rp[3] & 0x10),
