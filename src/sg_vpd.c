@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.89 20230129";  /* spc6r07 + sbc5r04 */
+static const char * version_str = "1.90 20230202";  /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_vpd"
 
@@ -2737,6 +2737,7 @@ main(int argc, char * argv[])
         goto fini;
     }
     if (op->sinq_inraw_fn) {
+        /* Note: want to support both --sinq_inraw= and --inhex= options */
         if ((ret = sg_f2hex_arr(op->sinq_inraw_fn, true, false, rsp_buff,
                                 &inraw_len, rsp_buff_sz))) {
             goto err_out;
@@ -2793,7 +2794,7 @@ main(int argc, char * argv[])
         }
     } else if ((NULL == op->device_name) && (! op->std_inq_a_valid)) {
         pr2serr("No DEVICE argument given\n\n");
-        usage();
+        pr2serr("Use '-h' or '--help' option for usage summary\n");
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;
     }

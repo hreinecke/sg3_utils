@@ -253,8 +253,8 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
              "off, and tabs are set to 4.\nBefore command line JO options "
              "are applied, the environment\nvariable: %s is applied (if "
              "present). Note that\nno space is permitted between the short "
-             "option ('-%c') and its\nargument ('JO').\n", sgj_opts_ev,
-             short_opt);
+             "option ('-%c') and its\nargument ('JO'). For more information "
+             "see 'man sg3_utils_json' .\n", sgj_opts_ev, short_opt);
 fini:
     return b;
 }

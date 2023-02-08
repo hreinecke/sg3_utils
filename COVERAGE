@@ -7,103 +7,103 @@ third table list supported NVMe commands.
 
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
-ATA COMMAND PASS-THROUGH(12)  sg_sat_identify, ++
+ATA COMMAND PASS-THROUGH(12)  sg_sat_identify
 ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features,
-                    sg_sat_phy_event, sg_sat_read_gplog ++
+                    sg_sat_phy_event, sg_sat_read_gplog
                     [sg_sat_chk_power, sg__sat_identify,
                      sg__sat_set_features, sg_sat_smart_rd_data
                      (previous four in the examples directory)]
-ATA COMMAND PASS-THROUGH(32)  sg_sat_identify, ++
+ATA COMMAND PASS-THROUGH(32)  sg_sat_identify
 BACKGROUND CONTROL  sg_bg_ctl
 CLOSE ZONE          sg_zone
 COMPARE AND WRITE   sg_compare_and_write
-COPY OPERATION ABORT    ddptctl, ++
-EXTENDED COPY(LID1)    sg_xcopy, ddpt, ++
-GET CONFIGURATION   sg_get_config, ++
-GET LBA STATUS      sg_get_lba_status, ++ <J>
-GET PHYSICAL ELEMENT STATUS      sg_get_elem_status, ++ <J>
+COPY OPERATION ABORT    ddptctl
+EXTENDED COPY(LID1)    sg_xcopy, ddpt
+GET CONFIGURATION   sg_get_config
+GET LBA STATUS      sg_get_lba_status <J>
+GET PHYSICAL ELEMENT STATUS      sg_get_elem_status <J>
 GET STREAM STATUS   sg_stream_ctl
-INQUIRY             sg_dd, sg_format, sg_inq, sginfo,
-                    sg_logs, sg_map('-i'), sg_modes, sg_opcodes,
-                    sg_persist, sg_scan, sg_ses, sg_vpd ++ <J>
+INQUIRY             sg_dd, sg_format, sg_inq, sginfo, sg_logs,
+                    sg_luns, sg_map('-i'), sg_modes, sg_opcodes,
+                    sg_persist, sg_scan, sg_ses, sg_vpd <J>
 FINISH ZONE         sg_zone
-FORMAT MEDIUM       sg_format, ++ [SSC]
-FORMAT UNIT         sg_format, ++ [SBC]
-FORMAT WITH PRESET    sg_format, ++ [SBC]
-LOG SELECT          sg_logs('-r' or '-select'), ++
-LOG SENSE           sg_logs, ++ <J>
+FORMAT MEDIUM       sg_format, [SSC]
+FORMAT UNIT         sg_format, [SBC]
+FORMAT WITH PRESET    sg_format, [SBC]
+LOG SELECT          sg_logs('-r' or '-select')
+LOG SENSE           sg_logs <J>
 MODE SELECT(6)      sdparm, sg_wr_mode, sginfo, sg_format,
-                    sg_emc_trespass, sg_rdac, ++
+                    sg_emc_trespass, sg_rdac
 MODE SELECT(10)     sdparm, sg_wr_mode, sginfo, sg_format,
-                    sg_emc_trespass, sg_rdac, ++
+                    sg_emc_trespass, sg_rdac
 MODE SENSE(6)       sdparm, sg_modes, sg_wr_mode, sginfo, sg_format,
-                    sg_senddiag('-e'), sg_rdac, ++
+                    sg_senddiag('-e'), sg_rdac
 MODE SENSE(10)      sdparm, sg_modes, sg_wr_mode, sginfo, sg_format,
-                    sg_senddiag('-e'), sg_rdac, ++
+                    sg_senddiag('-e'), sg_rdac
 OPEN ZONE           sg_zone
 ORWRITE(16)         sg_write_x
 ORWRITE(32)         sg_write_x
-PERSISTENT RESERVE IN       sg_persist, ++
-PERSISTENT RESERVE OUT      sg_persist, ++
-POPULATE TOKEN      ddpt, ddptctl, ++
+PERSISTENT RESERVE IN       sg_persist
+PERSISTENT RESERVE OUT      sg_persist
+POPULATE TOKEN      ddpt, ddptctl
 PRE-FETCH(10)       sg_seek
 PRE-FETCH(16)       sg_seek
-PREVENT ALLOW MEDIUM REMOVAL        sg_prevent, ++
+PREVENT ALLOW MEDIUM REMOVAL        sg_prevent
 READ(6)             sg_dd, sgm_dd, sgp_dd, sg_read
 READ(10)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(12)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ(16)            sg_dd, sgm_dd, sgp_dd, sg_read
 READ ATTRIBUTE      sg_read_attr
-READ BLOCK LIMITS   sg_read_block_limits, ++
-READ BUFFER(10)     sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte, ++
+READ BLOCK LIMITS   sg_read_block_limits
+READ BUFFER(10)     sg_rbuf, sg_test_rwbuf, sg_read_buffer, sg_safte
 READ BUFFER(16)     sg_read_buffer
-READ CAPACITY(10)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
-READ CAPACITY(16)   sg_readcap, sg_dd, sgm_dd, sgp_dd, sg_format, ++
-READ DEFECT(10)     sginfo('-d' or '-G'), sg_reassign('-g'), smartmontools, ++
+READ CAPACITY(10)   sg_readcap <J>, sg_dd, sgm_dd, sgp_dd, sg_format
+READ CAPACITY(16)   sg_readcap <J>, sg_dd, sgm_dd, sgp_dd, sg_format
+READ DEFECT(10)     sginfo('-d' or '-G'), sg_reassign('-g'), smartmontools
 READ DEFECT(12)     sginfo('-d' or '-G'), smartmontools
-READ LONG(10)       sg_read_long, sg_dd, ++
-READ LONG(16)       sg_read_long, ++
-READ MEDIA SERIAL NUMBER     sg_rmsn, ++
-REASSIGN BLOCKS     sg_reassign, ++
-RECEIVE COPY DATA(LID1)    sg_copy_results, ++
-RECEIVE COPY FAILURE DETAILS(LID1)    sg_copy_results, ++
-RECEIVE COPY OPERATING PARAMETERS    ddpt, sg_copy_results, sg_xcopy, ++
-RECEIVE COPY STATUS(LID1)    sg_copy_results, ++
-RECEIVE DIAGNOSTIC RESULTS  sg_senddiag, sg_ses <J>, sg_ses_microcode ++
-RECEIVE ROD TOKEN INFORMATION    ddpt, ddptctl ++
+READ LONG(10)       sg_read_long, sg_dd
+READ LONG(16)       sg_read_long
+READ MEDIA SERIAL NUMBER     sg_rmsn
+REASSIGN BLOCKS     sg_reassign
+RECEIVE COPY DATA(LID1)    sg_copy_results
+RECEIVE COPY FAILURE DETAILS(LID1)    sg_copy_results
+RECEIVE COPY OPERATING PARAMETERS    ddpt, sg_copy_results, sg_xcopy
+RECEIVE COPY STATUS(LID1)    sg_copy_results
+RECEIVE DIAGNOSTIC RESULTS  sg_senddiag, sg_ses <J>, sg_ses_microcode
+RECEIVE ROD TOKEN INFORMATION    ddpt, ddptctl
 REMOVE ELEMENT AND MODIFY ZONES   sg_zone
 REMOVE ELEMENT AND TRUNCATE       sg_rem_rest_elem
-REPORT ALL ROD TOKENS    ddptctl ++
+REPORT ALL ROD TOKENS    ddptctl
 REPORT DENSITY SUPPORT    sg_rep_density
-REPORT IDENTIFYING INFORMATION  sg_ident, ++ (2)
-REPORT LUNS         sg_luns, ++
-REPORT PROVISIONING INITIALIZATION PATTERN    sg_rep_pip, ++
+REPORT IDENTIFYING INFORMATION  sg_ident (2)
+REPORT LUNS         sg_luns <J>
+REPORT PROVISIONING INITIALIZATION PATTERN    sg_rep_pip
 REPORT REALMS       sg_rep_zones <J>
-REPORT REFERRALS    sg_referrals, ++
+REPORT REFERRALS    sg_referrals
 REPORT SUPPORTED OPERATION CODES              sg_opcodes <J>
 REPORT SUPPORTED TASK MANAGEMENT FUNCTIONS    sg_opcodes <J>
-REPORT TARGET PORT GROUPS       sg_rtpg, sg_stpg ++
+REPORT TARGET PORT GROUPS       sg_rtpg, sg_stpg
 REPORT TIMESTAMP    sg_timestamp
 REPORT ZONES        sg_rep_zones <J>
 REPORT ZONE DOMAINS  sg_rep_zones <J>
-REQUEST SENSE       sg_requests, ++
+REQUEST SENSE       sg_requests
 RESET WRITE POINTER sg_reset_wp
 RESTORE ELEMENTS AND REBUILD    sg_rem_rest_elem
 SANITIZE            sg_sanitize
-SEEK(10)            sg_seek ++
-SEND DIAGNOSTIC     sg_senddiag, sg_ses <J>, sg_ses_microcode ++
+SEEK(10)            sg_seek
+SEND DIAGNOSTIC     sg_senddiag, sg_ses <J>, sg_ses_microcode
 SEQUENTIALIZE ZONE  sg_zone
-SET IDENTIFYING INFORMATION  sg_ident, ++ (3)
-SET TARGET PORT GROUPS       sg_stpg, ++
+SET IDENTIFYING INFORMATION  sg_ident (3)
+SET TARGET PORT GROUPS       sg_stpg
 SET TIMESTAMP       sg_timestamp
-START STOP          sg_start, ++
+START STOP          sg_start
 STREAM CONTROL      sg_stream_ctl
-SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd, ++
-SYNCHRONIZE CACHE(16)   sg_sync++
-TEST UNIT READY     sg_turs, sg_format, ++
-UNMAP               sg_unmap, ++
-VERIFY(10)          sg_verify, ++
-VERIFY(16)          sg_verify, ++
+SYNCHRONIZE CACHE(10)   sg_sync, sg_dd, sgm_dd, sgp_dd
+SYNCHRONIZE CACHE(16)   sg_sync
+TEST UNIT READY     sg_turs, sg_format
+UNMAP               sg_unmap
+VERIFY(10)          sg_verify
+VERIFY(16)          sg_verify
 WRITE(6)            sg_dd, sgm_dd, sgp_dd
 WRITE(10)           sg_dd, sgm_dd, sgp_dd
 WRITE(12)           sg_dd, sgm_dd, sgp_dd
@@ -114,9 +114,9 @@ WRITE AND VERIFY(16)      sg_write_verify
 WRITE ATOMIC(16)    ddpt, sg_write_x
 WRITE ATOMIC(32)    sg_write_x
 WRITE ATTRIBUTE     sg_write_attr
-WRITE BUFFER        sg_test_rwbuf, sg_write_buffer, ++
-WRITE LONG(10)      sg_write_long, ++
-WRITE LONG(16)      sg_write_long, ++
+WRITE BUFFER        sg_test_rwbuf, sg_write_buffer
+WRITE LONG(10)      sg_write_long
+WRITE LONG(16)      sg_write_long
 WRITE SAME(10)      sg_write_same
 WRITE SAME(16)      sg_write_same, sg_write_x
 WRITE SAME(32)      sg_write_same, sg_write_x
@@ -124,7 +124,7 @@ WRITE SCATTERED(16)    sg_write_x
 WRITE SCATTERED(32)    sg_write_x
 WRITE STREAM(16)    sg_write_x
 WRITE STREAM(32)    sg_write_x
-WRITE USING TOKEN   ddpt, ddptctl, ++
+WRITE USING TOKEN   ddpt, ddptctl
 ZONE ACTIVATE       sg_z_act_query
 ZONE QUERY          sg_z_act_query
 <all commands>      sg_decodes_sense <J>
@@ -171,8 +171,6 @@ and REQUEST SENSE. READ CAPACITY(10 and 16) yield appropriate data
 by examining the response to the NVMe Identify command.
 
 
-++  command wrapper found in sg_cmds_basic.c, sg_cmds_mmc.c  or
-    sg_cmds_extra.c for this command
 (2) this command was known as REPORT DEVICE IDENTIFIER prior to spc4r07
 (3) this command was known as SET DEVICE IDENTIFIER prior to spc4r07
 <J> decoded results may be output in JSON instead of human readable form
@@ -189,4 +187,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-06 January 2023
+04 February 2023

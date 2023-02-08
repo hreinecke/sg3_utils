@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2021 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,49 +34,64 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.48 20210804";      /* spc6r05 */
+static const char * version_str = "1.50 20230207";      /* spc6r07 */
+
+#define MY_NAME "sg_luns"
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
 
 
 static struct option long_options[] = {
-        {"decode", no_argument, 0, 'd'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
+    {"decode", no_argument, 0, 'd'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"inhex", required_argument, 0, 'i'},
+    {"json", optional_argument, 0, 'j'},
+    {"js-file", required_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'J'},
 #ifdef SG_LIB_LINUX
-        {"linux", no_argument, 0, 'l'},
+    {"linux", no_argument, 0, 'l'},
 #endif
-        {"lu_cong", no_argument, 0, 'L'},
-        {"lu-cong", no_argument, 0, 'L'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"quiet", no_argument, 0, 'q'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"select", required_argument, 0, 's'},
-        {"test", required_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+    {"lu_cong", no_argument, 0, 'L'},
+    {"lu-cong", no_argument, 0, 'L'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"quiet", no_argument, 0, 'q'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"select", required_argument, 0, 's'},
+    {"sinq_inraw", required_argument, 0, 'Q'},
+    {"sinq-inraw", required_argument, 0, 'Q'},
+    {"test", required_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
+
+static const char * rl_pd_sn = "report_luns_parameter_data";
 
 
 static void
 usage()
 {
 #ifdef SG_LIB_LINUX
-    pr2serr("Usage: sg_luns    [--decode] [--help] [--hex] [--linux] "
+    pr2serr("Usage: sg_luns    [--decode] [--help] [--hex] [--inhex-FN] "
+            "[--json[=JO]]\n"
+            "                  [--json[=JO]] [--js-file=JFN] [--linux] "
             "[--lu_cong]\n"
             "                  [--maxlen=LEN] [--quiet] [--raw] "
             "[--readonly]\n"
-            "                  [--select=SR] [--verbose] [--version] "
-            "DEVICE\n");
+            "                  [--select=SR] [--sinq_inraw=RFN] [--verbose] "
+            "[--version]\n"
+            "                  DEVICE\n");
 #else
-    pr2serr("Usage: sg_luns    [--decode] [--help] [--hex] [--lu_cong] "
+    pr2serr("Usage: sg_luns    [--decode] [--help] [--hex] [--inhex-FN]\n"
+            "                  [--json[=JO]] [--js-file=JFN] [--lu_cong] "
             "[--maxlen=LEN]\n"
             "                  [--quiet] [--raw] [--readonly] "
             "[--select=SR]\n"
-            "                  [--verbose] [--version] DEVICE\n");
+            "                  [--sinq_inraw=RFN] [--verbose] [--version] "
+            "DEVICE\n");
 #endif
     pr2serr("     or\n"
             "       sg_luns    --test=ALUN [--decode] [--hex] [--lu_cong] "
@@ -87,6 +102,16 @@ usage()
             "    --hex|-H           output response in hexadecimal; used "
             "twice\n"
             "                       shows decoded values in hex\n");
+    pr2serr("    --inhex=FN|-i FN    contents of file FN treated as hex "
+            "and used\n"
+            "                        instead of DEVICE which is ignored\n"
+            "    --json[=JO]|-jJO    output in JSON instead of human "
+            "readable\n"
+            "                        test. Use --json=? for JSON help\n"
+            "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
+            "output is\n"
+            "                            written (def: stdout); truncates "
+            "then writes\n");
 #ifdef SG_LIB_LINUX
     pr2serr("    --linux|-l         show Linux integer lun after T10 "
             "representation\n");
@@ -111,6 +136,9 @@ usage()
             "non-conglomerate luns\n"
             "                          0x12 -> admin lun + its "
             "subsidiary luns\n"
+            "    --sinq_inraw=RFN|-Q RFN    read raw (binary) standard "
+            "INQUIRY\n"
+            "                               response from the RFN filename\n"
             "    --test=ALUN|-t ALUN    decode ALUN and ignore most other "
             "options\n"
             "                           and DEVICE (apart from '-H')\n"
@@ -129,71 +157,112 @@ usage()
  * "logical addressing method".  */
 static void
 decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
-           int do_hex, int verbose)
+           int do_hex, int verbose, sgj_state * jsp, sgj_opaque_p jop)
 {
-    bool next_level, admin_lu_cong;
+    bool next_level, admin_lu_cong, decoded;
     int k, x, a_method, bus_id, target, lun, len_fld, e_a_method;
     uint64_t ull;
+    const char * am_s;
+    const char * second_s;
+    sgj_opaque_p jo2p = NULL;
     char l_leadin[128];
     char b[256];
+    static const int leadin_len = sizeof(l_leadin);
+    static const int blen = sizeof(b);
+    static const char * tname_sn = "type_name";
 
+    jo2p = sgj_named_subobject_r(jsp, jop, "decode_level");
+#if 0
     if (0xff == lunp[0]) {
-        printf("%sLogical unit _not_ specified\n", leadin);
+         sgj_pr_hr(jsp, "%sLogical unit _not_ specified\n", leadin);
+         sgj_js_nv_ihex(jsp, jo2p, "specified", 0);
         return;
     }
+    sgj_js_nv_ihex(jsp, jo2p, "specified", 1);
+#endif
+    sgj_js_nv_ihex_nex(jsp, jo2p, "lu_cong", (int)lu_cong, false,
+                       "Logical Unit CONGlomerate");
     admin_lu_cong = lu_cong;
-    memset(l_leadin, 0, sizeof(l_leadin));
-    for (k = 0; k < 4; ++k, lunp += 2) {
-        next_level = false;
-        strncpy(l_leadin, leadin, sizeof(l_leadin) - 3);
+    memset(l_leadin, 0, leadin_len);
+    for (k = 0, next_level = false; k < 4; ++k, lunp += 2) {
+        if (next_level) {
+            jo2p = sgj_named_subobject_r(jsp, jo2p, "decode_level");
+            next_level = false;
+        }
+        strncpy(l_leadin, leadin, leadin_len - 3);
         if (k > 0) {
             if (lu_cong) {
                 admin_lu_cong = false;
                 if ((0 == lunp[0]) && (0 == lunp[1])) {
-                    printf("%s>>>> Administrative LU\n", l_leadin);
+                    sgj_pr_hr(jsp, "%s>>>> Administrative LU\n", l_leadin);
+                    sgj_js_nv_s(jsp, jo2p, "class",
+                                "Administrative logical unit");
+                    sgj_js_nv_ihex(jsp, jo2p, "administrative", 1);
+                    sgj_js_nv_ihex(jsp, jo2p, "decoded", 1);
                     if (do_hex || verbose)
-                         printf("        since Subsidiary element is "
-                                "0x0000\n");
+                        sgj_pr_hr(jsp, "        since Subsidiary element "
+                                  "is 0x0000\n");
                     break;
-                } else
-                    printf("%s>>Subsidiary element:\n", l_leadin);
+                } else {
+                    sgj_pr_hr(jsp, "%s>>Subsidiary element:\n", l_leadin);
+                    sgj_js_nv_s(jsp, jo2p, "logical_unit_conglomerate",
+                                "Subsidiary element");
+                    sgj_js_nv_s(jsp, jo2p, "class",
+                                "Subsidiary logical unit");
+                    sgj_js_nv_ihex(jsp, jo2p, "administrative", 0);
+                }
             } else
-                printf("%s>>%s level addressing:\n", l_leadin, ((1 == k) ?
-                         "Second" : ((2 == k) ? "Third" : "Fourth")));
+                 sgj_pr_hr(jsp, "%s>>%s level addressing:\n", l_leadin,
+                           ((1 == k) ? "Second" :
+                                       ((2 == k) ? "Third" : "Fourth")));
             strcat(l_leadin, "  ");
         } else if (lu_cong) {
-            printf("%s>>Administrative element:\n", l_leadin);
+            sgj_js_nv_s(jsp, jo2p, "logical_unit_conglomerate",
+                        "Administrative element");
+            sgj_pr_hr(jsp, "%s>>Administrative element:\n", l_leadin);
             strcat(l_leadin, "  ");
         }
         a_method = (lunp[0] >> 6) & 0x3;
+        sgj_js_nv_ihex(jsp, jo2p, "access_method", a_method);
+        am_s = NULL;
+        decoded = true;
+
         switch (a_method) {
         case 0:         /* peripheral device addressing method */
             if (lu_cong) {
-                snprintf(b, sizeof(b), "%sSimple lu addressing: ",
-                         l_leadin);
+                am_s = "Simple logical unit addressing";
+                sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
                 x = 0x3fff & sg_get_unaligned_be16(lunp + 0);
+                sgj_js_nv_ihex(jsp, jo2p, "value", x);
                 if (do_hex)
-                    printf("%s0x%04x\n", b, x);
+                     sgj_pr_hr(jsp, "%s%s: 0x%04x\n", l_leadin, am_s, x);
                 else
-                    printf("%s%d\n", b, x);
+                     sgj_pr_hr(jsp, "%s%s: %d\n", l_leadin, am_s, x);
                 if (admin_lu_cong)
                     next_level = true;
             } else {
                 bus_id = lunp[0] & 0x3f;
-                snprintf(b, sizeof(b), "%sPeripheral device addressing: ",
-                         l_leadin);
+                x = lunp[1];
+                am_s = "Peripheral device addressing";
+                sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
                 if ((0 == bus_id) && (0 == verbose)) {
+                    sgj_js_nv_ihex(jsp, jo2p, "lun", x);
                     if (do_hex)
-                        printf("%slun=0x%02x\n", b, lunp[1]);
+                         sgj_pr_hr(jsp, "%s%s: lun=0x%02x\n", l_leadin, am_s,
+                                   x);
                     else
-                        printf("%slun=%d\n", b, lunp[1]);
+                         sgj_pr_hr(jsp, "%s%s: lun=%d\n", l_leadin, am_s, x);
                 } else {
+                    sgj_js_nv_ihex(jsp, jo2p, "bus_identifier", bus_id);
+                    sgj_js_nv_ihex(jsp, jo2p, "target_or_lun", x);
                     if (do_hex)
-                        printf("%sbus_id=0x%02x, %s=0x%02x\n", b, bus_id,
-                               (bus_id ? "target" : "lun"), lunp[1]);
+                         sgj_pr_hr(jsp, "%s%s: bus_id=0x%02x, %s=0x%02x\n",
+                                   l_leadin, am_s, bus_id,
+                                   (bus_id ? "target" : "lun"), x);
                     else
-                        printf("%sbus_id=%d, %s=%d\n", b, bus_id,
-                               (bus_id ? "target" : "lun"), lunp[1]);
+                         sgj_pr_hr(jsp, "%s%s: bus_id=%d, %s=%d\n", l_leadin,
+                                   am_s, bus_id,
+                                   (bus_id ? "target" : "lun"), x);
                 }
                 if (bus_id)
                     next_level = true;
@@ -201,124 +270,129 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
             break;
         case 1:         /* flat space addressing method */
             lun = 0x3fff & sg_get_unaligned_be16(lunp + 0);
+            am_s = "Flat space addressing";
+            sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
+            sgj_js_nv_ihex(jsp, jo2p, "lun", lun);
             if (lu_cong) {
-                printf("%sSince LU_CONG=1, unexpected Flat space "
-                       "addressing: lun=0x%04x\n", l_leadin, lun);
+                 sgj_pr_hr(jsp, "%sSince LU_CONG=1, unexpected %s: "
+                           "lun=0x%04x\n", l_leadin, am_s, lun);
                 break;
             }
             if (do_hex)
-                printf("%sFlat space addressing: lun=0x%04x\n", l_leadin,
-                       lun);
+                 sgj_pr_hr(jsp, "%s%s: lun=0x%04x\n", l_leadin, am_s, lun);
             else
-                printf("%sFlat space addressing: lun=%d\n", l_leadin, lun);
+                 sgj_pr_hr(jsp, "%s%s: lun=%d\n", l_leadin, am_s, lun);
             break;
         case 2:         /* logical unit addressing method */
             target = (lunp[0] & 0x3f);
             bus_id = (lunp[1] >> 5) & 0x7;
             lun = lunp[1] & 0x1f;
+            am_s = "Logical Unit addressing";
+            sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
+            sgj_js_nv_ihex(jsp, jo2p, "target", target);
+            sgj_js_nv_ihex(jsp, jo2p, "bus_identifier", bus_id);
+            sgj_js_nv_ihex(jsp, jo2p, "lun", lun);
             if (lu_cong) {
-                printf("%sSince LU_CONG=1, unexpected lu addressing: "
-                       "bus_id=0x%x, target=0x%02x, lun=0x%02x\n", l_leadin,
-                       bus_id, target, lun);
+                sgj_pr_hr(jsp, "%sSince LU_CONG=1, unexpected %s: "
+                          "bus_id=0x%x, target=0x%02x, lun=0x%02x\n",
+                          l_leadin, am_s, bus_id, target, lun);
                 break;
             }
             if (do_hex)
-                printf("%sLogical unit addressing: bus_id=0x%x, "
-                       "target=0x%02x, lun=0x%02x\n", l_leadin, bus_id,
-                       target, lun);
+                sgj_pr_hr(jsp, "%s%s: bus_id=0x%x, target=0x%02x, lun="
+                          "0x%02x\n", l_leadin, am_s, bus_id, target, lun);
             else
-                printf("%sLogical unit addressing: bus_id=%d, target=%d, "
-                       "lun=%d\n", l_leadin, bus_id, target, lun);
+                sgj_pr_hr(jsp, "%s%s: bus_id=%d, target=%d, lun=%d\n",
+                          l_leadin, am_s, bus_id, target, lun);
             break;
         case 3:         /* extended logical unit + flat space addressing */
             len_fld = (lunp[0] & 0x30) >> 4;
+            sgj_js_nv_ihex(jsp, jo2p, "length", len_fld);
             e_a_method = lunp[0] & 0xf;
-            x = lunp[1];
-            if ((0 == len_fld) && (1 == e_a_method)) {
-                snprintf(b, sizeof(b), "well known logical unit");
-                switch (x) {
-                case 1:
-                    printf("%sREPORT LUNS %s\n", l_leadin, b);
-                    break;
-                case 2:         /* obsolete in spc5r01 */
-                    printf("%sACCESS CONTROLS %s\n", l_leadin, b);
-                    break;
-                case 3:
-                    printf("%sTARGET LOG PAGES %s\n", l_leadin, b);
-                    break;
-                case 4:
-                    printf("%sSECURITY PROTOCOL %s\n", l_leadin, b);
-                    break;
-                case 5:
-                    printf("%sMANAGEMENT PROTOCOL %s\n", l_leadin, b);
-                    break;
-                case 6:
-                    printf("%sTARGET COMMANDS %s\n", l_leadin, b);
-                    break;
-                default:
-                    if (do_hex)
-                        printf("%s%s 0x%02x\n", l_leadin, b, x);
+            sgj_js_nv_ihex(jsp, jo2p, "extended_address_method", e_a_method);
+            if (1 == e_a_method) {
+                if (0 == len_fld) {
+                    am_s = "Well known logical unit";
+                    x = lunp[1];
+                    if (1 == x)
+                        second_s = "REPORT LUNS";
+                    else if (2 == x)
+                        second_s = "ACCESS CONTROLS";
+                    else if (3 == x)
+                        second_s = "TARGET LOG PAGES";
+                    else if (4 == x)
+                        second_s = "SECURITY PROTOCOL";
+                    else if (5 == x)
+                        second_s = "MANAGEMENT PROTOCOL";
+                    else if (6 == x)
+                        second_s = "TARGET COMMANDS";
                     else
-                        printf("%s%s %d\n", l_leadin, b, x);
-                    break;
-                }
-            } else if ((1 == len_fld) && (2 == e_a_method)) {
-                x = sg_get_unaligned_be24(lunp + 1);
-                if (do_hex)
-                    printf("%sExtended flat space addressing: lun=0x%06x\n",
-                           l_leadin, x);
-                else
-                    printf("%sExtended flat space addressing: lun=%d\n",
-                           l_leadin, x);
-            } else if ((2 == len_fld) && (2 == e_a_method)) {
-                ull = sg_get_unaligned_be(5, lunp + 1);
-                if (do_hex)
-                    printf("%sLong extended flat space addressing: "
-                           "lun=0x%010" PRIx64 "\n", l_leadin, ull);
-                else
-                    printf("%sLong extended flat space addressing: "
-                           "lun=%" PRIu64 "\n", l_leadin, ull);
-            } else if ((3 == len_fld) && (0xf == e_a_method))
-                printf("%sLogical unit _not_ specified addressing\n",
-                       l_leadin);
-            else {
-                if (len_fld < 2) {
-                    if (1 == len_fld)
-                        x = sg_get_unaligned_be24(lunp + 1);
+                        second_s = "Unknown";
+                    snprintf(b, blen, "%s %s", second_s, am_s);
+                    sgj_pr_hr(jsp, "%s%s\n", l_leadin, b);
+                    sgj_js_nv_ihex(jsp, jo2p, "w_lun", x);
+                    sgj_js_nv_s(jsp, jo2p, tname_sn, b);
+                } else
+                    decoded = false;
+            } else if (2 == e_a_method) {
+                if (1 == len_fld) {
+                    x = sg_get_unaligned_be24(lunp + 1);
+                    am_s = "Extended flat space addressing";
+                    sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
+                    sgj_js_nv_ihex(jsp, jo2p, "extended_flat_space_lun", x);
                     if (do_hex)
-                        printf("%sExtended logical unit addressing: "
-                               "length=%d, e.a. method=%d, value=0x%06x\n",
-                               l_leadin, len_fld, e_a_method, x);
+                        sgj_pr_hr(jsp, "%s%s: lun=0x%06x\n", l_leadin, am_s,
+                                  x);
                     else
-                        printf("%sExtended logical unit addressing: "
-                               "length=%d, e.a. method=%d, value=%d\n",
-                               l_leadin, len_fld, e_a_method, x);
-                } else {
-                    ull = sg_get_unaligned_be(((2 == len_fld) ? 5 : 7),
-                                              lunp + 1);
-                    if (do_hex) {
-                        printf("%sExtended logical unit addressing: "
-                               "length=%d, e. a. method=%d, ", l_leadin,
-                               len_fld, e_a_method);
-                        if (5 == len_fld)
-                                printf("value=0x%010" PRIx64 "\n", ull);
-                        else
-                                printf("value=0x%014" PRIx64 "\n", ull);
-                    } else
-                        printf("%sExtended logical unit addressing: "
-                               "length=%d, e. a. method=%d, value=%" PRIu64
-                               "\n", l_leadin, len_fld, e_a_method, ull);
-                }
-            }
+                         sgj_pr_hr(jsp, "%s%s: lun=%d\n", l_leadin, am_s, x);
+                } else if (2 == len_fld) {
+                    am_s = "Long extended flat space addressing";
+                    sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
+                    ull = sg_get_unaligned_be(5, lunp + 1);
+                    sgj_js_nv_ihex(jsp, jo2p, "long_extended_flat_space_lun",
+                                   ull);
+                    if (do_hex)
+                        sgj_pr_hr(jsp, "%s%s: lun=0x%010" PRIx64 "\n",
+                                  l_leadin, am_s, ull);
+                    else
+                        sgj_pr_hr(jsp, "%s%s: lun=%" PRIu64 "\n", l_leadin,
+                                  am_s, ull);
+                } else
+                    decoded = false;
+            } else if (0xd == e_a_method) {
+                decoded = false;
+                if (3 == len_fld)
+                    am_s = "Restricted for T11";
+            } else if (0xe == e_a_method) {
+                decoded = false;
+                if (3 == len_fld)
+                    am_s = "Restricted for FC-SB-5";
+            } else if (0xf == e_a_method) {
+                decoded = false;
+                if (3 == len_fld)
+                    am_s = "Logical unit _not_ specified";
+            } else
+                decoded = false;
             break;
+        }               /* end of big case statement */
+        if (! decoded) {
+            if (am_s) {
+                sgj_pr_hr(jsp, "%s%s\n", l_leadin, am_s);
+                sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
+            } else {
+                sgj_pr_hr(jsp, "%sUnable to decode\n", l_leadin);
+                sgj_js_nv_s(jsp, jo2p, tname_sn, "Unable to decode");
+            }
         }
+        if ((k > 0) || (! lu_cong))
+            sgj_js_nv_ihex(jsp, jo2p, "decoded", decoded);
         if (next_level)
             continue;
         if ((2 == a_method) && (k < 3) && (lunp[2] || lunp[3]))
-            printf("%s<<unexpected data at next level, continue>>\n",
-                   l_leadin);
+             sgj_pr_hr(jsp, "%s<<unexpected data at next level, continue>>\n",
+                       l_leadin);
         break;
-    }
+    }           /* end of large for loop */
 }
 
 #ifdef SG_LIB_LINUX
@@ -358,6 +432,7 @@ dStrRaw(const char * str, int len)
 int
 main(int argc, char * argv[])
 {
+    bool do_json = false;
 #ifdef SG_LIB_LINUX
     bool do_linux = false;
 #endif
@@ -365,6 +440,7 @@ main(int argc, char * argv[])
     bool do_raw = false;
     bool lu_cong_arg_given = false;
     bool o_readonly = false;
+    bool std_inq_a_valid = false;
 #ifdef SG_LIB_LINUX
     bool test_linux_in = false;
     bool test_linux_out = false;
@@ -372,7 +448,8 @@ main(int argc, char * argv[])
     bool trunc;
     bool verbose_given = false;
     bool version_given = false;
-    int sg_fd, k, m, off, res, c, list_len, len_cap, luns;
+    int sg_fd, k, m, n, off, c, list_len, len_cap, luns, in_len;
+    int inraw_len;
     int decode_arg = 0;
     int do_hex = 0;
     int lu_cong_arg = 0;
@@ -381,22 +458,36 @@ main(int argc, char * argv[])
     int select_rep = 0;
     int verbose = 0;
     unsigned int h;
+    const uint32_t pg_sz = sg_get_page_size();
     const char * test_arg = NULL;
     const char * device_name = NULL;
+    const char * inhex_fn = NULL;
     const char * cp;
+    const char * json_arg = NULL;
+    const char * js_file = NULL;
+    const char * sinq_inraw_fn = NULL;
+    sgj_state * jsp;
+    sgj_opaque_p jop = NULL;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     uint8_t * reportLunsBuff = NULL;
     uint8_t * free_reportLunsBuff = NULL;
     uint8_t lun_arr[8];
+    uint8_t std_inq_a[36];
+    char b[144];
+    sgj_state json_st;
     struct sg_simple_inquiry_resp sir;
+    static const int blen = sizeof(b);
 
     while (1) {
         int option_index = 0;
 
 #ifdef SG_LIB_LINUX
-        c = getopt_long(argc, argv, "dhHlLm:qrRs:t:vV", long_options,
+        c = getopt_long(argc, argv, "dhHi:j::J:lLm:qQ:rRs:t:vV", long_options,
                         &option_index);
 #else
-        c = getopt_long(argc, argv, "dhHLm:qrRs:t:vV", long_options,
+        c = getopt_long(argc, argv, "dhHi:j::J:Lm:qQ:rRs:t:vV", long_options,
                         &option_index);
 #endif
         if (c == -1)
@@ -412,6 +503,17 @@ main(int argc, char * argv[])
             return 0;
         case 'H':
             ++do_hex;
+            break;
+       case 'i':
+            inhex_fn = optarg;
+            break;
+        case 'j':
+            do_json = true;
+            json_arg = optarg;
+            break;
+        case 'J':
+            do_json = true;
+            js_file = optarg;
             break;
 #ifdef SG_LIB_LINUX
         case 'l':
@@ -435,6 +537,9 @@ main(int argc, char * argv[])
             break;
         case 'q':
             do_quiet = true;
+            break;
+        case 'Q':
+            sinq_inraw_fn = optarg;
             break;
         case 'r':
             do_raw = true;
@@ -496,6 +601,25 @@ main(int argc, char * argv[])
     if (version_given) {
         pr2serr("version: %s\n", version_str);
         return 0;
+    }
+    jsp = &json_st;
+    if (do_json) {
+        if (! sgj_init_state(jsp, json_arg)) {
+            int bad_char = jsp->first_bad_char;
+            char e[1500];
+
+            if (bad_char) {
+                pr2serr("bad argument to --json= option, unrecognized "
+                        "character '%c'\n\n", bad_char);
+            }
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+            return SG_LIB_SYNTAX_ERROR;
+        }
+        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+        jo2p = sgj_named_subobject_r(jsp, jop, "pseudo_inquiry_data");
+        sgj_js_nv_ihex(jsp, jo2p, "lu_cong", 1 == (lu_cong_arg % 2));
+        jo2p = sgj_named_subobject_r(jsp, jop, rl_pd_sn);
     }
 
     if (test_arg) {
@@ -559,36 +683,48 @@ main(int argc, char * argv[])
 #endif
         {
             if (decode_arg > 1) {
-                printf("64 bit LUN in T10 (hex, dashed) format: ");
+                n = sg_scnpr(b, blen, "64 bit LUN in T10 (hex, dashed) "
+                             "format: ");
                 for (k = 0; k < 8; k += 2)
-                    printf("%c%02x%02x", (k ? '-' : ' '), lun_arr[k],
-                           lun_arr[k + 1]);
+                    n += sg_scnpr(b + n, blen - n, "%c%02x%02x",
+                                  (k ? '-' : ' '), lun_arr[k],
+                                  lun_arr[k + 1]);
             } else {
-                printf("64 bit LUN in T10 preferred (hex) format: ");
+                n = sg_scnpr(b, blen, "64 bit LUN in T10 preferred (hex) "
+                             "format: ");
                 for (k = 0; k < 8; ++k)
-                    printf(" %02x", lun_arr[k]);
+                    n += sg_scnpr(b + n, blen - n, " %02x", lun_arr[k]);
             }
-            printf("\n");
+            sgj_pr_hr(jsp, "%s\n", b);
         }
 #ifdef SG_LIB_LINUX
         if (test_linux_out) {
+            uint64_t lin_lun = t10_2linux_lun(lun_arr);
+            static const char * lwfilr_s = "Linux 'word flipped' integer LUN "
+                                           "representation";
             if (do_hex > 1)
-                printf("Linux 'word flipped' integer LUN representation: "
-                       "0x%016" PRIx64 "\n", t10_2linux_lun(lun_arr));
+                sgj_pr_hr(jsp, "%s: 0x%016" PRIx64 "\n", lwfilr_s, lin_lun);
             else if (do_hex)
-                printf("Linux 'word flipped' integer LUN representation: 0x%"
-                       PRIx64 "\n", t10_2linux_lun(lun_arr));
+                sgj_pr_hr(jsp, "%s: 0x%" PRIx64 "\n", lwfilr_s, lin_lun);
             else
-                printf("Linux 'word flipped' integer LUN representation: %"
-                       PRIu64 "\n", t10_2linux_lun(lun_arr));
+                sgj_pr_hr(jsp, "%s: %" PRIu64 "\n", lwfilr_s, lin_lun);
         }
 #endif
-        printf("Decoded LUN:\n");
-        decode_lun("  ", lun_arr, (lu_cong_arg % 2), do_hex, verbose);
+        sgj_pr_hr(jsp, "Decoded LUN:\n");
+        decode_lun("  ", lun_arr, (lu_cong_arg % 2), do_hex, verbose, jsp,
+                   jo2p);
         return 0;
     }
-    if (NULL == device_name) {
-        pr2serr("missing device name!\n");
+
+    if (inhex_fn) {
+        if (device_name) {
+            if (! do_json)
+                pr2serr("ignoring DEVICE, best to give DEVICE or "
+                        "--inhex=FN, but not both\n");
+            device_name = NULL;
+        }
+    } else if (NULL == device_name) {
+        pr2serr("missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -600,31 +736,19 @@ main(int argc, char * argv[])
         }
     }
 
-    sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
-    if (sg_fd < 0) {
-        int err = -sg_fd;
+    if (NULL == inhex_fn) {
+        sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
+        if (sg_fd < 0) {
+            int err = -sg_fd;
 
-        pr2serr("open error: %s: %s\n", device_name, safe_strerror(err));
-        if ((! o_readonly) && ((err == EACCES) || (err == EROFS)))
-            pr2serr("Perhaps try again with --readonly option or with root "
-                    "permissions\n");
-        return sg_convert_errno(-sg_fd);
-    }
-    if (decode_arg && (! lu_cong_arg_given)) {
-        if (verbose > 1)
-            pr2serr("in order to decode LUN and since --lu_cong not given, "
-                    "do standard\nINQUIRY to find LU_CONG bit\n");
-        /* check if LU_CONG set in standard INQUIRY response */
-        res = sg_simple_inquiry(sg_fd, &sir, false, verbose);
-        ret = res;
-        if (res) {
-            pr2serr("fetching standard INQUIRY response failed\n");
-            goto the_end;
+            pr2serr("open error: %s: %s\n", device_name, safe_strerror(err));
+            if ((! o_readonly) && ((err == EACCES) || (err == EROFS)))
+                pr2serr("Perhaps try again with --readonly option or with "
+                        "root permissions\n");
+            return sg_convert_errno(-sg_fd);
         }
-        lu_cong_arg = !!(0x40 & sir.byte_1);
-        if (verbose && lu_cong_arg)
-            pr2serr("LU_CONG bit set in standard INQUIRY response\n");
-    }
+    } else
+        sg_fd = -1;
 
     if (0 == maxlen)
         maxlen = DEF_RLUNS_BUFF_LEN;
@@ -635,11 +759,69 @@ main(int argc, char * argv[])
         return sg_convert_errno(ENOMEM);
     }
     trunc = false;
+    if (sinq_inraw_fn) {
+        /* Note: want to support both --sinq_inraw= and --inhex= options */
+        if ((ret = sg_f2hex_arr(sinq_inraw_fn, true, false, reportLunsBuff,
+                                &inraw_len, maxlen))) {
+            goto the_end;
+        }
+        if (inraw_len < 36) {
+            pr2serr("Unable to read 36 or more bytes from %s\n",
+                    sinq_inraw_fn);
+            ret = SG_LIB_FILE_ERROR;
+            goto the_end;
+        }
+        memcpy(std_inq_a,  reportLunsBuff, 36);
+        std_inq_a_valid = true;
+    }
+    if (decode_arg) {
+        if (std_inq_a_valid) {
+            int lu_cong = !!(0x40 & std_inq_a[1]);
 
-    res = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff, maxlen, true,
-                            verbose);
-    ret = res;
-    if (0 == res) {
+            if (lu_cong_arg_given && (lu_cong != (lu_cong_arg % 2))) {
+                pr2serr("LU_CONG in --sinq_inraw and --lu_cong= "
+                        "contradict\n");
+                return SG_LIB_CONTRADICT;
+            }
+            lu_cong_arg = lu_cong;
+        } else if ((! lu_cong_arg_given) && (sg_fd >= 0)) {
+            if (verbose > 1)
+                pr2serr("in order to decode LUN and since --lu_cong not "
+                        "given, do standard\nINQUIRY to find LU_CONG bit\n");
+            /* check if LU_CONG set in standard INQUIRY response */
+            ret = sg_simple_inquiry(sg_fd, &sir, false, verbose);
+            if (ret) {
+                pr2serr("fetching standard INQUIRY response failed\n");
+                goto the_end;
+            }
+            lu_cong_arg = !!(0x40 & sir.byte_1);
+        }
+        if (verbose && lu_cong_arg)
+            pr2serr("LU_CONG bit set in standard INQUIRY response\n");
+    }
+    if (inhex_fn) {
+        if ((ret = sg_f2hex_arr(inhex_fn, do_raw, false, reportLunsBuff,
+                                &in_len, pg_sz))) {
+            if (SG_LIB_LBA_OUT_OF_RANGE == ret)
+                pr2serr("decode buffer [%d] not large enough??\n", pg_sz);
+            goto the_end;
+        }
+        if (verbose > 2)
+            pr2serr("Read %d [0x%x] bytes of user supplied data\n",
+                    in_len, in_len);
+        if (do_raw)
+            do_raw = false;    /* can interfere on decode */
+        if (in_len < 4) {
+            pr2serr("--inhex=%s only decoded %d bytes (needs 4 at "
+                    "least)\n", inhex_fn, in_len);
+            ret = SG_LIB_SYNTAX_ERROR;
+            goto the_end;
+        }
+        ret = 0;
+    } else
+        ret = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff, maxlen,
+                                true, verbose);
+    if (0 == ret) {
         list_len = sg_get_unaligned_be32(reportLunsBuff + 0);
         len_cap = list_len + 8;
         if (len_cap > maxlen)
@@ -648,13 +830,22 @@ main(int argc, char * argv[])
             dStrRaw((const char *)reportLunsBuff, len_cap);
             goto the_end;
         }
-        if (1 == do_hex) {
-            hex2stdout(reportLunsBuff, len_cap, 1);
-            goto the_end;
+        if (do_hex > 0) {
+            if (1 == do_hex) {
+                hex2stdout(reportLunsBuff, len_cap, 1);
+                goto the_end;
+            } else if (do_hex > 2) {
+                if (do_hex > 3)
+                    sgj_pr_hr(jsp, "\n# %s\n", rl_pd_sn);
+                hex2stdout(reportLunsBuff, len_cap, -1);
+                goto the_end;
+            }
         }
+        sgj_js_nv_ihex(jsp, jo2p, "lun_list_length", list_len);
+        jap = sgj_named_subarray_r(jsp, jo2p, "lun_list");
         luns = (list_len / 8);
         if (! do_quiet)
-            printf("Lun list length = %d which imples %d lun entr%s\n",
+            sgj_pr_hr(jsp, "Lun list length = %d which imples %d lun entr%s\n",
                    list_len, luns, ((1 == luns) ? "y" : "ies"));
         if ((list_len + 8) > maxlen) {
             luns = ((maxlen - 8) / 8);
@@ -667,56 +858,87 @@ main(int argc, char * argv[])
             hex2stderr(reportLunsBuff, (trunc ? maxlen : list_len + 8), 1);
         }
         for (k = 0, off = 8; k < luns; ++k, off += 8) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_hex_bytes(jsp, jo3p, "lun", reportLunsBuff + off, 8);
+            n = 0;
             if (! do_quiet) {
                 if (0 == k)
-                    printf("Report luns [select_report=0x%x]:\n", select_rep);
-                printf("    ");
+                    sgj_pr_hr(jsp, "Report luns [select_report=0x%x]:\n",
+                              select_rep);
+                n = sg_scnpr(b + n, blen - n, "    ");
             }
             for (m = 0; m < 8; ++m)
-                printf("%02x", reportLunsBuff[off + m]);
+                n += sg_scnpr(b + n, blen - n, "%02x",
+                              reportLunsBuff[off + m]);
 #ifdef SG_LIB_LINUX
             if (do_linux) {
                 uint64_t lin_lun;
 
                 lin_lun = t10_2linux_lun(reportLunsBuff + off);
                 if (do_hex > 1)
-                    printf("    [0x%" PRIx64 "]", lin_lun);
+                    sg_scnpr(b + n, blen - n, "    [0x%" PRIx64 "]", lin_lun);
                 else
-                    printf("    [%" PRIu64 "]", lin_lun);
+                    sg_scnpr(b + n, blen - n, "    [%" PRIu64 "]", lin_lun);
             }
 #endif
-            printf("\n");
+            sgj_pr_hr(jsp, "%s\n", b);
             if (decode_arg)
                 decode_lun("      ", reportLunsBuff + off,
-                           (bool)(lu_cong_arg % 2), do_hex, verbose);
+                           (bool)(lu_cong_arg % 2), do_hex, verbose, jsp,
+                           jo3p);
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         }
-    } else if (SG_LIB_CAT_INVALID_OP == res)
+    } else if (SG_LIB_CAT_INVALID_OP == ret)
         pr2serr("Report Luns command not supported (support mandatory in "
                 "SPC-3)\n");
-    else if (SG_LIB_CAT_ABORTED_COMMAND == res)
+    else if (SG_LIB_CAT_ABORTED_COMMAND == ret)
         pr2serr("Report Luns, aborted command\n");
-    else if (SG_LIB_CAT_ILLEGAL_REQ == res)
+    else if (SG_LIB_CAT_ILLEGAL_REQ == ret)
         pr2serr("Report Luns command has bad field in cdb\n");
     else {
         char b[80];
 
-        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        sg_get_category_sense_str(ret, sizeof(b), b, verbose);
         pr2serr("Report Luns command: %s\n", b);
     }
 
 the_end:
     if (free_reportLunsBuff)
         free(free_reportLunsBuff);
-    res = sg_cmds_close_device(sg_fd);
-    if (res < 0) {
-        pr2serr("close error: %s\n", safe_strerror(-res));
-        if (0 == ret)
-            return sg_convert_errno(-res);
+    if (sg_fd >= 0) {
+        int res = sg_cmds_close_device(sg_fd);
+
+        if (res < 0) {
+            pr2serr("close error: %s\n", safe_strerror(-res));
+            if (0 == ret)
+                ret = sg_convert_errno(-res);
+        }
     }
     if (0 == verbose) {
         if (! sg_if_can2stderr("sg_luns failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
     }
-    return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
+    if (do_json) {
+        FILE * fp = stdout;
+
+        if (js_file) {
+            if ((1 != strlen(js_file)) || ('-' != js_file[0])) {
+                fp = fopen(js_file, "w");   /* truncate if exists */
+                if (NULL == fp) {
+                    pr2serr("unable to open file: %s\n", js_file);
+                    if (0 == ret)
+                        ret = SG_LIB_FILE_ERROR;
+                }
+            }
+            /* '--js-file=-' will send JSON output to stdout */
+        }
+        if (fp)
+            sgj_js2file(jsp, NULL, ret, fp);
+        if (js_file && fp && (stdout != fp))
+            fclose(fp);
+        sgj_finish(jsp);
+    }
+    return ret;
 }

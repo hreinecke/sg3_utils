@@ -1,12 +1,13 @@
-.TH SG_READCAP "8" "January 2020" "sg3_utils\-1.45" SG3_UTILS
+.TH SG_READCAP "8" "February 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_readcap \- send SCSI READ CAPACITY command
 .SH SYNOPSIS
 .B sg_readcap
-[\fI\-\-16\fR] [\fI\-\-brief\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
-[\fI\-\-lba=LBA\fR] [\fI\-\-long\fR] [\fI\-\-pmi\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-zbc\fR]
-\fIDEVICE\fR
+[\fI\-\-10\fR] [\fI\-\-16\fR] [\fI\-\-brief\fR] [\fI\-\-help\fR]
+[\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR]
+[\fI\-\-js\-file=JFN\fR] [\fI\-\-lba=LBA\fR] [\fI\-\-long\fR] [\fI\-\-pmi\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+[\fI\-\-zbc\fR] \fIDEVICE\fR
 .PP
 .B sg_readcap
 [\fI\-16\fR] [\fI\-b\fR] [\fI\-h\fR] [\fI\-H\fR] [\fI\-lba=LBA\fR]
@@ -49,6 +50,11 @@ Arguments to long options are mandatory for short options as well.
 The options are arranged in alphabetical order based on the long
 option name.
 .TP
+\fB\-\-10\fR
+Use the 10 byte cdb variant of the READ CAPACITY command. This is currently
+the default action of this utility. That default may change to the 16 byte
+variant, especially if T10 deprecates the 10 byte variant.
+.TP
 \fB\-\-16\fR
 Use the 16 byte cdb variant of the READ CAPACITY command. See the '\-\-long'
 option.
@@ -63,8 +69,39 @@ then "0x0 0x0" is written to stdout.
 print out the usage message then exit.
 .TP
 \fB\-H\fR, \fB\-\-hex\fR
-output the response to the READ CAPACITY command (either the 10 or 16
-byte cdb variant) in ASCII hexadecimal on stdout.
+output the response to the READ CAPACITY command (either the 10 or 16 byte
+cdb variant) in ASCII hexadecimal on stdout. Each line starts with a
+hexadecimal address or index, starting at 0. If this option is given twice,
+and ASCII rendering of the 16 bytes on each line is appended to the right
+hand side of each line.
+.br
+If this option is given three times then 16 bytes of ASCII hexadecimal are
+output in each line with no leading address nor ASCII rendering to the right.
+This output is suitable for importing into a later invocation of this utility
+with the file containing the hex given to the \fI\-\-inhex=FN\fR option.
+When given four (or more times) this option adds a comment line (starting
+with '#') describing the command that caused the output.
+.TP
+\fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
+where \fIFN\fR is a file name whose contents are assumed to be ASCII
+hexadecimal. If \fIDEVICE\fR is also given then \fIDEVICE\fR is ignored,
+a warning is issued and the utility continues, decoding the file named
+\fIFN\fR. See the "FORMAT OF FILES CONTAINING ASCII HEX" section in the
+sg3_utils manpage for more information. If the \fI\-\-raw\fR option is
+also given then the contents of \fIFN\fR are treated as binary.
+.TP
+\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
+output is in JSON format instead of human readable form. See sg3_utils_json
+manpage or use '?' for \fIJO\fR for a summary.
+.TP
+\fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
+output is in JSON format and it is sent to a file named \fIJFN\fR. If that
+file exists then it is truncated. By default, the JSON output is sent to
+stdout.
+.br
+When this option is given, the \fI\-\-json[=JO]\fR option is implied and
+need not be given. The \fI\-\-json[=JO]\fR option may still be needed to
+set the \fIJO\fR parameter to non-default values.
 .TP
 \fB\-L\fR, \fB\-\-lba\fR=\fILBA\fR
 used in conjunction with \fI\-\-pmi\fR option. This variant of READ CAPACITY
@@ -187,7 +224,7 @@ using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
 .SH AUTHORS
 Written by Douglas Gilbert
 .SH COPYRIGHT
-Copyright \(co 1999\-2020 Douglas Gilbert
+Copyright \(co 1999\-2023 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

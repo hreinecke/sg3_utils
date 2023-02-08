@@ -660,7 +660,7 @@ void dStrHexFp(const char* str, int len, int no_ascii, FILE * fp);
 /* Read 'len' bytes from 'str' and output as ASCII-Hex bytes (space separated)
  * to 'b' not to exceed 'b_len' characters. Each line starts with 'leadin'
  * (NULL for no leadin) and there are 16 bytes per line with an extra space
- * between the 8th and 9th bytes. 'oformat' is 0 for repeat in printable ASCII
+ * between the 8th and 9th bytes. 'oformat' is 0 for render in printable ASCII
  * ('.' for non printable chars) to right of each line; 1 don't (so just
  * output ASCII hex). If 'oformat' is 2 output same as 1 but any LFs are
  * replaced by space (and trailing spaces are trimmed). Note that an address

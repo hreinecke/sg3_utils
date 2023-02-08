@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "December 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_INQ "8" "February 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -8,8 +8,9 @@ sg_inq \- issue SCSI INQUIRY command and/or decode its response
 [\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
 [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR]
 [\fI\-\-len=LEN\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-only\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR] [\fI\-\-vendor\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
+[\fI\-\-only\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
+[\fI\-\fI\-sinq_inraw=RFN\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
 .B sg_inq
 [\fI\-36\fR] [\fI\-a\fR] [\fI\-A\fR] [\fI\-b\fR] [\fI\-\-B=0|1\fR]
@@ -237,6 +238,25 @@ used. The binary is sent to stdout, and errors are sent to stderr.
 .br
 If used with \fI\-\-inhex=FN\fR then the contents of \fIFN\fR is treated as
 binary.
+.TP
+\fB\-Q\fR, \fB\-\-sinq_inraw\fR=\fIRFN\fR
+where \fIRFN\fR is a filename containing binary standard INQUIRY response
+data that matches either \fIDEVICE\fR or \fIFN\fR. Linux places this standard
+INQUIRY response in its sysfs pseudo filesystem. A typical location is at
+/sys/class/scsi_device/<hctl>/device/inquiry where <hctl> is a four part
+numeric tuple separated by colons. This tuple distinguishes the device from
+any others on the system. Linux also places some VPD page responses in binary
+in the same directory with names like "vpd_pg83" where the last two digits
+form the hexadecimal VPD page number whose binary contents are therein.
+.br
+Some VPD pages (e.g. the Extended Inquiry VPD page) depend on knowing the
+settings in the standard INQUIRY response to interpret the fields in that VPD
+page. This option together with the \fI\-\-all\fR, \fI\-\-examine\fR or
+\fI\-\-page=PG\fR allows this utility to process both the standard INQUIRY
+response and VPD pages in the same invocation.
+.br
+The \fI\-\-raw\fR option has no effect on this option. The \fIDEVICE\fR
+argument may be given with this option.
 .TP
 \fB\-s\fR, \fB\-\-vendor\fR
 output a standard INQUIRY response's vendor specific fields from offset 36
@@ -560,11 +580,11 @@ Written by Douglas Gilbert
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2022 Douglas Gilbert
+Copyright \(co 2001\-2023 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2 or the BSD\-2\-Clause
 license. There is NO warranty; not even for MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sg_opcodes(8), sg_vpd(8), sg_logs(8), sg_modes(8), sdparm(8), hdparm(8),
-.B sgdiag(scsirastools)
+.B sg_opcodes(8), sg_vpd(8), sg_logs(8), sg_modes(8), sg_decode_sense(8),
+.B sdparm(8), hdparm(8),sgdiag(scsirastools)

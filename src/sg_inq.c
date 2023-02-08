@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.38 20230129";  /* spc6r07, sbc5r04 */
+static const char * version_str = "2.39 20230202";  /* spc6r07, sbc5r04 */
 
 #define MY_NAME "sg_inq"
 
@@ -2101,26 +2101,29 @@ decode_b3_vpd(uint8_t * buff, int len, struct opts_t * op, sgj_opaque_p jop)
 }
 
 static void
-std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
+std_inq_decode(const uint8_t * rp, int len, struct opts_t * op,
+               sgj_opaque_p jop)
 {
     uint8_t ansi_version;
-    int len, pqual, pdt, k, j;
+    int pqual, pdt, k, j, rsp_len, gv_len;
     sgj_state * jsp = &op->json_st;
     bool as_json = jsp->pr_as_json;
     const char * cp;
-    const uint8_t * rp;
     int vdesc_arr[8];
     char b[128];
     static const int blen = sizeof(b);
 
-    rp = rsp_buff + off;
+    if (len < 4) {
+        pr2serr("%s: len [%d] too short\n", __func__, len);
+        return;
+    }
     memset(vdesc_arr, 0, sizeof(vdesc_arr));
     if (op->do_raw) {
-        dStrRaw((const char *)rp, op->maxlen);
+        dStrRaw((const char *)rp, len);
         return;
     } else if (op->do_hex > 0) {
         /* with -H, print with address, -HH without */
-        hex2stdout(rp, op->maxlen, no_ascii_4hex(op));
+        hex2stdout(rp, len, no_ascii_4hex(op));
         return;
     }
     pqual = (rp[0] & 0xe0) >> 5;
@@ -2138,7 +2141,13 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
             sgj_pr_hr(jsp, "%s [reserved or vendor specific qualifier "
                       "[%d]]\n", b, pqual);
     }
-    len = rp[4] + 5;
+    gv_len = len;
+    rsp_len = rp[4] + 5;
+    if (op->verbose > 2)
+        pr2serr(">> requested %d bytes, %d bytes available\n", len, rsp_len);
+    if (rsp_len < len)
+        len = rsp_len;
+
     /* N.B. rp[2] full byte is 'version' in SPC-2,3,4 but in SPC
      * [spc-r11a (1997)] bits 6,7: ISO/IEC version; bits 3-5: ECMA
      * version; bits 0-2: SCSI version */
@@ -2176,25 +2185,25 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
                   !!(rp[7] & 0x20), !!(rp[7] & 0x10), !!(rp[7] & 0x08),
                   !!(rp[7] & 0x04));
         sgj_pr_hr(jsp, "CmdQue=%d\n", !!(rp[7] & 0x02));
-        if (op->maxlen > 56)
+        if (len > 56)
             sgj_pr_hr(jsp, "  [SPI: Clocking=0x%x  QAS=%d  IUS=%d]\n",
                       (rp[56] & 0x0c) >> 2, !!(rp[56] & 0x2),
                       !!(rp[56] & 0x1));
-        if (op->maxlen >= len)
+        if (gv_len >= len)
             sgj_pr_hr(jsp, "    length=%d (0x%x)", len, len);
         else
             sgj_pr_hr(jsp, "    length=%d (0x%x), but only fetched %d bytes",
-                      len, len, op->maxlen);
+                      len, len, gv_len);
         if ((ansi_version >= 2) && (len < SAFE_STD_INQ_RESP_LEN))
             sgj_pr_hr(jsp, "\n  [for SCSI>=2, len>=36 is expected]");
         cp = sg_get_pdt_str(pdt, blen, b);
         if (strlen(cp) > 0)
             sgj_pr_hr(jsp, "   Peripheral device type: %s\n", cp);
     }
-    if (op->maxlen <= 8) {
+    if (len <= 8) {
         if (! op->do_export)
             sgj_pr_hr(jsp, " Inquiry response length=%d, no vendor, product "
-                      "or revision data\n", op->maxlen);
+                      "or revision data\n", len);
     } else {
         int i;
 
@@ -2213,7 +2222,7 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
             }
         } else
             sgj_pr_hr(jsp, " Vendor identification: %s\n", xtra_buff);
-        if (op->maxlen <= 16) {
+        if (len <= 16) {
             if (! op->do_export)
                 sgj_pr_hr(jsp, " Product identification: <none>\n");
         } else {
@@ -2229,7 +2238,7 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
             } else
                 sgj_pr_hr(jsp, " Product identification: %s\n", xtra_buff);
         }
-        if (op->maxlen <= 32) {
+        if (len <= 32) {
             if (! op->do_export)
                 sgj_pr_hr(jsp, " Product revision level: <none>\n");
         } else {
@@ -2242,10 +2251,9 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
             } else
                 sgj_pr_hr(jsp, " Product revision level: %s\n", xtra_buff);
         }
-        if (op->do_vendor && (op->maxlen > 36) && ('\0' != rp[36]) &&
+        if (op->do_vendor && (len > 36) && ('\0' != rp[36]) &&
             (' ' != rp[36])) {
-            memcpy(xtra_buff, &rp[36], op->maxlen < 56 ? op->maxlen - 36 :
-                   20);
+            memcpy(xtra_buff, &rp[36], len < 56 ? len - 36 : 20);
             if (op->do_export) {
                 len = encode_whitespaces((uint8_t *)xtra_buff, 20);
                 if (len > 0)
@@ -2254,21 +2262,21 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
                 sgj_pr_hr(jsp, " Vendor specific: %s\n", xtra_buff);
         }
         if (op->do_descriptors) {
-            for (j = 0, k = 58; ((j < 8) && ((k + 1) < op->maxlen));
+            for (j = 0, k = 58; ((j < 8) && ((k + 1) < len));
                  k +=2, ++j)
                 vdesc_arr[j] = sg_get_unaligned_be16(rp + k);
         }
-        if ((op->do_vendor > 1) && (op->maxlen > 96)) {
-            memcpy(xtra_buff, &rp[96], op->maxlen - 96);
+        if ((op->do_vendor > 1) && (len > 96)) {
+            memcpy(xtra_buff, &rp[96], len - 96);
             if (op->do_export) {
                 len = encode_whitespaces((uint8_t *)xtra_buff,
-                                         op->maxlen - 96);
+                                         len - 96);
                 if (len > 0)
                     printf("VENDOR_SPECIFIC=%s\n", xtra_buff);
             } else
                 sgj_pr_hr(jsp, " Vendor specific: %s\n", xtra_buff);
         }
-        if (op->do_vendor && (op->maxlen > 243) &&
+        if (op->do_vendor && (len > 243) &&
             (0 == strncmp("OPEN-V", (const char *)&rp[16], 6))) {
            memcpy(xtra_buff, &rp[212], 32);
            if (op->do_export) {
@@ -2284,8 +2292,8 @@ std_inq_decode(struct opts_t * op, sgj_opaque_p jop, int off)
         sgj_opaque_p jo2p = NULL;
 
         if (as_json)
-            jo2p = std_inq_decode_js(rp, op->maxlen, op, jop);
-        if ((0 == op->maxlen) && usn_buff[0])
+            jo2p = std_inq_decode_js(rp, len, op, jop);
+        if ((0 == len) && usn_buff[0])
             sgj_pr_hr(jsp, " Unit serial number: %s\n", usn_buff);
         if (op->do_descriptors) {
             sgj_opaque_p jap = sgj_named_subarray_r(jsp, jo2p,
@@ -2388,12 +2396,12 @@ std_inq_process(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
     int vb, resid;
     char buff[48];
 
-    if (sg_fd < 0) {    /* assume --inhex=FD usage */
-        std_inq_decode(op, jop, off);
-        return 0;
-    }
     rlen = (op->maxlen > 0) ? op->maxlen : SAFE_STD_INQ_RESP_LEN;
     vb = op->verbose;
+    if (sg_fd < 0) {    /* assume --inhex=FD usage */
+        std_inq_decode(rsp_buff + off, rlen, op, jop);
+        return 0;
+    }
     res = sg_ll_inquiry_v2(sg_fd, false, 0, rsp_buff, rlen, DEF_PT_TIMEOUT,
                            &resid, false, vb);
     if (0 == res) {
@@ -2430,8 +2438,7 @@ std_inq_process(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             if (fetch_unit_serial_num(sg_fd, usn_buff, sizeof(usn_buff), vb))
                 usn_buff[0] = '\0';
         }
-        op->maxlen = act_len;
-        std_inq_decode(op, jop, 0);
+        std_inq_decode(rsp_buff, act_len, op, jop);
         return 0;
     } else if (res < 0) { /* could be an ATA device */
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
@@ -2862,7 +2869,9 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             bool protect = false;
 
             op->protect_not_sure = false;
-            if ((sg_fd >= 0) && (! op->do_force)) {
+            if (op->std_inq_a_valid)
+                 protect = !! (0x1 & op->std_inq_a[5]);
+            else if ((sg_fd >= 0) && (! op->do_force)) {
                 struct sg_simple_inquiry_resp sir;
 
                 res = sg_simple_inquiry(sg_fd, &sir, false, vb);
@@ -4293,6 +4302,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
+        /* Note: want to support both --sinq_inraw= and --inhex= options */
         if ((ret = sg_f2hex_arr(op->sinq_inraw_fn, true, false, rsp_buff,
                                 &inraw_len, rsp_buff_sz))) {
             goto err_out;
@@ -4370,9 +4380,9 @@ main(int argc, char * argv[])
             ret = svpd_inhex_decode_all(op, jop);
             goto fini2;
         }
-    } else if (0 == op->device_name) {
+    } else if ((NULL == op->device_name) && (! op->std_inq_a_valid)) {
         pr2serr("No DEVICE argument given\n\n");
-        usage_for(op);
+        pr2serr("Use '-h' or '--help' option for usage summary\n");
         ret = SG_LIB_SYNTAX_ERROR;
         goto err_out;
     }
@@ -4472,6 +4482,18 @@ main(int argc, char * argv[])
             ret = std_inq_process(-1, op, jop, 0);
             goto err_out;
         }
+    } else if (op->std_inq_a_valid && (NULL == op->device_name)) {
+        /* --sinq_inraw=RFN contents still in rsp_buff */
+        if (op->do_raw)
+            dStrRaw((const char *)rsp_buff, inraw_len);
+        else if (op->do_hex) {
+            if (! op->do_quiet && (op->do_hex < 3))
+                sgj_pr_hr(jsp, "Standard Inquiry data format:\n");
+            hex2stdout(rsp_buff, inraw_len, (1 == op->do_hex) ? 0 : -1);
+        } else
+            std_inq_decode(rsp_buff, inraw_len, op, jop);
+        ret = 0;
+        goto fini2;
     }
 
 #if defined(O_NONBLOCK) && defined(O_RDONLY)

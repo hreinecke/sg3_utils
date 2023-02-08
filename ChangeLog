@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230130] [svn: r1000]
+Changelog for pre-release sg3_utils-1.48 [20230207] [svn: r1001]
   - decoding utilities: add --json[=JO] option
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
@@ -301,7 +301,9 @@ Changelog for released sg3_utils-1.45 [20200229] [svn: r843]
   - sg_verify: correct so issues VERIFY(16)
     - add --0 and --ff options and implement bytchk=3 properly
   - sg_write_same: add --ff for 0xff fill
-  - sg_luns: report new "target commands" w-lun (19-117)
+  - sg_luns: report new "target commands" w-lun (spc6r02)
+    - add --inhex= and --sinq_inraw= options
+  - sg_readcap: add --inhex= and --10 options
   - sg_dd: add --verify support
   - sgp_dd: support memory-mapped IO via mmap flag
   - inhex directory: new, contains ASCII hex files that can be used with
