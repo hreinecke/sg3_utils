@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2022 Douglas Gilbert.
+ * Copyright (c) 2009-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.34 20221226";      /* sbc5r03++ */
+static const char * version_str = "1.35 20230210";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_lba_status"
 

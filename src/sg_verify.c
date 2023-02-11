@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2020 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.27 20201029";    /* sbc4r17 */
+static const char * version_str = "1.28 20230210";    /* sbc5r04 */
 
 #define ME "sg_verify: "
 
@@ -312,13 +312,6 @@ main(int argc, char * argv[])
             pr2serr("count exceed 31 bits, way too large\n");
             return SG_LIB_SYNTAX_ERROR;
         }
-#if 0
-        if ((3 == bytchk) && (1 != count)) {
-            pr2serr("count must be 1 when bytchk=3\n");
-            return SG_LIB_SYNTAX_ERROR;
-        }
-        // bpc = (int)count;
-#endif
     } else if (bytchk > 0) {
         pr2serr("when the 'ebytchk=BCH' option is given, then '--ndo=NDO' "
                 "must also be given\n");

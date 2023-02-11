@@ -207,7 +207,7 @@ struct sg_lib_simple_value_name_t sg_version_descriptor_arr[] = {
     {0x5a0, "SSC-5 (no version claimed)"},
     {0x5c0, "SPC-5 (no version claimed)"},
 /* SPC-5 is now a standard [INCITS 502-2020] but no version code */
-/* SPC-6 is now up to draft 06 but still no version code */
+/* post SPC-6 draft revison 07, 23-015r0 proproses new version code */
     {0x5e0, "SFSC (no version claimed)"},
     {0x5e3, "SFSC BSR INCITS 501 revision 01"},
     {0x5e5, "SFSC BSR INCITS 501 revision 02"},

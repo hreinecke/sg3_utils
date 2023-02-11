@@ -4,14 +4,15 @@ sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 .SH SYNOPSIS
 .B sg_luns
 [\fI\-\-decode\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-inhex=FN\fR]
-[\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR] [\fI\-\-linux\fR]
-[\fI\-\-lu_cong\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-select=SR\fR] [\fI\-\-sinq_inraw=RFN\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-inner\-hex\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR]
+[\fI\-\-linux\fR] [\fI\-\-lu_cong\fR] [\fI\-\-maxlen=LEN\fR] [\fI\-\-quiet\fR]
+[\fI\-\-raw\fR] [\fI\-\-readonly\fR] [\fI\-\-select=SR\fR]
+[\fI\-\-sinq_inraw=RFN\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .PP
 .B sg_luns
-\fI\-\-test=ALUN\fR [\fI\-\-decode\fR] [\fI\-\-hex\fR] [\fI\-\-lu_cong\fR]
-[\fI\-\-verbose\fR]
+\fI\-\-test=ALUN\fR [\fI\-\-decode\fR] [\fI\-\-hex\fR] [\fI\-\-inner\-hex\fR]
+[\fI\-\-lu_cong\fR] [\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 In the first form shown in the SYNOPSIS this utility sends the SCSI REPORT
@@ -50,8 +51,11 @@ output the usage message then exit.
 [device mode] when given once this utility will output the SCSI response (i.e.
 the data\-out buffer) to the REPORT LUNS command in ASCII hex then exit. When
 given twice it causes \fI\-\-decode\fR to output component fields in hex
-rather than decimal. Notice that this (i.e. how '\-HH' is processed differs
-from the description in sg3_utils(8).
+rather than decimal. Notice that this (i.e. how '\-HH' is processed) differs
+from the description in sg3_utils(8). The \fI\-\-inner\-hex\fR option has
+the same action as '\-HH'. When this option is used three (or more) times the
+hex output is suitable for placing in a file and using it with a later
+sg_luns invocation with the \fI\-\-inhex=FN\fR option.
 .br
 [test mode] when this option is given, then decoded component fields of
 \fIALUN\fR are output in hex.
@@ -70,6 +74,12 @@ ASCII hexadecimal or binary representing a REPORT LUNS response. This utility
 will then decode that response. See the "FORMAT OF FILES CONTAINING ASCII
 HEX" section in the sg3_utils manpage for more information. If the
 \fI\-\-raw\fR option is also given then \fIFN\fR is treated as binary.
+.TP
+\fB\-I\fR, \fB\-\-inner\-hex\fR
+used together with the \fI\-\-decode\fR option so that the decoded values are
+shown in hexadecimal. The default action is to show decoded values in decimal.
+This option has the same action as '\-HH' but the intent is a little clearer
+with this option.
 .TP
 \fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
 output is in JSON format instead of human readable form. See sg3_utils_json

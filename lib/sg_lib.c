@@ -315,12 +315,12 @@ static const char * sg_lib_ansi_version_arr[16] = {
     "SPC-3",            /* ANSI INCITS 408-2005, ISO/IEC 14776-453 */
     "SPC-4",            /* ANSI INCITS 513-2015 */
     "SPC-5",            /* ANSI INCITS 502-2020 */
-    "ecma=1, [8h]",
-    "ecma=1, [9h]",
-    "ecma=1, [Ah]",
-    "ecma=1, [Bh]",
+    "obsolete, [8h]",
+    "obsolete, [9h]",
+    "obsolete, [Ah]",
+    "obsolete, [Bh]",
+    "obsolete, [Ch]",
     "SPC-6",            /* T10/BSR INCITS 566, proposed value in 23-015r0 */
-    "reserved [Dh]",
     "reserved [Eh]",
     "reserved [Fh]",
 };

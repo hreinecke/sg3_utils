@@ -34,7 +34,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.50 20230207";      /* spc6r07 */
+static const char * version_str = "1.51 20230210";      /* spc6r07 */
 
 #define MY_NAME "sg_luns"
 
@@ -47,6 +47,8 @@ static struct option long_options[] = {
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
     {"inhex", required_argument, 0, 'i'},
+    {"inner-hex", no_argument, 0, 'I'},
+    {"inner_hex", no_argument, 0, 'I'},
     {"json", optional_argument, 0, 'j'},
     {"js-file", required_argument, 0, 'J'},
     {"js_file", required_argument, 0, 'J'},
@@ -76,7 +78,7 @@ usage()
 {
 #ifdef SG_LIB_LINUX
     pr2serr("Usage: sg_luns    [--decode] [--help] [--hex] [--inhex-FN] "
-            "[--json[=JO]]\n"
+            "[--inner-hex]\n"
             "                  [--json[=JO]] [--js-file=JFN] [--linux] "
             "[--lu_cong]\n"
             "                  [--maxlen=LEN] [--quiet] [--raw] "
@@ -85,7 +87,8 @@ usage()
             "[--version]\n"
             "                  DEVICE\n");
 #else
-    pr2serr("Usage: sg_luns    [--decode] [--help] [--hex] [--inhex-FN]\n"
+    pr2serr("Usage: sg_luns    [--decode] [--help] [--hex] [--inhex-FN] "
+            "[--inner-hex]\n"
             "                  [--json[=JO]] [--js-file=JFN] [--lu_cong] "
             "[--maxlen=LEN]\n"
             "                  [--quiet] [--raw] [--readonly] "
@@ -105,6 +108,9 @@ usage()
     pr2serr("    --inhex=FN|-i FN    contents of file FN treated as hex "
             "and used\n"
             "                        instead of DEVICE which is ignored\n"
+            "    --inner-hex|-I     when --decode given, output decoded "
+            "values in\n"
+            "                       hex (def: decimal)\n"
             "    --json[=JO]|-jJO    output in JSON instead of human "
             "readable\n"
             "                        test. Use --json=? for JSON help\n"
@@ -172,14 +178,6 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
     static const char * tname_sn = "type_name";
 
     jo2p = sgj_named_subobject_r(jsp, jop, "decode_level");
-#if 0
-    if (0xff == lunp[0]) {
-         sgj_pr_hr(jsp, "%sLogical unit _not_ specified\n", leadin);
-         sgj_js_nv_ihex(jsp, jo2p, "specified", 0);
-        return;
-    }
-    sgj_js_nv_ihex(jsp, jo2p, "specified", 1);
-#endif
     sgj_js_nv_ihex_nex(jsp, jo2p, "lu_cong", (int)lu_cong, false,
                        "Logical Unit CONGlomerate");
     admin_lu_cong = lu_cong;
@@ -371,7 +369,7 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                 decoded = false;
                 if (3 == len_fld)
                     am_s = "Logical unit _not_ specified";
-            } else
+            } else      /* includes 0x0 == e_a_method */
                 decoded = false;
             break;
         }               /* end of big case statement */
@@ -484,10 +482,10 @@ main(int argc, char * argv[])
         int option_index = 0;
 
 #ifdef SG_LIB_LINUX
-        c = getopt_long(argc, argv, "dhHi:j::J:lLm:qQ:rRs:t:vV", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "dhHi:Ij::J:lLm:qQ:rRs:t:vV",
+                        long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "dhHi:j::J:Lm:qQ:rRs:t:vV", long_options,
+        c = getopt_long(argc, argv, "dhHi:Ij::J:Lm:qQ:rRs:t:vV", long_options,
                         &option_index);
 #endif
         if (c == -1)
@@ -506,6 +504,9 @@ main(int argc, char * argv[])
             break;
        case 'i':
             inhex_fn = optarg;
+            break;
+       case 'I':
+            do_hex = 2;
             break;
         case 'j':
             do_json = true;
