@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.39 20230202";  /* spc6r07, sbc5r04 */
+static const char * version_str = "2.42 20230217";  /* spc6r07, sbc5r04 */
 
 #define MY_NAME "sg_inq"
 
@@ -2853,7 +2853,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
                 jap = sgj_named_subarray_r(jsp, jo2p,
                                   "network_services_descriptor_list");
             }
-            decode_net_man_vpd(rp, len, op, jap);
+            decode_man_net_vpd(rp, len, op, jap);
         }
         break;
     case VPD_EXT_INQ:           /* 0x86  ["ei"] */
@@ -2933,10 +2933,13 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         if (res)
             break;
         /* format output for 'hdparm --Istdin' with '-rr' or '-HHH' */
-        if ((2 == op->do_raw) || (3 == dhex))
-            dWordHex((const unsigned short *)(rp + 60), 256, -2,
-                     sg_is_big_endian());
-        else if (op->do_raw)
+        if ((2 == op->do_raw) || (3 == dhex)) {
+            if (len < 572)
+                pr2serr("%s is too short (%d < 572)\n", np, len);
+            else
+                dWordHex((const unsigned short *)(rp + 60), 256, -2,
+                         sg_is_big_endian());
+        } else if (op->do_raw)
             dStrRaw((const char *)rp, len);
         else {
             if (as_json)
@@ -2980,7 +2983,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         }
         break;
     case VPD_CFA_PROFILE_INFO:    /* 0x8c ["cfa"] */
-        np = cp_vpdp;
+        np = cpi_vpdp;
         if (!op->do_raw && (dhex < 3))
             sgj_pr_hr(jsp, "%s:\n", np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -3052,7 +3055,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         }
         break;
     case VPD_PROTO_PORT:        /* 0x91  ["pspo"] */
-        np = psp_vpdp;
+        np = pspo_vpdp;
         if (!op->do_raw && (dhex < 3))
             sgj_pr_hr(jsp, "VPD INQUIRY: %s\n", np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -3526,7 +3529,7 @@ vpd_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             pdt = rp[0] & PDT_MASK;
             switch (pdt) {
             case PDT_DISK: case PDT_WO: case PDT_OPTICAL: case PDT_ZBC:
-                np = cap_vpdp;
+                np = cap_vpdp;          /* VPD_CAP_PROD_ID */
                 ep = "(SBC)";
                 cap = true;
                 break;

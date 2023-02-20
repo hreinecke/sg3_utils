@@ -42,7 +42,7 @@
 
 */
 
-static const char * version_str = "1.90 20230202";  /* spc6r07 + sbc5r04 */
+static const char * version_str = "1.92 20230216";  /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_vpd"
 
@@ -1344,7 +1344,8 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                     len = sizeof(obuff) - 1;
                 memcpy(obuff, rp + 4, len);
                 jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
-                sgj_haj_vs(jsp, jo2p, 2, np, SGJ_SEP_COLON_1_SPACE, obuff);
+                sgj_haj_vs(jsp, jo2p, 2, "Product serial number",
+                           SGJ_SEP_COLON_1_SPACE, obuff);
             }
             return 0;
         }
@@ -1388,7 +1389,12 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
-            else {
+            else if (dhex > 0) {
+                if (dhex > 2)
+                    named_hhh_output(np, rp, len, op);
+                else
+                    hex2stdout(rp, len, no_ascii_4hex(op));
+            } else {
                 if (vb || long_notquiet)
                     sgj_pr_hr(jsp, "   [PQual=%d  Peripheral device type: "
                               "%s]\n", pqual, pdt_str);
@@ -1412,13 +1418,18 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
-            else {
+            else if (dhex > 0) {
+                if (dhex > 2)
+                    named_hhh_output(np, rp, len, op);
+                else
+                    hex2stdout(rp, len, no_ascii_4hex(op));
+            } else {
                 if (as_json) {
                     jo2p = sg_vpd_js_hdr(jsp, jop, np, rp);
                     jap = sgj_named_subarray_r(jsp, jo2p,
                                       "network_services_descriptor_list");
                 }
-                decode_net_man_vpd(rp, len, op, jap);
+                decode_man_net_vpd(rp, len, op, jap);
             }
             return 0;
         }
@@ -1433,7 +1444,12 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
             if (op->do_raw)
                 dStrRaw(rp, len);
-            else {
+            else if (dhex > 0) {
+                if (dhex > 2)
+                    named_hhh_output(np, rp, len, op);
+                else
+                    hex2stdout(rp, len, no_ascii_4hex(op));
+            } else {
                 bool protect = false;
 
                 op->protect_not_sure = false;
@@ -1521,13 +1537,11 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 sgj_pr_hr(jsp, "%s%s:\n", (prefix ? prefix : ""), np);
             if ((2 == op->do_raw) || (3 == dhex)) {  /* for hdparm */
                 if (len < (60 + 512))
-                    pr2serr("ATA_INFO %s len (%d) less than expected 572\n",
-                            vpd_pg_s, len);
+                    pr2serr("%s len (%d) less than expected 572\n", np, len);
                 else
                     dWordHex((const unsigned short *)(rp + 60), 256, -2,
                              sg_is_big_endian());
-            }
-            else if (op->do_raw)
+            } else if (op->do_raw)
                 dStrRaw(rp, len);
             else {
                 if (vb || long_notquiet)
@@ -1586,7 +1600,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         }
         break;
     case VPD_CFA_PROFILE_INFO:    /* 0x8c ["cfa"] */
-        np = cp_vpdp;
+        np = cpi_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -1682,7 +1696,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         }
         break;
     case VPD_PROTO_PORT:        /* 0x91  ["pspo"] */
-        np = psp_vpdp;
+        np = pspo_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s\n", pre, np);
         res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
@@ -1771,9 +1785,9 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 if (bl)
                     decode_block_limits_vpd(rp, len, op, jo2p);
                 else if (sad) {
-                    decode_b0_vpd(rp, len, op, jop);
+                    decode_b0_vpd(rp, len, op, jo2p);
                 } else if (oi) {
-                    decode_b0_vpd(rp, len, op, jop);
+                    decode_b0_vpd(rp, len, op, jo2p);
                 } else {
 
                 }
@@ -2298,7 +2312,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
         if (op->page_given && (VPD_NOPE_WANT_STD_INQ == op->vpd_pn))
             return svpd_decode_t10(-1, op, jop, 0, 0, NULL);
 
-        for (k = 0, off = 0; off < in_len; ++k, off += bump) {
+        for (off = 0; off < in_len; off += bump) {
             rp = rsp_buff + off;
             pn = rp[1];
             bump = sg_get_unaligned_be16(rp + 2) + 4;
@@ -2326,7 +2340,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
                 if (jsp->pr_as_json)
                     sgj_pr_hr(jsp, "[0x%x]:\n", pn);
                 else
-                    printf("[0x%x] ", pn);
+                    sgj_pr_hr(jsp, "[0x%x] ", pn);
             }
 
             res = svpd_decode_t10(-1, op, jop, 0, off, NULL);

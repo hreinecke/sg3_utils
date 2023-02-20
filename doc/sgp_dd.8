@@ -1,4 +1,4 @@
-.TH SGP_DD "8" "August 2022" "sg3_utils\-1.47" SG3_UTILS
+.TH SGP_DD "8" "February 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sgp_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -11,7 +11,7 @@ devices
 [\fIbpt=BPT\fR] [\fIcoe=\fR0|1] [\fIcdbsz=\fR6|10|12|16] [\fIdeb=VERB\fR]
 [\fIdio=\fR0|1] [\fIsync=\fR0|1] [\fIthr=THR\fR] [\fItime=\fR0|1]
 [\fIverbose=VERB\fR] [\fI\-\-chkaddr\fR] [\fI\-\-dry\-run\fR]
-[\fI\-\-verbose\fR]
+[\fI\-\-progress\fR] [\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 Copy data to and from any files. Specialised for "files" that are
@@ -152,6 +152,15 @@ executing them.
 \fB\-h\fR, \fB\-\-help\fR
 outputs usage message and exits.
 .TP
+\fB\-p\fR, \fB\-\-progress\fR
+this option causes a progress report to be output every two minutes until
+the copy is complete. After the copy is complete a line with "completed"
+is printed to distinguish the final report from the prior progress reports.
+When used twice the progress report is every minute, when used three times
+the progress report is every 30 seconds.
+.br
+If this option is given then the 'time=1' option is set implicitly.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 when used once, this is equivalent to \fIverbose=1\fR. When used
 twice (e.g. "\-vv") this is equivalent to \fIverbose=2\fR, etc.
@@ -210,18 +219,18 @@ excl
 causes the O_EXCL flag to be added to the open of \fIIFILE\fR and/or
 \fIOFILE\fR.
 .TP
+fua
+causes the FUA (force unit access) bit to be set in SCSI READ and/or WRITE
+commands. This only has effect with sg devices. The 6 byte variants
+of the SCSI READ and WRITE commands do not support the FUA bit.
+Only active for sg device file names.
+.TP
 mmap
 can only be used in the \fIiflag=FLAGS\fR or the \fIoflag=FLAGS\fR argument
 list but not both. The nominated side of the copy will use memory mapped IO
 based on the mmap(2) system call. The sg driver will remap its DMA
 destination or source buffer into the user space when the mmap(2) system call
 is used on a sg device.
-.TP
-fua
-causes the FUA (force unit access) bit to be set in SCSI READ and/or WRITE
-commands. This only has effect with sg devices. The 6 byte variants
-of the SCSI READ and WRITE commands do not support the FUA bit.
-Only active for sg device file names.
 .TP
 null
 has no affect, just a placeholder.
@@ -326,7 +335,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2022 Douglas Gilbert
+Copyright \(co 2000\-2023 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

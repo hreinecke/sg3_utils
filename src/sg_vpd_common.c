@@ -39,11 +39,11 @@
  * decode SCSI VPD pages. */
 
 const char * t10_vendor_id_hr = "T10_vendor_identification";
-const char * t10_vendor_id_js = "t10_vendor_identification";
+const char * t10_vendor_id_sn = "t10_vendor_identification";
 const char * product_id_hr = "Product_identification";
-const char * product_id_js = "product_identification";
+const char * product_id_sn = "product_identification";
 const char * product_rev_lev_hr = "Product_revision_level";
-const char * product_rev_lev_js = "product_revision_level";
+const char * product_rev_lev_sn = "product_revision_level";
 const char * vpd_pg_s = "VPD page";
 const char * lts_s = "length too short";
 
@@ -57,12 +57,12 @@ const char * sp_vpdp = "SCSI ports VPD page";
 const char * ai_vpdp = "ATA information VPD page";
 const char * pc_vpdp = "Power condition VPD page";
 const char * dc_vpdp = "Device constituents VPD page";
-const char * cp_vpdp = "CFA profile information VPD page";
+const char * cpi_vpdp = "CFA profile information VPD page";
 const char * psm_vpdp = "Power consumption VPD page";
 const char * tpc_vpdp = "Third party copy VPD page";
 const char * pslu_vpdp = "Protocol-specific logical unit information VPD "
                          "page";
-const char * psp_vpdp = "Protocol-specific port information VPD page";
+const char * pspo_vpdp = "Protocol-specific port information VPD page";
 const char * sfs_vpdp = "SCSI feature sets VPD page";
 const char * bl_vpdp = "Block limits VPD page";
 const char * sad_vpdp = "Sequential-access device capabilities VPD page";
@@ -409,7 +409,7 @@ static const char * network_service_type_arr[] =
 
 /* VPD_MAN_NET_ADDR     0x85 ["mna"] */
 void
-decode_net_man_vpd(const uint8_t * buff, int len, struct opts_t * op,
+decode_man_net_vpd(const uint8_t * buff, int len, struct opts_t * op,
                    sgj_opaque_p jap)
 {
     int k, bump, na_len, assoc, nst;
@@ -999,9 +999,7 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
     }
     if (len < 572)
         return;
-    if (2 == op->do_hex)
-        hex2stdout((buff + 60), 512, 0);
-    else if (do_long_nq)
+    if (do_long_nq)
         dWordHex((const unsigned short *)(buff + 60), 256, 0, is_be);
 }
 
@@ -1127,13 +1125,13 @@ decode_dev_constit_vpd(const uint8_t * buff, int len, struct opts_t * op,
                    sg_get_pdt_str(PDT_MASK & bp[2], dlen, d), bp[2]);
         snprintf(b, blen, "%.8s", bp + 4);
         sgj_pr_hr(jsp, "    %s: %s\n", t10_vendor_id_hr, b);
-        sgj_js_nv_s(jsp, jo2p, t10_vendor_id_js, b);
+        sgj_js_nv_s(jsp, jo2p, t10_vendor_id_sn, b);
         snprintf(b, blen, "%.16s", bp + 12);
         sgj_pr_hr(jsp, "    %s: %s\n", product_id_hr, b);
-        sgj_js_nv_s(jsp, jo2p, product_id_js, b);
+        sgj_js_nv_s(jsp, jo2p, product_id_sn, b);
         snprintf(b, blen, "%.4s", bp + 28);
         sgj_pr_hr(jsp, "    %s: %s\n", product_rev_lev_hr, b);
-        sgj_js_nv_s(jsp, jo2p, product_rev_lev_js, b);
+        sgj_js_nv_s(jsp, jo2p, product_rev_lev_sn, b);
         csd_len = sg_get_unaligned_be16(bp + 34);
         bump = 36 + csd_len;
         if ((k + bump) > len) {
@@ -1203,13 +1201,13 @@ decode_cga_profile_vpd(const uint8_t * buff, int len, struct opts_t * op,
 
     if (op->do_hex > 0) {
         if (op->do_hex > 2)
-            named_hhh_output(cp_vpdp, buff, len, op);
+            named_hhh_output(cpi_vpdp, buff, len, op);
         else
             hex2stdout(buff, len, no_ascii_4hex(op));
         return;
     }
     if (len < 4) {
-        pr2serr("%s length too short=%d\n", cp_vpdp, len);
+        pr2serr("%s length too short=%d\n", cpi_vpdp, len);
         return;
     }
     len -= 4;
@@ -1324,15 +1322,15 @@ std_inq_decode_js(const uint8_t * b, int len, struct opts_t * op,
     if (len < 16)
         return jo2p;
     snprintf(c, clen, "%.8s", b + 8);
-    sgj_js_nv_s(jsp, jo2p, t10_vendor_id_js, c);
+    sgj_js_nv_s(jsp, jo2p, t10_vendor_id_sn, c);
     if (len < 32)
         return jo2p;
     snprintf(c, clen, "%.16s", b + 16);
-    sgj_js_nv_s(jsp, jo2p, product_id_js, c);
+    sgj_js_nv_s(jsp, jo2p, product_id_sn, c);
     if (len < 36)
         return jo2p;
     snprintf(c, clen, "%.4s", b + 32);
-    sgj_js_nv_s(jsp, jo2p, product_rev_lev_js, c);
+    sgj_js_nv_s(jsp, jo2p, product_rev_lev_sn, c);
     return jo2p;
 }
 
@@ -1412,7 +1410,6 @@ decode_power_consumption(const uint8_t * buff, int len, struct opts_t * op,
         }
     }
 }
-
 
 /* VPD_BLOCK_LIMITS    0xb0 ["bl"] */
 void
@@ -1717,7 +1714,7 @@ decode_block_dev_ch_vpd(const uint8_t * buff, int len, struct opts_t * op,
         break;
     }
     sgj_pr_hr(jsp, "  Nominal form factor: %s\n", b);
-    sgj_js_nv_ihexstr(jsp, jop, "nominal_forn_factor", u, NULL, b);
+    sgj_js_nv_ihexstr(jsp, jop, "nominal_form_factor", u, NULL, b);
     sgj_haj_vi_nex(jsp, jop, 2, "MACT", SGJ_SEP_EQUAL_NO_SPACE,
                    !!(buff[8] & 0x40), false, "Multiple ACTuator");
     zoned = (buff[8] >> 4) & 0x3;   /* added sbc4r04, obsolete sbc5r01 */
@@ -3062,14 +3059,14 @@ decode_proto_port_vpd(const uint8_t * buff, int len, struct opts_t * op,
     dhex = op->do_hex;
     if (dhex > 0) {
         if (dhex > 2)
-            named_hhh_output(psp_vpdp, buff, len, op);
+            named_hhh_output(pspo_vpdp, buff, len, op);
         else
             hex2stdout(buff, len, no_ascii_4hex(op));
         return;
     } else
         dhex = -dhex;
     if (len < 4) {
-        pr2serr("%s length too short=%d\n", psp_vpdp, len);
+        pr2serr("%s length too short=%d\n", pspo_vpdp, len);
         return;
     }
     len -= 4;

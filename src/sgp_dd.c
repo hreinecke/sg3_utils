@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2022 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2023 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -85,7 +85,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.84 20220118";
+static const char * version_str = "5.85 20230217";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -173,7 +173,7 @@ struct opts_t
     bool mmap_active;
     int chkaddr;        /* check read data contains 4 byte, big endian block
                          * addresses, once: check only 4 bytes per block */
-    int progress;       /* accept --progress or -p, does nothing */
+    int progress;       /* --progress or -p, checked in sig_listen_thread */
     int debug;
     int dry_run;
 };
@@ -225,6 +225,7 @@ static void normal_out_operation(struct opts_t * clp, Rq_elem * rep,
                                  int blocks, bool bump_out_blk);
 static int sg_start_io(Rq_elem * rep);
 static int sg_finish_io(bool wr, Rq_elem * rep, pthread_mutex_t * a_mutp);
+static bool check_progress(struct opts_t * clp);
 
 #ifdef HAVE_C11_ATOMICS
 
@@ -268,6 +269,7 @@ static struct thread_arg thr_arg_a[MAX_NUM_THREADS];
 static bool shutting_down = false;
 static bool do_sync = false;
 static bool do_time = false;
+static bool start_tm_valid = false;
 static struct opts_t my_opts;
 static struct timeval start_tm;
 static int64_t dd_count = -1;
@@ -278,8 +280,101 @@ static char outfn[INOUTF_SZ];
 static const char * my_name = "sgp_dd: ";
 
 
+/* Note that duration measurements may be effected by "discontinuous jumps
+ * in the system time". */
 static void
-calc_duration_throughput(int contin)
+calc_duration_throughput(bool contin)
+{
+    int n, blk_sz, elapsed_secs;
+    int64_t blks;
+    double a, b, r, da, db;
+    char f[128];
+    struct timeval end_tm, res_tm, delta_tm;
+    static const int flen = sizeof(f);
+    static bool prev_valid = false;
+    static struct timeval prev_tm;
+    static int64_t prev_blks;
+
+    if (start_tm_valid && (start_tm.tv_sec || start_tm.tv_usec)) {
+        blks = dd_count - my_opts.out_rem_count;
+        blk_sz = my_opts.bs;
+        gettimeofday(&end_tm, NULL);
+        res_tm.tv_sec = end_tm.tv_sec - start_tm.tv_sec;
+        res_tm.tv_usec = end_tm.tv_usec - start_tm.tv_usec;
+        if (res_tm.tv_usec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_usec += 1000000;
+        }
+        elapsed_secs = res_tm.tv_sec;
+        a = res_tm.tv_sec;
+        a += (0.000001 * res_tm.tv_usec);
+        if (prev_valid) {
+            delta_tm.tv_sec = end_tm.tv_sec - prev_tm.tv_sec;
+            delta_tm.tv_usec = end_tm.tv_usec - prev_tm.tv_usec;
+            if (delta_tm.tv_usec < 0) {
+                --delta_tm.tv_sec;
+                delta_tm.tv_usec += 1000000;
+            }
+            da = delta_tm.tv_sec;
+            da += (0.000001 * delta_tm.tv_usec);
+        } else
+            da = 0.0000001;
+
+        b = (double)blk_sz * blks;
+        n = sg_scnpr(f, flen, "time to copy data%s: %d.%06d secs",
+                     (contin ? " so far" : ""),
+                     (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+        r = 0.0;
+        if ((a > 0.00001) && (b > 511)) {
+            r = b / (a * 1000000.0);
+            if (r < 1.0)
+                n += sg_scnpr(f + n, flen - n, " at %.1f kB/sec", r * 1000);
+            else
+                n += sg_scnpr(f + n, flen - n, " at %.2f MB/sec", r);
+        }
+        if (prev_valid && (da > 0.00001)) {
+            db = (double)blk_sz * (blks - prev_blks);
+            if (db > 511) {
+                double dr = db / (da * 1000000.0);
+
+                if (dr < 1.0)
+                    n += sg_scnpr(f + n, flen - n, " (delta %.1f KB/sec)",
+                                  dr * 1000);
+                else
+                    n += sg_scnpr(f + n, flen - n, " (delta %.2f MB/sec)",
+                                  dr);
+            }
+        }
+        pr2serr("%s\n", f);
+        if (contin && (r > 0.01) && (dd_count > 100)) {
+            int secs = (int)(((double)blk_sz * dd_count) / (r * 1000000));
+            int h, m;
+
+            if (secs > 10) {
+                n = sg_scnpr(f, flen, "%d%% complete, ",
+                             (100 * elapsed_secs) / (secs + elapsed_secs));
+                h = secs / 3600;
+                secs = secs - (h * 3600);
+                m = secs / 60;
+                secs = secs - (m * 60);
+                n += sg_scnpr(f + n, flen - n, "estimated time remaining: ");
+                if (h > 0)
+                    sg_scnpr(f + n, flen - n, "%d:%02d:%02d", h, m, secs);
+                else
+                    sg_scnpr(f + n, flen - n, "%d:%02d", m, secs);
+                pr2serr("%s\n", f);
+            }
+        }
+        prev_tm = end_tm;
+        prev_blks = blks;
+        if (! prev_valid)
+            prev_valid = true;
+    }
+}
+
+#if 0
+static void
+calc_duration_throughput(bool contin)
 {
     struct timeval end_tm, res_tm;
     double a, b;
@@ -302,6 +397,7 @@ calc_duration_throughput(int contin)
     else
         pr2serr("\n");
 }
+#endif
 
 static void
 print_stats(const char * str)
@@ -331,7 +427,7 @@ interrupt_handler(int sig)
     sigaction(sig, &sigact, NULL);
     pr2serr("Interrupted by signal,");
     if (do_time)
-        calc_duration_throughput(0);
+        calc_duration_throughput(false);
     print_stats("");
     kill(getpid (), sig);
 }
@@ -342,7 +438,7 @@ siginfo_handler(int sig)
     if (sig) { ; }      /* unused, dummy to suppress warning */
     pr2serr("Progress report, continuing ...\n");
     if (do_time)
-        calc_duration_throughput(1);
+        calc_duration_throughput(true);
     print_stats("  ");
 }
 
@@ -434,7 +530,7 @@ usage()
             "[deb=VERB] [dio=0|1]\n"
             "               [fua=0|1|2|3] [sync=0|1] [thr=THR] "
             "[time=0|1] [verbose=VERB]\n"
-            "               [--dry-run] [--verbose]\n"
+            "               [--dry-run] [--progress] [--verbose]\n"
             "  where:\n"
             "    bpt         is blocks_per_transfer (default is 128)\n"
             "    bs          must be device logical block size (default "
@@ -471,6 +567,7 @@ usage()
             "    --chkaddr|-c    check read data contains blk address\n"
             "    --dry-run|-d    prepare but bypass copy/read\n"
             "    --help|-h      output this usage message then exit\n"
+            "    --progress|-p    outputs progress report every 2 minutes\n"
             "    --verbose|-v   increase verbosity of utility\n"
             "    --version|-V   output version string then exit\n"
             "Copy from IFILE to OFILE, similar to dd command\n"
@@ -571,13 +668,26 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
 static void *
 sig_listen_thread(void * v_clp)
 {
-    struct opts_t * clp = (struct opts_t *)v_clp;
     int sig_number;
+    struct opts_t * clp = (struct opts_t *)v_clp;
+    struct timespec ts;
+    siginfo_t info;
 
-    while (1) {
-        sigwait(&signal_set, &sig_number);
+    ts.tv_sec = 0;
+    ts.tv_nsec = 200 * 1000 * 1000;
+
+    while (true) {
+        sig_number = sigtimedwait(&signal_set, &info, &ts);
         if (shutting_down)
             break;
+        if ((sig_number < 0) && (EAGAIN == errno)) {    /* time out */
+            if (clp->progress > 0) {
+                if (check_progress(clp)) {
+                    calc_duration_throughput(true);
+                    print_stats("");
+                }
+            }
+        }
         if (SIGINT == sig_number) {
             pr2serr("%sinterrupted by SIGINT\n", my_name);
 #ifdef HAVE_C11_ATOMICS
@@ -858,7 +968,6 @@ read_write_thread(void * v_tap)
         else
             normal_out_operation(clp, rep, blocks, enforce_write_ordering);
         pthread_cleanup_pop(0);
-
         if (enforce_write_ordering)
             pthread_cond_broadcast(&clp->out_sync_cv);
     } /* end of while loop */
@@ -1376,6 +1485,136 @@ num_chs_in_str(const char * s, int slen, int ch)
     return res;
 }
 
+#define PROGRESS_TRIGGER_MS 120000      /* milliseconds: 2 minutes */
+#define PROGRESS2_TRIGGER_MS 60000      /* milliseconds: 1 minute */
+#define PROGRESS3_TRIGGER_MS 30000      /* milliseconds: 30 seconds */
+
+/* Returns true when it time to output a progress report; else false. */
+static bool
+check_progress(struct opts_t * clp)
+{
+#if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
+    static bool have_prev, measure;
+    static struct timespec prev_true_tm;
+    static int count, threshold;
+    bool res = false;
+    uint32_t elapsed_ms, ms;
+    struct timespec now_tm, res_tm;
+
+    if (clp->progress) {
+        if (! have_prev) {
+            have_prev = true;
+            measure = true;
+            clock_gettime(CLOCK_MONOTONIC, &prev_true_tm);
+            return false;       /* starting reference */
+        }
+        if (! measure) {
+            if (++count >= threshold)
+                count = 0;
+            else
+                return false;
+        }
+        clock_gettime(CLOCK_MONOTONIC, &now_tm);
+        res_tm.tv_sec = now_tm.tv_sec - prev_true_tm.tv_sec;
+        res_tm.tv_nsec = now_tm.tv_nsec - prev_true_tm.tv_nsec;
+        if (res_tm.tv_nsec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_nsec += 1000000000;
+        }
+        elapsed_ms = (1000 * res_tm.tv_sec) + (res_tm.tv_nsec / 1000000);
+        if (measure) {
+            ++threshold;
+            if (elapsed_ms > 80)        /* 80 milliseconds */
+                measure = false;
+        }
+        if (elapsed_ms >= PROGRESS3_TRIGGER_MS) {
+            if (elapsed_ms >= PROGRESS2_TRIGGER_MS) {
+                if (elapsed_ms >= PROGRESS_TRIGGER_MS) {
+                    ms = PROGRESS_TRIGGER_MS;
+                    res = true;
+                } else if (clp->progress > 1) {
+                    ms = PROGRESS2_TRIGGER_MS;
+                    res = true;
+                }
+            } else if (clp->progress > 2) {
+                ms = PROGRESS3_TRIGGER_MS;
+                res = true;
+            }
+        }
+        if (res) {
+            prev_true_tm.tv_sec += (ms / 1000);
+            prev_true_tm.tv_nsec += (ms % 1000) * 1000000;
+            if (prev_true_tm.tv_nsec >= 1000000000) {
+                ++prev_true_tm.tv_sec;
+                prev_true_tm.tv_nsec -= 1000000000;
+            }
+        }
+    }
+    return res;
+
+#elif defined(HAVE_GETTIMEOFDAY)
+    static bool have_prev, measure;
+    static struct timeval prev_true_tm;
+    static int count, threshold;
+    bool res = false;
+    uint32_t elapsed_ms, ms;
+    struct timeval now_tm, res_tm;
+
+    if (clp->progress) {
+        if (! have_prev) {
+            have_prev = true;
+            gettimeofday(&prev_true_tm, NULL);
+            return false;       /* starting reference */
+        }
+        if (! measure) {
+            if (++count >= threshold)
+                count = 0;
+            else
+                return false;
+        }
+        gettimeofday(&now_tm, NULL);
+        res_tm.tv_sec = now_tm.tv_sec - prev_true_tm.tv_sec;
+        res_tm.tv_usec = now_tm.tv_usec - prev_true_tm.tv_usec;
+        if (res_tm.tv_usec < 0) {
+            --res_tm.tv_sec;
+            res_tm.tv_usec += 1000000;
+        }
+        elapsed_ms = (1000 * res_tm.tv_sec) + (res_tm.tv_usec / 1000);
+        if (measure) {
+            ++threshold;
+            if (elapsed_ms > 80)        /* 80 milliseconds */
+                measure = false;
+        }
+        if (elapsed_ms >= PROGRESS3_TRIGGER_MS) {
+            if (elapsed_ms >= PROGRESS2_TRIGGER_MS) {
+                if (elapsed_ms >= PROGRESS_TRIGGER_MS) {
+                    ms = PROGRESS_TRIGGER_MS;
+                    res = true;
+                } else if (clp->progress > 1) {
+                    ms = PROGRESS2_TRIGGER_MS;
+                    res = true;
+                }
+            } else if (clp->progress > 2) {
+                ms = PROGRESS3_TRIGGER_MS;
+                res = true;
+            }
+        }
+        if (res) {
+            prev_true_tm.tv_sec += (ms / 1000);
+            prev_true_tm.tv_usec += (ms % 1000) * 1000;
+            if (prev_true_tm.tv_usec >= 1000000) {
+                ++prev_true_tm.tv_sec;
+                prev_true_tm.tv_usec -= 1000000;
+            }
+        }
+    }
+    return res;
+
+#else   /* no clock reading functions available */
+    return false;
+#endif
+}
+
 
 int
 main(int argc, char * argv[])
@@ -1583,6 +1822,8 @@ main(int argc, char * argv[])
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+    if (clp->progress > 0)
+        do_time = true;
 
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
@@ -1890,6 +2131,7 @@ main(int argc, char * argv[])
         start_tm.tv_sec = 0;
         start_tm.tv_usec = 0;
         gettimeofday(&start_tm, NULL);
+        start_tm_valid = true;
     }
 
 /* vvvvvvvvvvv  Start worker threads  vvvvvvvvvvvvvvvvvvvvvvvv */
@@ -1936,7 +2178,7 @@ main(int argc, char * argv[])
     }   /* started worker threads and here after they have all exited */
 
     if (do_time && (start_tm.tv_sec || start_tm.tv_usec))
-        calc_duration_throughput(0);
+        calc_duration_throughput(false);
 
     if (do_sync) {
         if (FT_SG == clp->out_type) {

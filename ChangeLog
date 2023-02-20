@@ -2,8 +2,9 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230210] [svn: r1002]
-  - decoding utilities: add --json[=JO] option
+Changelog for pre-release sg3_utils-1.48 [20230219] [svn: r1003]
+  - decoding utilities: add --json[=JO] and --js-file=JFN
+    options
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
   - sg_rep_density: new utility for decoding the response of
@@ -60,7 +61,6 @@ Changelog for pre-release sg3_utils-1.48 [20230210] [svn: r1002]
       with their name (if T10 defined)
     - update names for TapeAlert lpage
     - allow --page selection with --inhex=FN
-    - add --js-file=JFN for json output to file
   - sg_modes: improve handling of zbc disks with pdt=0x14
   - sg_inq, sg_vpd: merge VPD page processing for T10
     defined pages, VS pages still differ
@@ -126,6 +126,7 @@ Changelog for pre-release sg3_utils-1.48 [20230210] [svn: r1002]
   - rev 921+922 are bugfix revs on release 1.47 [r919,920]
   - configure.ac: map msys to mingw
     - repeat tweak to accept uclinux as linux
+  - sgp_dd and sgm_dd: add --progress option
   - sg_dd: change uint type to uint32_t
     - remove unused out2_off in main()
   - sg_pt_dummy.c: remove problematic include

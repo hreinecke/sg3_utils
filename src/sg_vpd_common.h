@@ -190,7 +190,7 @@ typedef int (*recurse_vpd_decodep)(struct opts_t *, sgj_opaque_p jop, int off);
 
 sgj_opaque_p sg_vpd_js_hdr(sgj_state * jsp, sgj_opaque_p jop,
                            const char * name, const uint8_t * vpd_hdrp);
-void decode_net_man_vpd(const uint8_t * buff, int len, struct opts_t * op,
+void decode_man_net_vpd(const uint8_t * buff, int len, struct opts_t * op,
                         sgj_opaque_p jap);
 void decode_x_inq_vpd(const uint8_t * b, int len, bool protect,
                       struct opts_t * op, sgj_opaque_p jop);
@@ -301,11 +301,11 @@ extern const char * sp_vpdp;
 extern const char * ai_vpdp;
 extern const char * pc_vpdp;
 extern const char * dc_vpdp;
-extern const char * cp_vpdp;
+extern const char * cpi_vpdp;
 extern const char * psm_vpdp;
 extern const char * tpc_vpdp;
 extern const char * pslu_vpdp;
-extern const char * psp_vpdp;
+extern const char * pspo_vpdp;
 extern const char * sfs_vpdp;
 extern const char * bl_vpdp;
 extern const char * sad_vpdp;

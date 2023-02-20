@@ -1,7 +1,7 @@
 /* A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 1999 - 2022 D. Gilbert and P. Allworth
+ * Copyright (C) 1999 - 2023 D. Gilbert and P. Allworth
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.35 20220826";
+static const char * version_str = "6.36 20230218";
 
 
 #define ME "sg_dd: "
@@ -145,12 +145,12 @@ static const char * version_str = "6.35 20220826";
 
 static int sum_of_resids = 0;
 
-static int64_t dd_count = -1;
-static int64_t req_count = 0;
-static int64_t in_full = 0;
-static int in_partial = 0;
-static int64_t out_full = 0;
-static int out_partial = 0;
+static int64_t dd_count = -1;   /* number of block given to count=COUNT */
+static int64_t req_count = 0;   /* copy of dd_count that is _not_ tweaked */
+static int64_t in_full = 0;     /* count so far of full blocks read */
+static int in_partial = 0;      /* count so far of partial blocks read */
+static int64_t out_full = 0;    /* count so far of full blocks written */
+static int out_partial = 0;     /* count so far of partial blocks written */
 static int64_t out_sparse_num = 0;
 static int recovered_errs = 0;
 static int unrecovered_errs = 0;
@@ -1227,13 +1227,20 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     return 0;
 }
 
-
+/* Note that duration measurements may be effected by "discontinuous jumps
+ * in the system time". */
 static void
 calc_duration_throughput(bool contin)
 {
-    struct timeval end_tm, res_tm;
-    double a, b;
+    int n, elapsed_secs;
     int64_t blks;
+    double a, b, r, da, db;
+    char f[128];
+    struct timeval end_tm, res_tm, delta_tm;
+    static const int flen = sizeof(f);
+    static bool prev_valid = false;
+    static struct timeval prev_tm;
+    static int64_t prev_blks;
 
     if (start_tm_valid && (start_tm.tv_sec || start_tm.tv_usec)) {
         blks = (in_full > out_full) ? in_full : out_full;
@@ -1244,16 +1251,71 @@ calc_duration_throughput(bool contin)
             --res_tm.tv_sec;
             res_tm.tv_usec += 1000000;
         }
+        elapsed_secs = res_tm.tv_sec;
         a = res_tm.tv_sec;
         a += (0.000001 * res_tm.tv_usec);
+        if (prev_valid) {
+            delta_tm.tv_sec = end_tm.tv_sec - prev_tm.tv_sec;
+            delta_tm.tv_usec = end_tm.tv_usec - prev_tm.tv_usec;
+            if (delta_tm.tv_usec < 0) {
+                --delta_tm.tv_sec;
+                delta_tm.tv_usec += 1000000;
+            }
+            da = delta_tm.tv_sec;
+            da += (0.000001 * delta_tm.tv_usec);
+        } else
+            da = 0.0000001;
+
         b = (double)blk_sz * blks;
-        pr2serr("time to %s data%s: %d.%06d secs",
-                (do_verify ? "verify" : "copy"), (contin ? " so far" : ""),
-                (int)res_tm.tv_sec, (int)res_tm.tv_usec);
-        if ((a > 0.00001) && (b > 511))
-            pr2serr(" at %.2f MB/sec\n", b / (a * 1000000.0));
-        else
-            pr2serr("\n");
+        n = sg_scnpr(f, flen, "time to %s data%s: %d.%06d secs",
+                     (do_verify ? "verify" : "copy"),
+                     (contin ? " so far" : ""),
+                     (int)res_tm.tv_sec, (int)res_tm.tv_usec);
+        r = 0.0;
+        if ((a > 0.00001) && (b > 511)) {
+            r = b / (a * 1000000.0);
+            if (r < 1.0)
+                n += sg_scnpr(f + n, flen - n, " at %.1f kB/sec", r * 1000);
+            else
+                n += sg_scnpr(f + n, flen - n, " at %.2f MB/sec", r);
+        }
+        if (prev_valid && (da > 0.00001)) {
+            db = (double)blk_sz * (blks - prev_blks);
+            if (db > 511) {
+                double dr = db / (da * 1000000.0);
+
+                if (dr < 1.0)
+                    n += sg_scnpr(f + n, flen - n, " (delta %.1f KB/sec)",
+                                  dr * 1000);
+                else
+                    n += sg_scnpr(f + n, flen - n, " (delta %.2f MB/sec)",
+                                  dr);
+            }
+        }
+        pr2serr("%s\n", f);
+        if (contin && (r > 0.01) && (dd_count > 100)) {
+            int secs = (int)(((double)blk_sz * dd_count) / (r * 1000000));
+            int h, m;
+
+            if (secs > 10) {
+                n = sg_scnpr(f, flen, "%d%% complete, ",
+                             (100 * elapsed_secs) / (secs + elapsed_secs));
+                h = secs / 3600;
+                secs = secs - (h * 3600);
+                m = secs / 60;
+                secs = secs - (m * 60);
+                n += sg_scnpr(f + n, flen - n, "estimated time remaining: ");
+                if (h > 0)
+                    sg_scnpr(f + n, flen - n, "%d:%02d:%02d", h, m, secs);
+                else
+                    sg_scnpr(f + n, flen - n, "%d:%02d", m, secs);
+                pr2serr("%s\n", f);
+            }
+        }
+        prev_tm = end_tm;
+        prev_blks = blks;
+        if (! prev_valid)
+            prev_valid = true;
     }
 }
 

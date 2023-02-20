@@ -1,4 +1,4 @@
-.TH SGM_DD "8" "February 2019" "sg3_utils\-1.45" SG3_UTILS
+.TH SGM_DD "8" "February 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sgm_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -10,7 +10,7 @@ devices
 .PP
 [\fIbpt=BPT\fR] [\fIcdbsz=\fR6|10|12|16] [\fIdio=\fR0|1] [\fIsync=\fR0|1]
 [\fItime=\fR0|1] [\fIverbose=VERB\fR] [\fI\-\-dry\-run\fR]
-[\fI\-\-verbose\fR]
+[\fI\-\-progress\fR] [\fI\-\-verbose\fR]
 .SH DESCRIPTION
 .\" Add any additional description here
 Copy data to and from any files. Specialized for "files" that are
@@ -144,6 +144,15 @@ executing them.
 \fB\-h\fR, \fB\-\-help\fR
 outputs usage message and exits.
 .TP
+\fB\-p\fR, \fB\-\-progress\fR
+this option causes a progress report to be output every two minutes until
+the copy is complete. After the copy is complete a line with "completed"
+is printed to distinguish the final report from the prior progress reports.
+When used twice the progress report is every minute, when used three times
+the progress report is every 30 seconds.
+.br
+If this option is given then the 'time=1' option is set implicitly.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 when used once, this is equivalent to \fIverbose=1\fR. When used
 twice (e.g. "\-vv") this is equivalent to \fIverbose=2\fR, etc.
@@ -268,7 +277,7 @@ Written by Douglas Gilbert and Peter Allworth.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2000\-2019 Douglas Gilbert
+Copyright \(co 2000\-2023 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

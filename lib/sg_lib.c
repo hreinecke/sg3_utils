@@ -3234,18 +3234,9 @@ swapb_uint16(uint16_t u)
     return r;
 }
 
-/* Note the ASCII-hex output goes to stdout. [Most other output from functions
- * in this file go to sg_warnings_strm (default stderr).]
- * 'no_ascii' allows for 3 output types:
- *     > 0     each line has address then up to 8 ASCII-hex 16 bit words
- *     = 0     in addition, the ASCI bytes pairs are listed to the right
- *     = -1    only the ASCII-hex words are listed (i.e. without address)
- *     = -2    only the ASCII-hex words, formatted for "hdparm --Istdin"
- *     < -2    same as -1
- * If 'swapb' is true then bytes in each word swapped. Needs to be set
- * for ATA IDENTIFY DEVICE response on big-endian machines. */
-void
-dWordHex(const uint16_t* words, int num, int no_ascii, bool swapb)
+static void
+dWordHexFp(const uint16_t* words, int num, int no_ascii, bool swapb,
+           FILE * fp)
 {
     const uint16_t * p = words;
     uint16_t c;
@@ -3273,18 +3264,18 @@ dWordHex(const uint16_t* words, int num, int no_ascii, bool swapb)
             buff[bpos + 4] = ' ';
             if ((k > 0) && (0 == ((k + 1) % 8))) {
                 if (-2 == no_ascii)
-                    printf("%.39s\n", buff +8);
+                    fprintf(fp, "%.39s\n", buff +8);
                 else
-                    printf("%.47s\n", buff);
+                    fprintf(fp, "%.47s\n", buff);
                 bpos = bpstart;
                 memset(buff, ' ', 80);
             }
         }
         if (bpos > bpstart) {
             if (-2 == no_ascii)
-                printf("%.39s\n", buff +8);
+                fprintf(fp, "%.39s\n", buff +8);
             else
-                printf("%.47s\n", buff);
+                fprintf(fp, "%.47s\n", buff);
         }
         return;
     }
@@ -3315,7 +3306,7 @@ dWordHex(const uint16_t* words, int num, int no_ascii, bool swapb)
             buff[cpos++] = ' ';
         }
         if (cpos > (cpstart + 23)) {
-            printf("%.76s\n", buff);
+            fprintf(fp, "%.76s\n", buff);
             bpos = bpstart;
             cpos = cpstart;
             a += 8;
@@ -3325,7 +3316,23 @@ dWordHex(const uint16_t* words, int num, int no_ascii, bool swapb)
         }
     }
     if (cpos > cpstart)
-        printf("%.76s\n", buff);
+        fprintf(fp, "%.76s\n", buff);
+}
+
+/* Note the ASCII-hex output goes to stdout. [Most other output from functions
+ * in this file go to sg_warnings_strm (default stderr).]
+ * 'no_ascii' allows for 3 output types:
+ *     > 0     each line has address then up to 8 ASCII-hex 16 bit words
+ *     = 0     in addition, the ASCI bytes pairs are listed to the right
+ *     = -1    only the ASCII-hex words are listed (i.e. without address)
+ *     = -2    only the ASCII-hex words, formatted for "hdparm --Istdin"
+ *     < -2    same as -1
+ * If 'swapb' is true then bytes in each word swapped. Needs to be set
+ * for ATA IDENTIFY DEVICE response on big-endian machines. */
+void
+dWordHex(const uint16_t* words, int num, int no_ascii, bool swapb)
+{
+    dWordHexFp(words, num, no_ascii, swapb, stdout);
 }
 
 /* If the number in 'buf' can not be decoded or the multiplier is unknown

@@ -214,7 +214,7 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
     n +=  sg_scnpr(b + n, blen - n,
                    "      0 | 2    tab pretty output to 2 spaces\n");
     n +=  sg_scnpr(b + n, blen - n,
-                   "      4    tab pretty output to 4 spaces\n");
+                   "      4    tab pretty output to 4 spaces (def)\n");
     n +=  sg_scnpr(b + n, blen - n,
                    "      8    tab pretty output to 8 spaces\n");
     if (n >= (blen - 1))
@@ -254,7 +254,8 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
              "are applied, the environment\nvariable: %s is applied (if "
              "present). Note that\nno space is permitted between the short "
              "option ('-%c') and its\nargument ('JO'). For more information "
-             "see 'man sg3_utils_json' .\n", sgj_opts_ev, short_opt);
+             "see 'man sg3_utils_json' or\n'man sdparm_json' .\n",
+             sgj_opts_ev, short_opt);
 fini:
     return b;
 }

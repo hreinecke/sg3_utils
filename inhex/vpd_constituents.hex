@@ -1,6 +1,6 @@
 #
 # An example invocation:
-#    sg_vpd --inhex=vpd_consistuents.hex
+#    sg_vpd --inhex=vpd_constituents.hex
 
 
 # Device constituent VPD page header
