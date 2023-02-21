@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 Douglas Gilbert.
+ * Copyright (c) 2018-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -14,6 +14,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 #include <errno.h>
 #include <getopt.h>
 #define __STDC_FORMAT_MACROS 1
@@ -24,9 +25,8 @@
 #endif
 
 #if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
-#include <time.h>
+#               /* nop */
 #elif defined(HAVE_GETTIMEOFDAY)
-#include <time.h>
 #include <sys/time.h>
 #endif
 
@@ -49,7 +49,7 @@
  * to that LBA ...
  */
 
-static const char * version_str = "1.08 20200115";
+static const char * version_str = "1.09 20230220";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -420,7 +420,7 @@ fini:
     if (0 == verbose) {
         const char * e_str = (SG_LIB_CAT_CONDITION_MET == ret) ?
                              "sg_seek: " : "sg_seek: failed";
-        
+
         if (! sg_if_can2stderr(e_str, ret))
             pr2serr("Some error occurred, try again with '-v' "
                     "or '-vv' for more information\n");

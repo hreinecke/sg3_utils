@@ -42,7 +42,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <errno.h>
-#include <time.h>
+#include <time.h>               /* for clock_gettime() */
 #include <limits.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.36 20230218";
+static const char * version_str = "6.37 20230220";
 
 
 #define ME "sg_dd: "

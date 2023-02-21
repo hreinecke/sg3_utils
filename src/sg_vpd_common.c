@@ -2070,7 +2070,7 @@ decode_block_dev_char_ext_vpd(const uint8_t * buff, int len,
 /* VPD_ZBC_DEV_CHARS 0xb6  ["zdbch"]  sbc or zbc [zbc2r04] */
 void
 decode_zbdch_vpd(const uint8_t * buff, int len, struct opts_t * op,
-                 sgj_opaque_p jop)
+                sgj_opaque_p jop)
 {
     uint32_t u, pdt;
     sgj_state * jsp = &op->json_st;
@@ -2216,7 +2216,8 @@ static const char * sch_type_arr[8] = {
 static char *
 get_zone_align_method(uint8_t val, char * b, int blen)
 {
-   assert(blen > 32);
+   if (blen < 32)
+        return b;
    switch (val) {
     case 0:
         strcpy(b, nr_s);
@@ -3143,7 +3144,7 @@ decode_lb_protection_vpd(const uint8_t * buff, int len, struct opts_t * op,
         return;
     }
     if (len < 8) {
-        pr2serr("%s length too short=%d\n", vpd_pg_s, len);
+        pr2serr("%s length too short=%d\n", lbpro_vpdp, len);
         return;
     }
     len -= 8;

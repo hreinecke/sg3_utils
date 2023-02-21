@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2022 Douglas Gilbert.
+ * Copyright (c) 2014-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.

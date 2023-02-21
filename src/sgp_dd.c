@@ -43,6 +43,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>               /* for clock_gettime() */
 #include <limits.h>
 #include <pthread.h>
 #include <signal.h>
@@ -85,7 +86,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.85 20230217";
+static const char * version_str = "5.86 20230220";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

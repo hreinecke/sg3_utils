@@ -45,6 +45,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>               /* for clock_gettime() */
 #include <limits.h>
 #define __STDC_FORMAT_MACROS 1
 #include <inttypes.h>
@@ -69,7 +70,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.20 20230217";
+static const char * version_str = "1.21 20230220";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
