@@ -22,7 +22,7 @@ https://github.com/json-parser/json-builder which implements four simple JSON
 data types: string, integer, boolean and null. Its other data types are JSON
 object and JSON array.
 .PP
-This project uses the "snake_case" convention for JSON object names: all in
+This project uses the 'snake_case' convention for JSON object names: all in
 lower case letters or numerals with individual words joined with a single
 underscore (e.g. "starting_lba"). There should be no leading or trailing
 underscore characters. The json-builder library uses the
@@ -30,7 +30,7 @@ SPDX\-License\-Identifier: BSD\-2\-Clause which is the same license as the
 bulk of the utilities in the sg3_utils package.
 .PP
 The json-builder library is relatively lightweight (700 lines of C code) and
-is "hidden" fully within the sg3_utils library so that its function interface
+is 'hidden' fully within the sg3_utils library so that its function interface
 and data types are not available (directly) to the utilities in the sg3_utils
 package. That is why the json-builder interface (a file named
 sg_json_builder.h) is in the lib directory and not in the include directory.
@@ -50,12 +50,15 @@ have an optional argument. In its shorter form it may either be \fI\-j\fR or
 \fI\-J\fR (lower case preferred if not already in use). The shorter form may
 also take an argument but there must not be a space (or whitespace) between
 \fI\-j\fR and that argument.
+.PP
+Some care has been taken with quotes in this manpage. Double quotes are used
+around JSON object names, single quotes are used for all other purposes.
 .SH ENVIRONMENT VARIABLES
 The SG3_UTILS_JSON_OPTS environment variable allows the user to override the
 default values of the \fIJO\fR settings. Those settings can again be overridden
 by the command line \fI\-\-json[=JO]\fR option. If the string associated with
 SG3_UTILS_JSON_OPTS cannot be parsed this error message is sent to
-stderr: "error parsing SG3_UTILS_JSON_OPTS environment variable, ignore".
+stderr: 'error parsing SG3_UTILS_JSON_OPTS environment variable, ignore'.
 .SH OPTIONS
 Since the argument to \fI\-\-json[=JO]\fR is optional, in the shorter form
 there can be no space(s) between the option and its argument.
@@ -67,10 +70,10 @@ must appear immediately before the (boolean) feature it is toggling.
 .br
 In the short form the option letter may be other than \fI\-j\fR if that letter
 has already been used (\fI\-J\fR is preferred next). For example the sg_ses
-utility uses \fI\-j\fR for its "join" operation. Also since the argument to
+utility uses \fI\-j\fR for its 'join' operation. Also since the argument to
 the short form option is itself optional, there can be no space between the
 short form option and \fIJO\fR, if it is given. To make this read a little
-better on the command line, "=" may be first character of \fIJO\fR, so for
+better on the command line, '=' may be first character of \fIJO\fR, so for
 example, this is valid '\-j=av'.
 .TP
 \fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
@@ -120,7 +123,7 @@ errors detected).
 This boolean control character is default on (true).
 .TP
 \fBh\fR
-this is a boolean control character for "hexadecimal". Many values associated
+this is a boolean control character for 'hexadecimal'. Many values associated
 with SCSI are best (or at least historically) viewed in hexadecimal while
 JSON output prefers decimal integers (assumed to have a maximum size of 64
 bits, signed). The maximum size of most SCSI fields is 64 bit _unsigned_ .
@@ -141,7 +144,7 @@ has no effect.
 If the 'p' control character is set off (false) and this control character is
 set off (false) then the single line JSON output contains some spaces for
 readability. If the 'p' control character is set off (false) and this control
-character is set on (true) then the JSON single line JSON output is "packed"
+character is set on (true) then the JSON single line JSON output is 'packed'
 removing all unnecessary spaces.
 .br
 This boolean control character is default off (false).
@@ -149,23 +152,23 @@ This boolean control character is default off (false).
 \fBl\fR
 this is a boolean control character to control whether lead\-in fields are
 output. Lead\-in fields are at the start of the JSON output and include
-json_format_version and utility_invoked sub\-objects. The utility_invoked
-sub\-object includes name, version_date string fields and an JSON array
-named argv with an entry for each command line argument. If the \fIo\fR
-control character is also active, then if available, the non_JSON output
-is placed in and array called output with one element per line
-of 'normal' output.
+"json_format_version" and "utility_invoked" sub\-objects. The
+"utility_invoked" sub\-object includes "name", "version_date" string fields
+and an JSON array named "argv" with an entry for each command line argument.
+If the \fIo\fR control character is also active, then if available, the
+non_JSON output (i.e. the original, 'human readable' form) is placed in an
+array called "hr_output" with one element per line of 'normal' output.
 .br
 This boolean control character is default on (true).
 .TP
 \fBn\fR
 this is a boolean control character for "name_extra". It is used to provide
 additional information about the name it is a sub\-object of. The most
-common usage is to spell out an abbreviated name (e.g. a T10 name like "SKSV"
-to "Sense Key Specific Valid"). Another use is to note that a T10 field is
+common usage is to spell out an abbreviated name (e.g. a T10 name like 'SKSV'
+to 'Sense Key Specific Valid'). Another use is to note that a T10 field is
 obsolete and in which T10 standard it first became obsolete. Also if the
 named field's value is a physical quantity where the unit is unclear (e.g. a
-timeout) then "name_extra" can state that (e.g. "unit: millisecond").
+timeout) then "name_extra" can state that (e.g. 'unit: millisecond').
 Only some fields have associated "name_extra" data.
 .br
 This boolean control character is default off (false).
@@ -174,14 +177,15 @@ This boolean control character is default off (false).
 this is a boolean control character to control whether normal (i.e.
 non\-JSON) lines of output are placed in a JSON array (one element per
 line of normal output) within the utility_invoked subject (see control
-character \fIl\fR). This control character is active even if the
-\fIl\fR control character is negated).
+character \fIl\fR). The name of the array is "hr_output" where 'hr' stands
+for 'human readable'. This control character is active even if the
+lead\-in fields control character (\fIl\fR) is negated.
 .br
 This boolean control character is default off (false).
 .TP
 \fBp\fR
 this boolean control character controls whether the JSON output
-is "pretty printed" or sent in a relatively compact stream suitable
+is 'pretty printed' or sent in a relatively compact stream suitable
 for more efficient transmission over a communications channel.
 .br
 The pretty printed form of output has one JSON name with its associated
@@ -191,7 +195,7 @@ have their name on a separate line. These lines are indented with the
 current tab setting to indicate the level of nesting. Basically the pretty
 printed form is for human consumption.
 .br
-There are two forms of non\-pretty printed output, see the "packed" control
+There are two forms of non\-pretty printed output, see the 'packed' control
 character ['k'].
 .br
 This boolean control character is default on (true).
@@ -225,23 +229,23 @@ termination of a utility (e.g. command line option syntax error).
 When the \fI\-\-json\fR option is given and no errors are detected, then
 only JSON is normally sent to stdout. As the SCSI response is parsed, a JSON
 representation is built as a tree in memory. After all other actions (perhaps
-apart from the final exit status report) that JSON tree is "dumped" to
+apart from the final exit status report) that JSON tree is 'dumped' to
 stdout. This means if there is any non-JSON output sent to stdout that
 it will appear _before_ the JSON output.
 .PP
 If the 'o' control character is in the \fIJO\fR argument to the
-\fI\-\-json\fR option, then the former "human readable" output is placed in
-a JSON array named "output" within a JSON object named "utility_invoked".
-Each line of the former "human readable" output is placed in its own
-element of the JSON array named "output".
+\fI\-\-json\fR option, then the former 'human readable' output is placed in
+a JSON array named "hr_output" within a JSON object named "utility_invoked".
+Each line of the former 'human readable' output is placed in its own
+element of the JSON array.
 .PP
 A JSON tree is built in memory as the utility parses the data returned
 from the SCSI device (e.g. sg_vpd parsing a VPD page returned from a
-SCSI INQUIRY command). SCSI "list"s become JSON named arrays (e.g. in
-the Device Identification VPD page there is a "Designation descriptor
-list" that becomes a JSON array named "designation_descriptor_list").
+SCSI INQUIRY command). SCSI 'list's become JSON named arrays (e.g. in
+the Device Identification VPD page there is a 'Designation descriptor
+list' that becomes a JSON array named "designation_descriptor_list").
 .PP
-At the completion of the utility that JSON tree is "measured" taking into
+At the completion of the utility that JSON tree is 'measured' taking into
 account the form of output (i.e. pretty-printed, single line or packed single
 line). For the pretty-printed JSON output, the size of each indentation in
 spaces is also given (i.e. the tab width). The JSON is then output to a
@@ -264,7 +268,7 @@ descriptors that were previously reserved.
 As stated above, the default output is in human readable form using 7 bit
 ASCII. The \fI\-\-json[=JO]\fR option is designed to be an alternative to that
 human readable form. There are other alternative output formats such as the
-response output as a hexadecimal sequence of bytes or in "raw" binary output;
+response output as a hexadecimal sequence of bytes or in 'raw' binary output;
 both of those take precedence over the \fI\-\-json[=JO]\fR option. Other
 specialized output format (e.g. 'sg_inq \-\-export') will usually take
 precedence over JSON output.
@@ -279,7 +283,7 @@ There is typically only one form of JSON output so options like
 cases (i.e 'sg_inq \-\-descriptors') the JSON output is expanded.
 .SH ERRORS
 No attempts have been made to translate errors into JSON form, apart from the
-final "exit_status" JSON object where a value of 0 means "no errors". Exit
+final "exit_status" JSON object where a value of 0 means 'no errors'. Exit
 status values indicating a problem range from 1 to 255.
 .PP
 The sg_decode_sense utility will parse SCSI sense data into JSON form if
