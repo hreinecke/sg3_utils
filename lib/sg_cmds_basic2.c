@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999-2022 Douglas Gilbert.
+ * Copyright (c) 1999-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -68,7 +68,7 @@
 
 #define MODE6_RESP_HDR_LEN 4
 #define MODE10_RESP_HDR_LEN 8
-#define MODE_RESP_ARB_LEN 1024
+#define MODE_RESP_ARB_LEN 8192
 
 #define INQUIRY_RESP_INITIAL_LEN 36
 
@@ -656,21 +656,24 @@ an_err:
     return -1;
 }
 
-/* Fetches current, changeable, default and/or saveable modes pages as
- * indicated by pcontrol_arr for given pg_code and sub_pg_code. If
- * mode6==false then use MODE SENSE (10) else use MODE SENSE (6). If
- * flexible set and mode data length seems wrong then try and
- * fix (compensating hack for bad device or driver). pcontrol_arr
- * should have 4 elements for output of current, changeable, default
- * and saved values respectively. Each element should be NULL or
- * at least mx_mpage_len bytes long.
- * Return of 0 -> overall success, various SG_LIB_CAT_* positive values or
- * -1 -> other errors.
+/* Fetches current, changeable, default and/or saveable mode pages (note:
+ * _only_ mode pages) as indicated by pcontrol_arr for given pg_code and
+ * sub_pg_code. If mode6 is true then use MODE SENSE (6) else use MODE SENSE
+ * (10). If flexible true and mode data length seems wrong then try and fix
+ * (compensating hack for bad device or driver). pcontrol_arr should have 4
+ * elements for output of current, changeable, default and saved values
+ * respectively. Each element should be NULL or a pointer to memory that is
+ * at least mx_mpage_len bytes long. The length of the fetched mode page
+ * (or pages) is written to the reported_lenp pointer, if it is non-NULL.
+ * That should be the length written to each pointer within pcontrol_arr .
  * If success_mask pointer is not NULL then first zeros it. Then set bits
  * 0, 1, 2 and/or 3 if the current, changeable, default and saved values
- * respectively have been fetched. If error on current page
- * then stops and returns that error; otherwise continues if an error is
- * detected but returns the first error encountered.  */
+ * respectively have been fetched. Returns 0 if overall success, otherwise
+ * a SG_LIB_CAT type error is returned or -1 for an uncategorized error.
+ * If error on current page then stops and returns that error; otherwise
+ * continues if an error is detected, returning the first error encountered.
+ * So if the saved page control is not supported, for example, then 7 is
+ * written to *smask and SG_LIB_CAT_ILLEGAL_REQ is returned. */
 int
 sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
                           bool dbd, bool flexible, int mx_mpage_len,
@@ -681,7 +684,8 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
     int k, n, res, offset, calc_len, xfer_len;
     int resid = 0;
     const int msense10_hlen = MODE10_RESP_HDR_LEN;
-    uint8_t buff[MODE_RESP_ARB_LEN];
+    uint8_t * buffp;
+    uint8_t * free_buffp;
     char ebuff[EBUFF_SZ];
     int first_err = 0;
 
@@ -691,27 +695,33 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
         *reported_lenp = 0;
     if (mx_mpage_len < 4)
         return 0;
+
+    buffp = sg_memalign(MODE_RESP_ARB_LEN, 0, &free_buffp, false);
+    if (NULL == buffp)
+        return sg_convert_errno(ENOMEM);
+
     memset(ebuff, 0, sizeof(ebuff));
     /* first try to find length of current page response */
-    memset(buff, 0, msense10_hlen);
+    memset(buffp, 0, msense10_hlen);
     if (mode6)  /* want first 8 bytes just in case */
         res = sg_ll_mode_sense6(sg_fd, dbd, 0 /* pc */, pg_code,
-                                sub_pg_code, buff, msense10_hlen, true,
+                                sub_pg_code, buffp, msense10_hlen, true,
                                 verbose);
     else        /* MODE SENSE(10) obviously */
         res = sg_ll_mode_sense10_v2(sg_fd, false /* llbaa */, dbd,
-                                    0 /* pc */, pg_code, sub_pg_code, buff,
-                                    msense10_hlen, 0, &resid, true, verbose);
-    if (0 != res)
-        return res;
-    n = buff[0];
+                                    0 /* pc */, pg_code, sub_pg_code, buffp,
+                                    msense10_hlen, 0, NULL, true, verbose);
+    if (0 != res) {
+        first_err = res;
+        goto fini;
+    }
+    n = buffp[0];
     if (reported_lenp) {
-        int m;
+        int bd_len, non_mps;
+        int m = sg_msense_calc_length(buffp, msense10_hlen, mode6, &bd_len);
 
-        m = sg_msense_calc_length(buff, msense10_hlen, mode6, NULL) - resid;
-        if (m < 0)      /* Grrr, this should not happen */
-            m = 0;
-        *reported_lenp = m;
+        non_mps = bd_len + (mode6 ? 4 : 8);
+        *reported_lenp = (m > non_mps) ? m - non_mps : 0;
     }
     resp_mode6 = mode6;
     if (flexible) {
@@ -722,10 +732,10 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
                       "response processing\n", n);
         }
         if ((! mode6) && (n > 5)) {
-            if ((n > 11) && (0 == (n % 2)) && (0 == buff[4]) &&
-                (0 == buff[5]) && (0 == buff[6])) {
-                buff[1] = n;
-                buff[0] = 0;
+            if ((n > 11) && (0 == (n % 2)) && (0 == buffp[4]) &&
+                (0 == buffp[5]) && (0 == buffp[6])) {
+                buffp[1] = n;
+                buffp[0] = 0;
                 if (verbose)
                     pr2ws(">>> msense(10) but resp[0]=%d and not msense(6) "
                           "response so fix length\n", n);
@@ -735,15 +745,16 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
     }
     if (verbose && (resp_mode6 != mode6))
         pr2ws(">>> msense(%d) but resp[0]=%d so switch response "
-              "processing\n", (mode6 ? 6 : 10), buff[0]);
-    calc_len = sg_msense_calc_length(buff, msense10_hlen, resp_mode6, NULL);
+              "processing\n", (mode6 ? 6 : 10), buffp[0]);
+    calc_len = sg_msense_calc_length(buffp, msense10_hlen, resp_mode6, NULL);
     if (calc_len > MODE_RESP_ARB_LEN)
         calc_len = MODE_RESP_ARB_LEN;
-    offset = sg_mode_page_offset(buff, calc_len, resp_mode6, ebuff, EBUFF_SZ);
+    offset = sg_mode_page_offset(buffp, calc_len, resp_mode6, ebuff, EBUFF_SZ);
     if (offset < 0) {
         if (('\0' != ebuff[0]) && (verbose > 0))
             pr2ws("%s: %s\n", __func__, ebuff);
-        return SG_LIB_CAT_MALFORMED;
+        first_err = SG_LIB_CAT_MALFORMED;
+        goto fini;
     }
     xfer_len = calc_len - offset;
     if (xfer_len > mx_mpage_len)
@@ -756,12 +767,12 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
         resid = 0;
         if (mode6)
             res = sg_ll_mode_sense6(sg_fd, dbd, k /* pc */,
-                                    pg_code, sub_pg_code, buff,
+                                    pg_code, sub_pg_code, buffp,
                                     calc_len, true, verbose);
         else
             res = sg_ll_mode_sense10_v2(sg_fd, false /* llbaa */, dbd,
                                         k /* pc */, pg_code, sub_pg_code,
-                                        buff, calc_len, 0, &resid, true,
+                                        buffp, calc_len, 0, &resid, true,
                                         verbose);
         if (res || resid) {
             if (0 == first_err) {
@@ -780,10 +791,13 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
                 continue;
         }
         if (xfer_len > 0)
-            memcpy(pcontrol_arr[k], buff + offset, xfer_len);
+            memcpy(pcontrol_arr[k], buffp + offset, xfer_len);
         if (success_mask)
             *success_mask |= (1 << k);
     }
+fini:
+    if (free_buffp)
+        free(free_buffp);
     return first_err;
 }
 

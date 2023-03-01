@@ -93,15 +93,14 @@ sg_cmds_close_device(int device_fd)
     return scsi_pt_close_device(device_fd);
 }
 
-static const char * const pass_through_s = "pass-through";
+static const char * const pt_s = "pass-through";
 
 static void
 sg_cmds_resid_print(const char * leadin, bool is_din, int num_req,
                     int num_got)
 {
-    pr2ws("    %s: %s requested %d bytes (data-%s  got %d "
-          "bytes%s\n", leadin, pass_through_s,num_req,
-          (is_din ? "in), got" : "out) but reported"), num_got,
+    pr2ws("    %s: %s requested %d bytes (data-%s %d bytes%s\n", leadin, pt_s,
+          num_req, (is_din ? "in), got" : "out) but reported"), num_got,
           (is_din ? "" : " sent"));
 }
 
@@ -161,7 +160,7 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
                 if (act_din_x < 0) {
                     if (verbose)
                         pr2ws("    %s: %s can't get negative bytes, say it "
-                              "got none\n", leadin, pass_through_s);
+                              "got none\n", leadin, pt_s);
                 }
             }
         }
@@ -172,7 +171,7 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
                 if (act_dout_x < 0) {
                     if (verbose)
                         pr2ws("    %s: %s can't send negative bytes, say it "
-                              "sent none\n", leadin, pass_through_s);
+                              "sent none\n", leadin, pt_s);
                 }
             }
         }
@@ -205,7 +204,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     if (pt_res < 0) {
 #ifdef SG_LIB_LINUX
         if (verbose)
-            pr2ws("%s: %s os error: %s\n", leadin, pass_through_s,
+            pr2ws("%s: %s os error: %s\n", leadin, pt_s,
                   safe_strerror(-pt_res));
         if ((-ENXIO == pt_res) && o_sense_cat) {
             if (verbose > 2)
@@ -213,19 +212,19 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
             *o_sense_cat = SG_LIB_CAT_NOT_READY;
             return -2;
         } else if (noisy && (0 == verbose))
-            pr2ws("%s: %s os error: %s\n", leadin, pass_through_s,
+            pr2ws("%s: %s os error: %s\n", leadin, pt_s,
                   safe_strerror(-pt_res));
 #else
         if (noisy || verbose)
-            pr2ws("%s: %s os error: %s\n", leadin, pass_through_s,
+            pr2ws("%s: %s os error: %s\n", leadin, pt_s,
                   safe_strerror(-pt_res));
 #endif
         return -1;
     } else if (SCSI_PT_DO_BAD_PARAMS == pt_res) {
-        pr2ws("%s: bad %s setup\n", leadin, pass_through_s);
+        pr2ws("%s: bad %s setup\n", leadin, pt_s);
         return -1;
     } else if (SCSI_PT_DO_TIMEOUT == pt_res) {
-        pr2ws("%s: %s timeout\n", leadin, pass_through_s);
+        pr2ws("%s: %s timeout\n", leadin, pt_s);
         return -1;
     }
     if (verbose > 2) {
@@ -267,7 +266,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                 if (act_din_x < 0) {
                     if (verbose)
                         pr2ws("    %s: %s can't get negative bytes, say it "
-                              "got none\n", leadin, pass_through_s);
+                              "got none\n", leadin, pt_s);
                     act_din_x = 0;
                 }
             }
@@ -279,7 +278,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                 if (act_dout_x < 0) {
                     if (verbose)
                         pr2ws("    %s: %s can't send negative bytes, say it "
-                              "sent none\n", leadin, pass_through_s);
+                              "sent none\n", leadin, pt_s);
                     act_dout_x = 0;
                 }
             }
@@ -349,8 +348,7 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         }
         return -1;
     default:
-        pr2ws("%s: unknown %s result category (%d)\n", leadin, pass_through_s,
-               cat);
+        pr2ws("%s: unknown %s result category (%d)\n", leadin, pt_s, cat);
         return -1;
     }
 }

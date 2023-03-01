@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2022 Douglas Gilbert.
+ * Copyright (c) 2010-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.35 20221226";
+static const char * version_str = "1.36 20230227";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -495,6 +495,9 @@ main(int argc, char *argv[])
             pr2serr("unable to decode ASCII hex from file: %s\n", op->fname);
             goto fini;
         }
+        if (op->verbose > 1)
+            pr2serr("%d bytes read successfully from %s\n", op->sense_len,
+                    op->fname);
     }
 
     if (op->sense_len > 0) {

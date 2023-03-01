@@ -150,7 +150,7 @@ extern "C" {
 #define SG_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 /* Doesn't seem to be a common C and C++ technique for clearing an
- * aggregrate (e.g. a struct instance) on the stack. Hence this hack: */
+ * aggregate (e.g. a struct instance) on the stack. Hence this hack: */
 #ifdef __cplusplus
 #define SG_C_CPP_ZERO_INIT {}
 #else

@@ -2,7 +2,7 @@
 #define SG_CMDS_BASIC_H
 
 /*
- * Copyright (c) 2004-2020 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -297,23 +297,24 @@ int sg_mode_page_offset(const uint8_t * resp, int resp_len,
 int sg_msense_calc_length(const uint8_t * resp, int resp_len,
                           bool mode_sense_6, int * bd_lenp);
 
-/* Fetches current, changeable, default and/or saveable modes pages as
- * indicated by pcontrol_arr for given pg_code and sub_pg_code. If
- * mode6 is true then use MODE SENSE (6) else use MODE SENSE (10). If
- * flexible true and mode data length seems wrong then try and
- * fix (compensating hack for bad device or driver). pcontrol_arr
- * should have 4 elements for output of current, changeable, default
- * and saved values respectively. Each element should be NULL or
- * at least mx_mpage_len bytes long.
- * Return of 0 -> overall success, SG_LIB_CAT_INVALID_OP -> invalid opcode,
- * SG_LIB_CAT_ILLEGAL_REQ -> bad field in cdb, SG_LIB_CAT_UNIT_ATTENTION,
- * SG_LIB_CAT_NOT_READY -> device not ready,
- * SG_LIB_CAT_MALFORMED -> bad response, -1 -> other failure.
+/* Fetches current, changeable, default and/or saveable mode pages (note:
+ * _only_ mode pages) as indicated by pcontrol_arr for given pg_code and
+ * sub_pg_code. If mode6 is true then use MODE SENSE (6) else use MODE SENSE
+ * (10). If flexible true and mode data length seems wrong then try and fix
+ * (compensating hack for bad device or driver). pcontrol_arr should have 4
+ * elements for output of current, changeable, default and saved values
+ * respectively. Each element should be NULL or a pointer to memory that is
+ * at least mx_mpage_len bytes long. The length of the fetched mode page
+ * (or pages) is written to the reported_lenp pointer, if it is non-NULL.
+ * That should be the length written to each pointer within pcontrol_arr .
  * If success_mask pointer is not NULL then first zeros it. Then set bits
  * 0, 1, 2 and/or 3 if the current, changeable, default and saved values
- * respectively have been fetched. If error on current page
- * then stops and returns that error; otherwise continues if an error is
- * detected but returns the first error encountered.  */
+ * respectively have been fetched. Returns 0 if overall success, otherwise
+ * a SG_LIB_CAT type error is returned or -1 for an uncategorized error.
+ * If error on current page then stops and returns that error; otherwise
+ * continues if an error is detected, returning the first error encountered.
+ * So if the saved page control is not supported, for example, then 7 is
+ * written to *smask and SG_LIB_CAT_ILLEGAL_REQ is returned. */
 int sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code,
                               int sub_pg_code, bool dbd, bool flexible,
                               int mx_mpage_len, int * success_mask,
