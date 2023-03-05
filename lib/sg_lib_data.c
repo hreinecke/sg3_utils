@@ -19,7 +19,7 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "2.99 20230130";
+const char * sg_lib_version_str = "3.00 20230304";
 /* spc6r07, sbc5r04, zbc2r13 */
 
 
@@ -1977,7 +1977,8 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
     {48, "NVMe command with non-zero status", NULL},
     {50, "An OS error occurred", "(errno > 46 or negative)"},
     /* OS errors (errno in Unix) from 1 to 46 mapped into this range */
-    {97, "Malformed SCSI command", "trouble building command"},
+    {97, "Malformed SCSI command response",
+	 "trouble building or decoding command or its response"},
     {98, "Some other sense error", "try '-v' option for more information"},
     {99, "Some other error", "possible transport of driver issue"},
     {100, "Parameter list length error", NULL}, /* these for ddpt, xcopy */

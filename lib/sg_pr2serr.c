@@ -174,6 +174,9 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
         case 'p':
             jsp->pr_pretty = ! prev_negate;
             break;
+        case 'q':
+            ++jsp->q_counter;
+            break;
         case 's':
             jsp->pr_string = ! prev_negate;
             break;
@@ -182,6 +185,9 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
             break;
         case 'y':
             jsp->pr_format = 'g';
+            break;
+        case 'z':
+            ++jsp->z_counter;
             break;
         case '?':
             bad_arg = true;

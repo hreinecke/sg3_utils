@@ -2,7 +2,7 @@
 #define SG_PR2SERR_H
 
 /*
- * Copyright (c) 2004-2022 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -82,6 +82,8 @@ typedef struct sgj_state_t {
     char pr_format;             /*  (def: '\0') */
     int pr_indent_size;         /* digit (def: 4) */
     int verbose;                /* 'v' (def: 0) incremented each appearance */
+    int q_counter;              /* 'q' (def: 0) extra, for using apps */
+    int z_counter;              /* 'z' (def: 0) extra, for using apps */
 
     /* the following hold state information */
     int first_bad_char;         /* = '\0' */

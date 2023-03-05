@@ -695,7 +695,6 @@ sg_get_mode_page_controls(int sg_fd, bool mode6, int pg_code, int sub_pg_code,
         *reported_lenp = 0;
     if (mx_mpage_len < 4)
         return 0;
-
     buffp = sg_memalign(MODE_RESP_ARB_LEN, 0, &free_buffp, false);
     if (NULL == buffp)
         return sg_convert_errno(ENOMEM);
