@@ -38,7 +38,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.72 20230130";    /* ses4r04 */
+static const char * version_str = "2.73 20230306";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -161,9 +161,9 @@ struct opts_t {
     bool do_warn;
     int byte1;          /* (origin 0 so second byte) in Control dpage */
     int dev_slot_num;
-    int do_filter;
-    int do_help;
-    int do_hex;
+    int do_filter;      /* count of how many times --filter given */
+    int do_help;        /* count of how many times --help given */
+    int do_hex;         /* count of how many times --hex given */
     int do_hex_inner;   /* when --hex and --inner-hex are both given */
     int do_join;        /* relational join of Enclosure status, Element
                            descriptor and Additional element status dpages.
@@ -804,17 +804,18 @@ static const struct acronym2tuple ae_sas_a2t_arr[] = {
 };
 
 /* Boolean array of element types of interest to the Additional Element
- * Status page. Indexed by element type (0 <= et < 32). */
+ * Status page. Indexed by element type (0 <= et < 32). The corresponding
+ * element_type_arr[] acronym field is shown in the comment. */
 static const bool active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
-    false, true /* dev */, false, false,
-    false, false, false, true /* esce */,
+    false, true /* 'dev' */, false, false,
+    false, false, false, true /* 'esc', esce */,
     false, false, false, false,
     false, false, false, false,
     false, false, false, false,
-    true /* starg */, true /* sinit */, false, true /* arr */,
-    true /* sas exp */, false, false, false,
+    true /* 'stp' */, true /* 'sip' */, false, true /* 'arr' */,
+    true /* 'sse' */, false, false, false,
     false, false, false, false,
-};
+};      /* 6 of 16 are active, 3 of those are optional */
 
 /* Command line long option names with corresponding short letter. */
 static const struct option long_options[] = {
@@ -1263,6 +1264,7 @@ static int
 parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
     int c, n, d_len, ret;
+    int res = SG_LIB_SYNTAX_ERROR;
     const char * data_arg = NULL;
     const char * inhex_arg = NULL;
     uint64_t saddr;
@@ -1287,12 +1289,12 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 cp = optarg + 2;
             if (1 != sscanf(cp, "%" SCNx64 "", &saddr)) {
                 pr2serr("bad argument to '--sas-addr=SA'\n");
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             sg_put_unaligned_be64(saddr, op->sas_addr + 0);
             if (sg_all_ffs(op->sas_addr, 8)) {
                 pr2serr("error decoding '--sas-addr=SA' argument\n");
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             break;
         case 'b':
@@ -1300,7 +1302,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if ((op->byte1 < 0) || (op->byte1 > 255)) {
                 pr2serr("bad argument to '--byte1=B1' (0 to 255 "
                         "inclusive)\n");
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             op->byte1_given = true;
             break;
@@ -1311,7 +1313,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if (strlen(optarg) >= CGS_STR_MAX_SZ) {
                 pr2serr("--clear= option too long (max %d characters)\n",
                         CGS_STR_MAX_SZ);
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             if (op->num_cgs < CGS_CL_ARR_MAX_SZ) {
                 op->cgs_cl_arr[op->num_cgs].cgs_sel = CLEAR_OPT;
@@ -1320,7 +1322,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             } else {
                 pr2serr("Too many --clear=, --get= and --set= options "
                         "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
-                return SG_LIB_CONTRADICT;
+                res = SG_LIB_CONTRADICT;
+                goto err_fini;
             }
             break;
         case 'd':
@@ -1341,7 +1344,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             else {
                 pr2serr("--eiioe option expects 'auto' or 'force' as an "
                         "argument\n");
-                return SG_LIB_CONTRADICT;
+                res = SG_LIB_CONTRADICT;
+                goto err_fini;
             }
             break;
         case 'f':
@@ -1354,7 +1358,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if (strlen(optarg) >= CGS_STR_MAX_SZ) {
                 pr2serr("--get= option too long (max %d characters)\n",
                         CGS_STR_MAX_SZ);
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             if (op->num_cgs < CGS_CL_ARR_MAX_SZ) {
                 op->cgs_cl_arr[op->num_cgs].cgs_sel = GET_OPT;
@@ -1363,7 +1367,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             } else {
                 pr2serr("Too many --clear=, --get= and --set= options "
                         "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
-                return SG_LIB_CONTRADICT;
+                res = SG_LIB_CONTRADICT;
+                goto err_fini;
             }
             break;
         case 'h':
@@ -1372,7 +1377,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case '?':
             pr2serr("\n");
             usage(0);
-            return SG_LIB_SYNTAX_ERROR;
+            goto err_fini;
         case 'H':
             ++op->do_hex;
             break;
@@ -1400,7 +1405,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if ((op->seid < 0) || (op->seid > 255)) {
                 pr2serr("bad argument to '--nickid=SEID' (0 to 255 "
                         "inclusive)\n");
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             op->seid_given = true;
             break;
@@ -1409,7 +1414,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if ((n < 0) || (n > 65535)) {
                 pr2serr("bad argument to '--maxlen=LEN' (0 to 65535 "
                         "inclusive expected)\n");
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             if (0 == n)
                 op->maxlen = MX_ALLOC_LEN;
@@ -1429,7 +1434,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 if ((op->page_code < 0) || (op->page_code > 255)) {
                     pr2serr("bad argument to '--page=PG' (0 to 255 "
                             "inclusive)\n");
-                    return SG_LIB_SYNTAX_ERROR;
+                    goto err_fini;
                 }
             } else {
                 const struct diag_page_abbrev * ap;
@@ -1444,7 +1449,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                     pr2serr("'--page=PG' argument abbreviation \"%s\" not "
                             "found\nHere are the choices:\n", optarg);
                     enumerate_diag_pages();
-                    return SG_LIB_SYNTAX_ERROR;
+                    goto err_fini;
                 }
             }
             op->page_code_given = true;
@@ -1469,7 +1474,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if (strlen(optarg) >= CGS_STR_MAX_SZ) {
                 pr2serr("--set= option too long (max %d characters)\n",
                         CGS_STR_MAX_SZ);
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             if (op->num_cgs < CGS_CL_ARR_MAX_SZ) {
                 op->cgs_cl_arr[op->num_cgs].cgs_sel = SET_OPT;
@@ -1478,7 +1483,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             } else {
                 pr2serr("Too many --clear=, --get= and --set= options "
                         "(max: %d)\n", CGS_CL_ARR_MAX_SZ);
-                return SG_LIB_CONTRADICT;
+                res = SG_LIB_CONTRADICT;
+                goto err_fini;
             }
             break;
         case 'v':
@@ -1487,7 +1493,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
         case 'V':
             op->version_given = true;
-            return 0;
+            break;
         case 'w':
             op->do_warn = true;
             break;
@@ -1496,7 +1502,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             if ((op->dev_slot_num < 0) || (op->dev_slot_num > 255)) {
                 pr2serr("bad argument to '--dev-slot-num' (0 to 255 "
                         "inclusive)\n");
-                return SG_LIB_SYNTAX_ERROR;
+                goto err_fini;
             }
             break;
         case 'X':       /* --inhex=FN for compatibility with other utils */
@@ -1513,7 +1519,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             goto err_help;
         }
     }
-    if (op->do_help)
+    if (op->do_help || op->version_given)
         return 0;
     if (optind < argc) {
         if (NULL == op->dev_name) {
@@ -1534,7 +1540,8 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         if (op->do_hex > 0) {
             if (op->do_hex > 3) {
                 pr2serr("-HHHH and --inner-hex not permitted\n");
-                return SG_LIB_CONTRADICT;
+                res = SG_LIB_CONTRADICT;
+                goto err_fini;
             }
             op->h2s_oformat = (1 == op->do_hex);
             op->do_hex_inner = op->do_hex;
@@ -1548,27 +1555,25 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                                &op->free_data_arr, false);
     if (NULL == op->data_arr) {
         pr2serr("unable to allocate %u bytes on heap\n", op->mx_arr_len);
-        return sg_convert_errno(ENOMEM);
+        res = sg_convert_errno(ENOMEM);
+        goto err_fini;
     }
     if (op->data_or_inhex) {
-        if (inhex_arg) {
+        bool may_have_at = inhex_arg ? false : true;
+
+        if (inhex_arg)
             data_arg = inhex_arg;
-            ret = read_hex(data_arg, op->data_arr + DATA_IN_OFF,
-                           op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
-                           (op->do_raw < 2), false, op->verbose);
-            if (ret) {
+        ret = read_hex(data_arg, op->data_arr + DATA_IN_OFF,
+                       op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
+                       (op->do_raw < 2), may_have_at, op->verbose);
+        if (ret) {
+            if (inhex_arg)
                 pr2serr("bad argument, expect '--inhex=FN' or '--inhex=-'\n");
-                return ret;
-            }
-        } else {
-            ret = read_hex(data_arg, op->data_arr + DATA_IN_OFF,
-                           op->mx_arr_len - DATA_IN_OFF, &op->arr_len,
-                           (op->do_raw < 2), true, op->verbose);
-            if (ret) {
+            else
                 pr2serr("bad argument, expect '--data=H,H...', '--data=-' or "
                         "'--data=@FN'\n");
-                return ret;
-            }
+            res = ret;
+            goto err_fini;
         }
         if ((! op->do_status) && (! op->do_control)) {
             if ((op->do_join > 0) || op->no_config ||
@@ -1725,9 +1730,21 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
                 pr2serr("%sa _real_ device name must be supplied\n", cp);
             else
                 pr2serr("%seither --data or --inhex must be supplied\n", cp);
-        } else
+        } else {
             pr2serr("missing DEVICE name!\n\n");
+            res = SG_LIB_FILE_ERROR;
+        }
         goto err_help;
+    }
+    if (op->do_all && (op->do_hex > 2)) {
+        if (op->do_hex < 6) {
+            pr2serr("The --all and -HHH (-HHHH, or -HHHHH) options "
+                    "contradict\nproducing confusing output. To dump all "
+                    "pages in hex try\n'--page=all -HHHH' instead.\nTo "
+                    "override this error/warning give '-H' six times!\n");
+            res = SG_LIB_CONTRADICT;
+            goto err_fini;
+        }
     }
     return 0;
 
@@ -1736,7 +1753,8 @@ err_help:
         pr2serr("\n");
         usage(0);
     }
-    return SG_LIB_SYNTAX_ERROR;
+err_fini:
+    return res;
 }
 
 /* Parse clear/get/set string, writes output to '*tavp'. Uses 'buff' for
@@ -1973,6 +1991,25 @@ is_et_used_by_aes(int el_type)
         return active_et_aesp_arr[el_type];
     else
         return false;
+}
+
+/* Returns true if el_type (element type) is optional for the Additional
+ * Element Status page. Otherwise return false. Those element types that
+ * are active, but not optional, are required (if they appear in the
+ * configuration dpage). */
+static bool
+is_et_optional_for_aes(int el_type)
+{
+    switch (el_type) {
+    case SCSI_TPORT_ETC:
+        return true;
+    case SCSI_IPORT_ETC:
+        return true;
+    case ENC_SCELECTR_ETC:
+        return true;
+    default:
+        return false;
+    }
 }
 
 static const struct join_row_t *
@@ -4580,9 +4617,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                 if (as_json)
                     sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
             }
-        } else if ((SCSI_TPORT_ETC == etype) ||
-                   (SCSI_IPORT_ETC == etype) ||
-                   (ENC_SCELECTR_ETC == etype)) {
+        } else if (is_et_optional_for_aes(etype)) {
             sgj_pr_hr(jsp, "%snumber of phys: %d\n", pad, phys);
             if (as_json)
                 sgj_js_nv_ihex(jsp, jop,
@@ -4881,7 +4916,7 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                     const uint8_t * resp, int resp_len, struct opts_t * op,
                     sgj_opaque_p jop)
 {
-    bool eip, invalid, match_ind_th, my_eiioe_force, skip, as_json;
+    bool eip, invalid, match_ind_th, local_eiioe_force, skip, as_json;
     uint8_t et;
     int j, k, n, desc_len, el_num, ind, elem_count, ei, eiioe;
     int num_elems, fake_ei, proto;
@@ -4989,7 +5024,7 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         pr2serr("%s: logic error, resp==NULL\n", __func__);
         goto fini;
     }
-    my_eiioe_force = op->eiioe_force;
+    local_eiioe_force = op->eiioe_force;
 
     for (k = 0, elem_count = 0; k < tesp->num_ths; ++k, ++tp) {
         fake_ei = -1;
@@ -5002,9 +5037,13 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
             elem_count += num_elems;
             continue;   /* skip if not element type of interest */
         }
-        if ((bp + 1) > last_bp)
+        if ((bp + 1) >= last_bp) {
+            if ((bp + 1) == last_bp) {
+                if (is_et_optional_for_aes(et))
+                    continue;   /* at end of aes dpage but etype optional */
+            }
             goto truncated;
-
+        }
         eip = !! (bp[0] & 0x10);
         if (eip) { /* do bounds check on the element index */
             ei = bp[3];
@@ -5013,10 +5052,10 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                 /* heuristic: if first AES descriptor has EIP set and its
                  * element index equal to 1, then act as if the EIIOE field
                  * is one. */
-                my_eiioe_force = true;
+                local_eiioe_force = true;
             }
             eiioe = (0x3 & bp[2]);
-            if (my_eiioe_force && (0 == eiioe))
+            if (local_eiioe_force && (0 == eiioe))
                 eiioe = 1;
             if (1 == eiioe) {
                 if ((ei < (elem_count + k)) ||
@@ -5093,7 +5132,7 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
             }
             if (eip)
                 sgj_pr_hr(jsp, "      Element index: %d  eiioe=%d%s\n", ind,
-                          eiioe, (((0 != eiioe) && my_eiioe_force) ?
+                          eiioe, (((0 != eiioe) && local_eiioe_force) ?
                                                 " but overridden" : ""));
             else
                 sgj_pr_hr(jsp, "      Element %d descriptor\n", ind);
@@ -5105,7 +5144,7 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
                                        tesp, op, jo4p);
             if (as_json && jo3p)
                 sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
-        }
+        }       /* end_for inner loop over each element in current etype */
         elem_count += tp->num_elements;
         if (jsp->pr_as_json && jo2p)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);

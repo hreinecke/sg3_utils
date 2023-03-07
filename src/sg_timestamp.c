@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2021 Douglas Gilbert.
+ * Copyright (c) 2015-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.14 20210830";
+static const char * version_str = "1.15 20230307";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -149,7 +149,7 @@ usage(int num)
            );
     return;
 page2:
-    pr2serr("sg_timestamp examples:\n"
+    pr2serr("sg_timestamp examples:\n\n"
             "It is possible that the target device containing a SCSI "
             "Logical Unit (LU)\nhas a battery (or supercapacitor) to "
             "keep its RTC (real time clock)\nticking during a power "

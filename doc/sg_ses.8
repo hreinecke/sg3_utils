@@ -1,4 +1,4 @@
-.TH SG_SES "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_SES "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -111,9 +111,13 @@ option twice is equivalent to invoking the \fI\-\-ALL\fR option.
 This option implies the \fI\-\-status\fR option as long as the
 \fI\-\-control\fR option has not been given.
 .br
-It is not recommended to use the \fI\-HHHH\fR option with this option to dump
-all pages in hex for later decoding. Instead the \fI\-HHHH\fR option should
-be used with the \fI\-\-page=all\fR option for that purpose.
+Using this option together with the \fI\-HHH\fR, \fI\-HHHH\fR or
+\fI\-HHHHH\fR options is considered an error as it produces confusing output.
+To force the issue use \fI\-H\fR times (as discouragement). Instead using the
+\fI\-\-page=all\fR option together with the \fI\-HHH\fR, \fI\-HHHH\fR or
+\fI\-HHHHH\fR options will more likely produce the desired output: a dump of
+all SES diagnostics pages in hex suitable for later parsing or visual
+inspection with a text editor.
 .TP
 \fB\-z\fR, \fB\-\-ALL\fR
 shows the output of the \fI\-\-join\fR option invoked twice, followed by the
@@ -254,14 +258,13 @@ the \fI\-\-join\fR option is used). Also see the \fI\-\-raw\fR option which
 may be used with this option.
 .br
 To dump one of more dpage responses to stdout in ASCII parsable hexadecimal
-use \fI\-HHH\fR or \fI\-HHHH\fR. The triple H form only outputs hexadecimals
+use \fI\-HHH\fR or \fI\-HHHH\fR. The triple H form only outputs hexadecimal
 which is fine for a single dpage response. When all dpages are dumped (e.g.
 with \fI\-\-page=all\fR) then the quad H form adds the name of each dpage
-preceded by a hash mark ('#'). The \fI\-\-data=\fR option parser ignores
-everything from and including a hash mark to the end of the line. Hence the
-output of the quad H form is still parsable plus it is easier for users to
-view and possibly edit. \fI\-HHHHH\fR (that is 5) adds the page code in
-hex after the page's name in the comment.
+preceded by a hash mark ('#'). Hence the output of the quad H form is still
+parsable plus it is easier for users to view and possibly edit. Using this
+option 5 times (e.g. \fI\-HHHHH\fR) adds the page code in hex after the
+page's name in the comment before the hex rendering of that mode page.
 .br
 If the \fI\-\-inner\-hex\fR option is also given it changes the action of
 this option. See the description of the \fI\-\-inner\-hex\fR option. Giving

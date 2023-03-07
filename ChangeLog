@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230304] [svn: r1007]
+Changelog for pre-release sg3_utils-1.48 [20230307] [svn: r1008]
   - decoding utilities: add --json[=JO] and --js-file=JFN
     options
   - sg_z_act_query: new utility for sending either a
@@ -85,6 +85,7 @@ Changelog for pre-release sg3_utils-1.48 [20230304] [svn: r1007]
     - an index range now uses ':' as a separator; so 0:2
       matches element indexes 0, 1, and 2 if present.
       '-' is still accepted as a range separator.
+    - fix issue at end of additional element status dpage
   - sg_turs: change nanosleep() to Sleep() in MinGW
     - see sg_lib below for two new exit status values
   - sg_stream_ctl: fix --get indexing
