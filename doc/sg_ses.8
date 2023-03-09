@@ -640,16 +640,17 @@ offset 0). If needed, the \fI\-\-byte1=B1\fR option sets byte offset 1,
 else 0 is placed in that position. The number of bytes decoded from the data
 provided (i.e. its length) goes into byte offsets 2 and 3.
 .PP
-The second scenario is flagged by the \fI\-\-status\fR option. It decodes
-the supplied data assuming that it represents the response to one or more
-SCSI RECEIVE DIAGNOSTIC RESULTS commands. Those responses have typically
-been captured from some earlier invocation(s) of this utility. Those earlier
-invocations could use the '\-HHH' or '\-HHHH' option and file redirection to
-capture that response (or responses) in hexadecimal. The supplied dpage
-response data is decoded according to the other command line options. For
-example the \fI\-\-join\fR option could be given and that would require the
-data from multiple dpages typically:  Configuration, Enclosure status,
-Element descriptor and Additional element status dpages. If in doubt use
+The second scenario is flagged by the \fI\-\-status\fR option (or the absence
+of the \fI\-\-control\fR option). It decodes the supplied data assuming that
+it represents the response to one or more SCSI RECEIVE DIAGNOSTIC RESULTS
+commands. Those responses have typically been captured from some earlier
+invocation(s) of this utility. Those earlier invocations could use
+the '\-HHH' or '\-HHHH' option and file redirection to capture that
+response (or responses) in hexadecimal. The supplied dpage response data is
+decoded according to the other command line options. For example the
+\fI\-\-join\fR option could be given and that would require the data from
+multiple dpages typically:  Configuration, Enclosure status, Element
+descriptor and Additional element status dpages. If in doubt use
 \fI\-\-page=all\fR in the capture phase; having more dpages than needed
 is not a problem.
 .PP

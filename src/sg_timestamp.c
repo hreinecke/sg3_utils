@@ -37,7 +37,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.15 20230307";
+static const char * version_str = "1.16 20230307";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -248,7 +248,6 @@ sg_ll_rep_timestamp(int sg_fd, void * resp, int mx_resp_len, int * residp,
     destruct_scsi_pt_obj(ptvp);
     return ret;
 }
-
 
 /* Invokes the SET TIMESTAMP command.  Return of 0 -> success, various
  * SG_LIB_CAT_* positive values or -1 -> other errors */

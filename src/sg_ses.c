@@ -16,6 +16,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <getopt.h>
@@ -27,6 +28,7 @@
 #endif
 
 #include "sg_lib.h"
+#include "sg_lib_data.h"
 #include "sg_cmds_basic.h"
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
@@ -38,12 +40,16 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.73 20230306";    /* ses4r04 */
+static const char * version_str = "2.75 20230308";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define REQUEST_SENSE_RESP_SZ 252
+#define SENSE_BUFF_LEN 64
+#define DEF_PT_TIMEOUT 60               /* seconds */
+#define REP_TIMESTAMP_CMDLEN 12
+#define REP_TIMESTAMP_SA 0xf
 #define DATA_IN_OFF 4
 #define MIN_MAXLEN 16
 #define MIN_DATA_IN_SZ 8192     /* use max(MIN_DATA_IN_SZ, op->maxlen) for
@@ -152,6 +158,7 @@ struct opts_t {
     bool many_dpages;   /* user supplied data has more than one dpage */
     bool mask_ign;      /* element read-mask-modify-write actions */
     bool no_config;     /* -F  (do not depend on config dpage) */
+    bool no_time;       /* -y  (do not call REPORT TIMESTAMP) */
     bool o_readonly;
     bool page_code_given;       /* or suitable abbreviation */
     bool quiet;         /* exit status unaltered by --quiet */
@@ -384,6 +391,7 @@ static int add_elem_rsp_len;
 static int threshold_rsp_len;
 
 /* The '_sn' suffix is for snake format used in JSON names */
+static const char * const enc_s = "Enclosure";
 static const char * const not_avail = "not available";
 static const char * const not_rep = "not reported";
 static const char * const noss_s = "number of secondary subenclosures";
@@ -420,6 +428,60 @@ static const char * const dwuti = "decoded _without_ using type info";
 static const char * const oohm = ">>> Out of heap (memory)";
 static const char * const isel_sn = "individual_status_element_list";
 
+
+/* Command line long option names with corresponding short letter. */
+static const struct option long_options[] = {
+    {"all", no_argument, 0, 'a'},
+    {"ALL", no_argument, 0, 'z'},
+    {"byte1", required_argument, 0, 'b'},
+    {"clear", required_argument, 0, 'C'},
+    {"control", no_argument, 0, 'c'},
+    {"data", required_argument, 0, 'd'},
+    {"descriptor", required_argument, 0, 'D'},
+    {"dev-slot-num", required_argument, 0, 'x'},
+    {"dev_slot_num", required_argument, 0, 'x'},
+    {"device-slot-num", required_argument, 0, 'x'},
+    {"device_slot_num", required_argument, 0, 'x'},
+    {"device-slot-number", required_argument, 0, 'x'},
+    {"device_slot_number", required_argument, 0, 'x'},
+    {"dsn", required_argument, 0, 'x'},
+    {"eiioe", required_argument, 0, 'E'},
+    {"enumerate", no_argument, 0, 'e'},
+    {"filter", no_argument, 0, 'f'},
+    {"get", required_argument, 0, 'G'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"index", required_argument, 0, 'I'},
+    {"inhex", required_argument, 0, 'X'},
+    {"inner-hex", no_argument, 0, 'i'},
+    {"inner_hex", no_argument, 0, 'i'},
+    {"json", optional_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'Q'},
+    {"js-file", required_argument, 0, 'Q'},
+    {"join", no_argument, 0, 'j'},
+    {"list", no_argument, 0, 'l'},
+    {"nickid", required_argument, 0, 'N'},
+    {"nickname", required_argument, 0, 'n'},
+    {"no-config", no_argument, 0, 'F'},
+    {"no_config", no_argument, 0, 'F'},
+    {"mask", required_argument, 0, 'M'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"page", required_argument, 0, 'p'},
+    {"quiet", no_argument, 0, 'q'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"sas-addr", required_argument, 0, 'A'},
+    {"sas_addr", required_argument, 0, 'A'},
+    {"set", required_argument, 0, 'S'},
+    {"status", no_argument, 0, 's'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"warn", no_argument, 0, 'w'},
+    {"no-time", no_argument, 0, 'y'},
+    {"no_time", no_argument, 0, 'y'},
+    {"notime", no_argument, 0, 'y'},
+    {0, 0, 0, 0},
+};
 
 /* Diagnostic page names, control and/or status (in and/or out) */
 static const struct diag_page_code dpc_arr[] = {
@@ -817,59 +879,9 @@ static const bool active_et_aesp_arr[NUM_ACTIVE_ET_AESP_ARR] = {
     false, false, false, false,
 };      /* 6 of 16 are active, 3 of those are optional */
 
-/* Command line long option names with corresponding short letter. */
-static const struct option long_options[] = {
-    {"all", no_argument, 0, 'a'},
-    {"ALL", no_argument, 0, 'z'},
-    {"byte1", required_argument, 0, 'b'},
-    {"clear", required_argument, 0, 'C'},
-    {"control", no_argument, 0, 'c'},
-    {"data", required_argument, 0, 'd'},
-    {"descriptor", required_argument, 0, 'D'},
-    {"dev-slot-num", required_argument, 0, 'x'},
-    {"dev_slot_num", required_argument, 0, 'x'},
-    {"device-slot-num", required_argument, 0, 'x'},
-    {"device_slot_num", required_argument, 0, 'x'},
-    {"device-slot-number", required_argument, 0, 'x'},
-    {"device_slot_number", required_argument, 0, 'x'},
-    {"dsn", required_argument, 0, 'x'},
-    {"eiioe", required_argument, 0, 'E'},
-    {"enumerate", no_argument, 0, 'e'},
-    {"filter", no_argument, 0, 'f'},
-    {"get", required_argument, 0, 'G'},
-    {"help", no_argument, 0, 'h'},
-    {"hex", no_argument, 0, 'H'},
-    {"index", required_argument, 0, 'I'},
-    {"inhex", required_argument, 0, 'X'},
-    {"inner-hex", no_argument, 0, 'i'},
-    {"inner_hex", no_argument, 0, 'i'},
-    {"json", optional_argument, 0, 'J'},
-    {"js_file", required_argument, 0, 'Q'},
-    {"js-file", required_argument, 0, 'Q'},
-    {"join", no_argument, 0, 'j'},
-    {"list", no_argument, 0, 'l'},
-    {"nickid", required_argument, 0, 'N'},
-    {"nickname", required_argument, 0, 'n'},
-    {"no-config", no_argument, 0, 'F'},
-    {"no_config", no_argument, 0, 'F'},
-    {"mask", required_argument, 0, 'M'},
-    {"maxlen", required_argument, 0, 'm'},
-    {"page", required_argument, 0, 'p'},
-    {"quiet", no_argument, 0, 'q'},
-    {"raw", no_argument, 0, 'r'},
-    {"readonly", no_argument, 0, 'R'},
-    {"sas-addr", required_argument, 0, 'A'},
-    {"sas_addr", required_argument, 0, 'A'},
-    {"set", required_argument, 0, 'S'},
-    {"status", no_argument, 0, 's'},
-    {"verbose", no_argument, 0, 'v'},
-    {"version", no_argument, 0, 'V'},
-    {"warn", no_argument, 0, 'w'},
-    {0, 0, 0, 0},
-};
-
 /* For overzealous SES device servers that don't like some status elements
- * sent back as control elements. This table is as per ses3r06. */
+ * sent back as control elements. This table is as per ses3r06. The set bits
+ * are changeable positions in the corresponding control element. */
 static const uint8_t ses3_element_cmask_arr[NUM_ETC][4] = {
                                 /* Element type code (ETC) names; comment */
     {0x40, 0xff, 0xff, 0xff},   /* [0] unspecified */
@@ -908,10 +920,199 @@ static void enumerate_diag_pages(void);
 static bool saddr_non_zero(const uint8_t * bp);
 static const char * find_in_diag_page_desc(int page_num);
 
+static void gen_usage(bool long_opt)
+{
+    if (long_opt)
+        pr2serr(
+            "    sg_ses  [--all] [--ALL] [--descriptor=DES] "
+            "[--dev-slot-num=SN]\n"
+            "            [--eiioe=A_F] [--filter] [--get=STR] "
+            "[--hex]\n"
+            "            [--index=IIA | =TIA,II] [--inner-hex] [--join] "
+            "[--json[=JO]]\n"
+            "            [--js-file=JFN] [--maxlen=LEN] [--no-config] "
+            "[--no-time]\n"
+            "            [--page=PG] [--quiet] [--raw] [--readonly] "
+            "[--sas-addr=SA]\n"
+            "            [--status] [--verbose] [--warn] DEVICE\n"
+            );
+    else
+        pr2serr(
+            "    sg_ses  [-a] [-z] [-D DES] [-x SN] [-E A_F] [-f] [-G STR] "
+            "[-H]\n"
+            "            [-I IIA|TIA,II] [-i] [-j] [-m LEN] [-F] [-y] "
+            "[-p PG] [-q]\n"
+            "            [-r] [-R] [-A SA] [-s] [-v] [-w] DEVICE\n"
+            );
+
+}
+
+static void control_usage(bool long_opt)
+{
+    if (long_opt)
+        pr2serr(
+            "    sg_ses  --control [--byte1=B1] [--clear=STR] "
+            "[--data=H,H...]\n"
+            "            [--descriptor=DES] [--dev-slot-num=SN] "
+            "[--index=IIA | =TIA,II]\n"
+            "            [--inhex=FN] [--mask] [--maxlen=LEN] "
+            "[--nickid=SEID]\n"
+            "            [--nickname=SEN] [--page=PG] [--sas-addr=SA] "
+            "[--set=STR]\n"
+            "            [--verbose] DEVICE\n"
+            );
+    else
+        pr2serr(
+            "    sg_ses  -c [-b B1] [-C STR] [-d H,H...] [-D DES] "
+            "[-x SN]\n"
+            "            [-I IIA|TIA,II] [-M] [-m LEN] [-N SEID] [-n SEN] "
+            "[-p PG]\n"
+            "            [-A SA] [-S STR] [-v] DEVICE\n"
+            );
+}
+
+static void rd_file_usage(bool long_opt)
+{
+    if (long_opt)
+        pr2serr(
+            "    sg_ses  --inhex=FN [--raw --raw] [<most options from "
+            "general access>]\n"
+            "    sg_ses  --data=@FN [--raw --raw] [<most options from "
+            "general access>]\n"
+            );
+    else
+        pr2serr(
+            "    sg_ses  -X FN [-rr] [<most options from general access>]\n"
+            "    sg_ses  -d @FN [-rr] [<most options from general access>]\n"
+            );
+}
+
+static void other_usage(bool long_opt)
+{
+    if (long_opt)
+        pr2serr(
+            "    sg_ses  [--enumerate | --list] [--help] [--version]\n"
+            );
+    else
+        pr2serr(
+            "    sg_ses  [-e | -l] [-h] [-V]\n"
+            );
+}
 
 static void
 usage(int help_num)
 {
+    if (help_num < 1) {
+        pr2serr("Summary of usages:\n");
+        pr2serr("  general access:\n");
+        gen_usage(true);
+        pr2serr("   corresponding shorter form:\n");
+        gen_usage(false);
+        pr2serr("\n  control (modifying):\n");
+        control_usage(true);
+        pr2serr("   corresponding shorter form:\n");
+        control_usage(false);
+        pr2serr("\n  take input from file:\n");
+        rd_file_usage(true);
+        pr2serr("   corresponding shorter form:\n");
+        rd_file_usage(false);
+        pr2serr("\n  others:\n");
+        other_usage(true);
+        pr2serr("   corresponding shorter form:\n");
+        other_usage(false);
+    } else if (1 == help_num) {
+        pr2serr("Usage for general access:\n");
+        gen_usage(true);
+        pr2serr("\n  where the main general access options are:\n"
+            "    --all|-a            --join followed by other SES dpages\n"
+            "    --ALL|-A            --join --join followed by other SES "
+            "dpages\n"
+            "    --descriptor=DES|-D DES    descriptor name (for indexing)\n"
+            "    --dev-slot-num=SN|--dsn=SN|-x SN    device slot number "
+            "(for indexing)\n"
+            "    --filter|-f         filter out enclosure status flags that "
+            "are clear\n"
+            "                        use twice for status=okay entries "
+            "only\n"
+            "    --get=STR|-G STR    get value of field by acronym or "
+            "position\n"
+            "    --index=IIA|-I IIA    individual index ('-1' for overall) "
+            "or element\n"
+            "                          type abbreviation (e.g. 'arr'). A "
+            "range may be\n"
+            "                          given for the individual index "
+            "(e.g. '2:5')\n"
+            "    --index=TIA,II|-I TIA,II    comma separated pair: TIA is "
+            "type header\n"
+            "                                index or element type "
+            "abbreviation;\n"
+            "                                II is individual index ('-1' "
+            "for overall)\n"
+            );
+        pr2serr(
+            "    --inhex=FN|-X FN    read data from file FN, ignore DEVICE "
+            "if given\n"
+            "    --join|-j           group Enclosure Status, Element "
+            "Descriptor\n"
+            "                        and Additional Element Status pages. "
+            "Use twice\n"
+            "                        to add Threshold In page\n"
+            "    --json[=JO]|-J[JO]    output in JSON instead of human "
+            "readable\n"
+            "                          test. Use --json=? for JSON help\n"
+            "    --maxlen=LEN|-m LEN    max response length (allocation "
+            "length in cdb)\n"
+            "    --page=PG|-p PG     diagnostic page code (abbreviation "
+            "or number)\n"
+            "                        (def: 'ssp' [0x0] (supported diagnostic "
+            "pages))\n"
+            "    --sas-addr=SA|-A SA    SAS address in hex (for indexing)\n"
+            "    --status|-s         fetch status information (default "
+            "action)\n\n"
+            "The 'general access' usage fetches pages or fields from a SCSI "
+            "enclosure.\nUse '-hh' (or more) for other usage patterns, '-hh' "
+            "displays 'control' usage.\n"
+            );
+
+#if 0
+        "The second usage is for changing a page or field in "
+            "an enclosure. The\n'--clear=', '--get=' and '--set=' options "
+            "can appear multiple times.\nUse '-hh' for more help, including "
+            "the options not explained above.\n");
+#endif
+// xxxxx
+    } else if (2 == help_num) {
+        pr2serr("Control usage (for modifications):\n");
+        control_usage(true);
+        pr2serr(
+            "\n  where the control (modifying) options are:\n"
+            "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
+            "to B1\n"
+            "    --clear=STR|-C STR    clear field by acronym or position\n"
+            "    --control|-c        send control information (def: fetch "
+            "status)\n"
+            "    --data=H,H...|-d H,H...    string of ASCII hex bytes to "
+            "send as a\n"
+            "                               control page or decode as a "
+            "status page\n"
+            "    --data=- | -d -     fetch string of ASCII hex bytes from "
+            "stdin\n"
+            "    --descriptor=DES|-D DES    descriptor name (for indexing)\n"
+            "    --dev-slot-num=SN|--dsn=SN|-x SN    device slot number "
+            "(for indexing)\n"
+            "    --index=IIA|-I IIA    both index index ('-1' for overall) "
+            "    --index=TIA,II|-I TIA,II    comma separated pair: TIA is "
+            "    --mask|-M           ignore status element mask in modify "
+            "actions\n"
+            "                        (e.g.--set= and --clear=) (def: apply "
+            "mask)\n"
+            "    --set=STR|-S STR    set value of field by acronym or "
+            "position\n"
+            );
+
+
+    }
+#if 0
     if (2 != help_num) {
         pr2serr(
             "Usage: sg_ses [--all] [--ALL] [--descriptor=DES] "
@@ -921,10 +1122,10 @@ usage(int help_num)
             "              [--index=IIA | =TIA,II] [--inner-hex] [--join] "
             "[--json[=JO]]\n"
             "              [--js-file=JFN] [--maxlen=LEN] [--no-config] "
-            "[--page=PG]\n"
-            "              [--quiet] [--raw] [--readonly] [--sas-addr=SA] "
-            "[--status]\n"
-            "              [--verbose] [--warn] DEVICE\n\n"
+            "[--no-time]\n"
+            "              [--page=PG] [--quiet] [--raw] [--readonly] "
+            "[--sas-addr=SA]\n"
+            "              [--status] [--verbose] [--warn] DEVICE\n\n"
             "       sg_ses --control [--byte1=B1] [--clear=STR] "
             "[--data=H,H...]\n"
             "              [--descriptor=DES] [--dev-slot-num=SN] "
@@ -945,9 +1146,9 @@ usage(int help_num)
             pr2serr("Or the corresponding short option usage: \n"
                     "  sg_ses [-a] [-D DES] [-x SN] [-E A_F] [-f] [-G STR] "
                     "[-H] [-I IIA|TIA,II]\n"
-                    "         [-i] [-j] [-m LEN] [-p PG] [-q] [-r] [-R] "
-                    "[-A SA] [-s] [-v] [-w]\n"
-                    "         DEVICE\n\n"
+                    "         [-i] [-j] [-m LEN] [-F] [-y] [-p PG] [-q] "
+                    "[-r] [-R] [-A SA] [-s]\n"
+                    "         [-v] [-w] DEVICE\n\n"
                     "  sg_ses [-b B1] [-C STR] [-c] [-d H,H...] [-D DES] "
                     "[-x SN] [-I IIA|TIA,II]\n"
                     "         [-M] [-m LEN] [-N SEID] [-n SEN] [-p PG] "
@@ -1059,8 +1260,9 @@ usage(int help_num)
             "                            used to specify which nickname to "
             "change\n"
             "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
-            "    --no-config|-f      output without depending on config "
+            "    --no-config|-F      output without depending on config "
             "dpage\n"
+            "    --no-time|-y        skip Report timestamp command\n"
             "    --quiet|-q          suppress some output messages\n"
             "    --raw|-r            print status page in ASCII hex suitable "
             "for '-d';\n"
@@ -1088,6 +1290,7 @@ usage(int help_num)
             "in the SES device is itself optional.\n"
             );
     }
+#endif
 }
 
 /* Parse argument give to '--index='. Return 0 for okay, else an error. If
@@ -1274,7 +1477,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         int option_index = 0;
 
         c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fFG:hHiI:jJ::ln:N:m:Mp:"
-                        "qQ:rRsS:vVwx:X:z", long_options, &option_index);
+                        "qQ:rRsS:vVwx:X:yz", long_options, &option_index);
         if (c == -1)
             break;
 
@@ -1508,6 +1711,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'X':       /* --inhex=FN for compatibility with other utils */
             inhex_arg = optarg;
             op->data_or_inhex = true;
+            break;
+        case 'y':
+            op->no_time = true;
             break;
         case 'z':       /* --ALL */
             /* -A already used for --sas-addr=SA shortened form */
@@ -1899,6 +2105,136 @@ do_senddiag(struct sg_pt_base * ptvp, void * outgoing_pg, int outgoing_len,
                              outgoing_pg, outgoing_len, noisy, verbose);
     clear_scsi_pt_obj(ptvp);
     return ret;
+}
+
+/* Invokes a SCSI REPORT TIMESTAMP command.  Return of 0 -> success,
+ * various SG_LIB_CAT_* positive values or -1 -> other errors */
+static int
+sg_ll_rep_timestamp_pt(struct sg_pt_base * ptvp, uint8_t * resp, int mc_rlen,
+                       int * residp, bool noisy, int vb)
+{
+    int k, ret, res, sense_cat;
+    uint8_t rt_cdb[REP_TIMESTAMP_CMDLEN] =
+          {SG_MAINTENANCE_IN, REP_TIMESTAMP_SA, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0};
+    uint8_t sense_b[SENSE_BUFF_LEN] SG_C_CPP_ZERO_INIT;
+
+    sg_put_unaligned_be32((uint32_t)mc_rlen, rt_cdb + 6);
+    if (vb) {
+        char b[128];
+
+        pr2serr("    Report timestamp cdb: %s\n",
+                sg_get_command_str(rt_cdb, REP_TIMESTAMP_CMDLEN, false,
+                                   sizeof(b), b));
+    }
+    set_scsi_pt_cdb(ptvp, rt_cdb, sizeof(rt_cdb));
+    set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
+    set_scsi_pt_data_in(ptvp, resp, mc_rlen);
+    res = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, vb);
+    ret = sg_cmds_process_resp(ptvp, "report timestamp", res, noisy, vb,
+                               &sense_cat);
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
+        switch (sense_cat) {
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = sense_cat;
+            break;
+        }
+    } else
+        ret = 0;
+    k = get_scsi_pt_resid(ptvp);
+    if (residp)
+        *residp = k;
+    if ((vb > 2) && ((mc_rlen - k) > 0)) {
+        pr2serr("Parameter data returned:\n");
+        hex2stderr(resp, mc_rlen - k, ((vb > 3) ? -1 : 1));
+    }
+    return ret;
+}
+
+static void
+fetch_decode_timestamp(struct sg_pt_base * ptvp, struct opts_t * op)
+{
+    int n, rlen, resid, res;
+    int vb = op->verbose;
+    sgj_state * jsp = &op->json_st;
+    const char * cp;
+    uint8_t ts_rsp[32];
+    char b[96];
+    static const int ts_rsp_len = sizeof(ts_rsp);
+    static const int blen = sizeof(b);
+
+    clear_scsi_pt_obj(ptvp);
+    res = sg_ll_rep_timestamp_pt(ptvp, ts_rsp, ts_rsp_len, &resid,
+                                 ! op->quiet, vb > 0 ? vb - 1 : 0);
+    rlen = ts_rsp_len - resid;
+    if ((0 == res) && (rlen >= 12)) {
+        uint8_t ts_origin = 0x7 & ts_rsp[2];
+        uint64_t ms = sg_get_unaligned_be48(ts_rsp + 4);
+        uint64_t secs = ms / 1000;
+        uint32_t rem_ms = ms % 1000;
+        uint64_t days = secs / (60 * 60 * 24);
+        time_t tt_secs = secs;
+        struct tm * utc_secs_tm;
+        struct tm * loc_secs_tm;
+
+        sgj_pr_hr(jsp, "%s reports this timestamp:\n", enc_s);
+        if (days < (365 * 3)) { /* assume duration since powerup/reset */
+            uint32_t rem_hours = (secs / (60 * 60)) % 24;
+            uint32_t rem_mins = (secs / 60) % 60;
+            uint32_t rem_secs = (secs % 60);
+
+            n = 0;
+            if (days > 0)
+                n = sg_scnpr(b, blen, "%u day%s, ", (uint32_t)days,
+                             (1 == days) ? "" : "s");
+            if (rem_hours > 0)
+                n += sg_scnpr(b + n, blen - n, "%u hour%s, ", rem_hours,
+                              (1 == rem_hours) ? "" : "s");
+            else if (days > 0)
+                n += sg_scnpr(b + n, blen - n, "0 hours, ");
+            if (rem_mins > 0)
+                n += sg_scnpr(b + n, blen - n, "%u minute%s, ", rem_mins,
+                              (1 == rem_mins) ? "" : "s");
+            else if ((days > 0) || (rem_mins > 0))
+                n += sg_scnpr(b + n, blen - n, "0 minutes, ");
+            n += sg_scnpr(b + n, blen - n, "%u.%03u seconds", rem_secs,
+                          rem_ms);
+            sgj_pr_hr(jsp, "    %s since powerup or reset\n", b);
+            return;
+        }
+        utc_secs_tm  = gmtime(&tt_secs);
+        strftime(b, blen, "%a, %d %b %Y %T %z", utc_secs_tm);
+        sgj_pr_hr(jsp, "    %s:\n", b);
+        loc_secs_tm  = localtime(&tt_secs);
+        strftime(b, blen, "%a, %d %b %Y %T", loc_secs_tm);
+        n = strlen(b);
+        n += sg_scnpr(b + n, blen - n, ".%03u", rem_ms);
+        strftime(b + n, blen - n, " %z", loc_secs_tm);
+        sgj_pr_hr(jsp, "    %s:\n", b);
+        switch (ts_origin) {
+        case 0:
+            cp = "since power on or hard reset";
+            break;
+        case 2:
+            cp = "via SCSI SET TIMESTAMP command";
+            break;
+        case 3:
+            cp = "via non-SCSI mechanism";
+            break;
+        default:
+            cp = "unknown mechanism";
+            break;
+        }
+        sgj_pr_hr(jsp, "    origin: %s\n", cp);
+    }
 }
 
 /* Fetch diagnostic page name (status and/or control). Returns NULL if not
@@ -5037,8 +5373,8 @@ additional_elem_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
             elem_count += num_elems;
             continue;   /* skip if not element type of interest */
         }
-        if ((bp + 1) >= last_bp) {
-            if ((bp + 1) == last_bp) {
+        if (bp >= (last_bp + 1)) {
+            if (bp == (last_bp + 1)) {
                 if (is_et_optional_for_aes(et))
                     continue;   /* at end of aes dpage but etype optional */
             }
@@ -7359,6 +7695,8 @@ main(int argc, char * argv[])
     struct tuple_acronym_val tav_arr[CGS_CL_ARR_MAX_SZ];
     char buff[128];
     char b[128];
+    static const int bufflen = sizeof(buff);
+    static const int blen = sizeof(b);
 
     op = &opts;
     memset(op, 0, sizeof(*op));
@@ -7377,7 +7715,13 @@ main(int argc, char * argv[])
             enumerate_work(op);
             ret = SG_LIB_SYNTAX_ERROR;
             goto early_out;
-        }
+        } else if (op->do_json && op->json_arg && ('?' == op->json_arg[0])) {
+            char e[1500];
+
+            sg_json_usage(0, e, sizeof(e));
+            pr2serr("%s", e);
+        } else if (SG_LIB_FILE_ERROR == res)
+            usage(0);
         ret = res;
         goto early_out;
     }
@@ -7546,9 +7890,10 @@ main(int argc, char * argv[])
         }
         if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
             uint8_t inq_rsp[36];
+            static const int i_rlen = sizeof(inq_rsp);
 
-            memset(inq_rsp, 0, sizeof(inq_rsp));
-            if ((ret = sg_ll_inquiry_pt(ptvp, false, 0, inq_rsp, 36,
+            memset(inq_rsp, 0, i_rlen);
+            if ((ret = sg_ll_inquiry_pt(ptvp, false, 0, inq_rsp, i_rlen,
                                         0, &resid, ! op->quiet, vb))) {
                 pr2serr("%s doesn't respond to a SCSI INQUIRY\n",
                         op->dev_name);
@@ -7559,7 +7904,7 @@ main(int argc, char * argv[])
                  sgj_pr_hr(jsp, "  %.8s  %.16s  %.4s\n", inq_rsp + 8,
                            inq_rsp + 16, inq_rsp + 32);
                 pd_type = PDT_MASK & inq_rsp[0];
-                cp = sg_get_pdt_str(pd_type, sizeof(buff), buff);
+                cp = sg_get_pdt_str(pd_type, bufflen, buff);
                 if (0xd == pd_type) {
                     if (vb)
                         sgj_pr_hr(jsp, "    enclosure services device\n");
@@ -7613,7 +7958,7 @@ main(int argc, char * argv[])
     }
 #endif
 
-    if (ptvp) {
+    if (ptvp) {         /* report and consume a Unit attention, if any */
         n = (enc_stat_rsp_sz < REQUEST_SENSE_RESP_SZ) ? enc_stat_rsp_sz :
                                                         REQUEST_SENSE_RESP_SZ;
         ret = sg_ll_request_sense_pt(ptvp, false, enc_stat_rsp, n,
@@ -7625,7 +7970,7 @@ main(int argc, char * argv[])
             if ((sense_len > 7) && sg_scsi_normalize_sense(enc_stat_rsp,
                                         sense_len, &ssh)) {
                 const char * aa_str = sg_get_asc_ascq_str(ssh.asc, ssh.ascq,
-                                                          sizeof(b), b);
+                                                          blen, b);
 
                 /* Ignore the possibility that multiple UAs queued up */
                 if (SPC_SK_UNIT_ATTENTION == ssh.sense_key)
@@ -7638,7 +7983,7 @@ main(int argc, char * argv[])
                         pr2serr("  Sense key: %s, additional: %s\n  ... "
                                 "continue\n",
                                 sg_get_sense_key_str(ssh.sense_key,
-                                         sizeof(buff), buff), aa_str);
+                                         bufflen, buff), aa_str);
                     }
                 }
             }
@@ -7646,6 +7991,10 @@ main(int argc, char * argv[])
             if (vb)
                 pr2serr("Request sense failed (res=%d), most likely "
                         " problems ahead\n", ret);
+        }
+        if (! (op->do_raw || have_cgs || (op->do_hex > 2))) {
+            if (! op->no_time)
+                fetch_decode_timestamp(ptvp, op);
         }
         clear_scsi_pt_obj(ptvp);
         memset(enc_stat_rsp, 0, enc_stat_rsp_sz);
@@ -7753,7 +8102,7 @@ main(int argc, char * argv[])
 
 err_out:
     if (! op->do_status) {
-        sg_get_category_sense_str(ret, sizeof(b), b, vb);
+        sg_get_category_sense_str(ret, blen, b, vb);
         pr2serr("    %s\n", b);
     }
     if (free_enc_stat_rsp)
