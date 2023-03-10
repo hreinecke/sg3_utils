@@ -8,9 +8,10 @@ sg_ses \- access a SCSI Enclosure Services (SES) device
 [\fI\-\-get=STR\fR] [\fI\-\-hex\fR] [\fI\-\-index=IIA\fR |
 \fI\-\-index=TIA,II\fR] [\fI\-\-inner\-hex\fR] [\fI\-\-join\fR]
 [\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-no\-config\fR] [\fI\-\-page=PG\fR] [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
-[\fI\-\-readonly\fR] [\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR]
-[\fI\-\-verbose\fR] [\fI\-\-warn\fR] \fIDEVICE\fR
+[\fI\-\-no\-config\fR] [\fI\-\-no\-time\fR] [\fI\-\-page=PG\fR]
+[\fI\-\-quiet\fR] [\fI\-\-raw\fR] [\fI\-\-readonly\fR]
+[\fI\-\-sas\-addr=SA\fR] [\fI\-\-status\fR] [\fI\-\-verbose\fR]
+[\fI\-\-warn\fR] \fIDEVICE\fR
 .PP
 .B sg_ses
 \fI\-\-control\fR [\fI\-\-byte1=B1\fR] [\fI\-\-clear=STR\fR]
@@ -398,6 +399,25 @@ which is also useful for debugging.
 .br
 This option is ignored on dpages that don't depend on the Configuration
 dpage, including the Configuration dpage itself.
+.TP
+\fB\-y\fR, \fB\-\-no\-time\fR
+this utility now issues a SCSI REPORT TIMESTAMP command just after an INQUIRY
+command at the start of its execution. This enables the utility to output a
+date\-time stamp or an uptime duration. The time value returned is in
+illiseconds from some epoch. If the value corresponds to a period of less
+than 3 years then it is considered to be an uptime duration and is output in
+days, hours, minutes, seconds and milliseconds. Unix systems including Linux,
+FreeBSD and Solaris use 00:00 on 1st January 1970 UTC as their epoch. The
+date\-time stamp output is in RFC 2822 date format on two adjacent lines,
+one in UTC and the other in local time.
+.br
+If for some reason calling the REPORT TIMESTAMP command causes a problem,
+then this option will disable this feature.
+.br
+Note that the time returned is from the enclosure, not the machine that the
+utility is executed from. This utility can use modern SCSI disks as the
+\fIDEVICE\fR to fetch that disk't timestamp; this utility will then find
+thet the \fIDEVICE\fR is not an enclosure and exit without doing any harm.
 .TP
 \fB\-p\fR, \fB\-\-page\fR=\fIPG\fR
 where \fIPG\fR is a dpage abbreviation or code (a number). If \fIPG\fR

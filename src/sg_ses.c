@@ -40,7 +40,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.75 20230308";    /* ses4r04 */
+static const char * version_str = "2.76 20230309";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -464,6 +464,9 @@ static const struct option long_options[] = {
     {"nickname", required_argument, 0, 'n'},
     {"no-config", no_argument, 0, 'F'},
     {"no_config", no_argument, 0, 'F'},
+    {"no-time", no_argument, 0, 'y'},
+    {"no_time", no_argument, 0, 'y'},
+    {"notime", no_argument, 0, 'y'},
     {"mask", required_argument, 0, 'M'},
     {"maxlen", required_argument, 0, 'm'},
     {"page", required_argument, 0, 'p'},
@@ -477,9 +480,6 @@ static const struct option long_options[] = {
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
     {"warn", no_argument, 0, 'w'},
-    {"no-time", no_argument, 0, 'y'},
-    {"no_time", no_argument, 0, 'y'},
-    {"notime", no_argument, 0, 'y'},
     {0, 0, 0, 0},
 };
 
@@ -1002,8 +1002,8 @@ static void other_usage(bool long_opt)
 static void
 usage(int help_num)
 {
-    if (help_num < 1) {
-        pr2serr("Summary of usages:\n");
+    if ((help_num < 1) || (help_num > 4)) {
+        pr2serr("Summary of usage:\n");
         pr2serr("  general access:\n");
         gen_usage(true);
         pr2serr("   corresponding shorter form:\n");
@@ -1024,9 +1024,8 @@ usage(int help_num)
         pr2serr("Usage for general access:\n");
         gen_usage(true);
         pr2serr("\n  where the main general access options are:\n"
-            "    --all|-a            --join followed by other SES dpages\n"
-            "    --ALL|-A            --join --join followed by other SES "
-            "dpages\n"
+            "    --all|-a            same as --join followed by remaining "
+            "SES dpages\n"
             "    --descriptor=DES|-D DES    descriptor name (for indexing)\n"
             "    --dev-slot-num=SN|--dsn=SN|-x SN    device slot number "
             "(for indexing)\n"
@@ -1050,8 +1049,6 @@ usage(int help_num)
             "for overall)\n"
             );
         pr2serr(
-            "    --inhex=FN|-X FN    read data from file FN, ignore DEVICE "
-            "if given\n"
             "    --join|-j           group Enclosure Status, Element "
             "Descriptor\n"
             "                        and Additional Element Status pages. "
@@ -1060,8 +1057,6 @@ usage(int help_num)
             "    --json[=JO]|-J[JO]    output in JSON instead of human "
             "readable\n"
             "                          test. Use --json=? for JSON help\n"
-            "    --maxlen=LEN|-m LEN    max response length (allocation "
-            "length in cdb)\n"
             "    --page=PG|-p PG     diagnostic page code (abbreviation "
             "or number)\n"
             "                        (def: 'ssp' [0x0] (supported diagnostic "
@@ -1070,8 +1065,9 @@ usage(int help_num)
             "    --status|-s         fetch status information (default "
             "action)\n\n"
             "The 'general access' usage fetches pages or fields from a SCSI "
-            "enclosure.\nUse '-hh' (or more) for other usage patterns, '-hh' "
-            "displays 'control' usage.\n"
+            "enclosure.\nUse '-hh' (or more) for further usage patterns, "
+            "'-hh' displays the\n'control' usage. For examples see '-hhhh' "
+            ". The term 'diagnostic page'\nis often abbreviated to 'dpage'.\n"
             );
 
 #if 0
@@ -1100,137 +1096,35 @@ usage(int help_num)
             "    --descriptor=DES|-D DES    descriptor name (for indexing)\n"
             "    --dev-slot-num=SN|--dsn=SN|-x SN    device slot number "
             "(for indexing)\n"
-            "    --index=IIA|-I IIA    both index index ('-1' for overall) "
-            "    --index=TIA,II|-I TIA,II    comma separated pair: TIA is "
+            "    --index=IIA|-I IIA    see summary on '-h' page\n"
+            "    --index=TIA,II|-I TIA,II    see summary on '-h' page\n"
             "    --mask|-M           ignore status element mask in modify "
             "actions\n"
             "                        (e.g.--set= and --clear=) (def: apply "
             "mask)\n"
-            "    --set=STR|-S STR    set value of field by acronym or "
-            "position\n"
-            );
-
-
-    }
-#if 0
-    if (2 != help_num) {
-        pr2serr(
-            "Usage: sg_ses [--all] [--ALL] [--descriptor=DES] "
-            "[--dev-slot-num=SN]\n"
-            "              [--eiioe=A_F] [--filter] [--get=STR] "
-            "[--hex]\n"
-            "              [--index=IIA | =TIA,II] [--inner-hex] [--join] "
-            "[--json[=JO]]\n"
-            "              [--js-file=JFN] [--maxlen=LEN] [--no-config] "
-            "[--no-time]\n"
-            "              [--page=PG] [--quiet] [--raw] [--readonly] "
-            "[--sas-addr=SA]\n"
-            "              [--status] [--verbose] [--warn] DEVICE\n\n"
-            "       sg_ses --control [--byte1=B1] [--clear=STR] "
-            "[--data=H,H...]\n"
-            "              [--descriptor=DES] [--dev-slot-num=SN] "
-            "[--index=IIA | =TIA,II]\n"
-            "              [--inhex=FN] [--mask] [--maxlen=LEN] "
-            "[--nickid=SEID]\n"
-            "              [--nickname=SEN] [--page=PG] [--sas-addr=SA] "
-            "[--set=STR]\n"
-            "              [--verbose] DEVICE\n\n"
-            "       sg_ses --inhex=FN --status [-rr] [<most options from "
-            "first form>]\n"
-            "       sg_ses --data=@FN --status [-rr] [<most options from "
-            "first form>]\n\n"
-            "       sg_ses [--enumerate] [--help] [--index=IIA] [--list] "
-            "[--version]\n\n"
-               );
-        if ((help_num < 1) || (help_num > 2)) {
-            pr2serr("Or the corresponding short option usage: \n"
-                    "  sg_ses [-a] [-D DES] [-x SN] [-E A_F] [-f] [-G STR] "
-                    "[-H] [-I IIA|TIA,II]\n"
-                    "         [-i] [-j] [-m LEN] [-F] [-y] [-p PG] [-q] "
-                    "[-r] [-R] [-A SA] [-s]\n"
-                    "         [-v] [-w] DEVICE\n\n"
-                    "  sg_ses [-b B1] [-C STR] [-c] [-d H,H...] [-D DES] "
-                    "[-x SN] [-I IIA|TIA,II]\n"
-                    "         [-M] [-m LEN] [-N SEID] [-n SEN] [-p PG] "
-                    "[-A SA] [-S STR]\n"
-                    "         [-v] DEVICE\n\n"
-                    "  sg_ses -d @FN -s [-rr] [<most options from first "
-                    "form>]\n"
-                    "  sg_ses -X FN -s [-rr] [<most options from first "
-                    "form>]\n\n"
-                    "  sg_ses [-e] [-h] [-I IIA] [-l] [-V]\n"
-                   );
-            pr2serr("\nFor help use '-h' one or more times.\n");
-            return;
-        }
-        pr2serr(
-            "  where the main options are:\n"
-            "    --all|-a            --join followed by other SES dpages\n"
-            "    --clear=STR|-C STR    clear field by acronym or position\n"
-            "    --control|-c        send control information (def: fetch "
-            "status)\n"
-            "    --descriptor=DES|-D DES    descriptor name (for indexing)\n"
-            "    --dev-slot-num=SN|--dsn=SN|-x SN    device slot number "
-            "(for indexing)\n"
-            "    --filter|-f         filter out enclosure status flags that "
-            "are clear\n"
-            "                        use twice for status=okay entries "
-            "only\n"
-            "    --get=STR|-G STR    get value of field by acronym or "
-            "position\n"
-            "    --help|-h           print out usage message, use twice for "
-            "additional\n"
-            "    --index=IIA|-I IIA    individual index ('-1' for overall) "
-            "or element\n"
-            "                          type abbreviation (e.g. 'arr'). A "
-            "range may be\n"
-            "                          given for the individual index "
-            "(e.g. '2:5')\n"
-            "    --index=TIA,II|-I TIA,II    comma separated pair: TIA is "
-            "type header\n"
-            "                                index or element type "
-            "abbreviation;\n"
-            "                                II is individual index ('-1' "
-            "for overall)\n"
-            );
-        pr2serr(
-            "    --inhex=FN|-X FN    read data from file FN, ignore DEVICE "
-            "if given\n"
-            "    --join|-j           group Enclosure Status, Element "
-            "Descriptor\n"
-            "                        and Additional Element Status pages. "
-            "Use twice\n"
-            "                        to add Threshold In page\n"
-            "    --json[=JO]|-J[JO]    output in JSON instead of human "
-            "readable\n"
-            "                          test. Use --json=? for JSON help\n"
-            "    --page=PG|-p PG     diagnostic page code (abbreviation "
-            "or number)\n"
-            "                        (def: 'ssp' [0x0] (supported diagnostic "
-            "pages))\n"
+            "    --nickid=SEID|-N SEID   SEID is subenclosure identifier "
+            "(def: 0)\n"
+            "                            used to specify which nickname to "
+            "change\n"
+            "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
+            "    --page=PG|-p PG     see summary on '-h' page\n"
             "    --sas-addr=SA|-A SA    SAS address in hex (for indexing)\n"
             "    --set=STR|-S STR    set value of field by acronym or "
-            "position\n"
-            "    --status|-s         fetch status information (default "
-            "action)\n\n"
-            "First usage above is for fetching pages or fields from a SCSI "
-            "enclosure.\nThe second usage is for changing a page or field in "
-            "an enclosure. The\n'--clear=', '--get=' and '--set=' options "
-            "can appear multiple times.\nUse '-hh' for more help, including "
-            "the options not explained above.\n");
-    } else {    /* for '-hh' or '--help --help' */
+            "position\n\n"
+            "The '--control' option must be given for modifying enclosure "
+            "settings.\nThe fields to be modified can be given by the "
+            "'--clear=', '--set='\nor '--data=' options. See '-hhh' for "
+            "more help.\n"
+            );
+    } else if (3 == help_num) {
+        pr2serr("Input from file usage:\n");
+        rd_file_usage(true);
+        pr2serr("\nOther usage:\n");
+        other_usage(true);
         pr2serr(
-            "  where the remaining sg_ses options are:\n"
-            "    --ALL|-z            same as --join twice plus other "
+            "\n  where the remaining options are:\n"
+            "    --ALL|-z            same as --join twice plus remaining "
             "SES dpages\n"
-            "    --byte1=B1|-b B1    byte 1 (2nd byte) of control page set "
-            "to B1\n"
-            "    --data=H,H...|-d H,H...    string of ASCII hex bytes to "
-            "send as a\n"
-            "                               control page or decode as a "
-            "status page\n"
-            "    --data=- | -d -     fetch string of ASCII hex bytes from "
-            "stdin\n"
             "    --data=@FN | -d @FN    fetch string of ASCII hex bytes from "
             "file: FN\n"
             "    --eiioe=A_F|-E A_F    A_F is either 'auto' or 'force'. "
@@ -1241,7 +1135,13 @@ usage(int help_num)
             "(ignore\n"
             "                        DEVICE). Use twice for clear,get,set "
             "acronyms\n"
-            "    --hex|-H            print page response (or field) in hex\n"
+            "    --hex|-H            print page response (or field) in hex. "
+            "Can be\n"
+            "                        used multiple times: '-HHH' for "
+            "parsing\n"
+            "    --inhex=FN|-X FN    read data from file FN, ignore DEVICE "
+            "if given,\n"
+            "                        except in control usage\n"
             "    --inner-hex|-i      print innermost level of a"
             " status page in hex\n"
             "    --js-file=JFN|-Q JFN    JFN is a filename to which JSON "
@@ -1249,17 +1149,8 @@ usage(int help_num)
             "                            written (def: stdout); truncates "
             "then writes\n"
             "    --list|-l           same as '--enumerate' option\n"
-            "    --mask|-M           ignore status element mask in modify "
-            "actions\n"
-            "                        (e.g.--set= and --clear=) (def: apply "
-            "mask)\n"
             "    --maxlen=LEN|-m LEN    max response length (allocation "
             "length in cdb)\n"
-            "    --nickid=SEID|-N SEID   SEID is subenclosure identifier "
-            "(def: 0)\n"
-            "                            used to specify which nickname to "
-            "change\n"
-            "    --nickname=SEN|-n SEN   SEN is new subenclosure nickname\n"
             "    --no-config|-F      output without depending on config "
             "dpage\n"
             "    --no-time|-y        skip Report timestamp command\n"
@@ -1275,22 +1166,47 @@ usage(int help_num)
             "    --verbose|-v        increase verbosity\n"
             "    --version|-V        print version string and exit\n"
             "    --warn|-w           warn about join (and other) issues\n\n"
-            "If no options are given then DEVICE's supported diagnostic "
-            "pages are\nlisted. STR can be '<start_byte>:<start_bit>"
-            "[:<num_bits>][=<val>]'\nor '<acronym>[=val]'. Element type "
-            "abbreviations may be followed by a\nnumber (e.g. 'ps1' is "
-            "the second power supply element type). Use\n'sg_ses -e' and "
-            "'sg_ses -ee' for more information.\n\n"
+            "SES dpage contents may be fetched from a file named FN by "
+            "either\n'--data=@FN' or '--inhex=FN' and it can be parsed and "
+            "DEVICE, if given,\nwill be ignored. However when '--control' is "
+            "also given then the contents\nof FN (or the H,H... from "
+            "'--data=H,H...') will be used to send to the\nenclosure as a "
+            "control element. So in the '--control' case DEVICE is\n"
+            "required.\n"
             );
+    } else if (4 == help_num) {
         pr2serr(
-            "Low level indexing can be done with one of the two '--index=' "
-            "options.\nAlternatively, medium level indexing can be done "
-            "with either the\n'--descriptor=', 'dev-slot-num=' or "
-            "'--sas-addr=' options. Support for\nthe medium level options "
-            "in the SES device is itself optional.\n"
+            "Some examples:\n"
+            "    # Call sg_ses with no options: lists supported diagnostic "
+            "pages\n"
+            "    sg_ses /dev/sg3\n\n"
+            "    # Decode a single diagnostic page:\n"
+            "    sg_ses --page=snic /dev/sg3\n\n"
+            "    # Decode the larger Element status diagnostic page:\n"
+            "    sg_ses --page=es /dev/sg3\n\n"
+            "    # Decode several interrelated diagnostic pages (a "
+            "'join'):\n"
+            "    sg_ses --join /dev/sg3\n\n"
+            "    # Decode join then show remaining diagnostic pages:\n"
+            "    sg_ses --all /dev/sg3\n\n"
+            "    # Send a hex rendering of all diagnostic pages to a "
+            "file using\n"
+            "    # command line redirection. Hex format suitable for "
+            "later parsing:\n"
+            "    sg_ses --page=all -HHHHH /dev/sg3 > sg3_enc.hex\n\n"
+            "    # Get the 'ident' setting of the device/disk in slot 4:\n"
+            "    sg_ses --dsn=4 --get=ident /dev/sg3\n\n"
+            "    # Assuming that 1 bit field was clear (0), set it to 1:\n"
+            "    sg_ses --dsn=4 --set=ident /dev/sg3\n\n"
+            "    # The 'Identifier' LED of the device/disk in slot 4 "
+            "should now\n"
+            "    # be flashing. Do another 'get' to check the value is 1\n"
+            "    # Now turn off the flashing LED:\n"
+            "    sg_ses --dsn=4 --clear=ident /dev/sg3\n\n"
+            "    # Fetch dpages from file named sg3_enc.hex and decode:\n"
+            "    sg_ses --inhex=sg3_enc.hex --all\n\n"
             );
     }
-#endif
 }
 
 /* Parse argument give to '--index='. Return 0 for okay, else an error. If
@@ -2211,10 +2127,11 @@ fetch_decode_timestamp(struct sg_pt_base * ptvp, struct opts_t * op)
             return;
         }
         utc_secs_tm  = gmtime(&tt_secs);
-        strftime(b, blen, "%a, %d %b %Y %T %z", utc_secs_tm);
+        /* MinGW64 doesn't support %T, replace with %H:%M:%S */
+        strftime(b, blen, "%a, %d %b %Y %H:%M:%S %z", utc_secs_tm);
         sgj_pr_hr(jsp, "    %s:\n", b);
         loc_secs_tm  = localtime(&tt_secs);
-        strftime(b, blen, "%a, %d %b %Y %T", loc_secs_tm);
+        strftime(b, blen, "%a, %d %b %Y %H:%M:%S", loc_secs_tm);
         n = strlen(b);
         n += sg_scnpr(b + n, blen - n, ".%03u", rem_ms);
         strftime(b + n, blen - n, " %z", loc_secs_tm);
