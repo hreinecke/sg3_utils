@@ -42,7 +42,7 @@
 #endif
 
 
-static const char * const version_str = "2.01 20230110";
+static const char * const version_str = "2.02 20230311";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */

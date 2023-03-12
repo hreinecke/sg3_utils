@@ -40,7 +40,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.76 20230309";    /* ses4r04 */
+static const char * version_str = "2.77 20230311";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -2121,8 +2121,7 @@ fetch_decode_timestamp(struct sg_pt_base * ptvp, struct opts_t * op)
                               (1 == rem_mins) ? "" : "s");
             else if ((days > 0) || (rem_mins > 0))
                 n += sg_scnpr(b + n, blen - n, "0 minutes, ");
-            n += sg_scnpr(b + n, blen - n, "%u.%03u seconds", rem_secs,
-                          rem_ms);
+            sg_scnpr(b + n, blen - n, "%u.%03u seconds", rem_secs, rem_ms);
             sgj_pr_hr(jsp, "    %s since powerup or reset\n", b);
             return;
         }

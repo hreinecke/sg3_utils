@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2022 Douglas Gilbert.
+ * Copyright (c) 2009-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,7 +31,7 @@
 #include "sg_pt_nvme.h"
 #endif
 
-static const char * scsi_pt_version_str = "3.19 20220127";
+static const char * scsi_pt_version_str = "3.20 20230311";
 
 /* List of external functions that need to be defined for each OS are
  * listed at the top of sg_pt_dummy.c   */

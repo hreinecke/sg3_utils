@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.37 20230220";
+static const char * version_str = "6.38 20230311";
 
 
 #define ME "sg_dd: "
@@ -1285,11 +1285,10 @@ calc_duration_throughput(bool contin)
                 double dr = db / (da * 1000000.0);
 
                 if (dr < 1.0)
-                    n += sg_scnpr(f + n, flen - n, " (delta %.1f KB/sec)",
-                                  dr * 1000);
+                    sg_scnpr(f + n, flen - n, " (delta %.1f KB/sec)",
+                             dr * 1000);
                 else
-                    n += sg_scnpr(f + n, flen - n, " (delta %.2f MB/sec)",
-                                  dr);
+                    sg_scnpr(f + n, flen - n, " (delta %.2f MB/sec)", dr);
             }
         }
         pr2serr("%s\n", f);

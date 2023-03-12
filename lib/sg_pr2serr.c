@@ -237,8 +237,8 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
     n +=  sg_scnpr(b + n, blen - n,
                    "      n    show 'name_extra' information fields\n");
     n +=  sg_scnpr(b + n, blen - n,
-                   "      o    non-JSON output placed in 'output' array in "
-                   "lead-in\n");
+                   "      o    non-JSON output placed in 'plain_text_output' "
+		   "array in lead-in\n");
     if (n >= (blen - 1))
         goto fini;
     n +=  sg_scnpr(b + n, blen - n,
@@ -380,7 +380,8 @@ sgj_start_r(const char * util_name, const char * ver_str, int argc,
                                     json_object_new(0));
     }
     if (jsp->pr_out_hr && jv2p) {
-        jsp->out_hrp = json_object_push((json_value *)jv2p, "hr_output",
+        jsp->out_hrp = json_object_push((json_value *)jv2p,
+                                         "plain_text_output",
                                         json_array_new(0));
         if (jsp->pr_leadin && (jsp->verbose > 3)) {
             char * bp = (char *)calloc(4096, 1);

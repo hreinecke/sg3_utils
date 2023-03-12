@@ -1,4 +1,4 @@
-.TH SG3_UTILS_JSON "8" "February 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG3_UTILS_JSON "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg3_utils_json \- JSON output for some sg3_utils utilities
 .SH SYNOPSIS
@@ -11,8 +11,8 @@ sg3_utils is a package of utilities that send SCSI commands to the given
 \fIDEVICE\fR via a SCSI pass through interface provided by the host
 operating system. Some utilities, mainly those decoding structured data
 returned by SCSI commands (e.g. sg_vpd) can optionally provide JSON
-output, rather than simple, human\-readable output. The default remains
-human\-readable output.
+output, rather than simple, plain text output. The default remains
+plain text output.
 .PP
 JavaScript Object Notation (JSON) is an open standard file format that can be
 used for data exchange between programs including across a network. See
@@ -156,8 +156,8 @@ output. Lead\-in fields are at the start of the JSON output and include
 "utility_invoked" sub\-object includes "name", "version_date" string fields
 and an JSON array named "argv" with an entry for each command line argument.
 If the \fIo\fR control character is also active, then if available, the
-non_JSON output (i.e. the original, 'human readable' form) is placed in an
-array called "hr_output" with one element per line of 'normal' output.
+non_JSON output (i.e. the original, 'plain text' form) is placed in an
+array called "plain_text_output" with one element per line of 'normal' output.
 .br
 This boolean control character is default on (true).
 .TP
@@ -175,11 +175,10 @@ This boolean control character is default off (false).
 .TP
 \fBo\fR
 this is a boolean control character to control whether normal (i.e.
-non\-JSON) lines of output are placed in a JSON array (one element per
-line of normal output) within the utility_invoked subject (see control
-character \fIl\fR). The name of the array is "hr_output" where 'hr' stands
-for 'human readable'. This control character is active even if the
-lead\-in fields control character (\fIl\fR) is negated.
+non\-JSON) lines of output are placed in a JSON array (one element per line
+of normal output) within the utility_invoked subject (see control character
+\fIl\fR). The name of the array is "plain_text_output". This control character
+is active even if the lead\-in fields control character (\fIl\fR) is negated.
 .br
 This boolean control character is default off (false).
 .TP
@@ -223,7 +222,7 @@ This integer control character is set to 0 by default.
 .SH OUTPUT PROCESSING
 The default remains the same for all utilities that support the
 \fI\-\-json\fR option, namely the decoded information is sent to stdout in
-human readable form. Errors are reported to stderr and may cause the early
+plain text form. Errors are reported to stderr and may cause the early
 termination of a utility (e.g. command line option syntax error).
 .PP
 When the \fI\-\-json\fR option is given and no errors are detected, then
@@ -234,10 +233,10 @@ stdout. This means if there is any non-JSON output sent to stdout that
 it will appear _before_ the JSON output.
 .PP
 If the 'o' control character is in the \fIJO\fR argument to the
-\fI\-\-json\fR option, then the former 'human readable' output is placed in
-a JSON array named "hr_output" within a JSON object named "utility_invoked".
-Each line of the former 'human readable' output is placed in its own
-element of the JSON array.
+\fI\-\-json\fR option, then the former plain text output is placed in a JSON
+array named "plain_text_output" within a JSON object named "utility_invoked".
+ Each line of the former 'plain text' output is placed in its own element of
+the JSON array.
 .PP
 A JSON tree is built in memory as the utility parses the data returned
 from the SCSI device (e.g. sg_vpd parsing a VPD page returned from a
@@ -254,7 +253,7 @@ string terminator) somehow finds its way into a field that should (according
 to the spec) be space padded, then the JSON output may appear truncated.
 .PP
 Note that this JSON processing means that if a utility is aborted for whatever
-reason then no JSON output will appear. With the normal, human readable output
+reason then no JSON output will appear. With the normal, plain text output
 processing, some output may appear before the utility aborts in such bad
 situations.
 .SH BOOLEAN OR 0/1
@@ -265,9 +264,9 @@ fields are output as the integer value 0. Extensions to SCSI commands and
 associated data descriptors typically use parts of commands or data
 descriptors that were previously reserved.
 .SH INTERACTION WITH OTHER OPTIONS
-As stated above, the default output is in human readable form using 7 bit
+As stated above, the default output is in plain text form using 7 bit
 ASCII. The \fI\-\-json[=JO]\fR option is designed to be an alternative to that
-human readable form. There are other alternative output formats such as the
+plain text form. There are other alternative output formats such as the
 response output as a hexadecimal sequence of bytes or in 'raw' binary output;
 both of those take precedence over the \fI\-\-json[=JO]\fR option. Other
 specialized output format (e.g. 'sg_inq \-\-export') will usually take
@@ -275,7 +274,7 @@ precedence over JSON output.
 .PP
 When the \fI\-\-raw\fR option is used together with the \fI\-\-inhex=FN\fR
 option only the data input to the utility is interpreted as binary. So the
-output format defaults to human readable form and thus can be changed to
+output format defaults to plain text form and thus can be changed to
 JSON if the \fI\-\-json[=JO]\fR option is also used.
 .PP
 There is typically only one form of JSON output so options like
@@ -294,7 +293,7 @@ following 'sg_decode_sense \-j ' which should then render that sense data
 in JSON.
 .PP
 Otherwise, when a error is detected while JSON output is selected, the error
-message is sent to stderr in human readable form. Typically once an error is
+message is sent to stderr in plain text form. Typically once an error is
 detected the utility will exit, first dumping the JSON in\-memory tree as
 discussed above and a non\-zero exit status will be set. The JSON output will
 be well formed but missing any fields or list elements following the point
@@ -302,7 +301,7 @@ that the error was detected.
 .PP
 The summary is that when JSON output is selected and an error occurs each
 utility will process the error the same way as it would if JSON output had
-not been selected. In most cases error messages, in human readable form,
+not been selected. In most cases error messages, in plain text form,
 are sent to stderr.
 .SH AUTHORS
 Written by Douglas Gilbert. Some utilities have been contributed, see the
