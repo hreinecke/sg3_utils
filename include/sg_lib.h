@@ -431,7 +431,8 @@ bool sg_pdt_s_eq(int l_pdt_s, int r_pdt_s);
 
 /* Attempts to match acronym or abbreviation in 'acron' to a pdt. If 'spc'
  * given returns -1, if there is an other match returns 0 to 0x1f. If no
- * match returns -2 . */
+ * match returns -2 . If acronym is "xxx" then output a list of accepted
+ * acronyms, for each pdt value, to stderr (and returns -3). */
 int sg_get_pdt_from_acronym(const char * acron);
 
 extern FILE * sg_warnings_strm;

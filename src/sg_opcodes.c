@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.91 20230210";    /* spc6r07 */
+static const char * version_str = "0.92 20230213";    /* spc6r07 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -146,7 +146,7 @@ usage()
             "    --json[=JO]|-jJO    output in JSON instead of human "
             "readable\n"
             "                        test. Use --json=? for JSON help\n"
-	    "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
+            "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
             "output is\n"
             "                            written (def: stdout); truncates "
             "then writes\n"
@@ -436,10 +436,13 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 n = sg_get_num(optarg);
             else if ((2 == strlen(optarg)) && (0 == strcmp("-1", optarg)))
                 n = -1;
-	    else
-		n = sg_get_pdt_from_acronym(optarg);
+            else
+                n = sg_get_pdt_from_acronym(optarg);
             if ((n < -1) || (n > PDT_MAX)) {
-                pr2serr("bad argument to '--pdt=DT', expect -1 to 31\n");
+                if (-3 == n)        /* user asked for enueration */
+                    return SG_LIB_OK_FALSE;
+                pr2serr("bad argument to '--pdt=DT', expect -1 to 31 or "
+                        "acronym\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             peri_dtype = n;
@@ -498,6 +501,10 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     return 0;
 }
 
+/* Processes command line options according to old option format. Returns
+ * 0 is ok, else SG_LIB_SYNTAX_ERROR or similar is returned. Newer
+ * functionality is not available via these old options, better to use
+ * new options. */
 static int
 old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
@@ -1149,8 +1156,12 @@ main(int argc, char * argv[])
     op->opcode = -1;
     op->servact = -1;
     res = parse_cmd_line(op, argc, argv);
-    if (res)
-        return SG_LIB_SYNTAX_ERROR;
+    if (res) {
+        if (SG_LIB_OK_FALSE == res)
+            return 0;
+        else
+            return res;
+    }
     if (op->do_help) {
         if (op->opt_new)
             usage();

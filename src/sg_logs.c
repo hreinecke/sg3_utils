@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.19 20230130";    /* spc6r06 + sbc5r03 */
+static const char * version_str = "2.20 20230313";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -1066,12 +1066,15 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             else if (isdigit(*optarg)) {
                 n = sg_get_num(optarg);
                 if ((n < 0) || (n > 31)) {
-                    pr2serr("bad numeric argument to '--pdt='\n");
+                    pr2serr("bad numeric argument to '--pdt=', expect -1 to "
+                            "31 or acronym\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
             } else {
                 n = sg_get_pdt_from_acronym(optarg);
                 if (n < -1) {
+		    if (-3 == n)	/* user asked for enueration */
+			return SG_LIB_OK_FALSE;
                     pr2serr("bad acronym in argument to '--pdt='\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
@@ -1237,7 +1240,8 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 }
 
 /* Processes command line options according to old option format. Returns
- * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
+ * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. Newer functionality is
+ * not available via these old options, please use new options. */
 static int
 old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
@@ -9812,8 +9816,11 @@ main(int argc, char * argv[])
     op->vend_prod_num = VP_NONE;
     op->deduced_vpn = VP_NONE;
     res = parse_cmd_line(op, argc, argv);
-    if (res)
-        return SG_LIB_SYNTAX_ERROR;
+    if (res) {
+	if (SG_LIB_OK_FALSE == res)
+	    res = 0;
+	goto no_json;
+    }
     if (op->do_help) {
         usage_for(op->do_help, op);
         return 0;
@@ -10392,5 +10399,6 @@ err_out:
             fclose(fp);
         sgj_finish(jsp);
     }
+no_json:
     return (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
 }

@@ -668,6 +668,8 @@ sg_get_pdt_from_acronym(const char * acron)
     for (k = 0; k < len; ++k)
         b[k] = tolower(acron[k]);
     b[k] = '\0';
+    if (0 == memcmp("xxx", b, 3))
+        goto print_pdt_strs;
     if (0 == memcmp("spc", b, 3))
         return -1;
 
@@ -684,6 +686,14 @@ sg_get_pdt_from_acronym(const char * acron)
             return k;
     }
     return -2;
+
+print_pdt_strs:
+    pr2ws("List of peripheral device type (pdt) acronyms:\n");
+    for (k = 0, aip = sg_lib_pdt_aux_a; k < 0x20; ++k, ++aip)
+        pr2ws("  PDT 0x%x: %s [%d]\n", k, aip->acron, aip->min_match_len);
+    pr2ws("\nMultiple acronyms for a pdt are separated by semi-colons.\n");
+    pr2ws("The number in square brackets is the minimum match length.\n");
+    return -3;
 }
 
 /* Returns true if left argument is "equal" to the right argument. l_pdt_s
