@@ -95,18 +95,25 @@ typedef struct sgj_state_t {
 /* This function tries to convert the in_name C string to the "snake_case"
  * convention so the output sn_name only contains lower case ASCII letters,
  * numerals and "_" as a separator. Any leading or trailing underscores
- * are removed as are repeated underscores (e.g. "_Snake __ case" becomes
+ * are removed as are repeated underscores (e.g. "_Snake __ case_" becomes
  * "snake_case"). Parentheses and the characters between them are removed.
  * Returns sn_name (i.e. the pointer to the output buffer).
  * Note: strlen(in_name) should be <= max_sn_name_len . */
-char * sgj_convert2snake(const char * in_name, char * sn_name,
-                         int max_sn_name_len);
+char * sgj_convert2snake_rm_parens(const char * in_name, char * sn_name,
+                                   int max_sn_name_len);
+/* Returns sn_name which only contains lower case ASCII letters, numerals
+ * and "_" as a separator, taken from in_name. All other characters are
+ * converted to "_". Any leading or trailing underscores are removed as
+ * are repeated underscores (e.g. "_Output  power (mW)!" becomes
+ * "output_power_mw". */
+char * sgj_convert2snake(const char * in, char * out, int maxlen_out);
+/* Is in_name made up of only lower case alphanumerics and underscores? */
 bool sgj_is_snake_name(const char * in_name);
 
 /* There are many variants of JSON supporting functions below and some
  * abbreviations are used to shorten their function names:
  *    sgj_  - prefix of all the functions related to (non-)JSON output
- *    hr    - human readable form (as it was before JSON)
+ *    hr    - human readable form (same meaning as "plain text")
  *    js    - JSON only output
  *    haj   - human readable and JSON output, hr goes in 'output' array
  *    pr    - has printf() like variadic arguments
