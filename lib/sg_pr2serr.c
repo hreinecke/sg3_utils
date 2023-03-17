@@ -473,34 +473,62 @@ sgj_pr_hr(sgj_state * jsp, const char * fmt, ...)
 {
     va_list args;
 
-    if (jsp->pr_as_json && jsp->pr_out_hr) {
-        size_t len;
-        char b[256];
-
-        va_start(args, fmt);
-        len = vsnprintf(b, sizeof(b), fmt, args);
-        if ((len > 0) && (len < sizeof(b))) {
-            const char * cp = b;
-
-            /* remove up to two trailing linefeeds */
-            if (b[len - 1] == '\n') {
-                --len;
-                if (b[len - 1] == '\n')
-                    --len;
-                b[len] = '\0';
-            }
-            /* remove leading linefeed, if present */
-            if ((len > 0) && ('\n' == b[0]))
-                ++cp;
-            json_array_push((json_value *)jsp->out_hrp, json_string_new(cp));
-        }
-        va_end(args);
-    } else if (jsp->pr_as_json) {
-        va_start(args, fmt);
-        va_end(args);
-    } else {
+    if ((NULL == jsp) || (! jsp->pr_as_json)) {
         va_start(args, fmt);
         vfprintf(stdout, fmt, args);
+        va_end(args);
+    } else if (jsp->pr_out_hr) {
+        bool step = false;
+        size_t ln;
+        char b[256];
+        static const int blen = sizeof(b);
+
+        va_start(args, fmt);
+        ln = vsnprintf(b, blen, fmt, args);
+        if ((ln > 0) && (ln < blen)) {
+            char * cp;
+
+             /* deal with leading, trailing and embedded newlines */
+             while ( true ) {
+                cp = strrchr(b, '\n');
+                if (NULL == cp)
+                    break;
+                else if (cp == b) {
+                    if ('\0' == *(cp + 1))
+                        *cp = '\0';
+                    else
+                        step = true;
+                    break;
+                } else if ('\0' == *(cp + 1))
+                    *cp = '\0';
+                else
+                    *cp = ';';
+             }
+             /* replace any tabs with semicolons or spaces */
+             while ( true ) {
+                cp = strchr(b, '\t');
+                if (NULL == cp)
+                    break;
+                else if (cp == b) {
+                    if ('\0' == *(cp + 1))
+                        *cp = '\0';
+                    else {
+                        *cp = ' ';      /* so don't find \t again and again */
+                        step = true;
+                    }
+                } else {
+                    if (';' == *(cp - 1))
+                        *cp = ' ';
+                    else
+                        *cp = ';';
+                }
+            }
+        }
+        json_array_push((json_value *)jsp->out_hrp,
+                        json_string_new(step ? b + 1 : b));
+        va_end(args);
+    } else {    /* do nothing, just consume arguments */
+        va_start(args, fmt);
         va_end(args);
     }
 }

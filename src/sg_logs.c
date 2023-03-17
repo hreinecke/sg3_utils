@@ -37,7 +37,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "2.21 20230315";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.22 20230316";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -190,13 +190,27 @@ static struct option long_options[] = {
     {0, 0, 0, 0},
 };
 
+struct opts_t;
+
+struct log_elem {
+    int pg_code;
+    int subpg_code;     /* only unless subpg_high>0 then this is only */
+    int subpg_high;     /* when >0 this is high end of subpage range */
+    int pdt;            /* -1 for all */
+    int flags;          /* bit mask; or-ed with MVP_* constants */
+    const char * name;
+    const char * acron;
+    bool (*show_pagep)(const uint8_t * resp, int len, struct opts_t * op,
+                       sgj_opaque_p jop);
+                        /* Returns true if done */
+};
+
 struct opts_t {
     bool do_full;
     bool do_json;
     bool do_name;
     bool do_pcb;
     bool do_ppc;
-    bool do_raw;
     bool do_pcreset;
     bool do_select;
     bool do_sp;
@@ -215,6 +229,7 @@ struct opts_t {
     int do_help;
     int do_hex;
     int do_list;
+    int do_raw;
     int dstrhex_no_ascii;       /* value for dStrHex() no_ascii argument */
     int h2s_oformat;    /* value for hex2str() oformat argument */
     int vend_prod_num;  /* one of the VP_* constants or -1 (def) */
@@ -240,20 +255,6 @@ struct opts_t {
     sgj_state json_st;
 };
 
-
-struct log_elem {
-    int pg_code;
-    int subpg_code;     /* only unless subpg_high>0 then this is only */
-    int subpg_high;     /* when >0 this is high end of subpage range */
-    int pdt;            /* -1 for all */
-    int flags;          /* bit mask; or-ed with MVP_* constants */
-    const char * name;
-    const char * acron;
-    bool (*show_pagep)(const uint8_t * resp, int len,
-                       struct opts_t * op, sgj_opaque_p jop);
-                        /* Returns true if done */
-};
-
 struct vp_name_t {
     int vend_prod_num;       /* vendor/product identifier */
     const char * acron;
@@ -264,6 +265,8 @@ struct vp_name_t {
 
 static const char * ls_s = "log_sense: ";
 
+/* Following show_* functions need to match the signature of the
+ * function pointer: log_elem:show_pagep */
 static bool show_supported_pgs_page(const uint8_t * resp, int len,
                                     struct opts_t * op, sgj_opaque_p jop);
 static bool show_supported_pgs_sub_page(const uint8_t * resp, int len,
@@ -1188,7 +1191,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->do_ppc = true;
             break;
         case 'r':
-            op->do_raw = true;
+            ++op->do_raw;
             break;
         case 'R':
             op->do_pcreset = true;
@@ -1574,7 +1577,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
             goto resid_err;
         }
         calc_len = sg_get_unaligned_be16(resp + 2) + 4;
-        if ((! op->do_raw) && (vb > 1)) {
+        if ((0 == op->do_raw) && (vb > 1)) {
             pr2serr("  Log sense (find length) response:\n");
             hex2stderr(resp, LOG_SENSE_PROBE_ALLOC_LEN, 1);
             pr2serr("  hence calculated response length=%d\n", calc_len);
@@ -1612,7 +1615,7 @@ do_logs(int sg_fd, uint8_t * resp, int mx_resp_len,
             goto resid_err;
         }
     }
-    if ((! op->do_raw) && (vb > 1)) {
+    if ((0 == op->do_raw) && (vb > 1)) {
         pr2serr("  Log sense response:\n");
         hex2stderr(resp, request_len, 1);
     }
@@ -1621,7 +1624,7 @@ resid_err:
     pr2serr("%s: request_len=%d, resid=%d, problems\n", __func__, request_len,
             resid);
     request_len -= resid;
-    if ((request_len > 0) && (! op->do_raw) && (vb > 1)) {
+    if ((request_len > 0) && (0 == op->do_raw) && (vb > 1)) {
         pr2serr("  Log sense (resid_err) response:\n");
         hex2stderr(resp, request_len, 1);
     }
@@ -1723,12 +1726,16 @@ show_supported_pgs_page(const uint8_t * resp, int len,
     char b[64];
     static const char * slpgs = "Supported log pages";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x0]:\n", slpgs);  /* introduced in: SPC-2 */
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x0]:\n", leadin, slpgs);
+    }
     num = len - 4;
     bp = &resp[0] + 4;
-    if ((op->do_hex > 0) || op->do_raw) {
-        if (op->do_raw)
+    if ((op->do_hex > 0) || op->do_raw > 0) {
+        if (op->do_raw > 0)
             dStrRaw(resp, len);
         else
             hex2stdout(resp, len, op->dstrhex_no_ascii);
@@ -1782,16 +1789,19 @@ show_supported_pgs_sub_page(const uint8_t * resp, int len,
     static const char * slpass = "Supported log pages and subpages";
     static const char * sss = "Supported subpages";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (op->pg_code > 0)
-            sgj_pr_hr(jsp, "%s  [0x%x, 0xff]:\n", sss, op->pg_code);
+            sgj_pr_hr(jsp, "%s%s  [0x%x, 0xff]:\n", leadin, sss, op->pg_code);
         else
-            sgj_pr_hr(jsp, "%s  [0x0, 0xff]:\n", sss);
+            sgj_pr_hr(jsp, "%s%s  [0x0, 0xff]:\n", leadin, sss);
     }
     num = len - 4;
     bp = &resp[0] + 4;
-    if ((op->do_hex > 0) || op->do_raw) {
-        if (op->do_raw)
+    if ((op->do_hex > 0) || (op->do_raw > 0)) {
+        if (op->do_raw > 0)
             dStrRaw(resp, len);
         else
             hex2stdout(resp, len, op->dstrhex_no_ascii);
@@ -1868,8 +1878,19 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
     static const char * bourlp = "Buffer over-run/under-run log page";
     static const char * orurc = "over_run_under_run_counter";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x1]\n", bourlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x1]\n", leadin, bourlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -1886,7 +1907,7 @@ show_buffer_over_under_run_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -2046,8 +2067,19 @@ show_error_counter_page(const uint8_t * resp, int len,
                 pg_code);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s log page  [0x%x]\n", pg_cp, pg_code);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s log page  [0x%x]\n", leadin, pg_cp, pg_code);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         snprintf(b, blen, "%s %s", pg_cp, "log page");
         jo2p = sg_log_js_hdr(jsp, jop, b, resp);
@@ -2065,7 +2097,7 @@ show_error_counter_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -2175,8 +2207,19 @@ show_non_medium_error_page(const uint8_t * resp, int len,
     static const char * nmelp = "Non-medium error log page";
     static const char * nmec = "Non-medium error count";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x6]\n", nmelp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x6]\n", leadin, nmelp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -2191,7 +2234,7 @@ show_non_medium_error_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -2269,8 +2312,19 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
     static const char * pctlp = "Power condition transitions log page";
     static const char * att = "Accumulated transitions to";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x1a]\n", pctlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x1a]\n", leadin, pctlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -2286,7 +2340,7 @@ show_power_condition_transitions_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -2408,8 +2462,19 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
     static const char * maxorh = "Maximum other relative humidity";
     static const char * minorh = "Minimum other relative humidity";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0xd,0x1]\n", erlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xd,0x1]\n", leadin, erlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, erlp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -2424,7 +2489,7 @@ show_environmental_reporting_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -2576,8 +2641,19 @@ show_environmental_limits_page(const uint8_t * resp, int len,
     static const char * lorhlt =
                 "High operating relative humidity limit trigger";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0xd,0x2]\n", ellp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xd,0x2]\n", leadin, ellp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, ellp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -2592,7 +2668,7 @@ show_environmental_limits_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -2731,8 +2807,19 @@ show_cmd_dur_limits_page(const uint8_t * resp, int len,
         "Number of inactive target and active target miss commands";
     static const char * noc = "Number of commands";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x19,0x21]\n", cdllp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x19,0x21]\n", leadin, cdllp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -2748,7 +2835,7 @@ show_cmd_dur_limits_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -2902,8 +2989,20 @@ show_tape_usage_page(const uint8_t * resp, int len, struct opts_t * op,
         pr2serr("%s: badly formed %s\n", __func__, tu_lp);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  (LTO-5 and LTO-6 specific) [0x30]\n", tu_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  (LTO-5 and LTO-6 specific) [0x30]\n", leadin,
+                  tu_lp);
+   }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
    if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, tu_lp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p, "tape_usage_log_parameters");
@@ -2917,7 +3016,7 @@ show_tape_usage_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, extra);
             goto skip;
         } else if (op->do_hex) {
@@ -3026,8 +3125,19 @@ show_hgst_perf_page(const uint8_t * resp, int len, struct opts_t * op,
     static const char * hwpclp = "HGST/WDC performance counters log page";
 
 if (jop) { };
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x30]\n", hwpclp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x30]\n", leadin, hwpclp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     if (num < 0x30) {
         pr2serr("%s too short (%d) < 48\n", hwpclp, num);
@@ -3042,7 +3152,7 @@ if (jop) { };
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -3118,8 +3228,20 @@ show_tape_capacity_page(const uint8_t * resp, int len,
         pr2serr("%s: badly formed %s\n", __func__, tc_lp);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  (LTO-5 and LTO-6 specific) [0x31]\n", tc_lp);
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  (LTO-5 and LTO-6 specific) [0x31]\n", leadin,
+                  tc_lp);
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, tc_lp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p, "tape_capacity_log_parameters");
@@ -3133,7 +3255,7 @@ show_tape_capacity_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, extra);
             goto skip;
         } else if (op->do_hex) {
@@ -3210,7 +3332,6 @@ show_data_compression_page(const uint8_t * resp, int len,
     static const int blen = sizeof(b);
     static const char * const dc_lp = "Data compression log page";
 
-// yyyyyyyyyyyyyyyyyyyyy
     pg_code = resp[0] & 0x3f;
     num = len - 4;
     bp = &resp[0] + 4;
@@ -3218,11 +3339,22 @@ show_data_compression_page(const uint8_t * resp, int len,
         pr2serr("%s: badly formed data compression page\n", __func__);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (0x1b == pg_code)
-            sgj_pr_hr(jsp, "%s  (ssc-4) [0x1b]\n", dc_lp);
+            sgj_pr_hr(jsp, "%s%s  (ssc-4) [0x1b]\n", leadin, dc_lp);
         else
-            sgj_pr_hr(jsp, "%s  (LTO-5 specific) [0x%x]\n", dc_lp, pg_code);
+            sgj_pr_hr(jsp, "%s%s  (LTO-5 specific) [0x%x]\n", leadin, dc_lp,
+                       pg_code);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
     }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, dc_lp, resp);
@@ -3238,7 +3370,7 @@ show_data_compression_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, extra);
             break;
         } else if (op->do_hex) {
@@ -3355,8 +3487,19 @@ show_last_n_error_page(const uint8_t * resp, int len,
         sgj_pr_hr(jsp, "No error events logged\n");
         return true;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x7]\n", lneelp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x7]\n", leadin, lneelp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, lneelp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p, "error_event_log_parameters");
@@ -3375,7 +3518,7 @@ show_last_n_error_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -3444,8 +3587,19 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
         pr2serr("%s: No deferred errors logged\n", __func__);
         return true;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0xb]\n", lndeoaelp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xb]\n", leadin, lndeoaelp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, lndeoaelp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -3465,7 +3619,7 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -3480,7 +3634,7 @@ show_last_n_deferred_error_page(const uint8_t * resp, int len,
         }
         sgj_pr_hr(jsp, "  %s [0x%x]:\n", deoae, pc);
         if (op->do_brief > 0) {
-            hex2stdout(bp + 4, pl - 4, op->dstrhex_no_ascii);
+            // hex2stdout(bp + 4, pl - 4, op->dstrhex_no_ascii);
             hex2str(bp + 4, pl - 4, "    ", op->h2s_oformat, blen, b);
             sgj_pr_hr(jsp, "%s\n", b);
             if (jsp->pr_as_json)
@@ -3527,8 +3681,19 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
     static const char * lnidclp = "Last n inquiry data changed log page";
     static const char * idci = "Inquiry data changed indicator";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0xb,0x1]\n", lnidclp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xb,0x1]\n", leadin, lnidclp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -3545,7 +3710,7 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -3646,8 +3811,19 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
     static const char * lnmpdclp = "Last n mode page data changed log page";
     static const char * mpdci = "Mode page data changed indicator";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0xb,0x2]\n", lnmpdclp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xb,0x2]\n", leadin, lnmpdclp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -3664,7 +3840,7 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -3790,8 +3966,19 @@ show_self_test_page(const uint8_t * resp, int len, struct opts_t * op,
                 __func__, strlp, num);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x10]\n", strlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x10]\n", leadin, strlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, strlp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -3806,7 +3993,7 @@ show_self_test_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             break;
         } else if (op->do_hex) {
@@ -3910,9 +4097,19 @@ show_temperature_page(const uint8_t * resp, int len, struct opts_t * op,
         pr2serr("%s: badly formed %s\n", __func__, tlp);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (! op->do_temperature)
-            sgj_pr_hr(jsp, "%s  [0xd]\n", tlp);
+            sgj_pr_hr(jsp, "%s%s  [0xd]\n", leadin, tlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
     }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, tlp, resp);
@@ -3932,7 +4129,7 @@ show_temperature_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, extra);
             goto skip;
         } else if (op->do_hex) {
@@ -4040,8 +4237,19 @@ show_start_stop_page(const uint8_t * resp, int len, struct opts_t * op,
         pr2serr("%s: badly formed %s\n", __func__, sscclp);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0xe]\n", sscclp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xe]\n", leadin, sscclp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, sscclp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -4061,7 +4269,7 @@ show_start_stop_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, extra);
             goto skip;
         } else if (op->do_hex) {
@@ -4203,8 +4411,19 @@ show_app_client_page(const uint8_t * resp, int len, struct opts_t * op,
         pr2serr("%s: badly formed %s\n", __func__, aclp);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (op->do_hex == 0)))
-        sgj_pr_hr(jsp, "%s  [0xf]\n", aclp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xf]\n", leadin, aclp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json)
         jo2p = sg_log_js_hdr(jsp, jop, aclp, resp);
     if ((0 == op->filter_given) && (! op->do_full)) {
@@ -4254,7 +4473,7 @@ show_app_client_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, extra);
             break;
         }
@@ -4315,9 +4534,19 @@ show_ie_page(const uint8_t * resp, int len, struct opts_t * op,
         pr2serr("%s: badly formed %s\n", __func__, ielp);
         return false;
     }
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (full)
-            sgj_pr_hr(jsp, "%s  [0x2f]\n", ielp);
+            sgj_pr_hr(jsp, "%s%s  [0x2f]\n", leadin, ielp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
     }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, ielp, resp);
@@ -4338,7 +4567,7 @@ show_ie_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, param_len);
             goto skip;
         } else if (op->do_hex) {
@@ -5017,11 +5246,22 @@ show_protocol_specific_port_page(const uint8_t * resp, int len,
     static const char * fss = "for SAS SSP";
 
     num = len - 4;
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (op->do_name)
-            sgj_pr_hr(jsp, "%s=0x%x\n", lp_sn, PROTO_SPECIFIC_LPAGE);
+            sgj_pr_hr(jsp, "%s%s=0x%x\n", leadin, lp_sn,
+                      PROTO_SPECIFIC_LPAGE);
         else
-            sgj_pr_hr(jsp, "%s  [0x18]\n", psplp);
+            sgj_pr_hr(jsp, "%s%s  [0x18]\n", leadin, psplp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
     }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, psplp, resp);
@@ -5037,7 +5277,7 @@ show_protocol_specific_port_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto skip;
         } else if (op->do_hex) {
@@ -5109,21 +5349,31 @@ show_stats_perform_pages(const uint8_t * resp, int len,
         pg_name = gr_saplp;
     else
         pg_name = "Unknown subpage";
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (nm) {
-             sgj_pr_hr(jsp, "%s=0x%x\n", lp_sn, STATS_LPAGE);
+             sgj_pr_hr(jsp, "%s%s=0x%x\n", leadin, lp_sn, STATS_LPAGE);
             if (subpg_code > 0)
-                sgj_pr_hr(jsp, "log_subpage=0x%x\n", subpg_code);
+                sgj_pr_hr(jsp, "%slog_subpage=0x%x\n", leadin, subpg_code);
         } else {
             if (0 == subpg_code)
-                sgj_pr_hr(jsp, "%s  [0x19]\n", gsaplp);
+                sgj_pr_hr(jsp, "%s%s  [0x19]\n", leadin, gsaplp);
             else if (subpg_code < 0x20)
-                sgj_pr_hr(jsp, "%s (%d)  [0x19,0x%x]\n", gr_saplp, subpg_code,
-                          subpg_code);
+                sgj_pr_hr(jsp, "%s%s (%d)  [0x19,0x%x]\n", leadin, gr_saplp,
+                          subpg_code, subpg_code);
             else
-                sgj_pr_hr(jsp, "%s: %d  [0x19,0x%x]\n", pg_name, subpg_code,
-                          subpg_code);
+                sgj_pr_hr(jsp, "%s%s: %d  [0x19,0x%x]\n", leadin, pg_name,
+                          subpg_code, subpg_code);
         }
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
     }
     if (subpg_code > 31)
         return false;
@@ -5148,7 +5398,7 @@ show_stats_perform_pages(const uint8_t * resp, int len,
                 if (param_code != op->filter)
                     continue;
             }
-            if (op->do_raw) {
+            if (op->do_raw > 0) {
                 dStrRaw(bp, extra);
                 goto skip;
             } else if (op->do_hex) {
@@ -5292,7 +5542,7 @@ skip:
                 if (param_code != op->filter)
                     continue;
             }
-            if (op->do_raw) {
+            if (op->do_raw > 0) {
                 dStrRaw(bp, extra);
                 goto skip2;
             } else if (op->do_hex) {
@@ -5438,13 +5688,23 @@ show_cache_stats_page(const uint8_t * resp, int len, struct opts_t * op,
     }
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : NOT_SPG_SUBPG;
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (nm) {
-            sgj_pr_hr(jsp, "%s=0x%x\n", lp_sn, STATS_LPAGE);
+            sgj_pr_hr(jsp, "%s%s=0x%x\n", leadin, lp_sn, STATS_LPAGE);
             if (subpg_code > 0)
-                sgj_pr_hr(jsp, "log_subpage=0x%x\n", subpg_code);
+                sgj_pr_hr(jsp, "%slog_subpage=0x%x\n", leadin, subpg_code);
         } else
-            sgj_pr_hr(jsp, "%s  [0x19,0x20]\n", cmslp);
+            sgj_pr_hr(jsp, "%s%s  [0x19,0x20]\n", leadin, cmslp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
     }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, cmslp, resp);
@@ -5469,7 +5729,7 @@ show_cache_stats_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 continue;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, extra);
             goto skip;
         } else if (op->do_hex) {
@@ -5580,8 +5840,19 @@ show_format_status_page(const uint8_t * resp, int len,
     static const char * fso = "Format status out";
     static const char * fso_sn = "format_status_out";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x8]\n", fslp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x8]\n", leadin, fslp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -5596,7 +5867,7 @@ show_format_status_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -5717,8 +5988,19 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
     static const char * ziinv = "0 (i.e. it is now volatile)";
     static const char * indef = "indefinite";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-         sgj_pr_hr(jsp, "%s  [0x17]\n", nvclp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+         sgj_pr_hr(jsp, "%s%s  [0x17]\n", leadin, nvclp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -5734,7 +6016,7 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -5845,8 +6127,19 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
     static const int blen = sizeof(b);
     static const char * lbplp = "Logical block provisioning log page";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-         sgj_pr_hr(jsp, "%s  [0xc]\n", lbplp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xc]\n", leadin, lbplp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -5862,7 +6155,7 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -5984,8 +6277,19 @@ show_utilization_page(const uint8_t * resp, int len, struct opts_t * op,
     static const char * uurbodat =
                         "Utilization usage rate based on date and time";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0xe,0x1]\n", ulp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0xe,0x1]\n", leadin, ulp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -6001,7 +6305,7 @@ show_utilization_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -6089,8 +6393,19 @@ show_solid_state_media_page(const uint8_t * resp, int len,
     static const char * ssmlp = "Solid state media log page";
     static const char * puei = "Percentage used endurance indicator";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x11]\n", ssmlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x11]\n", leadin, ssmlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, ssmlp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -6105,7 +6420,7 @@ show_solid_state_media_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -6199,8 +6514,19 @@ show_dt_device_status_page(const uint8_t * resp, int len,
                         "DT device ADC data encryption control status";
     static const char * kmed = "Key management error data";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (ssc-3, adc-3) [0x11]\n", dds_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (ssc-3, adc-3) [0x11]\n", leadin, dds_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, dds_lp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -6216,7 +6542,7 @@ show_dt_device_status_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -6494,8 +6820,19 @@ show_tapealert_response_page(const uint8_t * resp, int len,
     static const int elen = sizeof(e);
     static const char * tar_lp = "TapeAlert response log page";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (adc-3, ssc-3) [0x12]\n", tar_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (adc-3, ssc-3) [0x12]\n", leadin, tar_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -6511,7 +6848,7 @@ show_tapealert_response_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -6636,8 +6973,19 @@ show_requested_recovery_page(const uint8_t * resp, int len,
     static const char * rp_s = "Recovery procedures";
     static const char * rp_sn = "recovery_procedure";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (ssc-3) [0x13]\n", rr_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (ssc-3) [0x13]\n", leadin, rr_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, rr_lp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -6653,7 +7001,7 @@ show_requested_recovery_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -6757,8 +7105,19 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
     static const int blen = sizeof(b);
     static const char * aptrlp = "ATA pass-through results log page";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x16]\n", aptrlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x16]\n", leadin, aptrlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -6774,7 +7133,7 @@ show_ata_pt_results_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -6901,8 +7260,19 @@ show_background_scan_results_page(const uint8_t * resp, int len,
     static const char * apom = "Accumulated power on minutes";
     static const char * rs = "Reassign status";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x15]\n", bsrlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x15]\n", leadin, bsrlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -6917,7 +7287,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -7128,8 +7498,19 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
     static const char * mxiosobrz =
         "Maximum implicitly open sequential or before required zones";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x14,0x1]\n", zbdslp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x14,0x1]\n", leadin, zbdslp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -7149,7 +7530,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -7364,8 +7745,19 @@ show_pending_defects_page(const uint8_t * resp, int len, struct opts_t * op,
     static const char * pdlp = "Pending defects log page";
     static const char * pd = "Pending defect";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-         sgj_pr_hr(jsp, "  %s  [0x15,0x1]\n", pdlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+         sgj_pr_hr(jsp, "%s  %s  [0x15,0x1]\n", leadin, pdlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -7380,7 +7772,7 @@ show_pending_defects_page(const uint8_t * resp, int len, struct opts_t * op,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -7481,8 +7873,19 @@ show_background_op_page(const uint8_t * resp, int len,
     static const char * bolp = "Background operation log page";
     static const char * bo_s = "Background operation";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x15,0x2]\n", bolp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x15,0x2]\n", leadin, bolp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -7498,7 +7901,7 @@ show_background_op_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -7568,8 +7971,19 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
     static const char * lmlp = "LPS misalignment log page";
     static const char * lmc = "LPS misalignment count";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s  [0x15,0x3]\n", lmlp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s  [0x15,0x3]\n", leadin, lmlp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -7585,7 +7999,7 @@ show_lps_misalignment_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -7673,8 +8087,19 @@ show_service_buffers_info_page(const uint8_t * resp, int len,
     static const int blen = sizeof(b);
     static const char * sbi_lp = "Service buffers information log page";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (adc-3) [0x15]\n", sbi_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (adc-3) [0x15]\n", leadin, sbi_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -7690,7 +8115,7 @@ show_service_buffers_info_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -7791,8 +8216,19 @@ show_sequential_access_page(const uint8_t * resp, int len,
     static const int blen = sizeof(b);
     static const char * const sad_lp = "Sequential access device log page";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (ssc-3)\n", sad_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (ssc-3)\n", leadin, sad_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, sad_lp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -7808,7 +8244,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -7995,8 +8431,19 @@ show_device_stats_page(const uint8_t * resp, int len,
     static const int blen = sizeof(b);
     static const char * const ds_lp = "Device statistics log page";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (ssc-3 and adc)\n", ds_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (ssc-3 and adc)\n", leadin, ds_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, ds_lp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p,
@@ -8012,7 +8459,7 @@ show_device_stats_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
              goto filter_chk;
         } else if (op->do_hex) {
@@ -8251,8 +8698,19 @@ show_media_stats_page(const uint8_t * resp, int len, struct opts_t * op,
     char str[PCB_STR_LEN];
 
 if (jop) { };
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Media statistics page (smc-3)\n");
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        printf("%s Media statistics page (smc-3)\n", leadin);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
@@ -8262,7 +8720,7 @@ if (jop) { };
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -8389,8 +8847,19 @@ show_element_stats_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
 
 if (jop) { };
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Element statistics page (smc-3) [0x15]\n");
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        printf("%sElement statistics page (smc-3) [0x15]\n", leadin);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
@@ -8400,7 +8869,7 @@ if (jop) { };
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -8451,8 +8920,19 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
     static const char * min_s = "Medium id number";
     static const char * min_sn = "medium_id_number";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (ssc-3) [0x16]\n", tdd_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (ssc-3) [0x16]\n", leadin, tdd_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -8468,7 +8948,7 @@ show_tape_diag_data_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -8598,8 +9078,19 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
     static const char * const mcdd_lp =
                         "Media changer diagnostics data log page";
 
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (smc-3) [0x16]\n", mcdd_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (smc-3) [0x16]\n", leadin, mcdd_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     if (jsp->pr_as_json) {
@@ -8615,7 +9106,7 @@ show_mchanger_diag_data_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -8829,7 +9320,6 @@ volume_stats_history(const char * name, const uint8_t * xp, int len,
         jap = sgj_named_subarray_r(jsp, jop,
                                    sgj_convert2snake(name, b, blen));
     }
-
     while (len > 3) {
         int dl, mhi;
 
@@ -8885,14 +9375,25 @@ show_volume_stats_pages(const uint8_t * resp, int len,
 
     spf = !!(resp[0] & 0x40);
     subpg_code = spf ? resp[1] : NOT_SPG_SUBPG;
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (subpg_code < 0x10)
-            sgj_pr_hr(jsp, "%s (ssc-4), subpage=%d\n", vs_lp, subpg_code);
-        else {
-            sgj_pr_hr(jsp, "%s (ssc-4), subpage=%d; Reserved, skip\n", vs_lp,
+            sgj_pr_hr(jsp, "%s%s (ssc-4), subpage=%d\n", leadin, vs_lp,
                       subpg_code);
+        else {
+            sgj_pr_hr(jsp, "%s%s (ssc-4), subpage=%d; Reserved, skip\n",
+                      leadin, vs_lp, subpg_code);
             return false;
         }
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
     }
     if (jsp->pr_as_json) {
         snprintf(b, blen, "%s subpage=0x%x?",  vs_lp, subpg_code);
@@ -8910,7 +9411,7 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -9239,8 +9740,19 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
     static const char * const ta_lp = "TapeAlert log page";
 
     /* N.B. the Tape alert log page for smc-3 is different */
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        sgj_pr_hr(jsp, "%s (ssc-3) [0x2e]\n", ta_lp);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        sgj_pr_hr(jsp, "%s%s (ssc-3) [0x2e]\n", leadin, ta_lp);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     if (jsp->pr_as_json) {
         jo2p = sg_log_js_hdr(jsp, jop, ta_lp, resp);
         jap = sgj_named_subarray_r(jsp, jo2p, "tapealert_log_parameters");
@@ -9255,7 +9767,7 @@ show_tape_alert_ssc_page(const uint8_t * resp, int len,
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -9319,16 +9831,26 @@ show_seagate_cache_page(const uint8_t * resp, int len,
     static const int blen = sizeof(b);
 
 if (jop) { };
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex))) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
         if (resp[1] > 0) {
-            sgj_pr_hr(jsp, "Suspicious page 0x37, SPF=0 but subpage=0x%x\n",
-                      resp[1]);
+            sgj_pr_hr(jsp, "%sSuspicious page 0x37, SPF=0 but subpage=0x%x\n",
+                      leadin, resp[1]);
             if (op->verbose)
-                sgj_pr_hr(jsp, "... try vendor=wdc\n");
+                sgj_pr_hr(jsp, "%s... try vendor=wdc\n", leadin);
             if (op->do_brief > 0)
                 return true;
         } else
-            sgj_pr_hr(jsp, "Seagate cache page [0x37]\n");
+            sgj_pr_hr(jsp, "%sSeagate cache page [0x37]\n", leadin);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
     }
     num = len - 4;
     bp = &resp[0] + 4;
@@ -9339,7 +9861,7 @@ if (jop) { };
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -9404,9 +9926,21 @@ show_hgst_misc_page(const uint8_t * resp, int len, struct opts_t * op,
     char str[PCB_STR_LEN];
 
 if (jop) { };
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("HGST/WDC miscellaneous page [0x37, 0x%x]\n",
-               op->decod_subpg_code);
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+// zzzzzzzzzzzzzzzzzzzzzz
+        printf("%sHGST/WDC miscellaneous page [0x37, 0x%x]\n",
+               leadin, op->decod_subpg_code);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     if (num < 0x30) {
         printf("HGST/WDC miscellaneous page too short (%d) < 48\n", num);
@@ -9420,7 +9954,7 @@ if (jop) { };
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -9476,8 +10010,19 @@ show_seagate_factory_page(const uint8_t * resp, int len,
     char str[PCB_STR_LEN];
 
 if (jop) { };
-    if (op->verbose || ((! op->do_raw) && (0 == op->do_hex)))
-        printf("Seagate/Hitachi factory page [0x3e]\n");
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+
+        printf("%sSeagate/Hitachi factory page [0x3e]\n", leadin);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return true;
+    }
     num = len - 4;
     bp = &resp[0] + 4;
     while (num > 3) {
@@ -9487,7 +10032,7 @@ if (jop) { };
             if (pc != op->filter)
                 goto skip;
         }
-        if (op->do_raw) {
+        if (op->do_raw > 0) {
             dStrRaw(bp, pl);
             goto filter_chk;
         } else if (op->do_hex) {
@@ -9541,13 +10086,24 @@ show_unknown_page(int subpg_code, const uint8_t * resp, int len,
     static const char * unable_s = "Unable to decode page";
 
     pg_code = resp[0] & 0x3f;
-    if (0 == op->do_hex) {
+    if (op->verbose || ((0 == op->do_raw) &&
+        ((0 == op->do_hex) || (op->do_hex > 3)))) {
+        const char * leadin = (op->do_hex > 3) ? "# " : "";
+        const char * hih = (op->do_hex > 3) ? "" : ", here is hex";
+
         if (subpg_code > 0)
-            sgj_pr_hr(jsp, "%s = 0x%x, subpage = 0x%x, here is hex:\n",
-                      unable_s, pg_code, subpg_code);
+            sgj_pr_hr(jsp, "%s%s = 0x%x, subpage = 0x%x%s:\n", leadin,
+                      unable_s, pg_code, subpg_code, hih);
         else
-            sgj_pr_hr(jsp, "%s = 0x%x, here is hex:\n", unable_s,
-                      pg_code);
+            sgj_pr_hr(jsp, "%s%s = 0x%x%s:\n", leadin, unable_s, pg_code,
+                      hih);
+    }
+    if ((op->do_hex > 2) || op->do_raw > 1) {
+        if (op->do_raw > 1)
+            dStrRaw(resp, len);
+        else
+            hex2stdout(resp, len, op->dstrhex_no_ascii);
+        return;
     }
     if (jsp->pr_as_json) {
         if (subpg_code > 0)
@@ -9821,10 +10377,10 @@ main(int argc, char * argv[])
     op->dev_pdt = DEF_DEV_PDT;
     op->vend_prod_num = VP_NONE;
     op->deduced_vpn = VP_NONE;
-    res = parse_cmd_line(op, argc, argv);
-    if (res) {
-        if (SG_LIB_OK_FALSE == res)
-            res = 0;
+    ret = parse_cmd_line(op, argc, argv);
+    if (ret) {
+        if (SG_LIB_OK_FALSE == ret)
+            ret = 0;
         goto no_json;
     }
     if (op->do_help) {
@@ -9972,7 +10528,7 @@ main(int argc, char * argv[])
                 pr2serr("Read %d [0x%x] bytes of user supplied data\n",
                         in_len, in_len);
             if (op->do_raw)
-                op->do_raw = false;    /* can interfere on decode */
+                op->do_raw = 0;    /* can interfere on decode */
             if (in_len < 4) {
                 pr2serr("--in=%s only decoded %d bytes (needs 4 at least)\n",
                         op->in_fn, in_len);
@@ -10089,7 +10645,7 @@ main(int argc, char * argv[])
             ret = SG_LIB_CONTRADICT;
             goto err_out;
         }
-    } else if (op->do_raw) {
+    } else if (op->do_raw > 0) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
             ret = SG_LIB_FILE_ERROR;
@@ -10171,7 +10727,7 @@ main(int argc, char * argv[])
             goto err_out;
         }
         op->dev_pdt = inq_out.peripheral_type;
-        if ((! op->do_raw) && (0 == op->do_hex) && (! op->do_name) &&
+        if ((0 == op->do_raw) && (0 == op->do_hex) && (! op->do_name) &&
             (0 == op->no_inq) && (0 == op->do_brief))
             sgj_pr_hr(jsp, "    %.8s  %.16s  %.4s\n", inq_out.vendor,
                       inq_out.product, inq_out.revision);
@@ -10271,16 +10827,15 @@ good:
         pg_len = merge_both_supported(supp_pgs_rsp + 4, su_p_pg_len, pg_len);
 
     if (0 == op->do_all) {
+#if 0
         if (op->filter_given) {
             if (op->do_hex > 2)
                 hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
             else
                 decode_page_contents(rsp_buff, pg_len + 4, op, jop);
-        } else if (op->do_raw)
-            dStrRaw(rsp_buff, pg_len + 4);
         else if (op->do_hex > 1)
             hex2stdout(rsp_buff, pg_len + 4, op->dstrhex_no_ascii);
-        else if (pg_len > 1) {
+         else if (pg_len > 1) {
             if (op->do_hex) {
                 if (rsp_buff[0] & 0x40)
                     printf("Log page code=0x%x,0x%x, DS=%d, SPF=1, "
@@ -10294,6 +10849,9 @@ good:
             else
                 decode_page_contents(rsp_buff, pg_len + 4, op, jop);
         }
+#else
+        decode_page_contents(rsp_buff, pg_len + 4, op, jop);
+#endif
     }
     ret = res;
 
@@ -10326,7 +10884,7 @@ good:
                 continue;       /* skip since no new information */
             if ((op->pg_code >= 0x30) && op->exclude_vendor)
                 continue;
-            if (! op->do_raw)
+            if (0 == op->do_raw)
                 sgj_pr_hr(jsp, "\n");
             res = do_logs(sg_fd, rsp_buff, resp_len, op);
             if (0 == res) {
@@ -10336,6 +10894,7 @@ good:
                             "output\n", resp_len);
                     pg_len = resp_len - 4;
                 }
+#if 0
                 if (op->do_raw && (! op->filter_given))
                     dStrRaw(rsp_buff, pg_len + 4);
                 else if (op->do_hex > 4)
@@ -10358,6 +10917,9 @@ good:
                 }
                 else
                     decode_page_contents(rsp_buff, pg_len + 4, op, jop);
+#else
+                decode_page_contents(rsp_buff, pg_len + 4, op, jop);
+#endif
             } else if (SG_LIB_CAT_INVALID_OP == res)
                 pr2serr("%spage=0x%x,0x%x not supported\n", ls_s,
                         op->pg_code, op->subpg_code);

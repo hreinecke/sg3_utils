@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.93 20230215";    /* spc6r07 */
+static const char * version_str = "0.94 20230216";    /* spc6r07 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -1148,19 +1148,6 @@ main(int argc, char * argv[])
     char b[80];
     struct sg_simple_inquiry_resp inq_resp;
     struct opts_t opts;
-
-static const char * t1 = "  boo hoo    ";
-static const char * t2 = "boo (hoo)";
-static const char * t3 = "!@#$";
-static const char * t4 = "Output Power (mW) [obsolete]:";
-pr2serr("sgj_convert2snake('%s'): %s\n", t1, sgj_convert2snake(t1, b, sizeof(b)));
-pr2serr("sgj_convert2snake_rm_parens('%s'): %s\n", t1, sgj_convert2snake_rm_parens(t1, b, sizeof(b)));
-pr2serr("sgj_convert2snake('%s'): %s\n", t2, sgj_convert2snake(t2, b, sizeof(b)));
-pr2serr("sgj_convert2snake_rm_parens('%s'): %s\n", t2, sgj_convert2snake_rm_parens(t2, b, sizeof(b)));
-pr2serr("sgj_convert2snake('%s'): %s\n", t3, sgj_convert2snake(t3, b, sizeof(b)));
-pr2serr("sgj_convert2snake_rm_parens('%s'): %s\n", t3, sgj_convert2snake_rm_parens(t3, b, sizeof(b)));
-pr2serr("sgj_convert2snake('%s'): %s\n", t4, sgj_convert2snake(t4, b, sizeof(b)));
-pr2serr("sgj_convert2snake_rm_parens('%s'): %s\n", t4, sgj_convert2snake_rm_parens(t4, b, sizeof(b)));
 
     op = &opts;
     memset(op, 0, sizeof(opts));
