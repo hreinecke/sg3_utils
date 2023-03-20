@@ -1770,7 +1770,7 @@ sg_get_sense_descriptors_str(const char * lip, const uint8_t * sbp,
                                   lip);
                     sg_get_sense_str(lip, descp + 4, add_d_len - 2, false,
                                      sizeof(c), c);
-                    n += sg_scnpr(b + n, blen - n, "%s", c);
+                    n += sg_scnpr(b + n, blen - n, "%s\n", c);
                     n += sg_scnpr(b + n, blen - n, "%s ^^^^^^^^^^^^^^^^\n",
                                   lip);
                 }
@@ -2151,7 +2151,7 @@ sg_print_sense(const char * leadin, const uint8_t * sbp, int sb_len,
     if (NULL == cp)
         return;
     sg_get_sense_str(leadin, sbp, sb_len, raw_sinfo, pg_sz, cp);
-    pr2ws("%s", cp);
+    pr2ws("%s\n", cp);
     free(free_cp);
 }
 
@@ -3815,7 +3815,8 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                 if (1 == sscanf(carry_over, "%4x", &h)) {
                     if (off > 0) {
                         if (off > max_arr_len) {
-                            pr2ws("%s: array length exceeded\n", __func__);
+                            pr2ws("%s: array length [%d>%d] exceeded\n",
+                                  __func__, off, max_arr_len);
                             ret = SG_LIB_LBA_OUT_OF_RANGE;
                             *mp_arr_len = max_arr_len;
                             goto fini;
@@ -3860,7 +3861,8 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                     goto fini;
                 }
                 if ((off + k) >= max_arr_len) {
-                    pr2ws("%s: array length exceeded\n", __func__);
+                    pr2ws("%s: array length [%d>=%d] exceeded\n",
+                          __func__, off + k, max_arr_len);
                     *mp_arr_len = max_arr_len;
                     ret = SG_LIB_LBA_OUT_OF_RANGE;
                     goto fini;
@@ -3886,7 +3888,8 @@ sg_f2hex_arr(const char * fname, bool as_binary, bool no_space,
                         carry_over[0] = *lcp;
                     }
                     if ((off + k) >= max_arr_len) {
-                        pr2ws("%s: array length exceeded\n", __func__);
+                        pr2ws("%s: array length [%d>=%d] exceeded\n",
+                              __func__, off + k, max_arr_len);
                         ret = SG_LIB_LBA_OUT_OF_RANGE;
                         *mp_arr_len = max_arr_len;
                         goto fini;

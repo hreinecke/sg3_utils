@@ -109,9 +109,9 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
                        int req_dout_x, int act_dout_x, const uint8_t * sbp,
                        int slen, bool noisy, int verbose, int * o_sense_cat)
 {
-    int scat;
     bool n = false;
     bool check_data_in = false;
+    int scat;
 
     scat = sg_err_category_sense(sbp, slen);
     switch (scat) {
@@ -146,12 +146,16 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
         break;
     }
     if (verbose || n) {
-        char b[512];
+        uint32_t pg_sz = sg_get_page_size();
+        char * b;
+        uint8_t *free_b;
 
+        b = (char *)sg_memalign(pg_sz, pg_sz, &free_b, false);
+        if (NULL == b)
+            return -2;
         if (leadin && (strlen(leadin) > 0))
             pr2ws("%s:\n", leadin);
-        sg_get_sense_str(NULL, sbp, slen, (verbose > 1),
-                         sizeof(b), b);
+        sg_get_sense_str(NULL, sbp, slen, (verbose > 1), pg_sz, b);
         pr2ws("%s", b);
         if (req_din_x > 0) {
             if (act_din_x != req_din_x) {
@@ -175,6 +179,8 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
                 }
             }
         }
+	if (free_b)
+	    free(free_b);
     }
     if (o_sense_cat)
         *o_sense_cat = scat;
@@ -197,7 +203,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
     int cat, slen, sstat, req_din_x, req_dout_x;
     int act_din_x, act_dout_x;
     const uint8_t * sbp;
-    char b[1024];
+    char d[256];
+    static const int dlen = sizeof(d);
 
     if (NULL == leadin)
         leadin = "";
@@ -311,8 +318,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
             }
         }
         if (verbose || noisy) {
-            sg_get_scsi_status_str(sstat, sizeof(b), b);
-            pr2ws("%s: scsi status: %s\n", leadin, b);
+            sg_get_scsi_status_str(sstat, dlen, d);
+            pr2ws("%s: scsi status: %s\n", leadin, d);
         }
         return -1;
     case SCSI_PT_RESULT_SENSE:
@@ -321,8 +328,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
                                       noisy, verbose, o_sense_cat);
     case SCSI_PT_RESULT_TRANSPORT_ERR:
         if (verbose || noisy) {
-            get_scsi_pt_transport_err_str(ptvp, sizeof(b), b);
-            pr2ws("%s: transport: %s\n", leadin, b);
+            get_scsi_pt_transport_err_str(ptvp, dlen, d);
+            pr2ws("%s: transport: %s\n", leadin, d);
         }
 #ifdef SG_LIB_LINUX
         return -1;      /* DRIVER_SENSE is not passed through */
@@ -343,8 +350,8 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
 #endif
     case SCSI_PT_RESULT_OS_ERR:
         if (verbose || noisy) {
-            get_scsi_pt_os_err_str(ptvp, sizeof(b), b);
-            pr2ws("%s: os: %s\n", leadin, b);
+            get_scsi_pt_os_err_str(ptvp, dlen, d);
+            pr2ws("%s: os: %s\n", leadin, d);
         }
         return -1;
     default:

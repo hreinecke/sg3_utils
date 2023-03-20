@@ -485,7 +485,7 @@ sgj_pr_hr(sgj_state * jsp, const char * fmt, ...)
 
         va_start(args, fmt);
         ln = vsnprintf(b, blen, fmt, args);
-        if ((ln > 0) && (ln < blen)) {
+        if ((ln > 0) && (ln < (size_t)blen)) {
             char * cp;
 
              /* deal with leading, trailing and embedded newlines */

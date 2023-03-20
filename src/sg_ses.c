@@ -40,7 +40,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.77 20230311";    /* ses4r04 */
+static const char * version_str = "2.77 20230319";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
@@ -1069,14 +1069,6 @@ usage(int help_num)
             "'-hh' displays the\n'control' usage. For examples see '-hhhh' "
             ". The term 'diagnostic page'\nis often abbreviated to 'dpage'.\n"
             );
-
-#if 0
-        "The second usage is for changing a page or field in "
-            "an enclosure. The\n'--clear=', '--get=' and '--set=' options "
-            "can appear multiple times.\nUse '-hh' for more help, including "
-            "the options not explained above.\n");
-#endif
-// xxxxx
     } else if (2 == help_num) {
         pr2serr("Control usage (for modifications):\n");
         control_usage(true);

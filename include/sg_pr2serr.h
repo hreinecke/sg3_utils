@@ -70,7 +70,7 @@ typedef void * sgj_opaque_p;
 typedef struct sgj_state_t {
     /* the following set by default, the SG3_UTILS_JSON_OPTS environment
      * variable or command line argument to --json option, in that order. */
-    bool pr_as_json;            /* = false (def: is human readable output) */
+    bool pr_as_json;            /* = false (def: is plain text output) */
     bool pr_exit_status;        /* 'e' (def: true) */
     bool pr_hex;                /* 'h' (def: false) */
     bool pr_leadin;             /* 'l' (def: true) */
@@ -88,7 +88,9 @@ typedef struct sgj_state_t {
     /* the following hold state information */
     int first_bad_char;         /* = '\0' */
     sgj_opaque_p basep;         /* base JSON object pointer */
-    sgj_opaque_p out_hrp;       /* JSON array pointer when pr_out_hr set */
+    sgj_opaque_p out_hrp;       /* JSON array pointer when pr_out_hr set. Each
+                                 * element contains a line of plain text. The
+                                 * array's JSON name is 'plain_text_output' */
     sgj_opaque_p userp;         /* for temporary usage */
 } sgj_state;
 
@@ -300,8 +302,8 @@ void sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop,
 
 /* The '_haj_' refers to generating output both for human readable and/or
  * JSON with a single invocation. If jsp is non-NULL and jsp->pr_out_hr is
- * true then both JSON and human readable output is formed (and the latter is
- * placed in the jsp->out_hrp JSON array). The human readable form will have
+ * true then both JSON and plain text output is formed (and the latter is
+ * placed in the jsp->out_hrp JSON array). The plain text form will have
  * leadin_sp spaces followed by 'name' then a separator, then 'value' with a
  * trailing LF. If 'name' is NULL then it and the separator are ignored. If
  * there is JSON output, then leadin_sp and sep are ignored. If 'jop' is NULL
@@ -316,7 +318,7 @@ void sgj_haj_vs(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
 /* Similar to sgj_haj_vs()'s description with 'JSON string object'
  * replaced by 'JSON integer object'. hex_haj when set will cause the value
  * to be output in <0x%x> form (default is a signed decimal 64 bit integer)
- * in the human readable rendering. For JSON output hex_haj has the same
+ * in the plain text rendering. For JSON output hex_haj has the same
  * effect as hex_as_well.  */
 void sgj_haj_vi(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
                 const char * name, enum sgj_separator_t sep,

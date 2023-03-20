@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "January 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_LOGS "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -13,11 +13,11 @@ sg_logs \- access log pages with SCSI LOG SENSE command
 [\fI\-\-verbose\fR] \fIDEVICE\fR
 .PP
 .B sg_logs
-\fI\-\-inhex=FN\fR  [\fI\-\-brief\fR] [\fI\-\-exclude\fR]
-[\fI\-\-filter=FL\fR] [\fI\-\-full\fR] [\fI\-\-hex\fR] [\fI\-\-in=FN\fR]
-[\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR] [\fI\-\-name\fR]
-[\fI\-\-page=PG\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR] [\fI\-\-undefined\fR]
-[\fI\-\-vendor=VP\fR]
+\fI\-\-inhex=FN\fR  [\fI\-\-ALL\fR] [\fI\-\-all\fR] [\fI\-\-brief\fR]
+[\fI\-\-exclude\fR] [\fI\-\-filter=FL\fR] [\fI\-\-full\fR] [\fI\-\-hex\fR]
+[\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR] [\fI\-\-list\fR]
+[\fI\-\-name\fR] [\fI\-\-page=PG\fR] [\fI\-\-pdt=DT\fR] [\fI\-\-raw\fR]
+[\fI\-\-undefined\fR] [\fI\-\-vendor=VP\fR]
 .PP
 .B sg_logs
 \fI\-\-select\fR  [\fI\-\-control=PC\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
@@ -71,14 +71,19 @@ This requires a two stage process: first the "supported log pages and
 subpages" log page is fetched, then for each entry in its response, the
 corresponding log page (or subpage) is fetched and displayed. Note that there
 are many SCSI devices that do not support LOG SENSE subpages and respond
-to this option with an illegal request sense key.
+to this option with an illegal request sense key. In this case this utility
+continues by fetching the supported log pages log page instead. In other
+words if the \fI\-\-ALL\fR option fails then the \fI\-\-all\fR is used
+instead. The reason is that almost certainly the \fIDEVICE\fR does not have
+any log subpages to report.
+.br
+To force an error if the fetch of the supported log pages and subpages log
+page fails use both the \fI\-\-ALL\fR and \fI\-\-full\fR options.
 .br
 Since some vendors don't list all log pages in the "supported log pages and
 subpages" log page, the '\-lll' option can be given in addition. This will
 merge both "supported ..." log pages then, from that resultant merged list,
 fetch page contents.
-.br
-The long option may also appear as \fB\-\-All\fR.
 .br
 This option overrides the \fI\-\-page=PG\fR if the latter is also given.
 .TP
@@ -151,11 +156,15 @@ then only generic direct access like (e.g. disk) pages are enumerated. If
 are enumerated.
 .TP
 \fB\-F\fR, \fB\-\-full\fR
-this option only applies to the Application client log page. Typically that
-log page has more than 16,000 bytes of user supplied data. Rather than
-print it all out, the default is to print out the first 64 bytes of data.
-When this option is given, the application client log pages is fully
-decoded.
+this option is only used in two situations: with the Application client (AC)
+log page and with the \fI\-\-ALL\fR option. Typically the AC log page has
+more than 16,000 bytes of user supplied data. Rather than print it all out,
+the default is to print out the first 64 bytes of data. When this option is
+given, the application client log pages is fully decoded.
+.br
+When both this option and the \fI\-\-ALL\fR option are given, then this
+utility will exit with an error if the Supported log pages and subpages
+log page is not available.
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 print out the usage message then exit.
@@ -183,9 +192,9 @@ see the LOG SELECT section below.
 .br
 The other context is with no \fIDEVICE\fR argument given in which case
 the contents of \fIFN\fR are decoded as if it were the response of a LOG
-SENSE command (i.e. a log page). For decoding the page and subpage numbers
-are taken from \fIFN\fR while the peripheral device type is either
-generic (i.e. from SPC) or the value given by \fI\-\-pdt=DT\fR.
+SENSE command (i.e. one or more log page). For decoding, the page and
+subpage numbers are taken from \fIFN\fR while the peripheral device type
+is either generic (i.e. from SPC) or the value given by \fI\-\-pdt=DT\fR.
 .br
 \fIFN\fR is treated as a file name (or '\-' for stdin) which contains ASCII
 hexadecimal or binary representing a log page. The hexadecimal should be
@@ -255,7 +264,8 @@ If this option is given twice (or more) then no INQUIRY command is sent
 hence there will be no device identification string output either. Also the
 peripheral device type (PDT) field will not be obtained so this utility will
 not be able to differentiate between some log pages that are device
-dependent. It will assume a PDT of 0 (i.e. a disk).
+dependent. The utility will assume a PDT of 0 (i.e. a disk) unless the
+\fI\-\-pdt=DT\fR option is given.
 .TP
 \fB\-O\fR, \fB\-\-old\fR
 Switch to older style options. Please use as first option.
@@ -288,15 +298,18 @@ the 'Format and linking' field (2 bits wide).
 .TP
 \fB\-D\fR, \fB\-\-pdt\fR=\fIDT\fR
 \fIDT\fR is the peripheral device type (PDT) that is used when it is not
-available from the \fIDEVICE\fR. There are two main cases of this: with
-the \fI\-\-pdt=DT\fR without a \fIDEVICE\fR (e.g. when \fI\-\-in=FN\fR
-is used) and when \fI\-\-no_inq\fR is used with a \fIDEVICE\fR.
+available from the \fIDEVICE\fR. There are several cases: when the
+\fIDEVICE\fR is not given (e.g. when the \fI\-\-inhex=FN\fR or
+\fI\-\-enumerate\fR option is given) and when \fIDEVICE\fR is and is
+coupled with the \fI\-\-no_inq\fR option. That stops this utility
+sending the SCSI INQUIRY command which is where this utility usually
+finds the PDT associated log pages being decoded.
 .br
 Numerical values between -1 and 31 (inclusive) may be used where -1 implies
-what is in SPC. Names like 'tape', 'disk' and 'processor' may also be given.
-The default is 0 or 'disk' for SBC.
-.br
-The default value of \fIDT\fR is zero which is the device type of disks.
+what is in SPC. SCSI Primary Commands (SPC) are common to all SCSI devices.
+Names like 'tape', 'disk' and 'processor' may also be given for \fIDT\fR.
+The default is 0 or 'disk' for SBC (and the associated standard acronym
+may also be given which is 'sbc' in this case).
 .TP
 \fB\-Q\fR, \fB\-\-ppc\fR
 sets the Parameter Pointer Control (PPC) bit in the LOG SENSE cdb. Default
@@ -401,8 +414,7 @@ length field.
 Other options that are active with the LOG SELECT command are
 \fI\-\-control=PC\fR, \fI\-\-reset\fR (which sets the PCR bit) and
 \fI\-\-sp\fR.
-.SH
-APPLICATION CLIENT
+.SH APPLICATION CLIENT
 This is the name of a log page that acts as a container for data provided
 by the user. An application client is a SCSI term for the program that issues
 commands to a SCSI initiator (often known as a Host Bus Adapter (HBA)). So,
@@ -415,6 +427,29 @@ provided with the \fI\-\-in=FN\fR option. A typical prefix would
 be '0,n,83,fc'. The "n" is the parameter code in hex so the last log
 parameter would be '0,3f,83,fc'. That log parameter could be read back at
 some later time with '\-\-page=0xf \-\-filter=0x<n>'.
+.SH INHEX INSTEAD OF DEVICE
+This section applies when the \fI\-\-inhex=FN\fR option is used and there
+is no \fIDEVICE\fR argument. This can be viewed as a replay facility where
+the \fIFN\fR file was created by a prior invocation of this utility, most
+likely with the '\-HHHHH' option, with command line output redirection used
+to create \fIFN\fR.
+.PP
+If the \fI\-\-all\fR option is given once then all pages (but not subpages)
+found in \fIFN\fR will be decoded, or output in hex if this utility is
+unable to decode some of them. If the \fI\-\-all\fR option is given two or
+more times then all pages and subpages found in \fIFN\fR will be decoded.
+In both cases pages are decoded in the order they are found in \fIFN\fR.
+.PP
+Next, if the \fI\-\-page=PG\fR] option is given, then \fIFN\fR is searched
+for a match on \fIPG\fR and, if found, that log (sub)page is decoded.
+If the \fI\-\-list\fR option is given once, then the Supported log pages log
+page [0x0,0x0] is decoded, if present. If the \fI\-\-list\fR option is given
+two or more times, then the Supported Log Pages and Subpages log
+page [0x0,0xff] is decoded, if present.
+.PP
+If none of the above selection options are given, then this utility will
+attempt to decode the first log page found in \fIFN\fR. If there are more
+log pages following the first one in \fIFN\fR then they are ignored.
 .SH NOTES
 This utility will usually do a double fetch of log pages with the SCSI LOG
 SENSE command. The first fetch requests a 4 byte response (i.e. place 4 in
