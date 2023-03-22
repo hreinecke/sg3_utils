@@ -1,5 +1,5 @@
-#ifndef SG_VPD_H
-#define SG_VPD_H
+#ifndef SG_VPD_COMMON_H
+#define SG_VPD_COMMON_H
 
 /*
  * Copyright (c) 2022-2023 Douglas Gilbert.
@@ -335,4 +335,4 @@ extern struct svpd_values_name_t vendor_vpd_pg[];
 }
 #endif
 
-#endif  /* end of SG_VPD_H */
+#endif  /* end of SG_VPD_COMMON_H */

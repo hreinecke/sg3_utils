@@ -97,6 +97,7 @@ sginfo_LDADD = ../lib/libsgutils2.la
 sg_inq_SOURCES = sg_inq.c sg_inq_data.c sg_vpd_common.c
 sg_inq_LDADD = ../lib/libsgutils2.la
 
+sg_logs_SOURCES = sg_logs.c sg_logs_vendor.c
 sg_logs_LDADD = ../lib/libsgutils2.la
 
 sg_luns_LDADD = ../lib/libsgutils2.la
@@ -218,5 +219,6 @@ sg_zone_LDADD = ../lib/libsgutils2.la
 sg_z_act_query_LDADD = ../lib/libsgutils2.la
 
 EXTRA_DIST = \
+	sg_logs.h \
 	sg_vpd_common.h \
 	BSD_LICENSE
