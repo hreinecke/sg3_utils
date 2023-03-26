@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.94 20230216";    /* spc6r07 */
+static const char * version_str = "0.95 20230326";    /* spc6r07 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -1152,7 +1152,7 @@ main(int argc, char * argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     if (getenv("SG3_UTILS_INVOCATION"))
-        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     op->opcode = -1;
     op->servact = -1;
     res = parse_cmd_line(op, argc, argv);

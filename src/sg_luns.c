@@ -34,7 +34,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.51 20230210";      /* spc6r07 */
+static const char * version_str = "1.52 20230326";      /* spc6r07 */
 
 #define MY_NAME "sg_luns"
 
@@ -478,6 +478,8 @@ main(int argc, char * argv[])
     struct sg_simple_inquiry_resp sir;
     static const int blen = sizeof(b);
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 

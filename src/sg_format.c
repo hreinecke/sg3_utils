@@ -40,8 +40,10 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.70 20230130";
+static const char * version_str = "1.71 20230326";
 
+
+#define MY_NAME "sg_format"
 
 #define RW_ERROR_RECOVERY_PAGE 1  /* can give alternate with --mode=MP */
 
@@ -1579,6 +1581,8 @@ main(int argc, char **argv)
 
         op = &opts;
         memset(op, 0, sizeof(opts));
+        if (getenv("SG3_UTILS_INVOCATION"))
+                sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
         ret = parse_cmd_line(op, argc, argv);
         if (ret)
                 return (SG_LIB_OK_FALSE == ret) ? 0 : ret;

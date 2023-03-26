@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022 Douglas Gilbert.
+ * Copyright (c) 2019-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.16 20221221";      /* sbc5r03 */
+static const char * version_str = "1.17 20230326";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -315,7 +315,7 @@ main(int argc, char * argv[])
     static const int blen = sizeof(b);
 
     if (getenv("SG3_UTILS_INVOCATION"))
-        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 

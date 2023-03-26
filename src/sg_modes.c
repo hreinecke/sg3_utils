@@ -32,7 +32,9 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.77 20230304";
+static const char * version_str = "1.78 20230326";
+
+#define MY_NAME "sg_modes"
 
 #define MAX_ALLOC_LEN (1024 * 8)
 #define DEF_6_ALLOC_LEN 252
@@ -1336,6 +1338,8 @@ main(int argc, char * argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     op->pg_code = -1;
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     res = parse_cmd_line(op, argc, argv);
     if (res)
         return (SG_LIB_OK_FALSE == res) ? 0 : res;

@@ -40,9 +40,10 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.77 20230319";    /* ses4r04 */
+static const char * version_str = "2.78 20230326";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
+
 #define MX_ALLOC_LEN ((64 * 1024) - 4)  /* max allowable for big enclosures */
 #define MX_ELEM_HDR 1024
 #define REQUEST_SENSE_RESP_SZ 252
@@ -7612,7 +7613,7 @@ main(int argc, char * argv[])
     op->ind_indiv_last = -1;
     op->maxlen = MX_ALLOC_LEN;
     if (getenv("SG3_UTILS_INVOCATION"))
-        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
 
     res = parse_cmd_line(op, argc, argv);
     vb = op->verbose;

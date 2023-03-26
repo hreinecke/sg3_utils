@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.25 20230321";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.26 20230326";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -9524,7 +9524,7 @@ main(int argc, char * argv[])
 
     op = &opts;
     if (getenv("SG3_UTILS_INVOCATION"))
-        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     /* N.B. some disks only give data for current cumulative */
     op->page_control = 1;
     op->dev_pdt = DEF_DEV_PDT;

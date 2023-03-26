@@ -633,6 +633,13 @@ sgj_new_unattached_bool_r(sgj_state * jsp, bool value)
     return (jsp && jsp->pr_as_json) ? json_boolean_new(value) : NULL;
 }
 
+/* Newly created null object is un-attached to jsp->basep tree */
+sgj_opaque_p
+sgj_new_unattached_null_r(sgj_state * jsp)
+{
+    return (jsp && jsp->pr_as_json) ? json_null_new() : NULL;
+}
+
 sgj_opaque_p
 sgj_js_nv_s(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
             const char * value)

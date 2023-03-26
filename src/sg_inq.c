@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.42 20230217";  /* spc6r07, sbc5r04 */
+static const char * version_str = "2.43 20230326";  /* spc6r07, sbc5r04 */
 
 #define MY_NAME "sg_inq"
 
@@ -4094,7 +4094,7 @@ main(int argc, char * argv[])
     op->page_pdt = -1;
     op->do_block = -1;         /* use default for OS */
     if (getenv("SG3_UTILS_INVOCATION"))
-        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
 
     res = parse_cmd_line(op, argc, argv);
     if (res)

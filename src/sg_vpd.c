@@ -2436,7 +2436,7 @@ main(int argc, char * argv[])
     struct opts_t * op = &opts;
 
     if (getenv("SG3_UTILS_INVOCATION"))
-        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     op->vend_prod_num = -1;
     while (1) {
         int option_index = 0;

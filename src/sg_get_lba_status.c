@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.35 20230210";      /* sbc5r04 */
+static const char * version_str = "1.36 20230326";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -297,7 +297,7 @@ main(int argc, char * argv[])
     static const char * compl_cond_sn = "completion_condition";
 
     if (getenv("SG3_UTILS_INVOCATION"))
-        sg_rep_invocation(MY_NAME, version_str, argc, argv, NULL);
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 

@@ -70,10 +70,10 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.38 20230311";
+static const char * version_str = "6.39 20230326";
 
 
-#define ME "sg_dd: "
+#define MY_NAME "sg_dd: "
 
 
 #define STR_SZ 1024
@@ -627,7 +627,7 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
     case 6:
         sz_ind = 0;
         if (is_verify && write_true) {
-            pr2serr(ME "there is no VERIFY(6), choose a larger cdbsz\n");
+            pr2serr(MY_NAME "there is no VERIFY(6), choose a larger cdbsz\n");
             return 1;
         }
         cdbp[0] = (uint8_t)(write_true ? wr_opcode[sz_ind] :
@@ -635,17 +635,17 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
         cdbp[4] = (256 == blocks) ? 0 : (uint8_t)blocks;
         if (blocks > 256) {
-            pr2serr(ME "for 6 byte commands, maximum number of blocks is "
+            pr2serr(MY_NAME "for 6 byte commands, maximum number of blocks is "
                     "256\n");
             return 1;
         }
         if ((start_block + blocks - 1) & (~0x1fffff)) {
-            pr2serr(ME "for 6 byte commands, can't address blocks beyond "
+            pr2serr(MY_NAME "for 6 byte commands, can't address blocks beyond "
                     "%d\n", 0x1fffff);
             return 1;
         }
         if (dpo || fua) {
-            pr2serr(ME "for 6 byte commands, neither dpo nor fua bits "
+            pr2serr(MY_NAME "for 6 byte commands, neither dpo nor fua bits "
                     "supported\n");
             return 1;
         }
@@ -660,8 +660,8 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         sg_put_unaligned_be32(start_block, cdbp + 2);
         sg_put_unaligned_be16(blocks, cdbp + 7);
         if (blocks & (~0xffff)) {
-            pr2serr(ME "for 10 byte commands, maximum number of blocks is "
-                    "%d\n", 0xffff);
+            pr2serr(MY_NAME "for 10 byte commands, maximum number of blocks "
+                    "is %d\n", 0xffff);
             return 1;
         }
         break;
@@ -692,7 +692,7 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         sg_put_unaligned_be32(blocks, cdbp + 10);
         break;
     default:
-        pr2serr(ME "expected cdb size of 6, 10, 12, or 16 but got %d\n",
+        pr2serr(MY_NAME "expected cdb size of 6, 10, 12, or 16 but got %d\n",
                 cdb_sz);
         return 1;
     }
@@ -722,8 +722,8 @@ sg_read_low(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
 
     if (sg_build_scsi_cdb(rdCmd, ifp->cdbsz, blocks, from_block, do_verify,
                           false, ifp->fua, ifp->dpo, ifp->cdl)) {
-        pr2serr(ME "bad rd cdb build, from_block=%" PRId64 ", blocks=%d\n",
-                from_block, blocks);
+        pr2serr(MY_NAME "bad rd cdb build, from_block=%" PRId64 ", "
+                "blocks=%d\n", from_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
     }
 
@@ -1131,7 +1131,7 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
 
     if (sg_build_scsi_cdb(wrCmd, ofp->cdbsz, blocks, to_block, do_verify,
                           true, ofp->fua, ofp->dpo, ofp->cdl)) {
-        pr2serr(ME "bad wr cdb build, to_block=%" PRId64 ", blocks=%d\n",
+        pr2serr(MY_NAME "bad wr cdb build, to_block=%" PRId64 ", blocks=%d\n",
                 to_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
     }
@@ -1440,13 +1440,13 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
         pr2serr(" >> Input file type: %s\n",
                 dd_filetype_str(*in_typep, ebuff));
     if (FT_ERROR & *in_typep) {
-        pr2serr(ME "unable access %s\n", inf);
+        pr2serr(MY_NAME "unable access %s\n", inf);
         goto file_err;
     } else if ((FT_BLOCK & *in_typep) && ifp->sgio)
         *in_typep |= FT_SG;
 
     if (FT_ST & *in_typep) {
-        pr2serr(ME "unable to use scsi tape device %s\n", inf);
+        pr2serr(MY_NAME "unable to use scsi tape device %s\n", inf);
         goto file_err;
     } else if (FT_SG & *in_typep) {
         flags = O_NONBLOCK;
@@ -1461,7 +1461,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
             fl = O_RDONLY;
             if ((infd = open(inf, fl | flags)) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for sg reading", inf);
+                         MY_NAME "could not open %s for sg reading", inf);
                 perror(ebuff);
                 goto file_err;
             }
@@ -1480,13 +1480,14 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
             t = blk_sz * bpt;
             res = ioctl(infd, SG_SET_RESERVED_SIZE, &t);
             if (res < 0)
-                perror(ME "SG_SET_RESERVED_SIZE error");
+                perror(MY_NAME "SG_SET_RESERVED_SIZE error");
             res = ioctl(infd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30000)) {
                 if (FT_BLOCK & *in_typep)
-                    pr2serr(ME "SG_IO unsupported on this block device\n");
+                    pr2serr(MY_NAME "SG_IO unsupported on this block "
+                            "device\n");
                 else
-                    pr2serr(ME "sg driver prior to 3.x.y\n");
+                    pr2serr(MY_NAME "sg driver prior to 3.x.y\n");
                 goto file_err;
             }
         }
@@ -1504,7 +1505,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
         infd = open(inf, flags);
         if (infd < 0) {
             snprintf(ebuff, EBUFF_SZ,
-                     ME "could not open %s for reading", inf);
+                     MY_NAME "could not open %s for reading", inf);
             perror(ebuff);
             goto file_err;
         } else {
@@ -1515,7 +1516,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
 
                 offset *= blk_sz;       /* could exceed 32 bits here! */
                 if (lseek64(infd, offset, SEEK_SET) < 0) {
-                    snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
+                    snprintf(ebuff, EBUFF_SZ, MY_NAME "couldn't skip to "
                              "required position on %s", inf);
                     perror(ebuff);
                     goto file_err;
@@ -1540,7 +1541,7 @@ open_if(const char * inf, int64_t skip, int bpt, struct flags_t * ifp,
         res = flock(infd, LOCK_EX | LOCK_NB);
         if (res < 0) {
             close(infd);
-            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
+            snprintf(ebuff, EBUFF_SZ, MY_NAME "flock(LOCK_EX | LOCK_NB) on %s "
                      "failed", inf);
             perror(ebuff);
             return -SG_LIB_FLOCK_ERR;
@@ -1582,7 +1583,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
         *out_typep |= FT_SG;
 
     if (FT_ST & *out_typep) {
-        pr2serr(ME "unable to use scsi tape device %s\n", outf);
+        pr2serr(MY_NAME "unable to use scsi tape device %s\n", outf);
         goto file_err;
     } else if (FT_SG & *out_typep) {
         flags = O_RDWR | O_NONBLOCK;
@@ -1594,7 +1595,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
             flags |= O_SYNC;
         if ((outfd = open(outf, flags)) < 0) {
             snprintf(ebuff, EBUFF_SZ,
-                     ME "could not open %s for sg writing", outf);
+                     MY_NAME "could not open %s for sg writing", outf);
             perror(ebuff);
             goto file_err;
         }
@@ -1612,10 +1613,10 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
             t = blk_sz * bpt;
             res = ioctl(outfd, SG_SET_RESERVED_SIZE, &t);
             if (res < 0)
-                perror(ME "SG_SET_RESERVED_SIZE error");
+                perror(MY_NAME "SG_SET_RESERVED_SIZE error");
             res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30000)) {
-                pr2serr(ME "sg driver prior to 3.x.y\n");
+                pr2serr(MY_NAME "sg driver prior to 3.x.y\n");
                 goto file_err;
             }
         }
@@ -1634,7 +1635,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
             flags |= O_SYNC;
         if ((outfd = open(outf, flags)) < 0) {
             snprintf(ebuff, EBUFF_SZ,
-                    ME "could not open %s for raw writing", outf);
+                    MY_NAME "could not open %s for raw writing", outf);
             perror(ebuff);
             goto file_err;
         }
@@ -1652,7 +1653,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
             flags |= O_APPEND;
         if ((outfd = open(outf, flags, 0666)) < 0) {
             snprintf(ebuff, EBUFF_SZ,
-                    ME "could not open %s for writing", outf);
+                    MY_NAME "could not open %s for writing", outf);
             perror(ebuff);
             goto file_err;
         }
@@ -1665,7 +1666,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
             offset *= blk_sz;       /* could exceed 32 bits here! */
             if (lseek64(outfd, offset, SEEK_SET) < 0) {
                 snprintf(ebuff, EBUFF_SZ,
-                    ME "couldn't seek to required position on %s", outf);
+                    MY_NAME "couldn't seek to required position on %s", outf);
                 perror(ebuff);
                 goto file_err;
             }
@@ -1677,7 +1678,7 @@ open_of(const char * outf, int64_t seek, int bpt, struct flags_t * ofp,
     if (ofp->flock && (outfd >= 0)) {
         res = flock(outfd, LOCK_EX | LOCK_NB);
         if (res < 0) {
-            snprintf(ebuff, EBUFF_SZ, ME "flock(LOCK_EX | LOCK_NB) on %s "
+            snprintf(ebuff, EBUFF_SZ, MY_NAME "flock(LOCK_EX | LOCK_NB) on %s "
                      "failed", outf);
             perror(ebuff);
             close(outfd);
@@ -1884,6 +1885,8 @@ main(int argc, char * argv[])
     iflag.cdbsz = DEF_SCSI_CDBSZ;
     oflag.cdbsz = DEF_SCSI_CDBSZ;
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     for (k = 1; k < argc; k++) {
         if (argv[k]) {
             strncpy(str, argv[k], STR_SZ);
@@ -1904,20 +1907,20 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "bpt")) {
             bpt = sg_get_num(buf);
             if (-1 == bpt) {
-                pr2serr(ME "bad argument to 'bpt='\n");
+                pr2serr(MY_NAME "bad argument to 'bpt='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             bpt_given = true;
         } else if (0 == strcmp(key, "bs")) {
             blk_sz = sg_get_num(buf);
             if ((blk_sz < 0) || (blk_sz > MAX_BPT_VALUE)) {
-                pr2serr(ME "bad argument to 'bs='\n");
+                pr2serr(MY_NAME "bad argument to 'bs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "cdbsz")) {
             iflag.cdbsz = sg_get_num(buf);
             if ((iflag.cdbsz < 6) || (iflag.cdbsz > 32)) {
-                pr2serr(ME "'cdbsz' expects 6, 10, 12, 16 or 32\n");
+                pr2serr(MY_NAME "'cdbsz' expects 6, 10, 12, 16 or 32\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             oflag.cdbsz = iflag.cdbsz;
@@ -1927,14 +1930,14 @@ main(int argc, char * argv[])
 
             iflag.cdl = sg_get_num(buf);
             if ((iflag.cdl < 0) || (iflag.cdl > 7)) {
-                pr2serr(ME "bad argument to 'cdl=', expect 0 to 7\n");
+                pr2serr(MY_NAME "bad argument to 'cdl=', expect 0 to 7\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             if (cp) {
                 oflag.cdl = sg_get_num(cp + 1);
                 if ((oflag.cdl < 0) || (oflag.cdl > 7)) {
-                    pr2serr(ME "bad argument to 'cdl=ICDL,OCDL', expect OCDL "
-                            "to be 0 to 7\n");
+                    pr2serr(MY_NAME "bad argument to 'cdl=ICDL,OCDL', expect "
+                            "OCDL to be 0 to 7\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
             } else
@@ -1946,19 +1949,19 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "coe_limit")) {
             coe_limit = sg_get_num(buf);
             if (-1 == coe_limit) {
-                pr2serr(ME "bad argument to 'coe_limit='\n");
+                pr2serr(MY_NAME "bad argument to 'coe_limit='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "conv")) {
             if (process_conv(buf, &iflag, &oflag)) {
-                pr2serr(ME "bad argument to 'conv='\n");
+                pr2serr(MY_NAME "bad argument to 'conv='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "count")) {
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
                 if ((dd_count < 0) || (dd_count > MAX_COUNT_SKIP_SEEK)) {
-                    pr2serr(ME "bad argument to 'count='\n");
+                    pr2serr(MY_NAME "bad argument to 'count='\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }   /* treat 'count=-1' as calculate count (same as not given) */
@@ -1972,7 +1975,7 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key, "ibs")) {
             ibs = sg_get_num(buf);
             if ((ibs < 0) || (ibs > MAX_BPT_VALUE)) {
-                pr2serr(ME "bad argument to 'ibs='\n");
+                pr2serr(MY_NAME "bad argument to 'ibs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key, "if") == 0) {
@@ -1985,13 +1988,13 @@ main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &iflag)) {
-                pr2serr(ME "bad argument to 'iflag='\n");
+                pr2serr(MY_NAME "bad argument to 'iflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "obs")) {
             obs = sg_get_num(buf);
             if ((obs < 0) || (obs > MAX_BPT_VALUE)) {
-                pr2serr(ME "bad argument to 'obs='\n");
+                pr2serr(MY_NAME "bad argument to 'obs='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "odir")) {
@@ -2015,26 +2018,26 @@ main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &oflag)) {
-                pr2serr(ME "bad argument to 'oflag='\n");
+                pr2serr(MY_NAME "bad argument to 'oflag='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "retries")) {
             iflag.retries = sg_get_num(buf);
             oflag.retries = iflag.retries;
             if (-1 == iflag.retries) {
-                pr2serr(ME "bad argument to 'retries='\n");
+                pr2serr(MY_NAME "bad argument to 'retries='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "seek")) {
             seek = sg_get_llnum(buf);
             if ((seek < 0) || (seek > MAX_COUNT_SKIP_SEEK)) {
-                pr2serr(ME "bad argument to 'seek='\n");
+                pr2serr(MY_NAME "bad argument to 'seek='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "skip")) {
             skip = sg_get_llnum(buf);
             if ((skip < 0) || (skip > MAX_COUNT_SKIP_SEEK)) {
-                pr2serr(ME "bad argument to 'skip='\n");
+                pr2serr(MY_NAME "bad argument to 'skip='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key, "sync"))
@@ -2046,7 +2049,7 @@ main(int argc, char * argv[])
             if (cp) {
                 n = sg_get_num(cp + 1);
                 if (n < 0) {
-                    pr2serr(ME "bad argument to 'time=0|1,TO'\n");
+                    pr2serr(MY_NAME "bad argument to 'time=0|1,TO'\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 cmd_timeout = n ? (n * 1000) : DEF_TIMEOUT;
@@ -2123,7 +2126,7 @@ main(int argc, char * argv[])
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
     if (version_given) {
-        pr2serr(ME "version: %s\n", version_str);
+        pr2serr(MY_NAME "version: %s\n", version_str);
         return 0;
     }
     if (progress > 0 && !do_time)
@@ -2164,8 +2167,8 @@ main(int argc, char * argv[])
     if ((blk_sz >= 2048) && (! bpt_given))
         bpt = DEF_BLOCKS_PER_2048TRANSFER;
 #ifdef DEBUG
-    pr2serr(ME "if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%" PRId64
-            "\n", inf, skip, outf, seek, dd_count);
+    pr2serr(MY_NAME "if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%"
+            PRId64 "\n", inf, skip, outf, seek, dd_count);
 #endif
     install_handler(SIGINT, interrupt_handler);
     install_handler(SIGQUIT, interrupt_handler);
@@ -2259,7 +2262,7 @@ main(int argc, char * argv[])
         if ((out2fd = open(out2f, O_WRONLY | O_CREAT, 0666)) < 0) {
             res = errno;
             snprintf(ebuff, EBUFF_SZ,
-                     ME "could not open %s for writing", out2f);
+                     MY_NAME "could not open %s for writing", out2f);
             perror(ebuff);
             return res;
         }
@@ -2510,7 +2513,7 @@ main(int argc, char * argv[])
                 pr2serr("read(unix): count=%d, res=%d\n", blocks * blk_sz,
                         res);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%" PRId64 " ",
+                snprintf(ebuff, EBUFF_SZ, MY_NAME "reading, skip=%" PRId64 " ",
                          skip);
                 perror(ebuff);
                 ret = -1;
@@ -2539,8 +2542,8 @@ main(int argc, char * argv[])
                 pr2serr("write to of2: count=%d, res=%d\n", blocks * blk_sz,
                         res);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "writing to of2, seek=%" PRId64
-                         " ", seek);
+                snprintf(ebuff, EBUFF_SZ, MY_NAME "writing to of2, seek=%"
+                         PRId64 " ", seek);
                 perror(ebuff);
                 ret = -1;
                 break;
@@ -2667,7 +2670,7 @@ main(int argc, char * argv[])
                 pr2serr("write(unix): count=%d, res=%d\n", blocks * blk_sz,
                         res);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "writing, seek=%" PRId64 " ",
+                snprintf(ebuff, EBUFF_SZ, MY_NAME "writing, seek=%" PRId64 " ",
                          seek);
                 perror(ebuff);
                 ret = -1;
@@ -2742,8 +2745,8 @@ main(int argc, char * argv[])
                 pr2serr("write(unix, sparse after error): count=%d, res=%d\n",
                         penult_blocks * blk_sz, res);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "writing(sparse after error), "
-                        "seek=%" PRId64 " ", seek);
+                snprintf(ebuff, EBUFF_SZ, MY_NAME "writing(sparse after "
+                         "error), seek=%" PRId64 " ", seek);
                 perror(ebuff);
             }
         }

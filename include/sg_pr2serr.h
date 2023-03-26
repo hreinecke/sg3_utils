@@ -178,6 +178,7 @@ sgj_opaque_p sgj_new_unattached_str_len_r(sgj_state * jsp, const char * value,
                                           int vlen);
 sgj_opaque_p sgj_new_unattached_integer_r(sgj_state * jsp, uint64_t value);
 sgj_opaque_p sgj_new_unattached_bool_r(sgj_state * jsp, bool value);
+sgj_opaque_p sgj_new_unattached_null_r(sgj_state * jsp);
 
 /* If jsp is NULL or jsp->pr_as_json is false nothing happens and NULL is
  * returned. Otherwise it creates a new named object (whose name is what
