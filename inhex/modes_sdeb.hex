@@ -1,0 +1,35 @@
+# See the EXAMPLES section in the sg_modes(8) manpage
+
+# Mode parameter header from MODE SENSE(10):
+00 ee 00 10 00 00 00 08
+#   Block descriptor length=8
+# > Direct access device block descriptors:
+#    Density code=0x0
+00 80 00 00 00 00 02 00
+
+# >> Read-Write error recovery [0x1], page_control: current
+01 0a c0 0b f0 00 00 00  05 00 ff ff
+# >> Disconnect-Reconnect [0x2], page_control: current
+02 0e 80 80 00 0a 00 00  00 00 00 00 00 00 00 00
+# >> Format (obsolete) [0x3], page_control: current
+03 16 00 00 00 00 00 00  00 00 00 3f 02 00 00 00
+00 00 00 00 40 00 00 00
+# >> Caching [0x8], page_control: current
+08 12 14 00 ff ff 00 00  ff ff ff ff 80 14 00 00
+00 00 00 00
+# >> Control [0xa], page_control: current
+0a 0a 02 00 00 80 00 00  00 00 02 4b
+# >> Protocol specific port (SPL) [0x19], page_control: current
+19 06 06 00 07 d0 00 00
+# >> Phy control and discover (SPL) [0x19,0x1], page_control: current
+59 01 00 64 00 06 00 02  00 00 00 00 10 09 08 00
+32 22 22 20 00 00 07 ce  31 11 11 10 00 00 00 01
+02 00 00 00 00 00 00 00  88 99 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 01 00 00 10 09 08 00
+32 22 22 20 00 00 07 cf  31 11 11 10 00 00 00 01
+03 00 00 00 00 00 00 00  88 99 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+# >> Shared port control (SPL) [0x19,0x2], page_control: current
+59 02 00 0c 00 06 10 00  00 00 00 00 00 00 00 00
+# >> Informational exceptions control [0x1c], page_control: current
+1c 0a 08 00 00 00 00 00  00 00 00 00

@@ -122,7 +122,6 @@ response are put on separate line.
 When the option is given four or more times (recommended for a parsable
 form), the ASCII informational lines are back, but they all start
 with "#" which a parser needs to ignore.
-.br
 The output is sent to stdout while any error messages or warning are
 sent to stderr. So simple Unix command line redirection of stdout to a
 file (done with '>' in most Unix shells) should be sufficient to capture
@@ -230,6 +229,11 @@ In the 2.4 series of Linux kernels the \fIDEVICE\fR must be a SCSI
 generic (sg) device. In the 2.6 series block devices (e.g. SCSI disks
 and DVD drives) can also be specified. For example "sg_modes \-a /dev/sda"
 will work in the 2.6 series kernels.
+.PP
+There is no JSON output from this utility because its primary output is
+mode pages in hexadecimal. So apart from the mode page name and its
+structure, nothing is decoded. The sdparm utility does decode mode
+page contents and it does support JSON output.
 .SH EXIT STATUS
 The exit status of sg_modes is 0 when it is successful. Otherwise see
 the sg3_utils(8) man page.
@@ -330,6 +334,44 @@ Since sg3_utils version 1.23 the environment variable SG3_UTILS_OLD_OPTS
 can be given. When it is present this utility will expect the older command
 line options. So the presence of this environment variable is equivalent to
 using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
+.SH EXAMPLES
+All mode pages, but not mode subpages, can be dumped in hex to a file
+like this:
+.PP
+   # sg_modes \-a \-HHHH /dev/sdb > modes_sdeb.hex
+.PP
+If there are any errors then they are sent to stderr so they will appear
+on the console and not within the modes_sdeb.hex file. Nonetheless the
+contents of modes_sdeb.hex may not be useful if an error has occurred.
+.PP
+The '\-HHHH' option produces hex output with comment lines starting with
+a '#' character. Each comment describes the following block.
+If all is well, the modes_sdeb.hex file will be suitable for the sdparm
+utility to decode:
+.PP
+   # sdparm \-a \-\-inhex=modes_sdeb.hex
+.PP
+See the sdparm(8) manpage for further information.
+.br
+To dump both mode pages and subpages, use this invocation:
+.PP
+   # sg_modes -aa -HHHH /dev/sdb > modes_sdeb.hex
+.PP
+No change is needed in the associated sdparm call. There is some example
+output in the inhex directory in the sg3_utils package, in a file called:
+modes_sdeb.hex . The file was produced by using this utility on the
+scsi_debug driver in Linux.
+.PP
+Each mode page (and subpage) has up to four 'page controls': current,
+changeable, default and saved. The last three may or may not be supported
+by the device. All available page controls for all mode pages and subpages
+can be placed in a hex file with this invocation:
+.PP
+   # sg_modes \-aa \-M \-HHHH /dev/sdb > modes_mm_sdeb.hex
+.PP
+Again, no change is needed in the associated sdparm call. There is some
+example output in the inhex directory in the sg3_utils package, in a file
+called: modes_mm_sdeb.hex .
 .SH AUTHOR
 Written by Douglas Gilbert
 .SH "REPORTING BUGS"

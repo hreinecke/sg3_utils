@@ -603,6 +603,36 @@ sgj_new_unattached_array_r(sgj_state * jsp)
     return (jsp && jsp->pr_as_json) ? json_array_new(0) : NULL;
 }
 
+/* Newly created string is un-attached to jsp->basep tree */
+sgj_opaque_p
+sgj_new_unattached_string_r(sgj_state * jsp, const char * value)
+{
+    return (jsp && jsp->pr_as_json) ? json_string_new(value) : NULL;
+}
+
+/* Newly created string with length object is un-attached to jsp->basep
+ * tree */
+sgj_opaque_p
+sgj_new_unattached_str_len_r(sgj_state * jsp, const char * value, int vlen)
+{
+    return (jsp && jsp->pr_as_json) ? json_string_new_length(vlen, value) :
+                                      NULL;
+}
+
+/* Newly created integer object is un-attached to jsp->basep tree */
+sgj_opaque_p
+sgj_new_unattached_integer_r(sgj_state * jsp, uint64_t value)
+{
+    return (jsp && jsp->pr_as_json) ? json_integer_new(value) : NULL;
+}
+
+/* Newly created boolean object is un-attached to jsp->basep tree */
+sgj_opaque_p
+sgj_new_unattached_bool_r(sgj_state * jsp, bool value)
+{
+    return (jsp && jsp->pr_as_json) ? json_boolean_new(value) : NULL;
+}
+
 sgj_opaque_p
 sgj_js_nv_s(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
             const char * value)

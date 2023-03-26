@@ -1,0 +1,103 @@
+# See the EXAMPLES section in the sg_modes(8) manpage
+
+# Mode parameter header from MODE SENSE(10):
+00 ee 00 10 00 00 00 08
+
+# Block descriptors from MODE SENSE(10):
+00 80 00 00 00 00 02 00
+
+#  Read-Write error recovery mode page [0x1]:
+#     current page control:
+01 0a c0 0b f0 00 00 00  05 00 ff ff
+#     changeable page control:
+01 0a 00 00 00 00 00 00  00 00 00 00
+#     default page control:
+01 0a c0 0b f0 00 00 00  05 00 ff ff
+
+#  Disconnect-Reconnect mode page [0x2]:
+#     current page control:
+02 0e 80 80 00 0a 00 00  00 00 00 00 00 00 00 00
+#     changeable page control:
+02 0e 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+#     default page control:
+02 0e 80 80 00 0a 00 00  00 00 00 00 00 00 00 00
+
+#  Format (obsolete) mode page [0x3]:
+#     current page control:
+03 16 00 00 00 00 00 00  00 00 00 3f 02 00 00 00
+00 00 00 00 40 00 00 00
+#     changeable page control:
+03 16 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+#     default page control:
+03 16 00 00 00 00 00 00  00 00 00 3f 02 00 00 00
+00 00 00 00 40 00 00 00
+
+#  Caching mode page [0x8]:
+#     current page control:
+08 12 14 00 ff ff 00 00  ff ff ff ff 80 14 00 00
+00 00 00 00
+#     changeable page control:
+08 12 04 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00
+#     default page control:
+08 12 14 00 ff ff 00 00  ff ff ff ff 80 14 00 00
+00 00 00 00
+
+#  Control mode page [0xa]:
+#     current page control:
+0a 0a 02 00 00 80 00 00  00 00 02 4b
+#     changeable page control:
+0a 0a 06 00 00 00 00 00  00 00 00 00
+#     default page control:
+0a 0a 02 00 00 00 00 00  00 00 02 4b
+
+#  Protocol specific port (SPL) mode page [0x19]:
+#     current page control:
+19 06 06 00 07 d0 00 00
+#     changeable page control:
+19 06 00 00 00 00 00 00
+#     default page control:
+19 06 06 00 07 d0 00 00
+
+#  Phy control and discover (SPL) mode page [0x19,0x1]:
+#     current page control:
+59 01 00 64 00 06 00 02  00 00 00 00 10 09 08 00
+32 22 22 20 00 00 07 ce  31 11 11 10 00 00 00 01
+02 00 00 00 00 00 00 00  88 99 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 01 00 00 10 09 08 00
+32 22 22 20 00 00 07 cf  31 11 11 10 00 00 00 01
+03 00 00 00 00 00 00 00  88 99 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+#     changeable page control:
+59 01 00 64 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+#     default page control:
+59 01 00 64 00 06 00 02  00 00 00 00 10 09 08 00
+32 22 22 20 00 00 07 ce  31 11 11 10 00 00 00 01
+02 00 00 00 00 00 00 00  88 99 00 00 00 00 00 00
+00 00 00 00 00 00 00 00  00 01 00 00 10 09 08 00
+32 22 22 20 00 00 07 cf  31 11 11 10 00 00 00 01
+03 00 00 00 00 00 00 00  88 99 00 00 00 00 00 00
+00 00 00 00 00 00 00 00
+
+#  Shared port control (SPL) mode page [0x19,0x2]:
+#     current page control:
+59 02 00 0c 00 06 10 00  00 00 00 00 00 00 00 00
+#     changeable page control:
+59 02 00 0c 00 00 00 00  00 00 00 00 00 00 00 00
+#     default page control:
+59 02 00 0c 00 06 10 00  00 00 00 00 00 00 00 00
+
+#  Informational exceptions control mode page [0x1c]:
+#     current page control:
+1c 0a 08 00 00 00 00 00  00 00 00 00
+#     changeable page control:
+1c 0a 04 0f 00 00 00 00  00 00 00 00
+#     default page control:
+1c 0a 08 00 00 00 00 00  00 00 00 00

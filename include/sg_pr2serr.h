@@ -172,6 +172,13 @@ sgj_opaque_p sgj_start_r(const char * util_name, const char * ver_str,
 sgj_opaque_p sgj_new_unattached_object_r(sgj_state * jsp);
 sgj_opaque_p sgj_new_unattached_array_r(sgj_state * jsp);
 
+/* following are similar, useful for leaves */
+sgj_opaque_p sgj_new_unattached_string_r(sgj_state * jsp, const char * value);
+sgj_opaque_p sgj_new_unattached_str_len_r(sgj_state * jsp, const char * value,
+                                          int vlen);
+sgj_opaque_p sgj_new_unattached_integer_r(sgj_state * jsp, uint64_t value);
+sgj_opaque_p sgj_new_unattached_bool_r(sgj_state * jsp, bool value);
+
 /* If jsp is NULL or jsp->pr_as_json is false nothing happens and NULL is
  * returned. Otherwise it creates a new named object (whose name is what
  * 'sn_name' points to) at 'jop' with an empty object as its value; a pointer
