@@ -123,6 +123,7 @@ EXTRA_DIST += \
 	inhex/z_act_query.hex
 
 EXTRA_DIST += \
+	scripts/00-scsi-sg3_config.rules \
 	scripts/40-usb-blacklist.rules \
 	scripts/54-before-scsi-sg3_id.rules \
 	scripts/55-scsi-sg3_id.rules \

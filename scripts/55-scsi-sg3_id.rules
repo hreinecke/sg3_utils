@@ -36,7 +36,7 @@ KERNEL!="sd*[!0-9]|sr*", GOTO="sg3_utils_id_end"
 # have scanned for VPD pages, so if the vpd page attribute is not
 # present it is not supported (or deemed unsafe to access).
 # Hence we can skip the call to sg_inq and avoid I/O altogether.
-# Set 'ID_SCSI_INQUIRY=0' in an earlier udev rule if the kernel
+# Set ENV{ID_SCSI_INQUIRY}="0" in 00-scsi-sg3_config.rules if the kernel
 # fails to scan VPD pages correctly; the rules will then fall
 # back to calling sg_vpd directly.
 LABEL="scsi_inquiry"
@@ -99,11 +99,54 @@ ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA_REG}=="?*", ENV{ID_BUS}="scsi", ENV
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA_EXT}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA_EXT}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA_EXT}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="2$env{SCSI_IDENT_LUN_EUI64}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_EUI64}"
 ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="8$env{SCSI_IDENT_LUN_NAME}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAME}"
-ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="1$env{SCSI_IDENT_LUN_T10}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_T10}"
-ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA_LOCAL}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA_LOCAL}"
-ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_VENDOR}"
-ENV{ID_SERIAL}!="?*", ENV{SCSI_IDENT_SERIAL}=="?*", ENV{ID_BUS}="scsi", ENV{ID_SERIAL}="S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}", ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_SERIAL}"
 
 # Compat ID_SCSI_SERIAL setting
 ENV{ID_SCSI_SERIAL}!="?*", ENV{SCSI_IDENT_SERIAL}=="?*", ENV{ID_SCSI_SERIAL}="$env{SCSI_IDENT_SERIAL}"
+
+# Enable or disable possibly ambiguous SCSI device ID sources for setting ID_SERIAL
+#
+# .SCSI_ID_SERIAL_SRC can be any combination of the characters "TLVS":
+#   T: T10 vendor ID ("1...") from VPD 0x83
+#   L: NAA local ("33...") from VPD 0x83
+#   V: vendor-specific ("0...") from VPD 0x83
+#   S: vendor/model/serial number ("S...") from VPD 0x80
+# The ordering of the letters doesn't matter, the precedence is always T, L, V, S
+# NAA (except "local") and EUI-64 IDs (see below), as well as ATA IDs, always take precedence over
+# the sources configured here.
+#
+# This only needs to be changed if there are legacy SCSI devices that don't provide any reliable
+# device identifiers, and some subsystem like multipath requires that ID_SERIAL is set.
+# Be aware that multipath actually needs unique identifiers, though.
+# Using ambiguous identifiers for ID_SERIAL can cause data corruption with multipath.
+#
+# To configure the behavior, set ENV{.SCSI_ID_SERIAL_SRC} in 00-scsi-sg3_config.rules.
+# By default, only T10 vendor ID is allowed.
+ENV{.SCSI_ID_SERIAL_SRC}!="?*", ENV{.SCSI_ID_SERIAL_SRC}="T"
+
+ENV{ID_SERIAL}=="?*", GOTO="sg3_utils_id_end"
+ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{ID_BUS}="scsi"
+ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{.SCSI_ID_SERIAL_SRC}=="*T*", \
+    ENV{ID_SERIAL}="1$env{SCSI_IDENT_LUN_T10}", \
+    ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_T10}"
+
+ENV{ID_SERIAL}=="?*", GOTO="sg3_utils_id_end"
+ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{ID_BUS}="scsi"
+ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{.SCSI_ID_SERIAL_SRC}=="*L*", \
+    ENV{ID_SERIAL}="3$env{SCSI_IDENT_LUN_NAA_LOCAL}", \
+    ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_NAA_LOCAL}"
+
+ENV{ID_SERIAL}=="?*", GOTO="sg3_utils_id_end"
+ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{ID_BUS}="scsi"
+ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{.SCSI_ID_SERIAL_SRC}=="*V*", \
+    ENV{ID_SERIAL}="0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}", \
+    ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_LUN_VENDOR}"
+
+ENV{ID_SERIAL}=="?*", GOTO="sg3_utils_id_end"
+ENV{SCSI_IDENT_SERIAL}=="?*", ENV{ID_BUS}="scsi"
+ENV{SCSI_IDENT_SERIAL}=="?*", ENV{.SCSI_ID_SERIAL_SRC}=="*S*", \
+    ENV{ID_SERIAL}="S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}", \
+    ENV{ID_SERIAL_SHORT}="$env{SCSI_IDENT_SERIAL}"
+
 LABEL="sg3_utils_id_end"
+ENV{ID_SERIAL}!="?*", ENV{DEVTYPE}=="disk", \
+    PROGRAM="/bin/logger -t 55-scsi-sg3_id.rules -p daemon.warning \"WARNING: SCSI device %k has no device ID, consider changing .SCSI_ID_SERIAL_SRC in 00-scsi-sg3_config.rules\""

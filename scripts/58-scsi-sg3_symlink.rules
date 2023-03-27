@@ -5,10 +5,32 @@ ACTION=="remove", GOTO="sg3_utils_symlink_end"
 SUBSYSTEM!="block", GOTO="sg3_utils_symlink_end"
 ENV{UDEV_DISABLE_PERSISTENT_STORAGE_RULES_FLAG}=="1", GOTO="sg3_utils_symlink_end"
 
-# Select which identifier to use per default
+# Enable or disable possibly ambiguous SCSI device symlinks under /dev/disk/by-id
+#
+# .SCSI_SYMLINK_SRC can be any combination of the letter "TLVS":
+#   T: T10 vendor ID ("1...") from VPD 0x83
+#   L: NAA local ("33...") from VPD 0x83
+#   V: vendor-specific ("0...") from VPD 0x83
+#   S: vendor/model/serial number ("S...") from VPD 0x80
+# Symlinks will be created for every letter included in .SCSI_SYMLINK_SRC.
+# Symlinks for NAA (except "local") and EUI-64 IDs (see below) are always created.
+#
+# NOTE: The default rules in 60-persistent-storage.rules create a symlink
+# "ENV{ID_BUS}-ENV{ID_SERIAL}" symlink anyway, where ID_BUS is "scsi", "ata", "usb", or "cciss".
+# ID_SERIAL is set in 55-scsi-sg3_id.rules from the least ambiguous device identifier.
+# The symlinks created by this file are created *in addition* to the default symlink.
+#
+# This only needs to be changed if some subsystem, like dm-crypt or LVM, depends on the
+# additional symlinks being present for device identification.
+#
+# To configure the behavior, set ENV{.SCSI_SYMLINK_SRC} in 00-scsi-sg3_config.rules.
+# By default, no possibly ambiguous additional symlinks will be created.
+
 # 0: vpd page 0x80 identifier
-ENV{SCSI_IDENT_SERIAL}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}"
-ENV{SCSI_IDENT_SERIAL}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}-part%n"
+ENV{.SCSI_SYMLINK_SRC}=="*S*", ENV{SCSI_IDENT_SERIAL}=="?*", ENV{DEVTYPE}=="disk", \
+    SYMLINK+="disk/by-id/scsi-S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}"
+ENV{.SCSI_SYMLINK_SRC}=="*S*", ENV{SCSI_IDENT_SERIAL}=="?*", ENV{DEVTYPE}=="partition", \
+    SYMLINK+="disk/by-id/scsi-S$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_SERIAL}-part%n"
 # NAA identifier (prefix 3)
 # 1: IEEE Registered Extended first
 ENV{SCSI_IDENT_LUN_NAA_REGEXT}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_REGEXT}"
@@ -26,13 +48,19 @@ ENV{SCSI_IDENT_LUN_EUI64}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id
 ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-8$env{SCSI_IDENT_LUN_NAME}"
 ENV{SCSI_IDENT_LUN_NAME}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-8$env{SCSI_IDENT_LUN_NAME}-part%n"
 # 6: T10 Vendor identifier (prefix 1)
-ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}"
-ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}-part%n"
+ENV{.SCSI_SYMLINK_SRC}=="*T*", ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="disk", \
+    SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}"
+ENV{.SCSI_SYMLINK_SRC}=="*T*", ENV{SCSI_IDENT_LUN_T10}=="?*", ENV{DEVTYPE}=="partition", \
+    SYMLINK+="disk/by-id/scsi-1$env{SCSI_IDENT_LUN_T10}-part%n"
 # 7: IEEE Locally assigned
-ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_LOCAL}"
-ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_LOCAL}-part%n"
+ENV{.SCSI_SYMLINK_SRC}=="*L*", ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{DEVTYPE}=="disk", \
+    SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_LOCAL}"
+ENV{.SCSI_SYMLINK_SRC}=="*L*", ENV{SCSI_IDENT_LUN_NAA_LOCAL}=="?*", ENV{DEVTYPE}=="partition", \
+    SYMLINK+="disk/by-id/scsi-3$env{SCSI_IDENT_LUN_NAA_LOCAL}-part%n"
 # 8: Vendor-specific identifier (prefix 0)
-ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{DEVTYPE}=="disk", SYMLINK+="disk/by-id/scsi-0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}"
-ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{DEVTYPE}=="partition", SYMLINK+="disk/by-id/scsi-0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}-part%n"
+ENV{.SCSI_SYMLINK_SRC}=="*V*", ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{DEVTYPE}=="disk", \
+    SYMLINK+="disk/by-id/scsi-0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}"
+ENV{.SCSI_SYMLINK_SRC}=="*V*", ENV{SCSI_IDENT_LUN_VENDOR}=="?*", ENV{DEVTYPE}=="partition", \
+    SYMLINK+="disk/by-id/scsi-0$env{SCSI_VENDOR}_$env{SCSI_MODEL}_$env{SCSI_IDENT_LUN_VENDOR}-part%n"
 
 LABEL="sg3_utils_symlink_end"
