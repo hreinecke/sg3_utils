@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.43 20230326";  /* spc6r07, sbc5r04 */
+static const char * version_str = "2.44 20230329";  /* spc6r08, sbc5r04 */
 
 #define MY_NAME "sg_inq"
 
@@ -343,7 +343,8 @@ usage()
             "    --vendor|-s     show vendor specific fields in std "
             "inquiry\n"
             "    --verbose|-v    increase verbosity\n"
-            "    --version|-V    print version string then exit\n"
+            "    --version|-V    print this utility's version string then "
+	    "exit\n"
             "    --vpd|-e        vital product data (set page with "
             "'--page=PG')\n\n"
             "Sends a SCSI INQUIRY command to the DEVICE and decodes the "
@@ -2148,9 +2149,9 @@ std_inq_decode(const uint8_t * rp, int len, struct opts_t * op,
     if (rsp_len < len)
         len = rsp_len;
 
-    /* N.B. rp[2] full byte is 'version' in SPC-2,3,4 but in SPC
-     * [spc-r11a (1997)] bits 6,7: ISO/IEC version; bits 3-5: ECMA
-     * version; bits 0-2: SCSI version */
+    /* N.B. rp[2] full byte is 'version' in SPC-2,3,4 but in SPC [spc-r11a "
+     * (1997)] bits 6,7: ISO/IEC version; bits 3-5: ECMA version; bits 0-2:
+     * SCSI version. Pattern broken by SPC-6 which 0xd .*/
     ansi_version = rp[2] & 0xf;
     pdt = rp[0] & PDT_MASK;
     if (op->do_export) {

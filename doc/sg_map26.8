@@ -1,4 +1,4 @@
-.TH SG_MAP26 "8" "November 2012" "sg3_utils\-1.35" SG3_UTILS
+.TH SG_MAP26 "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_map26 \- map SCSI generic (sg) device to corresponding device names
 .SH SYNOPSIS
@@ -32,6 +32,12 @@ and '/sys/block/hdc' usually refer to the same device and thus would
 be considered matching. A related example is that '/dev/cdrom'
 and '/dev/hdc' are also considered matching if '/dev/cdrom' is a
 symlink to '/dev/hdc'.
+.PP
+Note that this utility requires root permissions to access the storage
+device nodes in the /dev directory. The lsscsi utility may be used
+instead in many cases, and lsscsi does not require root permission
+as it "data\-mines" the sysfs pseudo file system for the information
+it needs.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -92,6 +98,11 @@ to search the device directory.
 This utility only shows one relationship at a time. To get an
 overview of all SCSI devices, with special file names and optionally
 the "mapped" sg device name, see the lsscsi utility.
+.PP
+Even though lsscsi is a functional replacement for this utility,
+it has been reported that this utility runs faster in systems that
+have a lot of disks connected. Theoretically a Linux system may
+have up to 16383 SCSI disks connected to it.
 .SH EXAMPLES
 Assume sg2 maps to sdb while dvd, cdrom and hdc are all matching.
 .PP
@@ -138,7 +149,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2005\-2012 Douglas Gilbert
+Copyright \(co 2005\-2023 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

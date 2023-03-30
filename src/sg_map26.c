@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2022 Douglas Gilbert.
+ * Copyright (c) 2005-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -47,7 +47,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.19 20220117";
+static const char * version_str = "1.20 20230329";
 
 #define ME "sg_map26: "
 
@@ -184,7 +184,8 @@ usage()
                 "    --verbose | -v    increase verbosity of output\n"
                 "    --version | -V    print version string and exit\n\n"
                 "Maps SCSI device node to corresponding generic node (and "
-                "vv)\n"
+                "vv). Users may\nfind the lsscsi utility more convenient "
+                "as it doesn't need root\npermissions.\n"
                 );
 }
 
@@ -668,7 +669,7 @@ static int
 map_sd(const char * device_name, const char * device_dir, int ma, int mi,
        int result, bool follow_symlink, int verbose)
 {
-        int index, m_mi, m_ma, num;
+        int index, m_mi, m_ma, num, disc, disc2;
         char value[D_NAME_LEN_MAX];
         char name[D_NAME_LEN_MAX];
 
@@ -677,14 +678,17 @@ map_sd(const char * device_name, const char * device_dir, int ma, int mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         }
+        /* see sd_major() in drivers/scsi/sd.c lk 6.2 */
+        disc2 = 0xfff00 & mi;
+        disc = 0xf & (mi >> 4);
         if (SCSI_DISK0_MAJOR == ma)
-                index = mi / 16;
+                index = disc + disc2;
         else if (ma >= SCSI_DISK8_MAJOR)
-                index = (mi / 16) + 128 +
-                        ((ma - SCSI_DISK8_MAJOR) * 16);
+                index = disc + 128 +
+                        ((ma - SCSI_DISK8_MAJOR) * 16) + disc2;
         else
-                index = (mi / 16) + 16 +
-                        ((ma - SCSI_DISK1_MAJOR) * 16);
+                index = disc + 16 +
+                        ((ma - SCSI_DISK1_MAJOR) * 16) + disc2;
         if (index < 26)
                 snprintf(name, sizeof(name), "%ssd%c",
                          sys_sd_dir, 'a' + index % 26);

@@ -19,8 +19,8 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "3.05 20230326";
-/* spc6r07, sbc5r04, zbc2r13 */
+const char * sg_lib_version_str = "3.07 20230329";
+/* spc6r08, sbc5r04, zbc2r13 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
@@ -768,6 +768,7 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x00,0x20,"Extended copy information available"},
     {0x00,0x21,"Atomic command aborted due to ACA"},
     {0x00,0x22,"Deferred microcode is pending"},
+    {0x00,0x23,"Overlapping atomic command in progress"},       /* spc6r08 */
     {0x01,0x00,"No index/sector signal"},
     {0x02,0x00,"No seek complete"},
     {0x03,0x00,"Peripheral device write fault"},

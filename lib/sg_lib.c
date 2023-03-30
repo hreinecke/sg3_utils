@@ -320,7 +320,7 @@ static const char * sg_lib_ansi_version_arr[16] = {
     "obsolete, [Ah]",
     "obsolete, [Bh]",
     "obsolete, [Ch]",
-    "SPC-6",            /* T10/BSR INCITS 566, proposed value in 23-015r0 */
+    "SPC-6",            /* T10/BSR INCITS 566, added in spc6r08 */
     "reserved [Eh]",
     "reserved [Fh]",
 };
