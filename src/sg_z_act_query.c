@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2022 Douglas Gilbert.
+ * Copyright (c) 2014-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,8 @@
  * command to the given SCSI device. Based on zbc2r12.pdf .
  */
 
-static const char * version_str = "1.04 20220729";
+static const char * version_str = "1.05 20230407";
+static const char * my_name = "sg_z_act_query: ";
 
 #define SG_ZBC_IN_CMDLEN 16
 #define Z_ACTIVATE_SA 0x8
@@ -368,6 +369,8 @@ main(int argc, char * argv[])
     struct opts_t opts SG_C_CPP_ZERO_INIT;
     struct opts_t * op = &opts;
 
+   if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 

@@ -70,7 +70,9 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.22 20230311";
+static const char * version_str = "1.23 20230407";
+
+static const char * my_name = "sgm_dd: ";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -80,7 +82,6 @@ static const char * version_str = "1.22 20230311";
 #define MAX_BPT_VALUE (1 << 24)         /* used for maximum bs as well */
 #define MAX_COUNT_SKIP_SEEK (1LL << 48) /* coverity wants upper bound */
 
-#define ME "sgm_dd: "
 
 
 #ifndef SG_FLAG_MMAP_IO
@@ -509,18 +510,18 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         sg_put_unaligned_be24(0x1fffff & start_block, cdbp + 1);
         cdbp[4] = (256 == blocks) ? 0 : (uint8_t)blocks;
         if (blocks > 256) {
-            pr2serr(ME "for 6 byte commands, maximum number of blocks is "
-                    "256\n");
+            pr2serr("%sfor 6 byte commands, maximum number of blocks is "
+                    "256\n", my_name);
             return 1;
         }
         if ((start_block + blocks - 1) & (~0x1fffff)) {
-            pr2serr(ME "for 6 byte commands, can't address blocks beyond "
-                    "%d\n", 0x1fffff);
+            pr2serr("%sfor 6 byte commands, can't address blocks beyond "
+                    "%d\n", my_name, 0x1fffff);
             return 1;
         }
         if (dpo || fua) {
-            pr2serr(ME "for 6 byte commands, neither dpo nor fua bits "
-                    "supported\n");
+            pr2serr("%sfor 6 byte commands, neither dpo nor fua bits "
+                    "supported\n", my_name);
             return 1;
         }
         break;
@@ -531,8 +532,8 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         sg_put_unaligned_be32((uint32_t)start_block, cdbp + 2);
         sg_put_unaligned_be16((uint16_t)blocks, cdbp + 7);
         if (blocks & (~0xffff)) {
-            pr2serr(ME "for 10 byte commands, maximum number of blocks is "
-                    "%d\n", 0xffff);
+            pr2serr("%sfor 10 byte commands, maximum number of blocks is "
+                    "%d\n", my_name, 0xffff);
             return 1;
         }
         break;
@@ -551,8 +552,8 @@ sg_build_scsi_cdb(uint8_t * cdbp, int cdb_sz, unsigned int blocks,
         sg_put_unaligned_be32((uint32_t)blocks, cdbp + 10);
         break;
     default:
-        pr2serr(ME "expected cdb size of 6, 10, 12, or 16 but got %d\n",
-                cdb_sz);
+        pr2serr("%sexpected cdb size of 6, 10, 12, or 16 but got %d\n",
+                my_name, cdb_sz);
         return 1;
     }
     return 0;
@@ -572,8 +573,8 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
 
     if (sg_build_scsi_cdb(rdCmd, cdbsz, blocks, from_block, false, fua,
                           dpo)) {
-        pr2serr(ME "bad rd cdb build, from_block=%" PRId64 ", blocks=%d\n",
-                from_block, blocks);
+        pr2serr("%sbad rd cdb build, from_block=%" PRId64 ", blocks=%d\n",
+                my_name, from_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
     }
     memset(&io_hdr, 0, sizeof(struct sg_io_hdr));
@@ -602,7 +603,10 @@ sg_read(int sg_fd, uint8_t * buff, int blocks, int64_t from_block,
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         sleep(1);
     if (res < 0) {
-        perror(ME "SG_IO error (sg_read)");
+        char e[64];
+
+        snprintf(e, sizeof(e), "%s%s: SG_IO error", my_name, __func__);
+        perror(e);
         return -1;
     }
 #else
@@ -668,8 +672,8 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
     struct sg_io_hdr io_hdr SG_C_CPP_ZERO_INIT;
 
     if (sg_build_scsi_cdb(wrCmd, cdbsz, blocks, to_block, true, fua, dpo)) {
-        pr2serr(ME "bad wr cdb build, to_block=%" PRId64 ", blocks=%d\n",
-                to_block, blocks);
+        pr2serr("%sbad wr cdb build, to_block=%" PRId64 ", blocks=%d\n",
+                my_name, to_block, blocks);
         return SG_LIB_SYNTAX_ERROR;
     }
 
@@ -700,7 +704,10 @@ sg_write(int sg_fd, uint8_t * buff, int blocks, int64_t to_block,
            ((EINTR == errno) || (EAGAIN == errno) || (EBUSY == errno)))
         sleep(1);
     if (res < 0) {
-        perror(ME "SG_IO error (sg_write)");
+        char e[64];
+
+        snprintf(e, sizeof(e), "%s%s: SG_IO error", my_name, __func__);
+        perror(e);
         return -1;
     }
 #else
@@ -984,6 +991,8 @@ main(int argc, char * argv[])
     char b[80];
     struct flags_t in_flags;
     struct flags_t out_flags;
+    static const char * bat_s = "bad argument to";
+    static const int blen = sizeof(b);
 
 #if defined(HAVE_SYSCONF) && defined(_SC_PAGESIZE)
     psz = sysconf(_SC_PAGESIZE); /* POSIX.1 (was getpagesize()) */
@@ -994,6 +1003,8 @@ main(int argc, char * argv[])
     outf[0] = '\0';
     memset(&in_flags, 0, sizeof(in_flags));
     memset(&out_flags, 0, sizeof(out_flags));
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
 
     for (k = 1; k < argc; k++) {
         if (argv[k])
@@ -1008,20 +1019,20 @@ main(int argc, char * argv[])
         if (0 == strcmp(key,"bpt")) {
             bpt = sg_get_num(buf);
             if (-1 == bpt) {
-                pr2serr(ME "bad argument to 'bpt'\n");
+                pr2serr("%s%s 'bpt'\n", my_name, bat_s);
                 return SG_LIB_SYNTAX_ERROR;
             }
             bpt_given = true;
         } else if (0 == strcmp(key,"bs")) {
             blk_sz = sg_get_num(buf);
             if (-1 == blk_sz) {
-                pr2serr(ME "bad argument to 'bs'\n");
+                pr2serr("%s%s 'bs'\n", my_name, bat_s);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"cdbsz")) {
             scsi_cdbsz_in = sg_get_num(buf);
             if ((scsi_cdbsz_in < 6) || (scsi_cdbsz_in > 32)) {
-                pr2serr(ME "'cdbsz' expects 6, 10, 12, 16 or 32\n");
+                pr2serr("%s'cdbsz' expects 6, 10, 12, 16 or 32\n", my_name);
                 return SG_LIB_SYNTAX_ERROR;
             }
             scsi_cdbsz_out = scsi_cdbsz_in;
@@ -1033,7 +1044,7 @@ main(int argc, char * argv[])
             if (0 != strcmp("-1", buf)) {
                 dd_count = sg_get_llnum(buf);
                 if ((dd_count < 0) || (dd_count > MAX_COUNT_SKIP_SEEK)) {
-                    pr2serr(ME "bad argument to 'count'\n");
+                    pr2serr("%s%s 'count'\n", my_name, bat_s);
                     return SG_LIB_SYNTAX_ERROR;
                 }
             }   /* treat 'count=-1' as calculate count (same as not given) */
@@ -1048,7 +1059,7 @@ main(int argc, char * argv[])
         } else if (0 == strcmp(key,"ibs")) {
             ibs = sg_get_num(buf);
             if ((ibs < 0) || (ibs > MAX_BPT_VALUE)) {
-                pr2serr(ME "bad argument to 'ibs'\n");
+                pr2serr("%s%s 'ibs'\n", my_name, bat_s);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key,"if") == 0) {
@@ -1061,7 +1072,7 @@ main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key, "iflag")) {
             if (process_flags(buf, &in_flags)) {
-                pr2serr(ME "bad argument to 'iflag'\n");
+                pr2serr("%s%s 'iflag'\n", my_name, bat_s);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (strcmp(key,"of") == 0) {
@@ -1074,25 +1085,25 @@ main(int argc, char * argv[])
             }
         } else if (0 == strcmp(key, "oflag")) {
             if (process_flags(buf, &out_flags)) {
-                pr2serr(ME "bad argument to 'oflag'\n");
+                pr2serr("%s%s 'oflag'\n", my_name, bat_s);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"obs")) {
             obs = sg_get_num(buf);
             if ((obs < 0) || (obs > MAX_BPT_VALUE)) {
-                pr2serr(ME "bad argument to 'obs'\n");
+                pr2serr("%s%s 'obs'\n", my_name, bat_s);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"seek")) {
             seek = sg_get_llnum(buf);
             if ((seek < 0) || (seek > MAX_COUNT_SKIP_SEEK)) {
-                pr2serr(ME "bad argument to 'seek'\n");
+                pr2serr("%s%s 'seek'\n", my_name, bat_s);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"skip")) {
             skip = sg_get_llnum(buf);
             if ((skip < 0) || (skip > MAX_COUNT_SKIP_SEEK)) {
-                pr2serr(ME "bad argument to 'skip'\n");
+                pr2serr("%s%s 'skip'\n", my_name, bat_s);
                 return SG_LIB_SYNTAX_ERROR;
             }
         } else if (0 == strcmp(key,"sync"))
@@ -1164,7 +1175,7 @@ main(int argc, char * argv[])
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
     if (version_given) {
-        pr2serr(ME ": %s\n", version_str);
+        pr2serr("%s%s\n", my_name, version_str);
         return 0;
     }
 
@@ -1197,8 +1208,8 @@ main(int argc, char * argv[])
         bpt = DEF_BLOCKS_PER_2048TRANSFER;
 
 #ifdef DEBUG
-    pr2serr(ME "if=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%" PRId64
-            "\n", inf, skip, outf, seek, dd_count);
+    pr2serr("%sif=%s skip=%" PRId64 " of=%s seek=%" PRId64 " count=%" PRId64
+            "\n", my_name, inf, skip, outf, seek, dd_count);
 #endif
     install_handler (SIGINT, interrupt_handler);
     install_handler (SIGQUIT, interrupt_handler);
@@ -1214,10 +1225,10 @@ main(int argc, char * argv[])
                     dd_filetype_str(in_type, ebuff));
 
         if (FT_ERROR == in_type) {
-            pr2serr(ME "unable to access %s\n", inf);
+            pr2serr("%sunable to access %s\n", my_name, inf);
             return SG_LIB_FILE_ERROR;
         } else if (FT_ST == in_type) {
-            pr2serr(ME "unable to use scsi tape device %s\n", inf);
+            pr2serr("%sunable to use scsi tape device %s\n", my_name, inf);
             return SG_LIB_FILE_ERROR;
         } else if (FT_SG == in_type) {
             flags = O_RDWR | O_NONBLOCK;
@@ -1230,13 +1241,13 @@ main(int argc, char * argv[])
             if ((infd = open(inf, flags)) < 0) {
                 err = errno;
                 snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for sg reading", inf);
+                         "%scould not open %s for sg reading", my_name, inf);
                 perror(ebuff);
                 return sg_convert_errno(err);
             }
             res = ioctl(infd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30122)) {
-                pr2serr(ME "sg driver prior to 3.1.22\n");
+                pr2serr("%ssg driver prior to 3.1.22\n", my_name);
                 return SG_LIB_FILE_ERROR;
             }
             in_res_sz = blk_sz * bpt;
@@ -1244,7 +1255,9 @@ main(int argc, char * argv[])
                 in_res_sz = ((in_res_sz / psz) + 1) * psz;
             if (ioctl(infd, SG_GET_RESERVED_SIZE, &t) < 0) {
                 err = errno;
-                perror(ME "SG_GET_RESERVED_SIZE error");
+                snprintf(ebuff, EBUFF_SZ, "%sSG_GET_RESERVED_SIZE error",
+                         my_name);
+                perror(ebuff);
                 return sg_convert_errno(err);
             }
             if (t < MIN_RESERVED_SIZE)
@@ -1252,7 +1265,9 @@ main(int argc, char * argv[])
             if (in_res_sz > t) {
                 if (ioctl(infd, SG_SET_RESERVED_SIZE, &in_res_sz) < 0) {
                     err = errno;
-                    perror(ME "SG_SET_RESERVED_SIZE error");
+                    snprintf(ebuff, EBUFF_SZ, "%sSG_SET_RESERVED_SIZE error",
+                             my_name);
+                    perror(ebuff);
                     return sg_convert_errno(err);
                 }
             }
@@ -1261,7 +1276,7 @@ main(int argc, char * argv[])
             if (MAP_FAILED == wrkMmap) {
                 err = errno;
                 snprintf(ebuff, EBUFF_SZ,
-                         ME "error using mmap() on file: %s", inf);
+                         "%serror using mmap() on file: %s", my_name, inf);
                 perror(ebuff);
                 return sg_convert_errno(err);
             }
@@ -1276,7 +1291,7 @@ main(int argc, char * argv[])
             if ((infd = open(inf, flags)) < 0) {
                 err = errno;
                 snprintf(ebuff, EBUFF_SZ,
-                         ME "could not open %s for reading", inf);
+                         "%scould not open %s for reading", my_name, inf);
                 perror(ebuff);
                 return sg_convert_errno(err);
             }
@@ -1286,8 +1301,8 @@ main(int argc, char * argv[])
                 offset *= blk_sz;       /* could exceed 32 bits here! */
                 if (lseek64(infd, offset, SEEK_SET) < 0) {
                     err = errno;
-                    snprintf(ebuff, EBUFF_SZ, ME "couldn't skip to "
-                             "required position on %s", inf);
+                    snprintf(ebuff, EBUFF_SZ, "%scouldn't skip to "
+                             "required position on %s", my_name, inf);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
@@ -1305,7 +1320,7 @@ main(int argc, char * argv[])
                     dd_filetype_str(out_type, ebuff));
 
         if (FT_ST == out_type) {
-            pr2serr(ME "unable to use scsi tape device %s\n", outf);
+            pr2serr("%sunable to use scsi tape device %s\n", my_name, outf);
             return SG_LIB_FILE_ERROR;
         }
         else if (FT_SG == out_type) {
@@ -1318,19 +1333,21 @@ main(int argc, char * argv[])
                 flags |= O_SYNC;
             if ((outfd = open(outf, flags)) < 0) {
                 err = errno;
-                snprintf(ebuff, EBUFF_SZ, ME "could not open %s for "
-                         "sg writing", outf);
+                snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
+                         "sg writing", my_name, outf);
                 perror(ebuff);
                 return sg_convert_errno(err);
             }
             res = ioctl(outfd, SG_GET_VERSION_NUM, &t);
             if ((res < 0) || (t < 30122)) {
-                pr2serr(ME "sg driver prior to 3.1.22\n");
+                pr2serr("%ssg driver prior to 3.1.22\n", my_name);
                 return SG_LIB_FILE_ERROR;
             }
             if (ioctl(outfd, SG_GET_RESERVED_SIZE, &t) < 0) {
                 err = errno;
-                perror(ME "SG_GET_RESERVED_SIZE error");
+                snprintf(ebuff, EBUFF_SZ, "%sSG_GET_RESERVED_SIZE error",
+                         my_name);
+                perror(ebuff);
                 return sg_convert_errno(err);
             }
            if (t < MIN_RESERVED_SIZE)
@@ -1339,7 +1356,9 @@ main(int argc, char * argv[])
             if (out_res_sz > t) {
                 if (ioctl(outfd, SG_SET_RESERVED_SIZE, &out_res_sz) < 0) {
                     err = errno;
-                    perror(ME "SG_SET_RESERVED_SIZE error");
+                    snprintf(ebuff, EBUFF_SZ, "%sSG_SET_RESERVED_SIZE error",
+                             my_name);
+                    perror(ebuff);
                     return sg_convert_errno(err);
                 }
             }
@@ -1348,8 +1367,8 @@ main(int argc, char * argv[])
                                 PROT_READ | PROT_WRITE, MAP_SHARED, outfd, 0);
                 if (MAP_FAILED == wrkMmap) {
                     err = errno;
-                    snprintf(ebuff, EBUFF_SZ,
-                             ME "error using mmap() on file: %s", outf);
+                    snprintf(ebuff, EBUFF_SZ, "%serror using mmap() on "
+                             "file: %s", my_name, outf);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
@@ -1370,8 +1389,8 @@ main(int argc, char * argv[])
                     flags |= O_APPEND;
                 if ((outfd = open(outf, flags, 0666)) < 0) {
                     err = errno;
-                    snprintf(ebuff, EBUFF_SZ,
-                             ME "could not open %s for writing", outf);
+                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
+                             "writing", my_name, outf);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
@@ -1379,8 +1398,8 @@ main(int argc, char * argv[])
             else {
                 if ((outfd = open(outf, O_WRONLY)) < 0) {
                     err = errno;
-                    snprintf(ebuff, EBUFF_SZ, ME "could not open %s "
-                             "for raw writing", outf);
+                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s "
+                             "for raw writing", my_name, outf);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
@@ -1391,8 +1410,8 @@ main(int argc, char * argv[])
                 offset *= blk_sz;       /* could exceed 32 bits here! */
                 if (lseek64(outfd, offset, SEEK_SET) < 0) {
                     err = errno;
-                    snprintf(ebuff, EBUFF_SZ, ME "couldn't seek to "
-                             "required position on %s", outf);
+                    snprintf(ebuff, EBUFF_SZ, "%scouldn't seek to "
+                             "required position on %s", my_name, outf);
                     perror(ebuff);
                     return sg_convert_errno(err);
                 }
@@ -1420,7 +1439,7 @@ main(int argc, char * argv[])
                 res = scsi_read_capacity(infd, &in_num_sect, &in_sect_sz);
             }
             if (0 != res) {
-                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                sg_get_category_sense_str(res, blen, b, verbose);
                 pr2serr("Read capacity (if=%s): %s\n", inf, b);
                 in_num_sect = -1;
             }
@@ -1449,7 +1468,7 @@ main(int argc, char * argv[])
                 res = scsi_read_capacity(outfd, &out_num_sect, &out_sect_sz);
             }
             if (0 != res) {
-                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                sg_get_category_sense_str(res, blen, b, verbose);
                 pr2serr("Read capacity (of=%s): %s\n", inf, b);
                 out_num_sect = -1;
             }
@@ -1582,8 +1601,8 @@ main(int argc, char * argv[])
                 pr2serr("read(unix): count=%d, res=%d\n", blocks * blk_sz,
                         res);
             if (ret < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "reading, skip=%" PRId64 " ",
-                         skip);
+                snprintf(ebuff, EBUFF_SZ, "%sreading, skip=%" PRId64 " ",
+                         my_name, skip);
                 perror(ebuff);
                 ret = -1;
                 break;
@@ -1637,8 +1656,8 @@ main(int argc, char * argv[])
                 pr2serr("write(unix): count=%d, res=%d\n", blocks * blk_sz,
                         res);
             if (res < 0) {
-                snprintf(ebuff, EBUFF_SZ, ME "writing, seek=%" PRId64 " ",
-                         seek);
+                snprintf(ebuff, EBUFF_SZ, "%swriting, seek=%" PRId64 " ",
+                         my_name, seek);
                 perror(ebuff);
                 break;
             }
@@ -1676,7 +1695,7 @@ main(int argc, char * argv[])
                 res = sg_ll_sync_cache_10(outfd, 0, 0, 0, 0, 0, false, 0);
             }
             if (0 != res) {
-                sg_get_category_sense_str(res, sizeof(b), b, verbose);
+                sg_get_category_sense_str(res, blen, b, verbose);
                 pr2serr("Synchronize cache(out): %s\n", b);
             }
         }

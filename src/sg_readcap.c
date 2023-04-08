@@ -36,9 +36,9 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.07 20230207";
+static const char * version_str = "4.08 20230407";
 
-#define MY_NAME "sg_readcap"
+static const char * my_name = "sg_readcap: ";
 
 #define RCAP_REPLY_LEN 8
 #define RCAP16_REPLY_LEN 32
@@ -470,6 +470,8 @@ main(int argc, char * argv[])
 
     op = &opts;
     memset(op, 0, sizeof(opts));
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     res = parse_cmd_line(op, argc, argv);
     if (res)
         return res;
@@ -511,7 +513,7 @@ main(int argc, char * argv[])
             pr2serr("%s", e);
             return SG_LIB_SYNTAX_ERROR;
         }
-        jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
+        jop = sgj_start_r(my_name, version_str, argc, argv, jsp);
     }
     as_json = jsp->pr_as_json;
 
@@ -538,8 +540,7 @@ main(int argc, char * argv[])
             op->do_long = true;
     }
     if ((! op->do_pmi) && (op->llba > 0)) {
-        pr2serr("%s: lba can only be non-zero when '--pmi' is set\n",
-                MY_NAME);
+        pr2serr("%slba can only be non-zero when '--pmi' is set\n", my_name);
         usage_for(op);
         ret = SG_LIB_CONTRADICT;
         goto fini;
@@ -576,7 +577,7 @@ main(int argc, char * argv[])
             rw_0_flag = true;  /* RCAP(10) has opened RO in past, so leave */
         if ((sg_fd = sg_cmds_open_device(op->device_name, rw_0_flag,
                                          op->verbose)) < 0) {
-            pr2serr("%s: error opening file: %s: %s\n", MY_NAME,
+            pr2serr("%serror opening file: %s: %s\n", my_name,
                     op->device_name, safe_strerror(-sg_fd));
             ret = sg_convert_errno(-sg_fd);
             goto fini;
@@ -667,7 +668,7 @@ main(int argc, char * argv[])
             sg_cmds_close_device(sg_fd);
             if ((sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
                                              op->verbose)) < 0) {
-                pr2serr("%s: error re-opening file: %s (rw): %s\n", MY_NAME,
+                pr2serr("%serror re-opening file: %s (rw): %s\n", my_name,
                         op->device_name, safe_strerror(-sg_fd));
                 ret = sg_convert_errno(-sg_fd);
                 goto fini;

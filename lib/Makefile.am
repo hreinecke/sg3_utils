@@ -54,7 +54,7 @@ endif
 endif
 
 if OS_NETBSD
-libsgutils2_la_SOURCES += sg_pt_dummy.c
+libsgutils2_la_SOURCES += sg_pt_netbsd.c
 endif
 
 if OS_OPENBSD

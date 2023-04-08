@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2022 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,9 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.40 20220607";
+static const char * version_str = "1.41 20230407";
+
+static const char * my_name = "sg_requests: ";	/* REQUEST Sense command */
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -44,8 +46,6 @@ static const char * version_str = "1.40 20220607";
 
 #define REQUEST_SENSE_CMD 0x3
 #define REQUEST_SENSE_CMDLEN 6
-
-#define ME "sg_requests: "
 
 
 static struct option long_options[] = {
@@ -147,6 +147,8 @@ main(int argc, char * argv[])
     struct timeval start_tm, end_tm;
 #endif
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 
@@ -240,7 +242,7 @@ main(int argc, char * argv[])
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
     if (version_given) {
-        pr2serr(ME "version: %s\n", version_str);
+        pr2serr("%sversion: %s\n", my_name, version_str);
         return 0;
     }
 
@@ -277,7 +279,7 @@ main(int argc, char * argv[])
     sg_fd = sg_cmds_open_device(device_name, true /* ro */, verbose);
     if (sg_fd < 0) {
         if (not_raw_hex && verbose)
-            pr2serr(ME "open error: %s: %s\n", device_name,
+            pr2serr("%sopen error: %s: %s\n", my_name, device_name,
                     safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
         goto finish;

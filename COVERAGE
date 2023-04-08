@@ -23,8 +23,8 @@ GET CONFIGURATION   sg_get_config
 GET LBA STATUS      sg_get_lba_status <J>
 GET PHYSICAL ELEMENT STATUS      sg_get_elem_status <J>
 GET STREAM STATUS   sg_stream_ctl
-INQUIRY             sg_dd, sg_format, sg_inq, sginfo, sg_logs,
-                    sg_luns, sg_map('-i'), sg_modes, sg_opcodes,
+INQUIRY             sg_dd, sg_format, sg_inq <J>, sginfo, sg_logs,
+                    sg_luns <J>, sg_map('-i'), sg_modes, sg_opcodes <J>,
                     sg_persist, sg_scan, sg_ses, sg_vpd <J>
 FINISH ZONE         sg_zone
 FORMAT MEDIUM       sg_format, [SSC]

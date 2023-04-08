@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2022 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -29,9 +29,9 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.13 20220826";
+static const char * version_str = "1.14 20230407";
 
-#define ME "sg_prevent: "
+static const char * my_name = "sg_prevent: ";
 
 
 static struct option long_options[] = {
@@ -77,6 +77,8 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     int ret = 0;
 
+   if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 
@@ -142,7 +144,7 @@ main(int argc, char * argv[])
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
     if (version_given) {
-        pr2serr(ME "version: %s\n", version_str);
+        pr2serr("%sversion: %s\n", my_name, version_str);
         return 0;
     }
 
@@ -164,7 +166,7 @@ main(int argc, char * argv[])
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         if (verbose)
-            pr2serr(ME "open error: %s: %s\n", device_name,
+            pr2serr("%sopen error: %s: %s\n", my_name, device_name,
                     safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
         goto fini;

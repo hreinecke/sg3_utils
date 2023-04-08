@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2021 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2023 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,9 +40,10 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.30 20210610";    /* spc6r05 */
+static const char * version_str = "1.31 20230407";    /* spc6r07 */
 
-#define ME "sg_write_buffer: "
+static const char * my_name = "sg_write_buffer: ";    /* spc6r07 */
+
 #define DEF_XFER_LEN (8 * 1024 * 1024)
 #define EBUFF_SZ 256
 
@@ -220,6 +221,8 @@ main(int argc, char * argv[])
     const struct mode_s * mp;
     char ebuff[EBUFF_SZ];
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 
@@ -399,7 +402,7 @@ main(int argc, char * argv[])
     sg_fd = sg_cmds_open_device(device_name, false /* rw */, verbose);
     if (sg_fd < 0) {
         if (verbose)
-            pr2serr(ME "open error: %s: %s\n", device_name,
+            pr2serr("%sopen error: %s: %s\n", my_name, device_name,
                     safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
         goto err_out;
@@ -409,7 +412,7 @@ main(int argc, char * argv[])
             wb_len = DEF_XFER_LEN;
         dop = sg_memalign(wb_len, 0, &free_dop, false);
         if (NULL == dop) {
-            pr2serr(ME "out of memory\n");
+            pr2serr("%sout of memory\n", my_name);
             ret = sg_convert_errno(ENOMEM);
             goto err_out;
         }
@@ -426,8 +429,8 @@ main(int argc, char * argv[])
             } else {
                 if ((infd = open(file_name, O_RDONLY)) < 0) {
                     ret = sg_convert_errno(errno);
-                    snprintf(ebuff, EBUFF_SZ,
-                             ME "could not open %s for reading", file_name);
+                    snprintf(ebuff, EBUFF_SZ, "%scould not open %s for "
+                             "reading", my_name, file_name);
                     perror(ebuff);
                     goto err_out;
                 } else if (sg_set_binary_mode(infd) < 0)
@@ -435,8 +438,9 @@ main(int argc, char * argv[])
                 if (wb_skip > 0) {
                     if (lseek(infd, wb_skip, SEEK_SET) < 0) {
                         ret = sg_convert_errno(errno);
-                        snprintf(ebuff,  EBUFF_SZ, ME "couldn't skip to "
-                                 "required position on %s", file_name);
+                        snprintf(ebuff,  EBUFF_SZ, "%scouldn't skip to "
+                                 "required position on %s", my_name,
+                                 file_name);
                         perror(ebuff);
                         close(infd);
                         goto err_out;
@@ -445,13 +449,14 @@ main(int argc, char * argv[])
             }
             if (infd == STDIN_FILENO) {
                 if (NULL == (read_buf = (uint8_t *)malloc(DEF_XFER_LEN))) {
-                    pr2serr(ME "out of memory\n");
+                    pr2serr("%sout of memory\n", my_name);
                     ret = SG_LIB_SYNTAX_ERROR;
                     goto err_out;
                 }
                 res = read(infd, read_buf, DEF_XFER_LEN);
                 if (res < 0) {
-                    snprintf(ebuff, EBUFF_SZ, ME "couldn't read from STDIN");
+                    snprintf(ebuff, EBUFF_SZ, "%scouldn't read from STDIN",
+                             my_name);
                     perror(ebuff);
                     ret = SG_LIB_FILE_ERROR;
                     goto err_out;
@@ -483,8 +488,8 @@ main(int argc, char * argv[])
                 res = read(infd, dop, wb_len);
                 if (res < 0) {
                     ret = sg_convert_errno(errno);
-                    snprintf(ebuff, EBUFF_SZ, ME "couldn't read from %s",
-                             file_name);
+                    snprintf(ebuff, EBUFF_SZ, "%scouldn't read from %s",
+                             my_name, file_name);
                     perror(ebuff);
                     if (! got_stdin)
                         close(infd);

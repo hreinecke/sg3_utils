@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2021 Douglas Gilbert.
+ * Copyright (c) 2004-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,9 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.27 20211114";
+static const char * version_str = "1.28 20230407";
+
+static const char * my_name = "sg_sync: ";
 
 #define SYNCHRONIZE_CACHE16_CMD     0x91
 #define SYNCHRONIZE_CACHE16_CMDLEN  16
@@ -59,7 +61,8 @@ static struct option long_options[] = {
         {0, 0, 0, 0},
 };
 
-static void usage()
+static void
+usage()
 {
     pr2serr("Usage: sg_sync    [--16] [--count=COUNT] [--group=GN] [--help] "
             "[--immed]\n"
@@ -152,7 +155,8 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
 }
 
 
-int main(int argc, char * argv[])
+int
+main(int argc, char * argv[])
 {
     bool do_16 = false;
     bool immed = false;
@@ -170,6 +174,8 @@ int main(int argc, char * argv[])
     int64_t lba = 0;
     const char * device_name = NULL;
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 

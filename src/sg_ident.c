@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2018 Douglas Gilbert.
+ * Copyright (c) 2005-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,9 +33,10 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.23 20180814";
+static const char * version_str = "1.24 20230407";
 
-#define ME "sg_ident: "
+static const char * my_name = "sg_ident: ";
+
 
 #define REPORT_ID_INFO_SANITY_LEN 512
 
@@ -134,6 +135,8 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     int ret = 0;
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 
@@ -209,7 +212,7 @@ main(int argc, char * argv[])
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
     if (version_given) {
-        pr2serr(ME "version: %s\n", version_str);
+        pr2serr("%sversion: %s\n", my_name, version_str);
         return 0;
     }
 
@@ -235,7 +238,8 @@ main(int argc, char * argv[])
     }
     sg_fd = sg_cmds_open_device(device_name, false /* rw=false */, verbose);
     if (sg_fd < 0) {
-        pr2serr(ME "open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
+        pr2serr("%sopen error: %s: %s\n", my_name, device_name,
+                safe_strerror(-sg_fd));
         return sg_convert_errno(-sg_fd);
     }
 

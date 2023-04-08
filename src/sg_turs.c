@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000-2022 D. Gilbert
+ * Copyright (C) 2000-2023 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -45,7 +45,9 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.52 20221208";
+static const char * version_str = "3.53 20230407";
+
+static const char * my_name = "sg_turs: ";
 
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
@@ -527,6 +529,8 @@ main(int argc, char * argv[])
     memset(op, 0, sizeof(opts));
     memset(resp, 0, sizeof(loop_res));
     op->do_number = 1;
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     res = parse_cmd_line(op, argc, argv);
     if (res)
         return res;

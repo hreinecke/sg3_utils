@@ -34,7 +34,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.52 20230326";      /* spc6r07 */
+static const char * version_str = "1.53 20230406";      /* spc6r07 */
 
 #define MY_NAME "sg_luns"
 
@@ -474,7 +474,7 @@ main(int argc, char * argv[])
     uint8_t lun_arr[8];
     uint8_t std_inq_a[36];
     char b[144];
-    sgj_state json_st;
+    sgj_state json_st SG_C_CPP_ZERO_INIT;
     struct sg_simple_inquiry_resp sir;
     static const int blen = sizeof(b);
 

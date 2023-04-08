@@ -1,7 +1,7 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem.
  *
- * Copyright (C) 2000-2022 Ingo van Lil <inguin@gmx.de>
+ * Copyright (C) 2000-2023 Ingo van Lil <inguin@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,9 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.39 (2022-04-25)"
+#define SG_RAW_VERSION "0.4.40 (2023-04-07)"
+
+static const char * my_name = "sg_raw: ";
 
 #define DEFAULT_TIMEOUT 20
 #define MIN_SCSI_CDBSZ 6
@@ -556,6 +558,8 @@ main(int argc, char *argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     op->timeout = DEFAULT_TIMEOUT;
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, SG_RAW_VERSION, argc, argv, stderr);
     ret = parse_cmd_line(op, argc, argv);
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");

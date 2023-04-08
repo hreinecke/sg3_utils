@@ -489,20 +489,20 @@ clear_scsi_pt_obj(struct sg_pt_base * vp)
 void
 partial_clear_scsi_pt_obj(struct sg_pt_base * vp)
 {
-    struct sg_pt_linux_scsi * ptp = &vp->impl;
+    if (vp) {
+        struct sg_pt_linux_scsi * ptp = &vp->impl;
 
-    if (NULL == ptp)
-        return;
-    ptp->in_err = 0;
-    ptp->os_err = 0;
-    ptp->io_hdr.device_status = 0;
-    ptp->io_hdr.transport_status = 0;
-    ptp->io_hdr.driver_status = 0;
-    ptp->io_hdr.din_xferp = 0;
-    ptp->io_hdr.din_xfer_len = 0;
-    ptp->io_hdr.dout_xferp = 0;
-    ptp->io_hdr.dout_xfer_len = 0;
-    ptp->nvme_result = 0;
+        ptp->in_err = 0;
+        ptp->os_err = 0;
+        ptp->io_hdr.device_status = 0;
+        ptp->io_hdr.transport_status = 0;
+        ptp->io_hdr.driver_status = 0;
+        ptp->io_hdr.din_xferp = 0;
+        ptp->io_hdr.din_xfer_len = 0;
+        ptp->io_hdr.dout_xferp = 0;
+        ptp->io_hdr.dout_xfer_len = 0;
+        ptp->nvme_result = 0;
+    }
 }
 
 #ifndef SG_SET_GET_EXTENDED

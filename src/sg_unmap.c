@@ -36,7 +36,8 @@
  * logical blocks. Note that DATA MAY BE LOST.
  */
 
-static const char * version_str = "1.20 20230126";
+static const char * version_str = "1.21 20230407";
+static const char * my_name = "sg_unmap: ";
 
 
 #define DEF_TIMEOUT_SECS 60
@@ -381,6 +382,8 @@ main(int argc, char * argv[])
     uint8_t param_arr[8 + (MAX_NUM_ADDR * 16)];
     static const char * tryvv_s = ", try '-vv' for more information";
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 

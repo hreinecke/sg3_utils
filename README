@@ -24,9 +24,9 @@ These utilities were written on Linux and should work from Linux kernel
 (lk) 2.4 through to the current series 5. The third group ("copy type")
 are only implemented on Linux, but a separate portable package/utility
 called ddpt implements similar functionality. The first two groups are
-implemented (i.e. ported) to Android, FreeBSD, Solaris and Windows. The
-Windows port uses either a Cygwin or MinGW (plus Msys) build environment
-(rather than Visual Studio).
+implemented (i.e. ported) to Android, FreeBSD, NetBSD Solaris and Windows.
+The Windows port uses either a Cygwin or MinGW (plus Msys) build
+environment (rather than Visual Studio).
 
 Library
 -------
@@ -134,4 +134,4 @@ is mirrored in git (using "git svn" tools) here:
 
 
 Douglas Gilbert
-9th January 2022
+7th April 2023

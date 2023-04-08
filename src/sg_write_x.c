@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2022 Douglas Gilbert.
+ * Copyright (c) 2017-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,9 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.31 20220217";
+static const char * version_str = "1.32 20230407";
+
+static const char * my_name = "g_write_x: ";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -2208,6 +2210,8 @@ main(int argc, char * argv[])
     op->app_tag = DEF_AT;       /* 2 bytes of protection information */
     op->tag_mask = DEF_TM;      /* final 2 bytes of protection information */
     op->timeout = DEF_TIMEOUT_SECS;
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
 
     /* Process command line */
     ret = parse_cmd_line(op, argc, argv, &lba_op, &num_op);
@@ -2238,7 +2242,7 @@ main(int argc, char * argv[])
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
     if (op->version_given) {
-        pr2serr("sg_write_x version: %s\n", version_str);
+        pr2serr("%s version: %s\n", my_name, version_str);
         return WANT_ZERO_EXIT;
     }
 

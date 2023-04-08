@@ -37,7 +37,9 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.16 20230307";
+static const char * version_str = "1.17 20230407";
+
+static const char * my_name = "sg_timestamp: ";
 
 #define REP_TIMESTAMP_CMDLEN 12
 #define SET_TIMESTAMP_CMDLEN 12
@@ -342,6 +344,8 @@ main(int argc, char * argv[])
     const char * device_name = NULL;
     const char * cmd_name;
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 

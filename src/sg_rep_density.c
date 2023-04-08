@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Douglas Gilbert.
+ * Copyright (c) 2022-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -38,7 +38,9 @@
  * SCSI (tape) device and outputs the response. Based on ssc5r06.pdf
  */
 
-static const char * version_str = "1.00 20220120";
+static const char * version_str = "1.01 20230407";
+
+static const char * my_name = "sg_rep_density: ";
 
 #define MAX_RDS_BUFF_LEN (64 * 1024 - 1)
 #define DEF_RDS_BUFF_LEN 4096
@@ -249,6 +251,8 @@ main(int argc, char * argv[])
     uint8_t * free_rds = NULL;
     char b[80];
 
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
     while (1) {
         int option_index = 0;
 

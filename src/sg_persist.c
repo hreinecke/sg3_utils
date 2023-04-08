@@ -35,7 +35,8 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.71 20230126";
+static const char * version_str = "0.72 20230407";
+static const char * my_name = "sg_persist: ";
 
 
 #define PRIN_RKEY_SA     0x0
@@ -55,7 +56,6 @@ static const char * version_str = "0.71 20230126";
 #define MX_TIDS 32
 #define MX_TID_LEN 256
 
-#define ME "sg_persist"
 
 #define SG_PERSIST_IN_RDONLY "SG_PERSIST_IN_RDONLY"
 
@@ -973,6 +973,8 @@ main(int argc, char * argv[])
     op->prout_sa = -1;
     op->inquiry = true;
     op->alloc_len = MX_ALLOC_LEN;
+   if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
 
     while (1) {
         int option_index = 0;
@@ -1264,7 +1266,7 @@ main(int argc, char * argv[])
     if (op->inquiry) {
         if ((sg_fd = sg_cmds_open_device(device_name, true /* ro */,
                                          op->verbose)) < 0) {
-            pr2serr("%s: error opening file (ro): %s: %s\n", ME,
+            pr2serr("%serror opening file (ro): %s: %s\n", my_name,
                     device_name, safe_strerror(-sg_fd));
             ret = sg_convert_errno(-sg_fd);
             flagged = true;
@@ -1281,7 +1283,7 @@ main(int argc, char * argv[])
             else
                 printf("  Peripheral device type: 0x%x\n", peri_type);
         } else {
-            printf("%s: SCSI INQUIRY failed on %s", ME, device_name);
+            printf("%sSCSI INQUIRY failed on %s", my_name, device_name);
             if (ret < 0) {
                 ret = -ret;
                 printf(": %s\n", safe_strerror(ret));
@@ -1293,7 +1295,7 @@ main(int argc, char * argv[])
         }
         res = sg_cmds_close_device(sg_fd);
         if (res < 0)
-            pr2serr("%s: sg_cmds_close_device() failed res=%d\n", ME, res);
+            pr2serr("%ssg_cmds_close_device() failed res=%d\n", my_name, res);
     }
 
     if (! op->readwrite_force) {
@@ -1305,7 +1307,7 @@ main(int argc, char * argv[])
         op->readonly = false;      /* '-yy' force open(RW) */
     sg_fd = sg_cmds_open_device(device_name, op->readonly, op->verbose);
     if (sg_fd < 0) {
-        pr2serr("%s: error opening file %s (r%s): %s\n", ME, device_name,
+        pr2serr("%serror opening file %s (r%s): %s\n", my_name, device_name,
                 (op->readonly ? "o" : "w"), safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
         flagged = true;

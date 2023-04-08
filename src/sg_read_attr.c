@@ -39,7 +39,9 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.17 20230106";
+static const char * version_str = "1.18 20230407";
+
+static const char * my_name = "sg_read_attr: ";
 
 #define MAX_RATTR_BUFF_LEN (1024 * 1024)
 #define DEF_RATTR_BUFF_LEN (1024 * 8)
@@ -751,6 +753,9 @@ main(int argc, char * argv[])
     op = &opts;
     memset(op, 0, sizeof(opts));
     op->filter = -1;
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
+
     while (1) {
         int option_index = 0;
 

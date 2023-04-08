@@ -86,7 +86,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.87 20230311";
+static const char * version_str = "5.88 20230407";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -1656,6 +1656,8 @@ main(int argc, char * argv[])
     clp->cdbsz_out = DEF_SCSI_CDBSZ;
     infn[0] = '\0';
     outfn[0] = '\0';
+    if (getenv("SG3_UTILS_INVOCATION"))
+        sg_rep_invocation(my_name, version_str, argc, argv, stderr);
 
     for (k = 1; k < argc; k++) {
         if (argv[k]) {

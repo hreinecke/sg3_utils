@@ -33,7 +33,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.95 20230326";    /* spc6r07 */
+static const char * version_str = "0.96 20230330";    /* spc6r08 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -143,9 +143,9 @@ usage()
             "    --inhex=FN|-i FN    contents of file FN treated as hex "
             "and used\n"
             "                        instead of DEVICE which is ignored\n"
-            "    --json[=JO]|-jJO    output in JSON instead of human "
+            "    --json[=JO]|-j[JO]    output in JSON instead of human "
             "readable\n"
-            "                        test. Use --json=? for JSON help\n"
+            "                          test. Use --json=? for JSON help\n"
             "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
             "output is\n"
             "                            written (def: stdout); truncates "
