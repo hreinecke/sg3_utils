@@ -28,7 +28,7 @@
 
 #define MY_NAME "sg_tst_json_builder"
 
-static const char * version_str = "1.01 20230326";
+static const char * version_str = "1.02 20230408";
 
 
 static struct option long_options[] = {
@@ -251,6 +251,8 @@ main(int argc, char * argv[])
                     "command line");
         sgj_js_nv_ihex(jsp, jo2p, "a_numeric_value_optionally_with_hex",
                        2468);
+        sgj_js_nv_s_nex(jsp, jo2p, "kernel_node_name", "/dev/sda",
+                        "kernel name before udev or user changed it");
         /* add more tests here <<<<<<<<<             xxxxxxxxxxxxxxxxx */
 
         if (js_file) {

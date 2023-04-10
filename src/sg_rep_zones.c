@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2022 Douglas Gilbert.
+ * Copyright (c) 2014-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.44 20221226";
+static const char * version_str = "1.45 20230409";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -1193,7 +1193,7 @@ main(int argc, char * argv[])
             break;
         case 'F':
             off = (('-' == *optarg) || ('!' == *optarg)) ? 1 : 0;
-            if (isdigit(*(optarg + off))) {
+            if (isdigit((uint8_t)*(optarg + off))) {
                 op->find_zt = sg_get_num_nomult(optarg + off);
                 if (op->find_zt < 0) {
                     pr2serr("bad numeric argument to '--find='\n");

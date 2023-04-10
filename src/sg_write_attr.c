@@ -35,7 +35,7 @@
  * device and decodes the response. Based on spc5r19.pdf
  */
 
-static const char * version_str = "1.04 20230407";
+static const char * version_str = "1.05 20230409";
 
 static const char * my_name = "sg_write_attr: ";
 
@@ -329,7 +329,7 @@ find_attr_by_acronym(const char * cp)
         if (NULL == anip->acronym)
             continue;
         for (mp = cp, k = 0; *mp; ++mp, ++k) {
-            if (tolower(*mp) != tolower(anip->acronym[k]))
+            if (tolower((uint8_t)*mp) != tolower((uint8_t)anip->acronym[k]))
                 break;
         }
         if ((0 == *mp) && (0 == anip->acronym[k]))
@@ -370,7 +370,7 @@ find_value_by_acronym(const char * cp, const struct acron_nv_t * anvp)
         if (NULL == anvp->acronym)
             continue;
         for (mp = cp, k = 0; *mp; ++mp, ++k) {
-            if (tolower(*mp) != tolower(anvp->acronym[k]))
+            if ((uint8_t)tolower(*mp) != tolower((uint8_t)anvp->acronym[k]))
                 break;
         }
         if ((0 == *mp) && (0 == anvp->acronym[k]))
@@ -883,7 +883,7 @@ parse_attributes_from_file(const char * fname, const struct opts_t * op,
         /* Trim leading and  trailing space and newline */
         lcp = line + strspn(line, whitespace);
         end = lcp + strlen(lcp) - 1;
-        while(end > lcp && isspace(*end)) end--;
+        while(end > lcp && isspace((uint8_t)*end)) end--;
         end[1] = '\0';
         if ('\0' == *lcp || '#' == *lcp)
             continue;

@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.44 20230329";  /* spc6r08, sbc5r04 */
+static const char * version_str = "2.44 20230409";  /* spc6r08, sbc5r04 */
 
 #define MY_NAME "sg_inq"
 
@@ -344,7 +344,7 @@ usage()
             "inquiry\n"
             "    --verbose|-v    increase verbosity\n"
             "    --version|-V    print this utility's version string then "
-	    "exit\n"
+            "exit\n"
             "    --vpd|-e        vital product data (set page with "
             "'--page=PG')\n\n"
             "Sends a SCSI INQUIRY command to the DEVICE and decodes the "
@@ -691,6 +691,10 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     op->do_vpd = true;
                     op->page_given = true;
                     ++op->num_pages;
+                    break;
+                case 'j':
+                    op->do_json = true;
+                    /* ignore optional argument if given */
                     break;
                 case 'L':
                     ++op->do_long;

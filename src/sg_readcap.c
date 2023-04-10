@@ -327,6 +327,10 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                 case 'H':
                     ++op->do_hex;
                     break;
+                case 'j':
+                    op->do_json = true;
+                    /* ignore optional argument if given */
+                    break;
                 case 'N':
                     op->opt_new = true;
                     return 0;

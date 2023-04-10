@@ -118,7 +118,7 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
     int k, c;
 
     for (k = 0; j_optarg[k]; ++k) {     /* step over leading whitespace */
-        if (! isspace(j_optarg[k]))
+        if (! isspace((uint8_t)j_optarg[k]))
             break;
     }
     for ( ; j_optarg[k]; ++k) {
@@ -862,6 +862,34 @@ sgj_js_nv_ihex_nex(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
         }
         if (as_nex)
             sgj_js_nv_s(jsp, jo2p, sc_nex_s, nex_s);
+    }
+}
+
+void
+sgj_js_nv_s_nex(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
+                const char * val_s, const char * nex_s)
+{
+    bool as_nex;
+
+    if ((NULL == jsp) || (! jsp->pr_as_json))
+        return;
+    as_nex = jsp->pr_name_ex && nex_s;
+    if ((NULL == val_s) && (! as_nex))
+        /* corner case: assume jop is an array */
+        json_array_push((json_value *)(jop ? jop : jsp->basep),
+                         json_string_new(sn_name));
+    else if (NULL == val_s)
+        sgj_js_nv_s(jsp, jop, sn_name, nex_s);
+    else if (! as_nex)
+        sgj_js_nv_s(jsp, jop, sn_name, val_s);
+    else {
+        sgj_opaque_p jo2p =
+                 sgj_named_subobject_r(jsp, jop, sn_name);
+
+        if (NULL == jo2p)
+            return;
+        sgj_js_nv_s(jsp, jo2p, "s", val_s);
+        sgj_js_nv_s(jsp, jo2p, sc_nex_s, nex_s);
     }
 }
 

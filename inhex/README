@@ -16,8 +16,9 @@ For example:
 after prepending 'sg_' becomes:
     sg_vpd_dev_id.hex
 which is a partial match on the sg_vpd utility.
-The remaining 'dev_id.hex' is meant to suggest the 'device identifier'
-VPD page which is a mandatory VPD page for SCSI devices..
+The remaining 'dev_id.hex' is meant to suggest that the 'device identifier'
+VPD page is what is being repesented. The 'device identifier' VPD page is
+mandatory for SCSI devices since SPC-2 (INCITS 351-2001).
 
 Assuming sg3_utils is installed, it can be tested like this:
     sg_vpd --inhex=<folder_holding_sg3_utils>/inhex/vpd_dev_id.hex
@@ -59,8 +60,8 @@ viewing in byte oriented ASCII hex these Unix commands can be used:
     od -t x1 vpd_zbdc.raw
     hexdump -C vpd_zbdc.raw
 
-Each line starting with a "input offset" which is a running count of
-bytes, starting at zero. The hexdump examples shows an ASCII rendering
+Each line starts with a "input offset" which is a running count of
+bytes, starting at zero. The hexdump example shows an ASCII rendering
 of those 16 bytes to the right of each line. The sg_decode_sense utility
 may also be used:
     sg_decode_sense --binary=vpd_zbdc.raw -H 

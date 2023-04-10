@@ -1502,7 +1502,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'j':
             ++op->do_join;
             break;
-        case 'J':
+        case 'J':	/* corresponds to --json[=JO] */
             op->json_arg = optarg;
             op->do_json = true;
             break;
@@ -1569,7 +1569,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'q':
             op->quiet = true;
             break;
-        case 'Q':
+        case 'Q':	/* corresponds to --js-file=JFN */
             op->js_file = optarg;
             op->do_json = true;
             break;

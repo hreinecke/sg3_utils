@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.26 20230326";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.27 20230496";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -915,7 +915,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         case 'D':
             if (0 == memcmp("-1", optarg, 3))
                 n = -1;       /* SPC */
-            else if (isdigit(*optarg)) {
+            else if (isdigit((uint8_t)*optarg)) {
                 n = sg_get_num(optarg);
                 if ((n < 0) || (n > 31)) {
                     pr2serr("bad numeric argument to '--pdt=', expect -1 to "
@@ -1136,6 +1136,7 @@ old_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
                     break;
                 case 'j':
                     op->do_json = true;
+                    /* ignore optional argument if given */
                     break;
                 case 'l':
                     ++op->do_list;

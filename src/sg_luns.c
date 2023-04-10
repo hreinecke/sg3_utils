@@ -653,7 +653,7 @@ main(int argc, char * argv[])
             if ('L' == toupper(cp[m - 1]))
                 test_linux_out = true;
 #endif
-            if (('0' == cp[0]) && ('X' == toupper(cp[1])))
+            if (('0' == cp[0]) && ('X' == toupper((uint8_t)cp[1])))
                 cp += 2;
             if (strchr(cp, ' ') || strchr(cp, '\t') || strchr(cp, '-')) {
                 for (k = 0; k < 8; ++k, cp += 2) {
