@@ -1,11 +1,12 @@
-.TH SG_TURS "8" "November 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_TURS "8" "April 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
 .B sg_turs
-[\fI\-\-delay=MS\fR] [\fI\-\-help\fR] [\fI\-\-low\fR] [\fI\-\-num=NUM\fR]
-[\fI\-\-number=NUM\fR] [\fI\-\-progress\fR] [\fI\-\-time\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-ascq=ASC[,ASQ]\fR] [\fI\-\-delay=MS\fR] [\fI\-\-help\fR]
+[\fI\-\-low\fR] [\fI\-\-num=NUM\fR] [\fI\-\-number=NUM\fR]
+[\fI\-\-progress\fR] [\fI\-\-time\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_turs
 [\fI\-d=MS\fR] [\fI\-n=NUM\fR] [\fI\-p\fR]  [\fI\-t\fR] [\fI\-v\fR] [\fI\-V\fR]
@@ -22,6 +23,18 @@ shown first in the synopsis and explained in this section. A later section
 on the old command line syntax outlines the second group of options.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-a\fR, \fB\-\-ascq\fR=\fIASC[,ASQ]\fR
+checks the sense data associated with a sense key of NOT READY. If there is
+a match on \fIASC\fR and, if given, with \fIASQ\fR then this utility sets
+its exit status to 36. That is an alternate good code because an exit status
+of 0 would imply the unit is ready.
+.PP
+The reason this option was added is USB card readers (e.g. SD card readers)
+that often yield an additional sense code of 0x3a,0x0 for "no medium present"
+when there is no SD card in the reader. There are variations of additional
+sense code 0x3a so it is best not to give the \fIASQ\fR value so any ascq
+code will match.
 .TP
 \fB\-d\fR, \fB\-\-delay\fR=\fIMS\fR
 this option causes a delay of \fIMS\fR milliseconds to occur before each
@@ -96,11 +109,12 @@ the SCSI REQUEST SENSE command should be used instead.
 .SH EXIT STATUS
 The exit status of sg_turs is 0 when it is successful (e.g. in the case of
 a mechanical disk, it is spun up and ready to accept IO commands). For this
-utility the other exit status values of interest are 2, 12 and 13. 12 is for
+utility the other exit status values of interest are 2, 12, 13 and 36. 12 is
+for the case when the sense key is "not ready" [0x2] and the additional
+sense code ends with "Target port in standby state" [0x4, 0xb]. 13 is for
 the case when the sense key is "not ready" [0x2] and the additional sense
-code ends with "Target port in standby state" [0x4, 0xb]. 13 is for the
-case when the sense key is "not ready" [0x2] and the additional sense code
-is "Target port in unavailable state" [0x4, 0xc]. All other cases when
+code is "Target port in unavailable state" [0x4, 0xc]. The exit status of
+36 is associated with \fI\-\-ascq=ASC[,ASQ]\fR option. All other cases when
 the sense key is "not ready" [0x2] will set the exit status to 2.
 For other exit status values see the sg3_utils(8) man page.
 .SH OLDER COMMAND LINE OPTIONS
@@ -143,7 +157,7 @@ using \fI\-\-old\fR (or \fI\-O\fR) as the first command line option.
 .SH AUTHORS
 Written by D. Gilbert
 .SH COPYRIGHT
-Copyright \(co 2000\-2022 Douglas Gilbert
+Copyright \(co 2000\-2023 Douglas Gilbert
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

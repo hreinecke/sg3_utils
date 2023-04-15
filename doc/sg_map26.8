@@ -1,4 +1,4 @@
-.TH SG_MAP26 "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_MAP26 "8" "April 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_map26 \- map SCSI generic (sg) device to corresponding device names
 .SH SYNOPSIS
@@ -38,6 +38,9 @@ device nodes in the /dev directory. The lsscsi utility may be used
 instead in many cases, and lsscsi does not require root permission
 as it "data\-mines" the sysfs pseudo file system for the information
 it needs.
+.PP
+For notes on bsg and nvme device nodes see the section on
+BSG and NVME DEVICES below.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -80,6 +83,39 @@ increase the level of verbosity, (i.e. debug output).
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 print the version string and then exit.
+.SH BSG and NVME DEVICES
+The bsg driver (Block Scsi Generic) presents alternate Unix character devices
+of the form: /dev/bsg/<h:c:t:l>. <h:c:t:l> is a 4 element tuple where 'h' is
+the host number, 'c' is the controller number, 't' is the target identifier
+and 'l' is the LUN (Logical Unit Number). Other than the bsg device names,
+each device, once open()\-ed, operates in a similar fashion to a sg device: a
+generic interface at the SCSI command level.
+.PP
+If a bsg device is given to this utility, it will first try to map it to a
+SCSI block device. This will either be of the form /dev/sd<letter_s> for a
+disk or /dev/sr<number> for a BD/DVD or CD drive. If no match is found, then
+a check is made for a SCSI tape drive with a name of the
+form /dev/st<number>. If that fails, the mapping to the corresponding sg
+device is made. If the \fI\-\-result=2\fR option is given, the block device
+and tape davice checks are bypassed and the mapping to the corresponding sg
+device is made.
+.PP
+Note that this utility makes no mapping to a bsg device. That is pretty easy
+to establish using the lsscsi utility as the 4 element <h:c:t:l> tuple is
+shown at the beginning of each line (by default) and it uniquely identifies
+each SCSI device. Each line will also show the primary device name and, if
+the \-\-generic option is given, the sg device node.
+.PP
+Currently NVMe device nodes come in several varieties, block devices of the
+form: /dev/nvme<c>n<n>[p<pn>] where <c> is the controller number (starting
+at 0), <n> is the namespace identifier (starting at 1), and <pn> is the
+partition number (starting at 1). There are two forms of NVMe character
+device nodes: one of the form /dev/nvme<c> and the other of the
+form /dev/ng<c>n<n> where "ng" is newer and termed as 'nvme-generic' in
+the /proc/devices output. This utility identifies but does not map NVMe
+devices. Their naming is more consistent so a utility like this is less
+needed. Udev might be used to remap the kernel's naming scheme for NVMe,
+removing its inherent naming consistency.
 .SH NOTES
 This utility is designed for the Linux 2.6 (and later) kernel series.
 It uses special file major and minor numbers (and whether the special

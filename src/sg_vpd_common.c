@@ -255,12 +255,12 @@ named_hhh_output(const char * pname, const uint8_t * b, int blen,
 /* mxlen is command line --maxlen=LEN option (def: 0) or -1 for a VPD page
  * with a short length (1 byte). Returns 0 for success. */
 int     /* global: use by sg_vpd_vendor.c */
-vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen, bool qt,
-               int vb, int * rlenp)
+vpd_fetch_page(struct sg_pt_base * ptvp, uint8_t * rp, int page, int mxlen,
+               bool qt /* quiet */, int vb, int * rlenp)
 {
     int res, resid, rlen, len, n;
 
-    if (sg_fd < 0) {
+    if (NULL == ptvp) {
         len = sg_get_unaligned_be16(rp + 2) + 4;
         if (vb && (len > mxlen))
             pr2serr("warning: VPD page's length (%d) > bytes in --inhex=FN "
@@ -274,18 +274,20 @@ vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen, bool qt,
         return SG_LIB_SYNTAX_ERROR;
     }
     n = (mxlen > 0) ? mxlen : DEF_ALLOC_LEN;
-    res = sg_ll_inquiry_v2(sg_fd, true, page, rp, n, DEF_PT_TIMEOUT, &resid,
+    res = sg_ll_inquiry_pt(ptvp, true, page, rp, n, DEF_PT_TIMEOUT, &resid,
                            ! qt, vb);
     if (res)
         return res;
     rlen = n - resid;
     if (rlen < 4) {
-        pr2serr("VPD response too short (len=%d)\n", rlen);
+        if (! qt)
+            pr2serr("VPD response too short (len=%d)\n", rlen);
         return SG_LIB_CAT_MALFORMED;
     }
     if (page != rp[1]) {
-        pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
-                "response\n");
+        if (! qt)
+            pr2serr("invalid VPD response; probably a STANDARD INQUIRY "
+                    "response\n");
         n = (rlen < 32) ? rlen : 32;
         if (vb) {
             pr2serr("First %d bytes of bad response\n", n);
@@ -296,8 +298,9 @@ vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen, bool qt,
         /* could be a Unit Serial number VPD page with a very long
          * length of 4+514 bytes; more likely standard response for
          * SCSI-2, RMB=1 and a response_data_format of 0x2. */
-        pr2serr("invalid Unit Serial Number VPD response; probably a "
-                "STANDARD INQUIRY response\n");
+        if (! qt)
+            pr2serr("invalid Unit Serial Number VPD response; probably a "
+                    "STANDARD INQUIRY response\n");
         return SG_LIB_CAT_MALFORMED;
     }
     if (mxlen < 0)
@@ -317,7 +320,7 @@ vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen, bool qt,
         pr2serr("response length too long: %d > %d\n", len, MX_ALLOC_LEN);
         return SG_LIB_CAT_MALFORMED;
     } else {
-        res = sg_ll_inquiry_v2(sg_fd, true, page, rp, len, DEF_PT_TIMEOUT,
+        res = sg_ll_inquiry_pt(ptvp, true, page, rp, len, DEF_PT_TIMEOUT,
                                &resid, ! qt, vb);
         if (res)
             return res;

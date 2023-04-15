@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-/* sg_pt_linux version 1.55 20230102 */
+/* sg_pt_linux version 1.56 20230412 */
 
 
 #include <stdio.h>
@@ -50,7 +50,7 @@
 #endif
 
 #ifndef BLOCK_EXT_MAJOR
-#define BLOCK_EXT_MAJOR 259
+#define BLOCK_EXT_MAJOR 259     /* used by NVMe block devices */
 #endif
 
 #define DEF_TIMEOUT 60000       /* 60,000 millisecs (60 seconds) */
@@ -114,6 +114,7 @@ static const char * linux_driver_suggests[] = {
 bool sg_bsg_nvme_char_major_checked = false;
 int sg_bsg_major = 0;
 volatile int sg_nvme_char_major = 0;
+volatile int sg_nvme_gen_char_major = 0;
 
 bool sg_checked_version_num = false;
 int sg_driver_version_num = 0;
@@ -128,13 +129,14 @@ long sg_lin_page_size = 4096;   /* default, overridden with correct value */
 void
 sg_find_bsg_nvme_char_major(int verbose)
 {
-    bool got_one = false;
+    int num_got = 0;
     int n;
-    const char * proc_devices = "/proc/devices";
     char * cp;
     FILE *fp;
     char a[128];
     char b[128];
+    static const int blen = sizeof(b);
+    static const char * proc_devices = "/proc/devices";
 
     sg_lin_page_size = sysconf(_SC_PAGESIZE);
     if (NULL == (fp = fopen(proc_devices, "r"))) {
@@ -142,23 +144,27 @@ sg_find_bsg_nvme_char_major(int verbose)
             pr2ws("fopen %s failed: %s\n", proc_devices, strerror(errno));
         return;
     }
-    while ((cp = fgets(b, sizeof(b), fp))) {
+    while ((cp = fgets(b, blen, fp))) {
         if ((1 == sscanf(b, "%126s", a)) &&
             (0 == memcmp(a, "Character", 9)))
             break;
     }
-    while (cp && (cp = fgets(b, sizeof(b), fp))) {
+    while (cp && (cp = fgets(b, blen, fp))) {
         if (2 == sscanf(b, "%d %126s", &n, a)) {
             if (0 == strcmp("bsg", a)) {
                 sg_bsg_major = n;
-                if (got_one)
+                if (++num_got >= 3)
                     break;
-                got_one = true;
-            } else if (0 == strcmp("nvme", a)) {
-                sg_nvme_char_major = n;
-                if (got_one)
-                    break;
-                got_one = true;
+            } else if (0 == memcmp("nvme", a, 4)) {
+                if (0 == strcmp("nvme-generic", a)) {
+                    sg_nvme_gen_char_major = n;
+                    if (++num_got >= 3)
+                        break;
+                } else if (0 == strcmp("nvme", a)) {
+                    sg_nvme_char_major = n;
+                    if (++num_got >= 3)
+                        break;
+                }
             }
         } else
             break;
@@ -169,8 +175,11 @@ sg_find_bsg_nvme_char_major(int verbose)
                 pr2ws("found sg_bsg_major=%d\n", sg_bsg_major);
             if (sg_nvme_char_major > 0)
                 pr2ws("found sg_nvme_char_major=%d\n", sg_nvme_char_major);
+            if (sg_nvme_gen_char_major > 0)
+                pr2ws("found sg_nvme_gen_char_major=%d\n",
+                      sg_nvme_gen_char_major);
         } else
-            pr2ws("found no bsg not nvme char device in %s\n", proc_devices);
+            pr2ws("found no bsg nor nvme char device in %s\n", proc_devices);
     }
     fclose(fp);
 }
@@ -185,6 +194,7 @@ check_file_type(int dev_fd, struct stat * dev_statp, bool * is_bsg_p,
                 int verbose)
 {
     bool is_nvme = false;
+    bool is_nvme_gen = false;
     bool is_sg = false;
     bool is_bsg = false;
     bool is_char = false;
@@ -206,10 +216,29 @@ check_file_type(int dev_fd, struct stat * dev_statp, bool * is_bsg_p,
             is_char = true;
             if (SCSI_GENERIC_MAJOR == major_num)
                 is_sg = true;
-            else if (sg_bsg_major == major_num)
-                is_bsg = true;
-            else if (sg_nvme_char_major == major_num)
-                is_nvme = true;
+            else {
+                if (! sg_bsg_nvme_char_major_checked) {
+                    sg_bsg_nvme_char_major_checked = true;
+                    sg_find_bsg_nvme_char_major(verbose);
+                }
+                if (sg_bsg_major == major_num)
+                    is_bsg = true;
+                else if (sg_nvme_char_major == major_num)
+                    is_nvme = true;
+                else if (sg_nvme_gen_char_major == major_num) {
+                    is_nvme_gen = true;
+                    nsid = ioctl(dev_fd, NVME_IOCTL_ID, NULL);
+                    if (SG_NVME_BROADCAST_NSID == nsid) {
+                        /* means ioctl error */
+                        os_err = errno;
+                        if (verbose)
+                            pr2ws("%s: ioctl(NVME_IOCTL_ID) failed: %s "
+                                  "(errno=%d) on NVMe generic\n", __func__,
+                                  safe_strerror(os_err), os_err);
+                    } else
+                        os_err = 0;
+                }
+            }
         } else if (S_ISBLK(dev_statp->st_mode)) {
             is_block = true;
             if (BLOCK_EXT_MAJOR == major_num) {
@@ -237,6 +266,8 @@ skip_out:
             pr2ws("sg device\n");
         else if (is_bsg)
             pr2ws("bsg device\n");
+        else if (is_nvme_gen)
+            pr2ws("NVMe generic char device, nsid=%d\n", nsid);
         else if (is_nvme && (0 == nsid))
             pr2ws("NVMe char device\n");
         else if (is_nvme)
@@ -252,7 +283,7 @@ skip_out:
     if (is_bsg_p)
         *is_bsg_p = is_bsg;
     if (is_nvme_p)
-        *is_nvme_p = is_nvme;
+        *is_nvme_p = is_nvme | is_nvme_gen;
     if (nsid_p)
         *nsid_p = nsid;
     if (os_err_p)
@@ -266,8 +297,8 @@ skip_out:
  * device_name. Returns 1 if SCSI generic pass-though device, returns 2 if
  * secondary SCSI pass-through device (in Linux a bsg device); returns 3 is
  * char NVMe device (i.e. no NSID); returns 4 if block NVMe device (includes
- * NSID), or 0 if something else (e.g. ATA block device) or dev_fd < 0.
- * If error, returns negated errno (operating system) value. */
+ * NSID), or 0 if something else (e.g. SCSI or ATA block device) or
+ * dev_fd < 0. If error, returns negated errno (operating system) value. */
 int
 check_pt_file_handle(int dev_fd, const char * device_name, int verbose)
 {
@@ -275,10 +306,6 @@ check_pt_file_handle(int dev_fd, const char * device_name, int verbose)
         pr2ws("%s: dev_fd=%d, device_name: %s\n", __func__, dev_fd,
               device_name);
     /* Linux doesn't need device_name to determine which pass-through */
-    if (! sg_bsg_nvme_char_major_checked) {
-        sg_bsg_nvme_char_major_checked = true;
-        sg_find_bsg_nvme_char_major(verbose);
-    }
     if (dev_fd >= 0) {
         bool is_sg, is_bsg, is_nvme;
         int err;
@@ -343,10 +370,6 @@ scsi_pt_open_flags(const char * device_name, int flags, int verbose)
 {
     int fd;
 
-    if (! sg_bsg_nvme_char_major_checked) {
-        sg_bsg_nvme_char_major_checked = true;
-        sg_find_bsg_nvme_char_major(verbose);
-    }
     if (verbose > 1) {
         pr2ws("open %s with flags=0x%x\n", device_name, flags);
     }
@@ -545,10 +568,6 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
     struct stat a_stat;
 
-    if (! sg_bsg_nvme_char_major_checked) {
-        sg_bsg_nvme_char_major_checked = true;
-        sg_find_bsg_nvme_char_major(verbose);
-    }
     ptp->dev_fd = dev_fd;
     if (dev_fd >= 0) {
         ptp->is_sg = check_file_type(dev_fd, &a_stat, &ptp->is_bsg,
@@ -1128,10 +1147,6 @@ do_scsi_pt(struct sg_pt_base * vp, int fd, int time_secs, int verbose)
     struct sg_pt_linux_scsi * ptp = &vp->impl;
     bool have_checked_for_type = (ptp->dev_fd >= 0);
 
-    if (! sg_bsg_nvme_char_major_checked) {
-        sg_bsg_nvme_char_major_checked = true;
-        sg_find_bsg_nvme_char_major(verbose);
-    }
     if (ptp->in_err) {
         if (verbose)
             pr2ws("Replicated or unused set_scsi_pt... functions\n");

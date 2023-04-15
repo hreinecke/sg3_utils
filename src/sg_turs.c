@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.53 20230407";
+static const char * version_str = "3.54 20230413";
 
 static const char * my_name = "sg_turs: ";
 
@@ -53,9 +53,10 @@ static const char * my_name = "sg_turs: ";
 
 
 static struct option long_options[] = {
+        {"ascq", required_argument, 0, 'a'},
         {"delay", required_argument, 0, 'd'},
         {"help", no_argument, 0, 'h'},
-        {"low", no_argument, 0, 'l'},
+        {"low", no_argument, 0, 'l'},   /* use sg_pt, minimize open()s */
         {"new", no_argument, 0, 'N'},
         {"number", required_argument, 0, 'n'},
         {"num", required_argument, 0, 'n'}, /* added in v3.32 (sg3_utils
@@ -76,6 +77,8 @@ struct opts_t {
     bool opts_new;
     bool verbose_given;
     bool version_given;
+    int asc;
+    int ascq;
     int delay;
     int do_help;
     int do_number;
@@ -93,11 +96,15 @@ struct loop_res_t {
 static void
 usage()
 {
-    printf("Usage: sg_turs [--delay=MS] [--help] [--low] [--number=NUM] "
-           "[--num=NUM]\n"
-           "               [--progress] [--time] [--verbose] [--version] "
-           "DEVICE\n"
+    printf("Usage: sg_turs [--ascq=ASC[,ASQ]] [--delay=MS] [--help] "
+           "[--low]\n"
+           "               [--number=NUM] [--num=NUM] [--progress] "
+           "[--time]\n"
+           "               [--verbose] [--version] DEVICE\n"
            "  where:\n"
+           "    --ascq=ASC[,ASQ] |    check sense from TUR for match on "
+           "ASC[,ASQ]\n"
+           "        -a ASC[,ASQ]      exit status 36 if sense code match\n"
            "    --delay=MS|-d MS    delay MS miiliseconds before sending "
            "each tur\n"
            "    --help|-h        print usage message then exit\n"
@@ -152,16 +159,39 @@ static int
 new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
     int c, n;
+    const char * ccp;
 
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "d:hln:NOptvV", long_options,
+        c = getopt_long(argc, argv, "a:d:hln:NOptvV", long_options,
                         &option_index);
         if (c == -1)
             break;
 
         switch (c) {
+        case 'a':
+            ccp = strchr(optarg, ',');
+            n = sg_get_num_nomult(optarg);
+            if ((n < 0) || (n > 255)) {
+                pr2serr("bad argument to '--ascq=\?\?', expect 0 to 255\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->asc = n;
+            if (ccp) {
+                if (0 == memcmp("-1", ccp + 1, 2)) {
+                    op->ascq = -1;
+                    break;
+                }
+                n = sg_get_num_nomult(ccp + 1);
+                if ((n < 0) || (n > 255)) {
+                    pr2serr("bad argument to '--ascq=0x%x,\?\?', expect 0 "
+                            "to 255\n", op->asc);
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->ascq = n;
+            }
+            break;
         case 'd':
             n = sg_get_num(optarg);
             if (n < 0) {
@@ -375,17 +405,17 @@ wait_millisecs(int millisecs)
 
 /* Returns true if prints estimate of duration to ready */
 bool
-check_for_lu_becoming(struct sg_pt_base * ptvp)
+check_for_lu_becoming(struct sg_pt_base * ptvp,
+                      struct sg_scsi_sense_hdr * sshp)
 {
     int s_len = get_scsi_pt_sense_len(ptvp);
     uint64_t info;
     uint8_t * sense_b = get_scsi_pt_sense_buf(ptvp);
-    struct sg_scsi_sense_hdr ssh;
 
     /* Check for "LU is in process of becoming ready" with a non-zero INFO
      * field that isn't too big. As per 20-061r2 it means the following: */
-    if (sg_scsi_normalize_sense(sense_b, s_len, &ssh) && (ssh.asc == 0x4) &&
-        (ssh.ascq == 0x1) && sg_get_sense_info_fld(sense_b, s_len, &info) &&
+    if (sg_scsi_normalize_sense(sense_b, s_len, sshp) && (sshp->asc == 0x4) &&
+        (sshp->ascq == 0x1) && sg_get_sense_info_fld(sense_b, s_len, &info) &&
         (info > 0x0) && (info < 0x1000000)) {
         printf("device not ready, estimated to be ready in %" PRIu64
                " milliseconds\n", info);
@@ -403,7 +433,7 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
     int packet_id = 0;
     int vb = op->verbose;
     char b[80];
-    uint8_t sense_b[32] SG_C_CPP_ZERO_INIT;
+    uint8_t sense_b[64] SG_C_CPP_ZERO_INIT;
 
     if (op->do_low) {
         int rs, n, sense_cat;
@@ -427,6 +457,8 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                     resp->ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
                 return k;
             } else if (-2 == n) {
+                struct sg_scsi_sense_hdr ssh SG_C_CPP_ZERO_INIT;
+
                 switch (sense_cat) {
                 case SG_LIB_CAT_RECOVERED:
                 case SG_LIB_CAT_NO_SENSE:
@@ -434,9 +466,16 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                 case SG_LIB_CAT_NOT_READY:
                     ++resp->num_errs;
                     if ((1 == op->do_number) || (op->delay > 0)) {
-                        if (! check_for_lu_becoming(ptvp))
-                            printf("device not ready\n");
-                        resp->ret = sense_cat;
+                        if (! check_for_lu_becoming(ptvp, &ssh)) {
+                            if ((op->asc > 0) && (op->asc == ssh.asc) &&
+                                ((op->ascq < 0) || (op->ascq == ssh.ascq)))
+                                resp->ret = SG_LIB_OK_FALSE;
+                            else {
+                                printf("device not ready\n");
+                                resp->ret = sense_cat;
+                            }
+                        } else
+                            resp->ret = sense_cat;
                         resp->reported = true;
                     }
                     break;
@@ -488,8 +527,17 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                 resp->ret = res;
                 if ((1 == op->do_number) || (op->delay > 0)) {
                     if (SG_LIB_CAT_NOT_READY == res) {
-                        if (! check_for_lu_becoming(ptvp))
-                            printf("device not ready\n");
+                        struct sg_scsi_sense_hdr ssh SG_C_CPP_ZERO_INIT;
+
+                        if (! check_for_lu_becoming(ptvp, &ssh)) {
+                            if ((op->asc > 0) && (op->asc == ssh.asc) &&
+                                ((op->ascq < 0) || (op->ascq == ssh.ascq))) {
+                                resp->ret = SG_LIB_OK_FALSE;
+                                resp->reported = true;
+                                break;
+                            } else
+                                printf("device not ready\n");
+                        }
                         continue;
                     } else {
                         sg_get_category_sense_str(res, sizeof(b), b, vb);
@@ -527,6 +575,8 @@ main(int argc, char * argv[])
 
 
     memset(op, 0, sizeof(opts));
+    op->asc = -1;
+    op->ascq = -1;
     memset(resp, 0, sizeof(loop_res));
     op->do_number = 1;
     if (getenv("SG3_UTILS_INVOCATION"))

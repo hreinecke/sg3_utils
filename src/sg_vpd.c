@@ -28,6 +28,7 @@
 
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
+#include "sg_pt.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
@@ -42,7 +43,7 @@
 
 */
 
-static const char * version_str = "1.92 20230216";  /* spc6r07 + sbc5r04 */
+static const char * version_str = "1.93 20230414";  /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_vpd"
 
@@ -71,8 +72,9 @@ static const char * version_str = "1.92 20230216";  /* spc6r07 + sbc5r04 */
 
 uint8_t * rsp_buff;
 
-static int svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
-                           int subvalue, int off, const char * prefix);
+static int svpd_decode_t10(struct sg_pt_base * ptvp, struct opts_t * op,
+                           sgj_opaque_p jop, int subvalue, int off,
+                           const char * prefix);
 
 static int filter_dev_ids(const char * print_if_found, int num_leading,
                           uint8_t * buff, int len, int m_assoc,
@@ -223,7 +225,7 @@ usage()
             "is given (e.g. '0x83');\n"
             "                       can also take PG,VP as an "
             "operand\n"
-            "    --quiet|-q      suppress some output when decoding\n"
+            "    --quiet|-q      suppress some decoding and error output\n"
             "    --raw|-r        output page in binary; if --inhex=FN is "
             "also\n"
             "                    given, FN is in binary (else FN is in "
@@ -1074,8 +1076,8 @@ decode_b5_vpd(uint8_t * b, int len, int pdt, struct opts_t * op)
 
 /* Returns 0 if successful */
 static int
-svpd_unable_to_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
-                      int subvalue, int off)
+svpd_unable_to_decode(struct sg_pt_base * ptvp, struct opts_t * op,
+                      sgj_opaque_p jop, int subvalue, int off)
 {
     bool as_json, json_o_hr, hex0;
     int res, len, n, pg_c, dhex;
@@ -1106,7 +1108,7 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     if ((!op->do_raw) && (dhex < 2) && (! op->examine_given))
         sgj_pr_hr(jsp, "%s:\n", b);
 
-    res = vpd_fetch_page(sg_fd, rp, pg_c, op->maxlen, op->do_quiet,
+    res = vpd_fetch_page(ptvp, rp, pg_c, op->maxlen, op->do_quiet,
                          op->verbose, &len);
     if (0 == res) {
         int rlen;
@@ -1173,12 +1175,12 @@ svpd_unable_to_decode(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
 static int
 recurse_vpd_decode(struct opts_t * op, sgj_opaque_p jop, int off)
 {
-    int res = svpd_decode_t10(-1, op, jop, 0, off, NULL);
+    int res = svpd_decode_t10(NULL, op, jop, 0, off, NULL);
 
     if (SG_LIB_CAT_OTHER == res) {
-        res = svpd_decode_vendor(-1, op, jop, off);
+        res = svpd_decode_vendor(NULL, op, jop, off);
         if (SG_LIB_CAT_OTHER == res)
-            svpd_unable_to_decode(-1, op, jop, 0, off);
+            svpd_unable_to_decode(NULL, op, jop, 0, off);
     }
     return res;
 }
@@ -1186,12 +1188,13 @@ recurse_vpd_decode(struct opts_t * op, sgj_opaque_p jop, int off)
 /* Returns 0 if successful. If don't know how to decode, returns
  * SG_LIB_CAT_OTHER else see sg_ll_inquiry(). */
 static int
-svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
-                int subvalue, int off, const char * prefix)
+svpd_decode_t10(struct sg_pt_base * ptvp, struct opts_t * op,
+                sgj_opaque_p jop, int subvalue, int off,
+                const char * prefix)
 {
     bool allow_name, allow_if_found, long_notquiet, qt;
     bool vpd_supported = false;
-    bool inhex_active = (-1 == sg_fd);
+    bool inhex_active = (NULL == ptvp);
     bool exam_not_given = ! op->examine_given;
     int len, pdt, pqual, num, k, resid, alloc_len, pn, dhex, vb;
     int res = 0;
@@ -1228,7 +1231,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
     if (!inhex_active && !op->do_force && exam_not_given &&
         pn != VPD_NOPE_WANT_STD_INQ &&
         pn != VPD_SUPPORTED_VPDS) {
-        res = vpd_fetch_page(sg_fd, rp, VPD_SUPPORTED_VPDS, op->maxlen, qt,
+        res = vpd_fetch_page(ptvp, rp, VPD_SUPPORTED_VPDS, op->maxlen, qt,
                              vb, &len);
         if (res)
             return res;
@@ -1267,7 +1270,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 alloc_len = DEF_ALLOC_LEN;
             else
                 alloc_len = 36;
-            res = sg_ll_inquiry_v2(sg_fd, false, 0, rp, alloc_len,
+            res = sg_ll_inquiry_pt(ptvp, false, 0, rp, alloc_len,
                                    DEF_PT_TIMEOUT, &resid, ! op->do_quiet, vb);
         } else {
             alloc_len = op->maxlen;
@@ -1294,7 +1297,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = svp_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1323,7 +1326,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = usn_vpdp;
         if (allow_name && not_json)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1354,7 +1357,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = "Device Identification VPD page";
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1383,7 +1386,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = "Software interface identification VPD page";
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1412,7 +1415,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np= mna_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1438,7 +1441,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = eid_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1455,10 +1458,11 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
                 op->protect_not_sure = false;
                 if (op->std_inq_a_valid)
                      protect = !! (0x1 & op->std_inq_a[5]);
-                else if ((sg_fd >= 0) && (! op->do_force)) {
+                else if (ptvp && (! op->do_force)) {
                     struct sg_simple_inquiry_resp sir;
 
-                    res = sg_simple_inquiry(sg_fd, &sir, false, vb);
+                    res = sg_simple_inquiry(get_pt_file_handle(ptvp), &sir,
+                                            false, vb);
                     if (res) {
                         if (op->verbose)
                             pr2serr("%s: sg_simple_inquiry() failed, "
@@ -1482,7 +1486,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = mpp_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", (prefix ? prefix : ""), np);
@@ -1506,7 +1510,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = sp_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1531,7 +1535,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
         alloc_len = op->maxlen ? op->maxlen : VPD_ATA_INFO_LEN;
-        res = vpd_fetch_page(sg_fd, rp, pn, alloc_len, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, alloc_len, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", (prefix ? prefix : ""), np);
@@ -1558,7 +1562,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = pc_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp,  "%s%s\n", pre, np);
@@ -1579,7 +1583,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = dc_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1603,7 +1607,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = cpi_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s\n", pre, np);
@@ -1627,7 +1631,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = psm_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s\n", pre, np);
@@ -1651,7 +1655,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = tpc_vpdp;       /* ["tpc"] */
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s\n", pre, np);
@@ -1675,7 +1679,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = pslu_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1699,7 +1703,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = pspo_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s:\n", pre, np);
@@ -1723,7 +1727,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         np = sfs_vpdp;
         if (allow_name)
             sgj_pr_hr(jsp, "%s%s:\n", pre, np);
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             if (! allow_name && allow_if_found)
                 sgj_pr_hr(jsp, "%s%s\n", pre, np);
@@ -1744,7 +1748,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
         }
         break;
     case 0xb0:  /* depends on pdt */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool bl = false;
             bool sad = false;
@@ -1798,7 +1802,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb0\n", pre);
         break;
     case 0xb1:  /* depends on pdt */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool bdc = false;
 
@@ -1847,7 +1851,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb1\n", pre);
         break;
     case 0xb2:          /* VPD page depends on pdt */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool lbpv = false;
             bool tas = false;
@@ -1892,7 +1896,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb2\n", pre);
         break;
     case 0xb3:          /* VPD page depends on pdt */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool ref = false;
 
@@ -1934,7 +1938,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb3\n", pre);
         break;
     case 0xb4:          /* VPD page depends on pdt */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool sbl = false;
 
@@ -1979,7 +1983,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb4\n", pre);
         break;
     case 0xb5:          /* VPD page depends on pdt */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool bdce = false;
             bool lbp = false;
@@ -2028,7 +2032,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb5\n", pre);
         break;
     case VPD_ZBC_DEV_CHARS:       /* 0xb6 for both pdt=0 and pdt=0x14 */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool zbdch = false;
 
@@ -2066,7 +2070,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb6\n", pre);
         break;
     case 0xb7:
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool ble = false;
 
@@ -2104,7 +2108,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb7\n", pre);
         break;
     case 0xb8:          /* VPD_FORMAT_PRESETS */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool fp = false;
 
@@ -2145,7 +2149,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb8\n", pre);
         break;
     case 0xb9:          /* VPD_CON_POS_RANGE */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool cpr = false;           /* ["cpr"] */
 
@@ -2186,7 +2190,7 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
             sgj_pr_hr(jsp, "%sVPD page=0xb9\n", pre);
         break;
     case 0xba:          /* VPD_CAP_PROD_ID */
-        res = vpd_fetch_page(sg_fd, rp, pn, op->maxlen, qt, vb, &len);
+        res = vpd_fetch_page(ptvp, rp, pn, op->maxlen, qt, vb, &len);
         if (0 == res) {
             bool cap = false;           /* ["cap"] */
 
@@ -2234,7 +2238,8 @@ svpd_decode_t10(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
 }
 
 static int
-svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
+svpd_decode_all(struct sg_pt_base * ptvp, struct opts_t * op,
+                sgj_opaque_p jop)
 {
     int k, res, rlen, n, pn;
     int max_pn = 255;
@@ -2245,8 +2250,8 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
 
     if (op->vpd_pn > 0)
         max_pn = op->vpd_pn;
-    if (sg_fd >= 0) {   /* have valid open file descriptor (handle) */
-        res = vpd_fetch_page(sg_fd, rp, VPD_SUPPORTED_VPDS, op->maxlen,
+    if (ptvp) {   /* have valid open file descriptor (handle) */
+        res = vpd_fetch_page(ptvp, rp, VPD_SUPPORTED_VPDS, op->maxlen,
                              op->do_quiet, op->verbose, &rlen);
         if (res) {
             if (! op->do_quiet) {
@@ -2283,11 +2288,11 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
                     printf("[0x%x] ", pn);
             }
 
-            res = svpd_decode_t10(sg_fd, op, jop, 0, 0, NULL);
+            res = svpd_decode_t10(ptvp, op, jop, 0, 0, NULL);
             if (SG_LIB_CAT_OTHER == res) {
-                res = svpd_decode_vendor(sg_fd, op, jop, 0);
+                res = svpd_decode_vendor(ptvp, op, jop, 0);
                 if (SG_LIB_CAT_OTHER == res)
-                    res = svpd_unable_to_decode(sg_fd, op, jop, 0, 0);
+                    res = svpd_unable_to_decode(ptvp, op, jop, 0, 0);
             }
             if (! op->do_quiet) {
                 if (SG_LIB_CAT_ABORTED_COMMAND == res)
@@ -2310,7 +2315,7 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
 
         res = 0;
         if (op->page_given && (VPD_NOPE_WANT_STD_INQ == op->vpd_pn))
-            return svpd_decode_t10(-1, op, jop, 0, 0, NULL);
+            return svpd_decode_t10(NULL, op, jop, 0, 0, NULL);
 
         for (off = 0; off < in_len; off += bump) {
             rp = rsp_buff + off;
@@ -2343,11 +2348,11 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
                     sgj_pr_hr(jsp, "[0x%x] ", pn);
             }
 
-            res = svpd_decode_t10(-1, op, jop, 0, off, NULL);
+            res = svpd_decode_t10(NULL, op, jop, 0, off, NULL);
             if (SG_LIB_CAT_OTHER == res) {
-                res = svpd_decode_vendor(-1, op, jop, off);
+                res = svpd_decode_vendor(NULL, op, jop, off);
                 if (SG_LIB_CAT_OTHER == res)
-                    res = svpd_unable_to_decode(-1, op, jop, 0, off);
+                    res = svpd_unable_to_decode(NULL, op, jop, 0, off);
             }
         }
     }
@@ -2355,7 +2360,8 @@ svpd_decode_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
 }
 
 static int
-svpd_examine_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
+svpd_examine_all(struct sg_pt_base * ptvp, struct opts_t * op,
+                 sgj_opaque_p jop)
 {
     bool first = true;
     bool got_one = false;
@@ -2394,11 +2400,11 @@ svpd_examine_all(int sg_fd, struct opts_t * op, sgj_opaque_p jop)
             snprintf(b, sizeof(b), "[0x%x] ", k);
         else
             b[0] = '\0';
-        res = svpd_decode_t10(sg_fd, op, jop, 0, 0, b);
+        res = svpd_decode_t10(ptvp, op, jop, 0, 0, b);
         if (SG_LIB_CAT_OTHER == res) {
-            res = svpd_decode_vendor(sg_fd, op, jop, 0);
+            res = svpd_decode_vendor(ptvp, op, jop, 0);
             if (SG_LIB_CAT_OTHER == res)
-                res = svpd_unable_to_decode(sg_fd, op, jop, 0, 0);
+                res = svpd_unable_to_decode(ptvp, op, jop, 0, 0);
         }
         if (! op->do_quiet) {
             if (SG_LIB_CAT_ABORTED_COMMAND == res)
@@ -2429,6 +2435,7 @@ main(int argc, char * argv[])
     int ret = 0;
     int subvalue = 0;
     const char * cp;
+    struct sg_pt_base * ptvp = NULL;
     sgj_state * jsp;
     sgj_opaque_p jop = NULL;
     const struct svpd_values_name_t * vnp;
@@ -2839,13 +2846,13 @@ main(int argc, char * argv[])
         if ((0 == op->maxlen) || (inhex_len < op->maxlen))
             op->maxlen = inhex_len;
         if (op->do_all || op->page_given)
-            res = svpd_decode_all(-1, op, jop);
+            res = svpd_decode_all(NULL, op, jop);
         else {
-            res = svpd_decode_t10(-1, op, jop, subvalue, 0, NULL);
+            res = svpd_decode_t10(NULL, op, jop, subvalue, 0, NULL);
             if (SG_LIB_CAT_OTHER == res) {
-                res = svpd_decode_vendor(-1, op, jop, 0);
+                res = svpd_decode_vendor(NULL, op, jop, 0);
                 if (SG_LIB_CAT_OTHER == res)
-                    res = svpd_unable_to_decode(-1, op, jop, subvalue, 0);
+                    res = svpd_unable_to_decode(NULL, op, jop, subvalue, 0);
             }
         }
         ret = res;
@@ -2875,19 +2882,24 @@ main(int argc, char * argv[])
             ret = SG_LIB_FILE_ERROR;
         goto err_out;
     }
-
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, vb);
+    if (NULL == ptvp) {
+        pr2serr("memory problem from construct_scsi_pt_obj_with_fd()\n");
+        ret = sg_convert_errno(ENOMEM);
+        goto err_out;
+    }
     if (op->examine_given) {
-        ret = svpd_examine_all(sg_fd, op, jop);
+        ret = svpd_examine_all(ptvp, op, jop);
     } else if (op->do_all)
-        ret = svpd_decode_all(sg_fd, op, jop);
+        ret = svpd_decode_all(ptvp, op, jop);
     else {
         memset(rsp_buff, 0, rsp_buff_sz);
 
-        res = svpd_decode_t10(sg_fd, op, jop, subvalue, 0, NULL);
+        res = svpd_decode_t10(ptvp, op, jop, subvalue, 0, NULL);
         if (SG_LIB_CAT_OTHER == res) {
-            res = svpd_decode_vendor(sg_fd, op, jop, 0);
+            res = svpd_decode_vendor(ptvp, op, jop, 0);
             if (SG_LIB_CAT_OTHER == res)
-                res = svpd_unable_to_decode(sg_fd, op, jop, subvalue, 0);
+                res = svpd_unable_to_decode(ptvp, op, jop, subvalue, 0);
         }
         if (! op->do_quiet) {
             if (SG_LIB_CAT_ABORTED_COMMAND == res)
@@ -2910,6 +2922,8 @@ err_out:
                     "more information\n");
     }
 fini:
+    if (ptvp)
+        destruct_scsi_pt_obj(ptvp);
     res = (sg_fd >= 0) ? sg_cmds_close_device(sg_fd) : 0;
 
     if (res < 0) {

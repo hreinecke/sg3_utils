@@ -20,7 +20,7 @@ will generate the configure script so then './configure; make;
 make install' sequence should succeed. Tarballs of this package should
 include the configure script so the ./autogen.sh step may not be needed.
 Other autotools base packages use the script name 'bootstrap' instead
-of 'autogen.sh', so for compatability a bootstrap script has been added
+of 'autogen.sh', so for compatibility a bootstrap script has been added
 to this package which simply calls ./autogen.sh .
 
 The following more detailed instructions are generic; see the `README'

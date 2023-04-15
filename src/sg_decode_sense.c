@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.37 20230326";
+static const char * version_str = "1.38 20230411";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -52,6 +52,8 @@ static struct option long_options[] = {
     {"json", optional_argument, 0, 'j'},
     {"js-file", required_argument, 0, 'J'},
     {"js_file", required_argument, 0, 'J'},
+    {"list-err", no_argument, 0, 'l'},
+    {"list_err", no_argument, 0, 'l'},
     {"nodecode", no_argument, 0, 'N'},
     {"nospace", no_argument, 0, 'n'},
     {"status", required_argument, 0, 's'},
@@ -66,9 +68,10 @@ struct opts_t {
     bool do_cdb;
     bool do_help;
     bool do_json;
+    bool do_list_err;
+    bool do_status;
     bool no_decode;
     bool no_space;
-    bool do_status;
     bool verbose_given;
     bool version_given;
     bool err_given;
@@ -76,6 +79,7 @@ struct opts_t {
     bool ignore_first;
     const char * fname;
     int es_val;
+    int es_up_val;
     int hex_count;
     int sense_len;
     int sstatus;
@@ -94,15 +98,15 @@ static char concat_buff[1024];
 static void
 usage()
 {
-  pr2serr("Usage: sg_decode_sense [--binary=BFN] [--cdb] [--err=ES] "
+  pr2serr("Usage: sg_decode_sense [--binary=BFN] [--cdb] [--err=ES[,LES]] "
           "[--file=HFN]\n"
           "                       [--help] [--hex] [--inhex=HFN] "
           "[--ignore-first]\n"
           "                       [--json[=JO]] [--js_file=JFN] "
-          "[--nodecode]\n"
-          "                       [--nospace] [--status=SS] "
-          "[--verbose] [--version]\n"
-          "                       [--write=WFN] H1 H2 H3 ...\n"
+          "[--list-err]\n"
+          "                       [--nodecode] [--nospace] [--status=SS] "
+          "[--verbose]\n"
+          "                       [--version] [--write=WFN] H1 H2 H3 ...\n"
           "  where:\n"
           "    --binary=BFN|-b BFN    BFN is a file name to read sense "
           "data in\n"
@@ -112,6 +116,8 @@ usage()
           "sense data\n"
           "    --err=ES|-e ES        ES is Exit Status from utility in this "
           "package\n"
+          "    --err=ES,LES|-e ES,LES    ES,LES is a range of exit status "
+	  "values\n"
           "    --file=HFN|-f HFN     HFN is a file name from which to read "
           "sense data\n"
           "                          in ASCII hexadecimal. Interpret '-' "
@@ -137,6 +143,8 @@ usage()
           "output is\n"
           "                            written (def: stdout); truncates "
           "then writes\n"
+          "    --list-err|-l         list all error codes and meanings for "
+          "sg3_utils\n"
           "    --nodecode|-N         do not decode, input hex or binary may "
           "be\n"
           "                          unrelated to SCSI sense or CDB formats\n"
@@ -166,10 +174,11 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     unsigned int ui;
     long val;
     char * avp;
-    char *endptr;
+    const char * ccp;
+    char * endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:ce:f:hHi:Ij::J:nNs:vVw:",
+        c = getopt_long(argc, argv, "b:ce:f:hHi:Ij::J:lnNs:vVw:",
                         long_options, NULL);
         if (c == -1)
             break;
@@ -188,13 +197,23 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->do_cdb = true;
             break;
         case 'e':
-            n = sg_get_num(optarg);
+	    ccp = strchr(optarg, ',');
+            n = sg_get_num_nomult(optarg);
             if ((n < 0) || (n > 255)) {
                 pr2serr("--err= expected number from 0 to 255 inclusive\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             op->err_given = true;
             op->es_val = n;
+	    if (ccp) {
+		n = sg_get_num_nomult(ccp + 1);
+                if ((n < 1) || (n > 255)) {
+                    pr2serr("--err=<l>,<u> expected number from 1 to 255 "
+			    "inclusive\n");
+                    return SG_LIB_SYNTAX_ERROR;
+                }
+                op->es_up_val = n;
+	    }
             break;
         case 'f':
             if (op->fname) {
@@ -231,6 +250,9 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
        case 'J':
             op->do_json = true;
             op->js_file = optarg;
+            break;
+        case 'l':
+            op->do_list_err = true;
             break;
         case 'n':
             op->no_space = true;
@@ -306,6 +328,38 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     }
 the_end:
     return 0;
+}
+
+static void
+enumerate_err_codes(const struct opts_t *op)
+{
+    int k = 0;
+    int last = 127;
+    char b[168];
+    static const int blen = sizeof(b);
+
+    if (op->err_given && (! op->do_list_err)) {
+        if (! sg_exit2str(op->es_val, op->verbose > 1, blen, b))
+            snprintf(b, blen, "Unable to decode exit status %d", op->es_val);
+        if (1 & op->verbose) /* odd values of verbose print to stderr */
+            pr2serr("%s\n", b);
+        else    /* even values of verbose (including not given) to stdout */
+            printf("%s\n", b);
+        return;
+    }
+    if (op->err_given) {
+	k = op->es_val;
+	if (op->es_up_val > 0)
+	    last = op->es_up_val;
+    }
+    for ( ; k <= last; ++k) {
+        if (sg_exit2str(k, op->verbose > 1, blen, b)) {
+            if (1 & op->verbose) /* odd values of verbose print to stderr */
+                pr2serr("%d: %s\n", k, b);
+            else    /* even values of verbose (incl. not given) to stdout */
+                printf("%d: %s\n", k, b);
+        }
+    }
 }
 
 /* Keep this format (e.g. 0xff,0x12,...) for backward compatibility */
@@ -393,6 +447,10 @@ main(int argc, char *argv[])
         usage();
         goto clean_op;
     }
+    if (op->do_list_err || op->err_given) {
+        enumerate_err_codes(op);
+        goto clean_op;
+    }
     jsp = &op->json_st;
     if (op->do_json) {
        if (! sgj_init_state(jsp, op->json_arg)) {
@@ -412,18 +470,6 @@ main(int argc, char *argv[])
     }
     as_json = jsp->pr_as_json;
 
-    if (op->err_given) {
-        char d[128];
-        const int dlen = sizeof(d);
-
-        if (! sg_exit2str(op->es_val, op->verbose > 1, dlen, d))
-            snprintf(d, dlen, "Unable to decode exit status %d", op->es_val);
-        if (1 & op->verbose) /* odd values of verbose print to stderr */
-            pr2serr("%s\n", d);
-        else    /* even values of verbose (including not given) to stdout */
-            printf("%s\n", d);
-        goto fini;
-    }
 
     if (op->do_status) {
         sg_get_scsi_status_str(op->sstatus, blen, b);

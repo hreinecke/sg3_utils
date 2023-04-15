@@ -4,7 +4,7 @@
 # (c) 2006--2022 Hannes Reinecke, GNU GPL v2 or later
 # $Id: rescan-scsi-bus.sh,v 1.57 2012/03/31 14:08:48 garloff Exp $
 
-VERSION="20220930"
+VERSION="20230413"
 SCAN_WILD_CARD=4294967295
 
 TMPLUNINFOFILE="/tmp/rescan-scsi-mpath-info.txt"
@@ -251,7 +251,7 @@ is_removable ()
   if [ -n "$b" ]; then
     echo $(((0x$b & 0x80) != 0))
   else
-    sg_inq /dev/$SGDEV 2>/dev/null | sed -n 's/^.*RMB=\([0-9]*\).*$/\1/p'
+    sg_inq "$sg_len_arg" /dev/$SGDEV 2>/dev/null | sed -n 's/^.*RMB=\([0-9]*\).*$/\1/p'
   fi
 }
 
@@ -273,12 +273,12 @@ testonline ()
   [ ! -x /usr/bin/sg_turs ] && return 0
   sgdevice
   [ -z "$SGDEV" ] && return 0
-  sg_turs /dev/$SGDEV >/dev/null 2>&1
+  sg_turs "$sg_turs_opt" /dev/$SGDEV >/dev/null 2>&1
   RC=$?
 
   # Handle in progress of becoming ready and unit attention
   while [ $RC = 2 -o $RC = 6 ] && [ $ctr -lt $timeout ] ; do
-    if [ $RC = 2 ] && [ "$RMB" != "1" ] && sg_inq /dev/$SGDEV | grep -q -i "PQual=0" ; then
+    if [ $RC = 2 ] && [ "$RMB" != "1" ] && sg_inq "$sg_len_arg" /dev/$SGDEV | grep -q -i "PQual=0" ; then
       echo -n "."
       let LN+=1
       sleep 1
@@ -286,7 +286,7 @@ testonline ()
       sleep 0.02
     fi
     let ctr+=1
-    sg_turs /dev/$SGDEV >/dev/null 2>&1
+    sg_turs "$sg_turs_opt" /dev/$SGDEV >/dev/null 2>&1
     RC=$?
     # Check for removable device; TEST UNIT READY obviously will
     # fail for a removable device with no medium
@@ -468,7 +468,7 @@ udevadm_settle()
     # Loop for up to 60 seconds if sd devices still are settling..
     # This allows us to continue if udev events are stuck on multipaths in recovery mode
     while [ $tmo -gt 0 ] ; do
-      if ! /sbin/udevadm settle --timeout=1 | egrep -q sd[a-z]+ ; then
+      if ! /sbin/udevadm settle --timeout=1 | grep -E -q sd[a-z]+ ; then
         break;
       fi
       let tmo=$tmo-1
@@ -1122,13 +1122,13 @@ findresized()
   if [ -n "$mp_enable" ] && [ -n "$mpaths" ] ; then
     i=0
     for m in $mpaths ; do
-      mpathsizes[$i]="$($MULTIPATH -l "$m" | egrep -o [0-9]+.[0-9]+[KMGT])"
+      mpathsizes[$i]="$($MULTIPATH -l "$m" | grep -E -o [0-9]+.[0-9]+[KMGT])"
       let i=$i+1
     done
     resizempaths
     i=0
     for m in $mpaths ; do
-      mpathsize="$($MULTIPATH -l "$m" | egrep -o [0-9\.]+[KMGT])"
+      mpathsize="$($MULTIPATH -l "$m" | grep -E -o [0-9\.]+[KMGT])"
       echo "$m ${mpathsizes[$i]} => $mpathsize"
       let i=$i+1
     done
@@ -1215,11 +1215,23 @@ if [ -x /usr/bin/sg_inq ] ; then
     let sg_version+=$((100 * sg_ver_maj))
   fi
   sg_version=${sg_version##0.}
+  sg_turs_version=$(sg_turs -V 2>&1 | cut -d " " -f 3)
+  if [ -n "$sg_turs_version" ] ; then
+    sg_tur_maj=${sg_turs_version:0:1}
+    sg_turs_version=${sg_turs_version##?.}
+    let sg_turs_version+=$((100 * sg_tur_maj))
+  fi
+  sg_turs_version=${sg_turs_version##0.}
   #echo "\"$sg_version\""
   if [ -z "$sg_version" ] || [ "$sg_version" -lt 70 ] ; then
     sg_len_arg="-36"
   else
     sg_len_arg="--len=36"
+  fi
+  if [ "$sg_turs_version" -gt 353 ] ; then
+    sg_turs_opt="--ascq=0x3a"
+  else
+    sg_turs_opt=""
   fi
 else
   echo "WARN: /usr/bin/sg_inq not present -- please install sg3_utils"

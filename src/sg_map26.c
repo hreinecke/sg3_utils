@@ -47,7 +47,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.20 20230329";
+static const char * version_str = "1.21 20230414";
 
 #define ME "sg_map26: "
 
@@ -59,8 +59,11 @@ static const char * version_str = "1.20 20230329";
 #define NT_OSST 5
 #define NT_SG 6
 #define NT_CH 7
-#define NT_REG 8
-#define NT_DIR 9
+#define NT_BSG 8
+#define NT_NVME 9
+#define NT_NVME_GEN 10  /* e.g.  /dev/ng0n1 */
+#define NT_REG 11
+#define NT_DIR 12
 
 #define NAME_LEN_MAX 256
 #define D_NAME_LEN_MAX 520
@@ -72,7 +75,7 @@ static const char * version_str = "1.20 20230329";
 #define OSST_MAJOR 206
 #endif
 
-/* scandir() and stat() categories */
+/* scandir() and stat() categories, file_type enumeration */
 #define FT_OTHER 0
 #define FT_REGULAR 1
 #define FT_BLOCK 2
@@ -101,6 +104,7 @@ static const char * sys_sg_dir = "/sys/class/scsi_generic/";
 static const char * sys_sd_dir = "/sys/block/";
 static const char * sys_sr_dir = "/sys/block/";
 static const char * sys_hd_dir = "/sys/block/";
+static const char * sys_scsi_dev_dir = "/sys/class/scsi_device/";
 static const char * sys_st_dir = "/sys/class/scsi_tape/";
 static const char * sys_sch_dir = "/sys/class/scsi_changer/";
 static const char * sys_osst_dir = "/sys/class/onstream_tape/";
@@ -154,8 +158,8 @@ pr2serr(const char * fmt, ...)
 static void
 usage()
 {
-        pr2serr("Usage: sg_map26 [--dev_dir=DIR] [--given_is=0...1] [--help] "
-                "[--result=0...3]\n"
+        pr2serr("Usage: sg_map26 [--dev_dir=DIR] [--given_is=0..1] [--help] "
+                "[--result=0..3]\n"
                 "                [--symlink] [--verbose] [--version] "
                 "DEVICE\n"
                 "  where:\n"
@@ -163,21 +167,21 @@ usage()
                 "resulting special\n"
                 "                            (def: directory of DEVICE "
                 "or '/dev')\n"
-                "    --given_is=0...1 | -g 0...1    variety of given "
+                "    --given_is=0..1 | -g 0..1    variety of given "
                 "DEVICE\n"
-                "                                   0->block or char special "
+                "                                 0->block or char special "
                 "(or symlink to)\n"
                 "                                   1->sysfs device, 'dev' or "
                 "parent\n"
                 "    --help | -h       print out usage message\n"
-                "    --result=0...3 | -r 0...3    variety of file(s) to "
+                "    --result=0..3 | -r 0..3    variety of file(s) to "
                 "find\n"
-                "                                 0->mapped block or char "
+                "                               0->mapped block or char "
                 "special(def)\n"
-                "                                 1->mapped sysfs path\n"
-                "                                 2->matching block or "
+                "                               1->mapped sysfs path\n"
+                "                               2->matching block or "
                 "char special\n"
-                "                                 3->matching sysfs "
+                "                               3->matching sysfs "
                 "path\n"
                 "    --symlink | -s    symlinks to special included in "
                 "result\n"
@@ -215,11 +219,74 @@ ssafe_strerror(int errnum)
         return errstr;
 }
 
+/* This code is borrowed from lib/sg_pt_linux.c and a stripped down version
+ * is here so sg_map26 continues to not depend on libsgutils . */
+static void
+find_bsg_nvme_char_major(int * bsg_majp, int * nvme_majp, int * nvme_gen_majp,
+                         int vb)
+{
+    bool got_one = false;
+    int n;
+    char * cp;
+    FILE *fp;
+    char a[128];
+    char b[128];
+    static const int blen = sizeof(b);
+    static const char * proc_devices = "/proc/devices";
+
+    if (bsg_majp)
+        *bsg_majp = 0;
+    if (nvme_majp)
+        *nvme_majp = 0;
+    if (nvme_gen_majp)
+        *nvme_gen_majp = 0;
+    if (NULL == (fp = fopen(proc_devices, "r"))) {
+        if (vb)
+            pr2serr("fopen %s failed: %s\n", proc_devices, strerror(errno));
+        return;
+    }
+    while ((cp = fgets(b, blen, fp))) {
+        if ((1 == sscanf(b, "%126s", a)) &&
+            (0 == memcmp(a, "Character", 9)))
+            break;
+    }
+    while (cp && (cp = fgets(b, blen, fp))) {
+        if (2 == sscanf(b, "%d %126s", &n, a)) {
+            if (0 == strcmp("bsg", a)) {
+                if (bsg_majp)
+                    *bsg_majp = n;
+                if (vb > 3)
+                    pr2serr("found bsg_major=%d\n", n);
+                if (got_one)
+                    break;
+                got_one = true;
+            } else if (0 == memcmp("nvme", a, 4)) {
+                if (0 == strcmp("nvme-generic", a)) {
+                    if (nvme_gen_majp)
+                        *nvme_gen_majp = n;
+                    if (vb > 3)
+                        pr2serr("found nvme_gen_char_major=%d\n", n);
+                } else {
+                    if (nvme_majp)
+                        *nvme_majp = n;
+                    if (vb > 3)
+                        pr2serr("found nvme_char_major=%d\n", n);
+                }
+                got_one = true;
+            }
+        } else
+            break;
+    }
+    if ((vb > 3) && (! got_one))
+        pr2serr("found no bsg nor nvme char device in %s\n", proc_devices);
+    fclose(fp);
+}
+
 static int
 nt_typ_from_filename(const char * filename, int * majj, int * minn)
 {
+        int ma, mi, res, bsg_maj, nvme_maj, nvme_gen_maj;
         struct stat st;
-        int ma, mi;
 
         if (stat(filename, &st) < 0)
                 return -errno;
@@ -240,7 +307,16 @@ nt_typ_from_filename(const char * filename, int * majj, int * minn)
                 case SCSI_CHANGER_MAJOR:
                         return NT_CH;
                 default:
-                        return NT_NO_MATCH;
+                        res = NT_NO_MATCH;
+                        find_bsg_nvme_char_major(&bsg_maj, &nvme_maj,
+                                                 &nvme_gen_maj, 0);
+                        if (ma == bsg_maj)
+                            res = NT_BSG;
+                        else if (ma == nvme_maj)
+                            res = NT_NVME;
+                        else if (ma == nvme_gen_maj)
+                            res = NT_NVME_GEN;
+                        return res;
                 }
         } else if (S_ISBLK(st.st_mode)) {
                 switch(ma) {
@@ -635,12 +711,12 @@ get_value(const char * dir_name, const char * base_name, char * value,
 }
 
 static int
-map_hd(const char * device_dir, int ma, int mi, int result,
+map_hd(const char * device_dir, int ma, int mi, int op_result,
        bool follow_symlink, int verbose)
 {
         char c, num;
 
-        if (2 == result) {
+        if (2 == op_result) {
                 num = list_matching_nodes(device_dir, FT_BLOCK,
                                           ma, mi, follow_symlink,
                                           verbose);
@@ -667,13 +743,13 @@ map_hd(const char * device_dir, int ma, int mi, int result,
 
 static int
 map_sd(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, bool follow_symlink, int verbose)
+       int op_result, bool follow_symlink, int verbose)
 {
         int index, m_mi, m_ma, num, disc, disc2;
         char value[D_NAME_LEN_MAX];
         char name[D_NAME_LEN_MAX];
 
-        if (2 == result) {
+        if (2 == op_result) {
                 num = list_matching_nodes(device_dir, FT_BLOCK, ma, mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
@@ -704,7 +780,7 @@ map_sd(const char * device_name, const char * device_dir, int ma, int mi,
                 snprintf(name, sizeof(name), "%ssd%c%c%c",
                          sys_sd_dir, 'a' + m1, 'a' + m2, 'a' + m3);
         }
-        if (3 == result) {
+        if (3 == op_result) {
                 printf("%s\n", name);
                 return 0;
         }
@@ -720,7 +796,7 @@ map_sd(const char * device_name, const char * device_dir, int ma, int mi,
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
-                if (1 == result) {
+                if (1 == op_result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
                         printf("%s\n", value);
@@ -749,19 +825,19 @@ map_sd(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_sr(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, bool follow_symlink, int verbose)
+       int op_result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
         char name[D_NAME_LEN_MAX];
 
-        if (2 == result) {
+        if (2 == op_result) {
                 num = list_matching_nodes(device_dir, FT_BLOCK, ma, mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%ssr%d", sys_sr_dir, mi);
-        if (3 == result) {
+        if (3 == op_result) {
                 printf("%s\n", name);
                 return 0;
         }
@@ -777,7 +853,7 @@ map_sr(const char * device_name, const char * device_dir, int ma, int mi,
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
-                if (1 == result) {
+                if (1 == op_result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
                         printf("%s\n", value);
@@ -806,20 +882,20 @@ map_sr(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_st(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, bool follow_symlink, int verbose)
+       int op_result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
         char name[D_NAME_LEN_MAX];
 
-        if (2 == result) {
+        if (2 == op_result) {
                 num = list_matching_nodes(device_dir, FT_CHAR, ma, mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%sst%d", sys_st_dir,
                  TAPE_NR(mi));
-        if (3 == result) {
+        if (3 == op_result) {
                 printf("%s\n", name);
                 return 0;
         }
@@ -835,7 +911,7 @@ map_st(const char * device_name, const char * device_dir, int ma, int mi,
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
-                if (1 == result) {
+                if (1 == op_result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
                         printf("%s\n", value);
@@ -864,20 +940,20 @@ map_st(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_osst(const char * device_name, const char * device_dir, int ma, int mi,
-         int result, bool follow_symlink, int verbose)
+         int op_result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
         char name[D_NAME_LEN_MAX];
 
-        if (2 == result) {
+        if (2 == op_result) {
                 num = list_matching_nodes(device_dir, FT_CHAR, ma, mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%sosst%d", sys_osst_dir,
                  TAPE_NR(mi));
-        if (3 == result) {
+        if (3 == op_result) {
                 printf("%s\n", name);
                 return 0;
         }
@@ -893,7 +969,7 @@ map_osst(const char * device_name, const char * device_dir, int ma, int mi,
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
-                if (1 == result) {
+                if (1 == op_result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
                         printf("%s\n", value);
@@ -922,19 +998,19 @@ map_osst(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_ch(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, bool follow_symlink, int verbose)
+       int op_result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
         char name[D_NAME_LEN_MAX];
 
-        if (2 == result) {
+        if (2 == op_result) {
                 num = list_matching_nodes(device_dir, FT_CHAR, ma, mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%ssch%d", sys_sch_dir, mi);
-        if (3 == result) {
+        if (3 == op_result) {
                 printf("%s\n", name);
                 return 0;
         }
@@ -950,7 +1026,7 @@ map_ch(const char * device_name, const char * device_dir, int ma, int mi,
                 return 1;
         }
         if (if_directory_ch2generic(".")) {
-                if (1 == result) {
+                if (1 == op_result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
                         printf("%s\n", value);
@@ -979,19 +1055,19 @@ map_ch(const char * device_name, const char * device_dir, int ma, int mi,
 
 static int
 map_sg(const char * device_name, const char * device_dir, int ma, int mi,
-       int result, bool follow_symlink, int verbose)
+       int op_result, bool follow_symlink, int verbose)
 {
         int m_mi, m_ma, num;
         char value[D_NAME_LEN_MAX];
         char name[D_NAME_LEN_MAX];
 
-        if (2 == result) {
+        if (2 == op_result) {
                 num = list_matching_nodes(device_dir, FT_CHAR, ma, mi,
                                           follow_symlink, verbose);
                 return (num > 0) ? 0 : 1;
         }
         snprintf(name, sizeof(name), "%ssg%d", sys_sg_dir, mi);
-        if (3 == result) {
+        if (3 == op_result) {
                 printf("%s\n", name);
                 return 0;
         }
@@ -1016,7 +1092,7 @@ map_sg(const char * device_name, const char * device_dir, int ma, int mi,
                                 pr2serr("unexpected scan_for_first error\n");
                         }
                 }
-                if (1 == result) {
+                if (1 == op_result) {
                         if (NULL == getcwd(value, sizeof(value)))
                                 value[0] = '\0';
                         printf("%s\n", value);
@@ -1042,6 +1118,73 @@ map_sg(const char * device_name, const char * device_dir, int ma, int mi,
         }
 }
 
+/* Attempts to map bsg device of the form /dev/bsg/h:c:t:l to the
+ * corresponding device. If 2!=op_result, first looks for a matching sd
+ * device (for disks), then for a sr device (for bd/dvd/cd), then for a st
+ * device (for tape drives). If no match is found, or 2==op_result then
+ * checks for a matching sg device. Always returns 0 (probably shouldn't). */
+static int
+map_bsg(const char * device_name, const char * device_dir, int ma, int mi,
+        int op_result, bool follow_symlink, int vb)
+{
+        bool found = false;
+        int n;
+        char * cp;
+        char bsname[D_NAME_LEN_MAX];
+        char b[196];
+        char value[D_NAME_LEN_MAX];
+        static const int bsname_len = sizeof(bsname);
+        static const int blen = sizeof(b);
+        static const int vlen = sizeof(value);
+
+        if (vb > 3) {
+                pr2serr("%s: device_name: %s, device_dir: %s\n", __func__,
+                        device_name, device_dir);
+                pr2serr("   major=%d, minor=%d, op_result=%d, follow_symlink"
+                        "=%d\n", ma, mi, op_result, (int)follow_symlink);
+        }
+        strncpy(bsname, device_name, bsname_len);
+        cp = basename(bsname);
+        if (vb > 2)
+                pr2serr("%s: basename: %s\n", __func__, cp);
+        snprintf(b, blen, "%s%s/device", sys_scsi_dev_dir, cp);
+        if (2 == op_result)
+            goto skip;
+        if (if_directory_chdir(b, "block")) {
+                /* should get both sd and sr driver devices */
+                n = scan_for_first(".", vb);
+                if (1 == n)
+                        printf("/dev/%s\n", for_first.name);
+                if (vb > 1)
+                        pr2serr("%s: expected 1, found %d\n", __func__, n);
+                found = true;
+        } else if (if_directory_chdir(b, "tape")) {
+                snprintf(bsname, bsname_len, "%s/tape", b);
+                if (get_value(bsname, "dev", value, vlen)) {
+                        int maj, min;
+
+                        if (2 == sscanf(value, "%d:%d", &maj, &min)) {
+                                n = list_matching_nodes("/dev", FT_CHAR, maj,
+                                                        min, false, vb);
+                                if (vb > 2)
+                                    pr2serr("%s: found tape matches: %d\n",
+                                            __func__, n);
+                        }
+                } else if (vb > 0)
+                        pr2serr("%s: tape failed to fetch ../dev\n",
+                                __func__);
+                found = true;
+        }
+skip:
+        if ((! found) && if_directory_chdir(b, "scsi_generic")) {
+                n = scan_for_first(".", vb);
+                if (1 == n)
+                        printf("/dev/%s\n", for_first.name);
+                if (vb > 1)
+                        pr2serr("%s: expected 1, found %d\n", __func__, n);
+        }
+        return 0;
+}
 
 int
 main(int argc, char * argv[])
@@ -1049,7 +1192,7 @@ main(int argc, char * argv[])
         bool cont;
         int c, num, tt, res;
         int given_is = -1;
-        int result = 0;
+        int opt_result = 0;
         int verbose = 0;
         int ret = 1;
         int ma, mi;
@@ -1091,7 +1234,7 @@ main(int argc, char * argv[])
                 case 'r':
                         num = sscanf(optarg, "%d", &res);
                         if ((1 == num) && (res >= 0) && (res < 4))
-                                result = res;
+                                opt_result = res;
                         else {
                                 pr2serr("value for '--result=' must be "
                                         "0..3\n");
@@ -1182,6 +1325,9 @@ main(int argc, char * argv[])
         case NT_OSST:
         case NT_CH:
         case NT_SG:
+        case NT_BSG:
+        case NT_NVME:
+        case NT_NVME_GEN:
                 if (given_is > 0) {
                         pr2serr("character special but '--given_is=' "
                                 "suggested sysfs device\n");
@@ -1216,37 +1362,48 @@ main(int argc, char * argv[])
                         res = 1;
                         break;
                 case NT_SD:
-                        res = map_sd(device_name, device_dir, ma, mi, result,
-                                     follow_symlink, verbose);
+                        res = map_sd(device_name, device_dir, ma, mi,
+                                     opt_result, follow_symlink, verbose);
                         break;
                 case NT_SR:
-                        res = map_sr(device_name, device_dir, ma, mi, result,
-                                     follow_symlink, verbose);
+                        res = map_sr(device_name, device_dir, ma, mi,
+                                     opt_result, follow_symlink, verbose);
                         break;
                 case NT_HD:
-                        if (result < 2) {
+                        if (opt_result < 2) {
                                 pr2serr("a hd device does not map to a sg "
                                         "device\n");
                                 return SG_LIB_FILE_ERROR;
                         }
-                        res = map_hd(device_dir, ma, mi, result,
+                        res = map_hd(device_dir, ma, mi, opt_result,
                                      follow_symlink, verbose);
                         break;
                 case NT_ST:
-                        res = map_st(device_name, device_dir, ma, mi, result,
-                                     follow_symlink, verbose);
+                        res = map_st(device_name, device_dir, ma, mi,
+                                     opt_result, follow_symlink, verbose);
                         break;
                 case NT_OSST:
                         res = map_osst(device_name, device_dir, ma, mi,
-                                       result, follow_symlink, verbose);
+                                       opt_result, follow_symlink, verbose);
                         break;
                 case NT_CH:
-                        res = map_ch(device_name, device_dir, ma, mi, result,
-                                     follow_symlink, verbose);
+                        res = map_ch(device_name, device_dir, ma, mi,
+                                     opt_result, follow_symlink, verbose);
                         break;
                 case NT_SG:
-                        res = map_sg(device_name, device_dir, ma, mi, result,
-                                     follow_symlink, verbose);
+                        res = map_sg(device_name, device_dir, ma, mi,
+                                     opt_result, follow_symlink, verbose);
+                        break;
+                case NT_BSG:
+                        res = map_bsg(device_name, device_dir, ma, mi,
+                                      opt_result, follow_symlink, verbose);
+                        break;
+                case NT_NVME_GEN:
+                        pr2serr("Can't map NVMe generic device: %s\n",
+                                device_name);
+                        break;
+                case NT_NVME:
+                        pr2serr("Can't map NVMe device: %s\n", device_name);
                         break;
                 case NT_REG:
                         if (! get_value(NULL, device_name, value,

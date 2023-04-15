@@ -1,4 +1,4 @@
-.TH SG_INQ "8" "February 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_INQ "8" "April 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_inq \- issue SCSI INQUIRY command and/or decode its response
 .SH SYNOPSIS
@@ -8,7 +8,7 @@ sg_inq \- issue SCSI INQUIRY command and/or decode its response
 [\fI\-\-force\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR] [\fI\-\-id\fR]
 [\fI\-\-inhex=FN\fR] [\fI\-\-json[=JO]\fR] [\fI\-\-js\-file=JFN\fR]
 [\fI\-\-len=LEN\fR] [\fI\-\-long\fR] [\fI\-\-maxlen=LEN\fR]
-[\fI\-\-only\fR] [\fI\-\-page=PG\fR] [\fI\-\-raw\fR]
+[\fI\-\-only\fR] [\fI\-\-page=PG\fR]  [\fI\-\-quiet\fR] [\fI\-\-raw\fR]
 [\fI\-\fI\-sinq_inraw=RFN\fR] [\fI\-\-vendor\fR] [\fI\-\-verbose\fR]
 [\fI\-\-version\fR] [\fI\-\-vpd\fR] \fIDEVICE\fR
 .PP
@@ -17,7 +17,7 @@ sg_inq \- issue SCSI INQUIRY command and/or decode its response
 [\fI\-c\fR] [\fI\-cl\fR] [\fI\-d\fR] [\fI\-e\fR] [\fI\-f\fR] [\fI\-h\fR]
 [\fI\-H\fR] [\fI\-i\fR] [\fI\-I=FN\fR] [\fI\-j[=JO]\fR] [\fI\-l=LEN\fR]
 [\fI\-L\fR] [\fI\-m\fR] [\fI\-M\fR] [\fI\-o\fR] [\fI\-p=VPD_PG\fR]
-[\fI\-P\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
+[\fI\-P\fR] [\fI\-q\fR] [\fI\-r\fR] [\fI\-s\fR] [\fI\-u\fR] [\fI\-v\fR]
 [\fI\-V\fR] [\fI\-x\fR] [\fI\-36\fR] [\fI\-?\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -210,7 +210,8 @@ Without this option an additional SCSI command is sent: a (non\-standard)
 SCSI INQUIRY to fetch the Serial Number VPD page. However the Serial
 Number VPD page is not mandatory (while the Device Identification page is
 mandatory but a billion USB keys ignore that) and may cause nuisance error
-reports.
+reports. In most cases if the \fI\-\-maxlen=LEN\fR option is given and
+\fILEN\fR is greater than 0 then this option is not needed.
 .br
 For NVMe devices only the Identify controller is performed, even if the
 \fIDEVICE\fR includes a namespace identifier. For example in FreeBSD
@@ -230,6 +231,9 @@ can be used to override some guessing logic associated with the
 .br
 If \fIPG\fR is not found in the 'Supported VPD pages' VPD page (0x0) then
 EDOM is returned. To bypass this check use the \fI\-\-force\fR option.
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+suppress the amount of decoding and error output.
 .TP
 \fB\-r\fR, \fB\-\-raw\fR
 in the absence of \fI\-\-inhex=FN\fR then the output response is in binary.

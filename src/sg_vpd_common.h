@@ -132,7 +132,7 @@ struct opts_t {
     bool do_force;              /* sg_inq + sg_vpd */
     bool do_json;               /* sg_inq + sg_vpd */
     bool do_only; /* sg_inq: --only after stdinq: don't fetch VPD page 0x80 */
-    bool do_quiet;              /* sg_vpd */
+    bool do_quiet;              /* sg_inq (new) + sg_vpd */
     bool examine_given;         /* sg_vpd */
     bool page_given;            /* sg_inq + sg_vpd */
     bool possible_nvme;         /* sg_inq */
@@ -267,16 +267,16 @@ int no_ascii_4hex(const struct opts_t * op);
 
 void svpd_enumerate_vendor(int vend_prod_num);
 int svpd_count_vendor_vpds(int vpd_pn, int vend_prod_num);
-int svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop,
-                       int off);
+int svpd_decode_vendor(struct sg_pt_base * ptvp, struct opts_t * op,
+		       sgj_opaque_p jop, int off);
 void sgjv_js_hex_long(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * bp,
                       int len);
 const struct svpd_values_name_t * svpd_find_vendor_by_acron(const char * ap);
 int svpd_find_vp_num_by_acron(const char * vp_ap);
 const struct svpd_values_name_t * svpd_find_vendor_by_num(int page_num,
                                                           int vend_prod_num);
-int vpd_fetch_page(int sg_fd, uint8_t * rp, int page, int mxlen,
-                   bool qt, int vb, int * rlenp);
+int vpd_fetch_page(struct sg_pt_base * ptvp, uint8_t * rp, int page,
+		   int mxlen, bool qt, int vb, int * rlenp);
 
 void named_hhh_output(const char * pname, const uint8_t * buff, int len,
                       const struct opts_t * op);

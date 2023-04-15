@@ -35,7 +35,7 @@
  * device and decodes the response. Based on spc5r19.pdf
  */
 
-static const char * version_str = "1.05 20230409";
+static const char * version_str = "1.06 20230410";
 
 static const char * my_name = "sg_write_attr: ";
 
@@ -370,7 +370,7 @@ find_value_by_acronym(const char * cp, const struct acron_nv_t * anvp)
         if (NULL == anvp->acronym)
             continue;
         for (mp = cp, k = 0; *mp; ++mp, ++k) {
-            if ((uint8_t)tolower(*mp) != tolower((uint8_t)anvp->acronym[k]))
+            if (tolower((uint8_t)*mp) != tolower((uint8_t)anvp->acronym[k]))
                 break;
         }
         if ((0 == *mp) && (0 == anvp->acronym[k]))

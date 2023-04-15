@@ -1034,7 +1034,8 @@ decode_vpd_d2_hit(uint8_t * b, int blen)
 /* Returns 0 if successful, see sg_ll_inquiry() plus SG_LIB_CAT_OTHER for
    unsupported page */
 int
-svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
+svpd_decode_vendor(struct sg_pt_base * ptvp, struct opts_t * op,
+		   sgj_opaque_p jop, int off)
 {
     bool as_json;
     int len, pdt, plen, pn, dhex;
@@ -1072,11 +1073,11 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
         return SG_LIB_CAT_OTHER;
     }
     rp = rsp_buff + off;
-    if (sg_fd >= 0) {
+    if (ptvp) {
         if (0 == alloc_len)
             alloc_len = DEF_ALLOC_LEN;
     }
-    res = vpd_fetch_page(sg_fd, rp, pn, alloc_len, op->do_quiet, op->verbose,
+    res = vpd_fetch_page(ptvp, rp, pn, alloc_len, op->do_quiet, op->verbose,
                          &len);
     if (res) {
         pr2serr("Vendor VPD page=0x%x  failed to fetch\n", pn);
@@ -1281,8 +1282,8 @@ svpd_decode_vendor(int sg_fd, struct opts_t * op, sgj_opaque_p jop, int off)
             /* NVMe: Identify Controller data structure (CNS 01h) */
             plen = sg_get_unaligned_be16(rp + 2) + 4;
             if (plen > len) {   /* fetch the whole page */
-                res = vpd_fetch_page(sg_fd, rp, pn, plen,
-                                     op->do_quiet, op->verbose, &len);
+                res = vpd_fetch_page(ptvp, rp, pn, plen, op->do_quiet,
+				     op->verbose, &len);
                 if (res) {
                     pr2serr("Vendor VPD page=0x%x  failed to fetch\n", pn);
                     return res;
