@@ -4103,7 +4103,7 @@ int
 main(int argc, char * argv[])
 {
     bool as_json = false;
-    int res, n, err, vb;
+    int res, err, vb;
     int sg_fd = -1;
     int ret = 0;
     int subvalue = 0;
@@ -4530,7 +4530,8 @@ main(int argc, char * argv[])
 
 #if defined(O_NONBLOCK) && defined(O_RDONLY)
     if (op->do_block >= 0) {
-        n = O_RDONLY | (op->do_block ? 0 : O_NONBLOCK);
+        int n = O_RDONLY | (op->do_block ? 0 : O_NONBLOCK);
+
         if ((sg_fd = sg_cmds_open_flags(op->device_name, n, vb)) < 0) {
             pr2serr("sg_inq: error opening file: %s: %s\n",
                     op->device_name, safe_strerror(-sg_fd));

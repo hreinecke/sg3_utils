@@ -70,7 +70,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "6.40 20230407";
+static const char * version_str = "6.41 20230415";
 
 
 static const char * my_name = "sg_dd: ";
@@ -447,7 +447,8 @@ usage()
             "[odir=0|1]\n"
             "              [of2=OFILE2] [retries=RETR] [sync=0|1] "
             "[time=0|1[,TO]]\n"
-            "              [verbose=VERB] [--progress] [--verify]\n"
+            "              [verbose=VERB] [--compare] [--progress] "
+            "[--verify]\n"
             "  where:\n"
             "    blk_sgio    0->block device use normal I/O(def), 1->use "
             "SG_IO\n"
@@ -502,7 +503,9 @@ usage()
             "                TO is command timeout in seconds (def: 60)\n"
             "    verbose     0->quiet(def), 1->some noise, 2->more noise, "
             "etc\n"
-            "    --dry-run    do preparation but bypass copy (or read)\n"
+            "    --compare|-c    same as --verify, compare IFILE with "
+            "OFILE\n"
+            "    --dry-run|-d    do preparation but bypass copy (or read)\n"
             "    --help|-h    print out this usage message then exit\n"
             "    --progress|-p    print progress report every 2 minutes\n"
             "    --verbose|-v   same as 'verbose=1', can be used multiple "
@@ -549,7 +552,7 @@ scsi_read_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
         *num_sect = (int64_t)ui + 1;
         *sect_sz = (int)sg_get_unaligned_be32(rcBuff + 4);
     }
-    if (verbose)
+    if (verb)
         pr2serr("      number of blocks=%" PRId64 " [0x%" PRIx64 "], "
                 "logical block size=%d\n", *num_sect, *num_sect, *sect_sz);
     return 0;
@@ -2065,6 +2068,10 @@ main(int argc, char * argv[])
             verbose = sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
+            n = num_chs_in_str(key + 1, keylen - 1, 'c');
+            if (n > 0)
+                do_verify = true;
+            res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'd');
             dry_run += n;
             res += n;
@@ -2094,7 +2101,9 @@ main(int argc, char * argv[])
                         key);
                 return SG_LIB_SYNTAX_ERROR;
             }
-        } else if ((0 == strncmp(key, "--dry-run", 9)) ||
+        } else if (0 == strncmp(key, "--comp", 6))
+            do_verify = true;
+        else if ((0 == strncmp(key, "--dry-run", 9)) ||
                  (0 == strncmp(key, "--dry_run", 9)))
             ++dry_run;
         else if ((0 == strncmp(key, "--help", 6)) ||

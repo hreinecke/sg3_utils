@@ -2,7 +2,7 @@
  * A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 2018-2022 D. Gilbert
+ * Copyright (C) 2018-2023 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -30,7 +30,7 @@
  *
  */
 
-static const char * version_str = "1.44 20221020";
+static const char * version_str = "1.45 20230415";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -510,6 +510,7 @@ usage(int pg_num)
             "                <<list from iflag>>]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
+            "    --compare|-c    same action as --verify\n"
             "    --help|-h      output this usage message then exit\n"
             "    --verify|-x    do a verify (compare) operation [def: do a "
             "copy]\n"
@@ -3804,6 +3805,10 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             clp->verbose = sg_get_num(buf);
         else if ((keylen > 1) && ('-' == key[0]) && ('-' != key[1])) {
             res = 0;
+            n = num_chs_in_str(key + 1, keylen - 1, 'c');
+            if (n > 0)
+                verify_given = true;
+            res += n;
             n = num_chs_in_str(key + 1, keylen - 1, 'd');
             clp->dry_run += n;
             res += n;
@@ -3833,8 +3838,10 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
                         key);
                 goto syn_err;
             }
-        } else if ((0 == strncmp(key, "--dry-run", 9)) ||
-                   (0 == strncmp(key, "--dry_run", 9)))
+        } else if (0 == strncmp(key, "--compare", 6))
+            verify_given = true;
+        else if ((0 == strncmp(key, "--dry-run", 9)) ||
+                 (0 == strncmp(key, "--dry_run", 9)))
             ++clp->dry_run;
         else if ((0 == strncmp(key, "--help", 6)) ||
                    (0 == strcmp(key, "-?")))

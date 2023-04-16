@@ -2,7 +2,7 @@
  * A utility program for copying files. Specialised for "files" that
  * represent devices that understand the SCSI command set.
  *
- * Copyright (C) 2018-2022 D. Gilbert
+ * Copyright (C) 2018-2023 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.22 20221020";
+static const char * version_str = "2.23 20230415";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE
@@ -183,7 +183,7 @@ struct flags_t {
     bool excl;
     bool ff;
     bool fua;
-    bool polled;	/* formerly called 'hipri' */
+    bool polled;        /* formerly called 'hipri' */
     bool masync;        /* more async sg v4 driver flag */
     bool mrq_immed;     /* mrq submit non-blocking */
     bool mrq_svb;       /* mrq shared_variable_block, for sg->sg copy */
@@ -485,9 +485,9 @@ usage(int pg_num)
             "[sync=0|1]\n"
             "               [thr=THR] [time=0|1|2[,TO]] [unshare=1|0] "
             "[verbose=VERB]\n"
-            "               [--dry-run] [--prefetch] [-v|-vv|-vvv] "
-            "[--verbose]\n"
-            "               [--verify] [--version]\n\n"
+            "               [--compare] [--dry-run] [--prefetch] "
+            "[-v|-vv|-vvv]\n"
+            "               [--verbose] [--verify] [--version]\n\n"
             "  where the main options (shown in first group above) are:\n"
             "    bs          must be device logical block size (default "
             "512)\n"
@@ -513,6 +513,7 @@ usage(int pg_num)
             "iflag>>]\n"
             "    seek        block position to start writing to OFILE\n"
             "    skip        block position to start reading from IFILE\n"
+            "    --compare|-x    same action as --verify\n"
             "    --help|-h      output this usage message then exit\n"
             "    --verify|-x    do a verify (compare) operation [def: do a "
             "copy]\n"
@@ -4287,6 +4288,8 @@ parse_cmdline_sanity(int argc, char * argv[], struct global_collection * clp,
             }
         } else if (0 == strncmp(key, "--chkaddr", 9))
             ++clp->chkaddr;
+        else if (0 == strncmp(key, "--compare", 6))
+            verify_given = true;
         else if ((0 == strncmp(key, "--dry-run", 9)) ||
                  (0 == strncmp(key, "--dry_run", 9)))
             ++clp->dry_run;

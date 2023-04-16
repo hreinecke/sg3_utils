@@ -144,6 +144,7 @@ EXTRA_DIST += \
 	testing/Makefile \
 	testing/Makefile.cyg \
 	testing/Makefile.freebsd \
+	testing/random_write_cp_verify.sh \
 	testing/README \
 	testing/sg_chk_asc.c \
 	testing/sgh_dd.cpp \

@@ -86,7 +86,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.88 20230407";
+static const char * version_str = "5.89 20230415";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
