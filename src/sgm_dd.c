@@ -180,6 +180,7 @@ calc_duration_throughput(bool contin)
     static struct timeval prev_tm;
     static int64_t prev_blks;
 
+    f[0] = '\0';
     if (start_tm_valid && (start_tm.tv_sec || start_tm.tv_usec)) {
         blks = (in_full > out_full) ? in_full : out_full;
         gettimeofday(&end_tm, NULL);

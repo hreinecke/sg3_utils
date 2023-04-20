@@ -36,7 +36,7 @@
  * renamed [20181221]
  */
 
-static const char * version_str = "2.23 20230415";
+static const char * version_str = "2.24 20230417";
 
 #define _XOPEN_SOURCE 600
 #ifndef _GNU_SOURCE

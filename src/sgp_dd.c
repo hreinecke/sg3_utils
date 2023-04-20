@@ -86,7 +86,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.89 20230415";
+static const char * version_str = "5.90 20230419";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -296,6 +296,7 @@ calc_duration_throughput(bool contin)
     static struct timeval prev_tm;
     static int64_t prev_blks;
 
+    f[0] = '\0';
     if (start_tm_valid && (start_tm.tv_sec || start_tm.tv_usec)) {
         blks = dd_count - my_opts.out_rem_count;
         blk_sz = my_opts.bs;
@@ -2135,6 +2136,8 @@ main(int argc, char * argv[])
         gettimeofday(&start_tm, NULL);
         start_tm_valid = true;
     }
+    if (FT_DEV_NULL == clp->in_type)
+        goto degen;     /* corner case: if=/dev/null */
 
 /* vvvvvvvvvvv  Start worker threads  vvvvvvvvvvvvvvvvvvvvvvvv */
     if ((clp->out_rem_count > 0) && (clp->num_threads > 0)) {
@@ -2179,6 +2182,7 @@ main(int argc, char * argv[])
         }
     }   /* started worker threads and here after they have all exited */
 
+degen:
     if (do_time && (start_tm.tv_sec || start_tm.tv_usec))
         calc_duration_throughput(false);
 

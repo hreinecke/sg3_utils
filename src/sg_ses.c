@@ -40,7 +40,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.78 20230326";    /* ses4r04 */
+static const char * version_str = "2.79 20230420";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 
@@ -395,6 +395,7 @@ static int threshold_rsp_len;
 static const char * const enc_s = "Enclosure";
 static const char * const not_avail = "not available";
 static const char * const not_rep = "not reported";
+static const char * const nf_s = "not found";
 static const char * const noss_s = "number of secondary subenclosures";
 static const char * const gc_s = "generation code";
 static const char * const et_s = "Element type";
@@ -1209,8 +1210,9 @@ static int
 parse_index(struct opts_t *op)
 {
     bool m1;
-    int n = 0;
-    int n2 = 0;
+    int n = -1;
+    int n2 = -1;
+    int k;
     const char * cp;
     char * c2p;
     const struct element_type_t * etp;
@@ -1241,28 +1243,32 @@ parse_index(struct opts_t *op)
         if (NULL == cc3p)
             cc3p = strchr(cp + 2, '-');
         if (cc3p) {
-            n2 = sg_get_num_nomult(cc3p + 1);
-            if ((n2 < n) || (n2 > 255)) {
-                pr2serr("%s after ':' %s %d to 255\n", bati, enf, n);
-                return SG_SES_CALL_ENUMERATE;
+            if (0 == strncmp("-1", cc3p + 1, 2))
+                n2 = -1;
+            else {
+                n2 = sg_get_num_nomult(cc3p + 1);
+                if ((n2 < n) || (n2 > 255)) {
+                    pr2serr("%s after ':' %s %d to 255\n", bati, enf, n);
+                    return SG_SES_CALL_ENUMERATE;
+                }
             }
         }
         op->ind_indiv = n;
-        if (n2 >= 0)
-            op->ind_indiv_last = n2;
-        n = cp - op->index_str;
-        if (n >= (blen - 1)) {
+        op->ind_indiv_last = n2;
+        k = cp - op->index_str;
+        if (k >= (blen - 1)) {
             pr2serr("%s string prior to comma too long\n", bati);
             return SG_SES_CALL_ENUMERATE;
         }
     } else {    /* no comma found in index_str */
-        n = strlen(op->index_str);
-        if (n >= (blen - 1)) {
+        k = strlen(op->index_str);
+        if (k >= (blen - 1)) {
             pr2serr("%s string too long\n", bati);
             return SG_SES_CALL_ENUMERATE;
         }
     }
-    snprintf(b, blen, "%.*s", n, op->index_str);
+    /* fetch string before comma (or whole string if no comma) */
+    snprintf(b, blen, "%.*s", k, op->index_str);
     m1 = (0 == strncmp("-1", b, 2));
     if (m1 || isdigit((uint8_t)b[0])) {
         if (m1) {
@@ -1288,11 +1294,11 @@ parse_index(struct opts_t *op)
         }
         c2p = strchr(b, ':');
         if (NULL == c2p)
-            c2p = strchr(b + 1, '-');
+            c2p = strchr(b, '-');
         if (c2p) {
             n2 = sg_get_num_nomult(c2p + 1);
             if ((n2 < n) || (n2 > 255)) {
-                pr2serr("%s after '-' %s %d to 255\n", bati, enf, n);
+                pr2serr("%s after ':' %s %d to 255\n", bati, enf, n);
                 return SG_SES_CALL_ENUMERATE;
             }
             op->ind_indiv_last = n2;
@@ -1502,7 +1508,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'j':
             ++op->do_join;
             break;
-        case 'J':	/* corresponds to --json[=JO] */
+        case 'J':       /* corresponds to --json[=JO] */
             op->json_arg = optarg;
             op->do_json = true;
             break;
@@ -1569,7 +1575,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'q':
             op->quiet = true;
             break;
-        case 'Q':	/* corresponds to --js-file=JFN */
+        case 'Q':       /* corresponds to --js-file=JFN */
             op->js_file = optarg;
             op->do_json = true;
             break;
@@ -2347,7 +2353,7 @@ do_rec_diag(struct sg_pt_base * ptvp, int page_code, uint8_t * rsp_buff,
         if (found)
             memcpy(rsp_buff, bp + off, d_len);
         else {
-            pr2serr("%s: %s not found in user data\n", __func__, cp);
+            pr2serr("%s: %s %s in user data\n", __func__, cp, nf_s);
             return SG_LIB_OK_FALSE;     /* flag dpage not found */
         }
 
@@ -3946,7 +3952,7 @@ enc_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         snprintf(b, blen, "      >>> no match on --index=%d,%d", op->ind_th,
                  op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            sgj_pr_hr(jsp, "%s-%d\n", b, op->ind_indiv_last);
+            sgj_pr_hr(jsp, "%s:%d\n", b, op->ind_indiv_last);
         else
             sgj_pr_hr(jsp, "%s\n", b);
     }
@@ -4110,7 +4116,7 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         n = sg_scnpr(b, blen, "      >>> no match on --index=%d,%d",
                      op->ind_th, op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            sg_scnpr(b + n, blen - n, "-%d\n", op->ind_indiv_last);
+            sg_scnpr(b + n, blen - n, ":%d\n", op->ind_indiv_last);
         else
             sgj_pr_hr(jsp, "%s\n", b);
     }
@@ -4436,7 +4442,7 @@ threshold_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         snprintf(b, blen, "      >>> no match on --index=%d,%d", op->ind_th,
                  op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            sgj_pr_hr(jsp, "%s-%d\n", b, op->ind_indiv_last);
+            sgj_pr_hr(jsp, "%s:%d\n", b, op->ind_indiv_last);
         else
             sgj_pr_hr(jsp, "%s\n", b);
     }
@@ -4609,7 +4615,7 @@ element_desc_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         snprintf(b, blen, "      >>> no match on --index=%d,%d", op->ind_th,
                  op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            sgj_pr_hr(jsp, "%s-%d\n", b, op->ind_indiv_last);
+            sgj_pr_hr(jsp, "%s:%d\n", b, op->ind_indiv_last);
         else
             sgj_pr_hr(jsp, "%s\n", b);
     }
@@ -6719,7 +6725,7 @@ join_array_display(struct th_es_t * tesp, struct opts_t * op,
             n = sg_scnpr(b, blen, "      >>> no match on --index=%d,%d",
                          op->ind_th, op->ind_indiv);
             if (op->ind_indiv_last > op->ind_indiv)
-                sg_scnpr(b + n, blen - n, "-%d\n", op->ind_indiv_last);
+                sg_scnpr(b + n, blen - n, ":%d\n", op->ind_indiv_last);
             else
                 sgj_pr_hr(jsp, "%s\n", b);
         } else if (op->desc_name)
@@ -7316,6 +7322,7 @@ ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
         bool last, struct opts_t * op, sgj_opaque_p jop)
 {
     int ret, k, j, desc_len, dn_len;
+    int last_indiv_i = -2;
     bool found;
     struct join_row_t * jrp;
     const uint8_t * ed_bp;
@@ -7354,7 +7361,7 @@ ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
         found = true;
     }
     if (! found) {
-        pr2serr("acroynm %s not found (try '-ee' option)\n", tavp->acron);
+        pr2serr("acroynm %s %s (try '-ee' option)\n", tavp->acron, nf_s);
         return -1;
     }
     if (false == join_done) {
@@ -7370,6 +7377,11 @@ ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
                 continue;
             if (! match_ind_indiv(jrp->indiv_i, op))
                 continue;
+            last_indiv_i = jrp->indiv_i;
+            if (op->verbose > 3)
+                pr2serr("%s: ind_given, match type_header_ind=%d, "
+                        "individual_ind=%d\n", __func__, jrp->th_i,
+                        jrp->indiv_i);
         } else if (op->desc_name) {
             ed_bp = jrp->elem_descp;
             if (NULL == ed_bp)
@@ -7408,23 +7420,31 @@ ses_cgs(struct sg_pt_base * ptvp, const struct tuple_acronym_val * tavp,
         }
         if (ret)
             return ret;
-        if (op->ind_indiv_last <= op->ind_indiv)
+        if (op->ind_indiv_last <= jrp->indiv_i)  /* op->ind_indiv) */
             break;
     }   /* end of loop over join array */
     if ((k >= MX_JOIN_ROWS || (NULL == jrp->enc_statp))) {
+        if (k >= MX_JOIN_ROWS)
+            pr2serr("%s: join array overflow ??\n", __func__);
         if (op->desc_name)
-            pr2serr("descriptor name: %s not found (check the 'ed' page "
-                    "[0x7])\n", op->desc_name);
+            pr2serr("descriptor name: %s %s (check the 'ed' page [0x7])\n",
+                    op->desc_name, nf_s);
         else if (op->dev_slot_num >= 0)
-            pr2serr("device slot number: %d not found\n", op->dev_slot_num);
+            pr2serr("device slot number: %d %s\n", op->dev_slot_num, nf_s);
         else if (saddr_non_zero(op->sas_addr))
-            pr2serr("SAS address not found\n");
+            pr2serr("SAS address %s\n", nf_s);
         else {
-            pr2serr("index: %d,%d", op->ind_th, op->ind_indiv);
+            if (last_indiv_i > -2) {    /* got at least one match */
+                if (op->verbose > 0)
+                    pr2serr("%s: last individual index match: %d\n",
+                            __func__, last_indiv_i);
+                return 0;
+            }
+            /* no matches found */
+            pr2serr("index: th=%d,%d", op->ind_th, op->ind_indiv);
             if (op->ind_indiv_last > op->ind_indiv)
-                printf("-%d not found\n", op->ind_indiv_last);
-            else
-                printf(" not found\n");
+                pr2serr(":%d", op->ind_indiv_last);
+            pr2serr(" %s\n", nf_s);
         }
         return -1;
     }

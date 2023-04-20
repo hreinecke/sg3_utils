@@ -51,6 +51,23 @@ sg_rep_zones --domain --i rep_zdomains.hex
 sg_rep_zones --i rep_zones.hex
 
 sg_ses --all --inhex=ses_areca_all.hex
+# test indexing on Voltage sensor ('vs') element type [0x12]
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,-1
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,-1:-1
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,-1:0
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,-1:1
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,-1:2
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,-1:255
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,1
+echo ""
+echo "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+echo "expect error cause only 2 individual Voltage sensors"
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,2
+echo ""
+# The Voltage sensor number given rather than abbreviation
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=_0x12,1
+# Voltage sensor given but no individual index so defaults to overall
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs
 
 sg_vpd -I vpd_bdce.hex
 sg_vpd -I vpd_constituents.hex
@@ -69,12 +86,5 @@ sg_vpd -I vpd_zbdc.hex
 
 sg_z_act_query --inhex=z_act_query.hex
 
-#    rep_density_typem.hex  vpd_cpr.hex     vpd_sdeb.hex
-#    rep_realms.hex         vpd_dev_id.hex  vpd_sfs.hex
-#    rep_zdomains.hex       vpd_di_all.hex  vpd_tpc.hex
-#    rep_zones.hex          vpd_fp.hex      vpd_zbdc.hex
-#    ses_areca_all.hex      vpd_lbpro.hex   vpd_zbdc.raw
-#    tst_script.sh          vpd_lbpv.hex    z_act_query.hex
-# rep_density_media.hex        vpd_bdce.hex           vpd_ref.hex
-# rep_density_media_typem.hex  vpd_constituents.hex   vpd_sbl.hex
+# D. Gilbert, last updated 20230420
 

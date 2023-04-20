@@ -1,4 +1,4 @@
-.TH SG_DD "8" "February 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_DD "8" "April 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_dd \- copy data to and from files and devices, especially SCSI
 devices
@@ -43,6 +43,9 @@ sg3_utils package have been ported to other operating systems. A utility
 called "ddpt" has similar syntax and functionality to sg_dd. ddpt drops some
 Linux specific features while adding some other generic features. This allows
 ddpt to be ported to other operating systems.
+.PP
+For support of NVMe storage devices see the section below titled:
+NVME SUPPORT .
 .SH OPTIONS
 .TP
 \fBblk_sgio\fR={0|1}
@@ -402,6 +405,10 @@ file called '/dev/sdc' being created.
 null
 has no affect, just a placeholder.
 .TP
+pt
+has the same meaning as the sgio flag. Added for compatibility with the
+ddpt utility.
+.TP
 random
 this flag is only active with \fIiflag=\fR and when given replaces
 \fIif=IFILE\fR. If both are given an error is generated. The input will
@@ -505,6 +512,42 @@ is used. Hence the whole device is read (rather than just the second
 partition) by this invocation:
 .PP
    sg_dd if=/dev/sdb2 blk_sgio=1 of=t bs=512
+.SH NVME SUPPORT
+Some support for copying from and to NVMe devices in Linux have been added.
+There are two varieties of NVME "char" devices, examples: /dev/nvme<cid>
+and /dev/ng<cid>n<nsid> where <cid> is the controller identifier (starting
+at 0) and <nsid> is the NVMe namespace identifier (starting at 1). The
+latter form is called "nvme-generic" in /proc/devices .
+The NVMe block devices have the form: /dev/nvme<cid>n<nsid>[p<part_id>]
+where the optional <part_id> is the partition identifier (starting at 1).
+In the case of NVMe block devices the default action of sg_dd is to access
+them using standard Unix IO (i.e. read(2) or write(2)). To access them
+using SCSI/NVMe commands, the flag "sgio" or "pt" needs to be
+given (e.g. iflag=pt if=/dev/nvme0n1 ).
+.PP
+Just as with partitions on SCSI disks, it is dangerous to access NVMe
+partitions (e.g. iflag=pt if=/dev/nvme0n1p2) using a pass-through interface.
+The reason is that both SCSI and NVMe commands are oblivious to any
+partitioning arrangement which Linux (or any other OS) has set up on those
+disks. In other words, in the above example the "p2" at the end of
+if=/dev/nvme0n1p2 is
+.B ignored
+when a pass\-through is being used.
+.PP
+The READ and WRITE commands in NVMe are in the "NVM" command set which
+requires a NVMe namespace to be specified. This means that the char
+device /dev/nvme0 is not useful for the utility, only administrative
+commands can be sent to it. That leaves the /dev/ng<cid>n<nsid> as
+the only NVMe "char" device that can be used with this utility. Since
+it is not a block device, the standard Unix read(2) and write(2) will
+not work with it; so the pass-through interface, issuing SCSI/NVME
+commands, is assumed by this utility.
+.PP
+The term "SCSI/NVME command" refers to the fact that this utility
+issues SCSI commands and a lower level, within libsgutils, converts
+them to the corresponding NVMe commands. This action is known as
+a SCSI to NVMe Translation Layer (SNTL) and the NVMe consortium
+wrote a white paper on it early in the development of NVMe.
 .SH EXAMPLES
 Looks quite similar in usage to dd:
 .PP

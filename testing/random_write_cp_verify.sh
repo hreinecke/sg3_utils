@@ -17,8 +17,8 @@ bpt=64
 # (e.g. 'cd sg3_utils_src ; ./bootstrap ; ./configure ; make ;
 #        cd testing ; make sgh_dd'
 ## dd_clone="/home/dougg/scsi/sg3_utils/svn/testing/sgh_dd"
-## dd_clone="sg_dd"
-dd_clone="ddpt"
+dd_clone="sg_dd"
+## dd_clone="ddpt"
 
 usage()
 {
@@ -37,8 +37,11 @@ usage()
   echo "BEWARE: the contents of <device1> and <device2> will be DESTROYED."
 }
 
-SDP_OPTS=( "bs=${bs}" "bpt=${bpt}" -v )
-echo "${SDP_OPTS[@]}"
+# Additional command line options/operands can be added to or removed from
+# th SDP_OPTS array
+SDP_OPTS=( "bs=${bs}" "bpt=${bpt}" -v iflag=sgio oflag=sgio )
+##SDP_OPTS=( "bs=${bs}" "bpt=${bpt}" -v iflag=pt oflag=pt )
+# echo "${SDP_OPTS[@]}"
 
 
 opt="$1"

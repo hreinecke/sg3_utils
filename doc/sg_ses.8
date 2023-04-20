@@ -1,4 +1,4 @@
-.TH SG_SES "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_SES "8" "April 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -547,14 +547,14 @@ element's "Element Index" field refers to the position of the corresponding
 element in the Enclosure Status dpage.
 .PP
 Addressing a single overall element or a single individual element is done
-with two indexes: TI and II. Both are origin 0. TI=0 corresponds to the
-first type header entry which must be a Device Slot or Array Device Slot
-Element type (according to the SES\-2 standard). To address the corresponding
-overall instance, II is set to \-1, otherwise II can be set to the individual
-instance index. As an alternative to the type header index (TI), an Element
-type abbreviation (A) (e.g. "ps" for Power Supply Element type) optionally
-followed by a number (e.g. "ps" refers to the first Power Supply Element
-type; "ps1" refers to the second) can be given.
+with two indexes: TI and II. TI=0 corresponds to the first type header entry
+which must be a Device Slot or Array Device Slot Element type (according to
+the SES\-2 standard). To address the corresponding overall instance, II is
+set to \-1, otherwise II can be set to the individual instance index. As an
+alternative to the type header index (TI), an Element type
+abbreviation (A) (e.g. "ps" for Power Supply Element type) optionally followed
+by a number (e.g. "ps" refers to the first Power Supply Element type; "ps1"
+refers to the second) can be given.
 .PP
 One of two command lines variants can be used to specify indexes:
 \fI\-\-index=TIA,II\fR where \fITIA\fR is either an type header index (TI)

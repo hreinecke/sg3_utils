@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230414] [svn: r1024]
+Changelog for pre-release sg3_utils-1.48 [20230420] [svn: r1025]
   - decoding utilities: add --json[=JO] and --js-file=JFN
     options
   - sg_z_act_query: new utility for sending either a
@@ -93,6 +93,7 @@ Changelog for pre-release sg3_utils-1.48 [20230414] [svn: r1024]
       matches element indexes 0, 1, and 2 if present.
       '-' is still accepted as a range separator.
     - fix issue at end of additional element status dpage
+    - fix issue with indexing overall element for --get
     - add logic to call Report timestamp on the enclosure
       and report what is found. If this is problematic the
       new --no-time option will turn off this feature
@@ -145,6 +146,7 @@ Changelog for pre-release sg3_utils-1.48 [20230414] [svn: r1024]
   - sgp_dd and sgm_dd: add --progress option
   - sg_dd: change uint type to uint32_t
     - remove unused out2_off in main()
+    - add support for accessing NVMe devices via pass-through
   - sg_pt_dummy.c: remove problematic include
   - sg3_utils.spec: change tarball extension from .tgz to
     .tar.gz ; fix build issue with Fedora 36
