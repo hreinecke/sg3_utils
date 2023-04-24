@@ -62,6 +62,10 @@ typedef struct json_builder_value
 
 } json_builder_value;
 
+/* Use this to silence clang --analyze warning about 'unix.MallocSizeof' */
+static const int jbv_sz = sizeof (json_builder_value);
+
+
 static int builderize (json_value * value)
 {
    if (((json_builder_value *) value)->is_builder_value)
@@ -134,7 +138,7 @@ static int get_serialize_flags (json_serialize_opts opts)
 json_value * json_array_new (size_t length)
 {
     /* 'value' will be pointer to an instance of the base class json_value */
-    json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
+    json_value * value = (json_value *) calloc (1, jbv_sz);
 
     if (!value)
        return NULL;
@@ -186,7 +190,7 @@ json_value * json_array_push (json_value * array, json_value * value)
 
 json_value * json_object_new (size_t length)
 {
-    json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
+    json_value * value = (json_value *) calloc (1, jbv_sz);
 
     if (!value)
        return NULL;
@@ -304,7 +308,7 @@ json_value * json_string_new_length (unsigned int length, const json_char * buf)
 
 json_value * json_string_new_nocopy (unsigned int length, json_char * buf)
 {
-   json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
+   json_value * value = (json_value *) calloc (1, jbv_sz);
    
    if (!value)
       return NULL;
@@ -320,7 +324,7 @@ json_value * json_string_new_nocopy (unsigned int length, json_char * buf)
 
 json_value * json_integer_new (json_int_t integer)
 {
-   json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
+   json_value * value = (json_value *) calloc (1, jbv_sz);
    
    if (!value)
       return NULL;
@@ -335,7 +339,7 @@ json_value * json_integer_new (json_int_t integer)
 
 json_value * json_double_new (double dbl)
 {
-   json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
+   json_value * value = (json_value *) calloc (1, jbv_sz);
    
    if (!value)
       return NULL;
@@ -350,7 +354,7 @@ json_value * json_double_new (double dbl)
 
 json_value * json_boolean_new (int b)
 {
-   json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
+   json_value * value = (json_value *) calloc (1, jbv_sz);
    
    if (!value)
       return NULL;
@@ -365,7 +369,7 @@ json_value * json_boolean_new (int b)
 
 json_value * json_null_new (void)
 {
-   json_value * value = (json_value *) calloc (1, sizeof (json_builder_value));
+   json_value * value = (json_value *) calloc (1, jbv_sz);
    
    if (!value)
       return NULL;

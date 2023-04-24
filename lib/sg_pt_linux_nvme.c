@@ -555,7 +555,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
         case 0:
             /* inq_dout[0] = (PQ=0)<<5 | (PDT=0); prefer pdt=0xd --> SES */
             inq_dout[1] = pg_cd;
-            n = 11;
+            n = 12;
             sg_put_unaligned_be16(n - 4, inq_dout + 2);
             inq_dout[4] = 0x0;
             inq_dout[5] = 0x80;
@@ -563,6 +563,7 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
             inq_dout[7] = 0x86;
             inq_dout[8] = 0x87;
             inq_dout[9] = 0x92;
+            inq_dout[10] = 0xb1;
             inq_dout[n - 1] = SG_NVME_VPD_NICR;     /* last VPD number */
             break;
         case 0x80:
@@ -621,7 +622,15 @@ sntl_inq(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp, int time_secs,
             sg_put_unaligned_be16(n - 4, inq_dout + 2);
             inq_dout[9] = 0x1;  /* SFS SPC Discovery 2016 */
             break;
+        case 0xb1:      /* Block Device Characteristics */
+            inq_dout[1] = pg_cd;
+            n = 64;
+            sg_put_unaligned_be16(n - 4, inq_dout + 2);
+            inq_dout[3] = 0x3c;
+            inq_dout[5] = 0x01;
+            break;
         case SG_NVME_VPD_NICR:  /* 0xde (vendor (sg3_utils) specific) */
+            /* 16 byte page header then NVME Identify controller response */
             inq_dout[1] = pg_cd;
             sg_put_unaligned_be16((16 + 4096) - 4, inq_dout + 2);
             n = 16 + 4096;

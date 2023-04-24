@@ -4,9 +4,6 @@
 # Test the hex "inhex" files in this directory using the corresponding
 # sg3_utils utility which is assumed to be installed.
 
-# the following are invoked in the order the hex files appear in the
-# inhex directory (e.g. with the ls command).
-
 # Get each utility to send its version string and command line options
 # to stderr. Comment out the next line to stop that.
 export SG3_UTILS_INVOCATION=1
@@ -50,6 +47,8 @@ sg_rep_zones --realm --i rep_realms.hex
 sg_rep_zones --domain --i rep_zdomains.hex
 sg_rep_zones --i rep_zones.hex
 
+echo ""
+echo ">>>>>>>>>>>>>>>> sg_ses tests"
 sg_ses --all --inhex=ses_areca_all.hex
 # test indexing on Voltage sensor ('vs') element type [0x12]
 sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,-1
@@ -64,11 +63,15 @@ echo "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 echo "expect error cause only 2 individual Voltage sensors"
 sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs,2
 echo ""
-# The Voltage sensor number given rather than abbreviation
+# The Voltage sensor element type number given rather than abbreviation
 sg_ses --get=disable --inhex=ses_areca_all.hex --index=_0x12,1
+# In the config dpage Voltage sensor is entry 5 in the type desc. header
+sg_ses --get=disable --inhex=ses_areca_all.hex --index=5,1
 # Voltage sensor given but no individual index so defaults to overall
 sg_ses --get=disable --inhex=ses_areca_all.hex --index=vs
 
+echo ""
+echo ">>>>>>>>>>>>>>>> sg_vpd tests"
 sg_vpd -I vpd_bdce.hex
 sg_vpd -I vpd_constituents.hex
 sg_vpd -I vpd_cpr.hex

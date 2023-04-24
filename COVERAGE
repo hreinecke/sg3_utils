@@ -153,12 +153,12 @@ SES Read            sg_senddiag, sg_ses (NVME-MI command)
 SES Write           sg_senddiag, sg_ses (NVME-MI command)
 Device self-test    [SNTL of SEND DIAGNOSTIC] sg_senddiag
 Get features(power management) [SNTL of REQUEST SENSE] sg_requests
-Read                [SCSI READ(10) -->SNTL--> Read]
-                    [SCSI READ(16) -->SNTL--> Read]
-Write               [SCSI WRITE(10) -->SNTL--> Write]
-                    [SCSI WRITE(16) -->SNTL--> Write]
-Compare             [SCSI VERIFY(10,BYTCHK=1) -->SNTL--> Compare]
-                    [SCSI VERIFY(16,BYTCHK=1) -->SNTL--> Compare]
+Read                [SCSI READ(10) -->SNTL--> Read]  sg_dd
+                    [SCSI READ(16) -->SNTL--> Read]  sg_dd
+Write               [SCSI WRITE(10) -->SNTL--> Write]  sg_dd
+                    [SCSI WRITE(16) -->SNTL--> Write]  sg_dd
+Compare             [SCSI VERIFY(10,BYTCHK=1) -->SNTL--> Compare]  sg_dd
+                    [SCSI VERIFY(16,BYTCHK=1) -->SNTL--> Compare]  sg_dd
 Write zeroes        [SCSI WRITE SAME(10,zeros) -->SNTL--> Write zeroes]
                     [SCSI WRITE SAME(16,zeros) -->SNTL--> Write zeroes]
 Flush               [SCSI SYNCHRONIZE CACHE -->SNTL--> Flush]
@@ -187,4 +187,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-04 February 2023
+20 April 2023

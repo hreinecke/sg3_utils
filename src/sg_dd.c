@@ -71,7 +71,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"              /* used to get to SNTL for NVMe devices */
 
-static const char * version_str = "6.42 20230420";
+static const char * version_str = "6.43 20230421";
 
 static const char * my_name = "sg_dd: ";
 
@@ -2246,6 +2246,8 @@ parse_cmd_line(int argc, char * argv[], struct opts_t * op)
             return SG_LIB_SYNTAX_ERROR;
         }
     }
+    if (op->version_given)
+        return 0;
     if (op->blk_sz <= 0) {
         op->blk_sz = DEF_BLOCK_SIZE;
         pr2serr("Assume default 'bs' ((logical) block size) of %d bytes\n",
