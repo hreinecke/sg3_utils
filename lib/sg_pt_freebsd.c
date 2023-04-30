@@ -3168,7 +3168,11 @@ do_nvm_pt(struct sg_pt_base * vp, int submq, int timeout_secs, int vb)
         pr2ws("don't IGNORE_NVME");
 #endif
     }
-    if (vp) { }
+    if (vp) {
+        struct sg_pt_freebsd_scsi * ptp = &vp->impl;
+
+        ptp->os_err = ENOTTY;   /* inappropriate ioctl */
+    }
     if (submq) { }
     if (timeout_secs) { }
     return SCSI_PT_DO_NOT_SUPPORTED;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2021 Douglas Gilbert.
+ * Copyright (c) 2017-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -1847,6 +1847,8 @@ fini:
 int
 sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
 {
+    static const int inapprop_errno = ENOTTY;	/* inappropriate ioctl */
+
     if (vb) {
         pr2ws("%s: not supported, ", __func__);
 #ifdef HAVE_NVME
@@ -1862,10 +1864,14 @@ sg_do_nvme_pt(struct sg_pt_base * vp, int fd, int time_secs, int vb)
 #endif
         pr2ws("\n");
      }
-    if (vp) { ; }               /* suppress warning */
+    if (vp) {
+        struct sg_pt_linux_scsi * ptp = &vp->impl;
+
+	ptp->os_err = inapprop_errno;
+    }
     if (fd) { ; }               /* suppress warning */
     if (time_secs) { ; }        /* suppress warning */
-    return -ENOTTY;             /* inappropriate ioctl error */
+    return -inapprop_errno;
 }
 
 #endif          /* (HAVE_NVME && (! IGNORE_NVME)) */

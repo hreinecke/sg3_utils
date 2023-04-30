@@ -5,23 +5,24 @@ Introduction
 sg3_utils is a package of utilities originally written to send individual
 SCSI commands to storage devices that used one of the SCSI command sets.
 These utilities can be divided into three groups:
-   - sg_raw: the user supplies the cdb (command descriptor block) and
+   - sg_raw: the user supplies the CDB (Command Descriptor Block) and
      optionally the size of the data-in and data-out buffers
    - one command utilities: the majority of the utilities in this package
      send one SCSI command. Their names start with "sg_" while the
-     remaining part of their name alludes to the command which is sent. For
-     example, "sg_inq" sends the SCSI INQUIRY command. Some utilities in
-     this group send one of a selection of commands, typically those
-     commands have a lot it common (e.g. sg_write_x).
+     remaining part of their name alludes to the name of the command which
+     is sent. For example, "sg_inq" sends the SCSI INQUIRY command. Some
+     utilities in this group send one of a selection of commands, typically
+     those commands have a lot it common (e.g. sg_write_x).
    - copy type utilities: sg_dd, sgp_dd and sgm_dd use the Unix dd command
-     as a template. sg_xcopy sends the SCSI EXTENDED COPY command which in
-     some cases can do offloaded copies. As well as copying some of these
-     utilities can compare if two data segments held on disks are the same.
+     functionality and command line syntax as a template. sg_dd may also be
+     used to verify that two storage devices (or part thereof) contain the
+     same user data, stopping at the first "miscompare". sg_xcopy sends the
+     SCSI EXTENDED COPY command which in some cases can do offloaded copies.
 
 Platforms
 ---------
 These utilities were written on Linux and should work from Linux kernel
-(lk) 2.4 through to the current series 5. The third group ("copy type")
+(lk) 2.4 through to the current series 6. The third group ("copy type")
 are only implemented on Linux, but a separate portable package/utility
 called ddpt implements similar functionality. The first two groups are
 implemented (i.e. ported) to Android, FreeBSD, NetBSD, Solaris and
@@ -90,8 +91,17 @@ hexadecimal for large values (e.g. Logical Block Addresses (LBAs)). This
 issue is addressed with the 'h' argument (e.g. '--json=h') which changes
 decimal rendered numbers into a JSON subobject with two name-value pairs:
 one name is 'i' whose value is the same decimal rendered integer, and the
-other name 'hex' whose value is a JSON string with that integer rendered
+other named 'hex' whose value is a JSON string with that integer rendered
 in (unsigned) hexadecimal in that string.
+
+To simplify name decoding in JSON, the "snake notation" convention is used.
+This restricts names to the 26 lower case, alphabetical characters (from
+English), the 10 digits and underscore. Further an underscore is never the
+first or last character of the name and is never repeated. So underscore
+can be used as a name separator (e.g. "device_id"). Other JSON producing
+utilities follow different naming conventions. One advantage of the "snake
+notation" is that it is compatible with various Unix pseudo file system
+naming conventions (e.g. procfs and sysfs in Linux).
 
 There is a manual page called "sg3_utils_json" that contains more
 information.
@@ -134,4 +144,4 @@ is mirrored in git (using "git svn" tools) here:
 
 
 Douglas Gilbert
-8th April 2023
+26th April 2023

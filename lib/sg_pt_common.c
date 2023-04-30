@@ -270,8 +270,6 @@ resp_caching_m_pg(unsigned char *p, int pcontrol, bool wce)
         uint8_t d_caching_m_pg[] = {0x8, 18, 0x14, 0, 0xff, 0xff, 0, 0,
                 0xff, 0xff, 0xff, 0xff, 0x80, 0x14, 0, 0,     0, 0, 0, 0};
 
-        // if (SDEBUG_OPT_N_WCE & sdebug_opts)
-                caching_m_pg[2] &= ~0x4;  /* set WCE=0 (default WCE=1) */
         if ((0 == pcontrol) || (3 == pcontrol)) {
             if (wce)
                 caching_m_pg[2] |= 0x4;
@@ -390,7 +388,7 @@ sntl_init_dev_stat(struct sg_sntl_dev_state_t * dsp)
 }
 
 
-#define SDEBUG_MAX_MSENSE_SZ 256
+#define SG_PT_C_MAX_MSENSE_SZ 256
 
 /* Only support MODE SENSE(10). Returns the number of bytes written to dip,
  * or -1 if error info placed in resp. */
@@ -405,7 +403,7 @@ sntl_resp_mode_sense10(const struct sg_sntl_dev_state_t * dsp,
     const uint32_t lb_size = 512;               /* guess */
     uint8_t dev_spec;
     uint8_t * ap;
-    uint8_t arr[SDEBUG_MAX_MSENSE_SZ];
+    uint8_t arr[SG_PT_C_MAX_MSENSE_SZ];
 
     memset(resp, 0, sizeof(*resp));
     dbd = !! (cdbp[1] & 0x8);         /* disable block descriptors */
@@ -419,7 +417,7 @@ sntl_resp_mode_sense10(const struct sg_sntl_dev_state_t * dsp,
     else
         bd_len = 0;
     alloc_len = sg_get_unaligned_be16(cdbp + 7);
-    memset(arr, 0, SDEBUG_MAX_MSENSE_SZ);
+    memset(arr, 0, SG_PT_C_MAX_MSENSE_SZ);
     if (0x3 == pcontrol) {  /* Saving values not supported */
         resp->asc = SAVING_PARAMS_UNSUP;
         goto err_out;
@@ -537,7 +535,7 @@ err_out:
     return -1;
 }
 
-#define SDEBUG_MAX_MSELECT_SZ 512
+#define SG_PT_C_MAX_MSELECT_SZ 512
 
 /* Only support MODE SELECT(10). Returns number of bytes used from dop,
  * else -1 on error with sense code placed in resp. */
@@ -548,14 +546,14 @@ sntl_resp_mode_select10(struct sg_sntl_dev_state_t * dsp,
 {
     int pf, sp, ps, md_len, bd_len, off, spf, pg_len, rlen, param_len, mpage;
     int sub_mpage;
-    uint8_t arr[SDEBUG_MAX_MSELECT_SZ];
+    uint8_t arr[SG_PT_C_MAX_MSELECT_SZ];
 
     memset(resp, 0, sizeof(*resp));
     memset(arr, 0, sizeof(arr));
     pf = cdbp[1] & 0x10;
     sp = cdbp[1] & 0x1;
     param_len = sg_get_unaligned_be16(cdbp + 7);
-    if ((0 == pf) || sp || (param_len > SDEBUG_MAX_MSELECT_SZ)) {
+    if ((0 == pf) || sp || (param_len > SG_PT_C_MAX_MSELECT_SZ)) {
         resp->asc = INVALID_FIELD_IN_CDB;
         resp->in_byte = 1;
         if (sp)

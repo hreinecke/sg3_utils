@@ -117,7 +117,8 @@ bool sgj_is_snake_name(const char * in_name);
  *    sgj_  - prefix of all the functions related to (non-)JSON output
  *    hr    - human readable form (same meaning as "plain text")
  *    js    - JSON only output
- *    haj   - human readable and JSON output, hr goes in 'output' array
+ *    haj   - human readable and JSON output, if JSON output is selected
+ *            then the normal output goes in 'plain_text_output' array
  *    pr    - has printf() like variadic arguments
  *    _r    - suffix indicating the return value should/must be used
  *    nv    - adds a name-value JSON field (or several)
@@ -157,10 +158,11 @@ bool sgj_init_state(sgj_state * jsp, const char * j_optarg);
  * to be returned is placed in jsp->basep. If jsp->pr_leadin is true and
  * util_name is non-NULL then a "utility_invoked" JSON object is made with
  * "name", and "version_date" object fields. If the jsp->pr_out_hr field is
- * true a named array called "output" is added to the "utility_invoked" object
- * (creating it in the case when jsp->pr_leadin is false) and a pointer to
- * that array object is placed in jsp->objectp . The returned pointer is not
- * usually needed but if it is NULL then a heap allocation has failed. */
+ * true a named array called "plain_text_output" is added to the
+ * "utility_invoked" object  (creating it in the case when jsp->pr_leadin is
+ * false) and a pointer to that array object is placed in jsp->objectp . The
+ * returned pointer is not usually needed but if it is NULL then a heap
+ * allocation has failed. */
 sgj_opaque_p sgj_start_r(const char * util_name, const char * ver_str,
                          int argc, char *argv[], sgj_state * jsp);
 

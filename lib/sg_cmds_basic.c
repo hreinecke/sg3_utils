@@ -179,8 +179,8 @@ sg_cmds_process_helper(const char * leadin, int req_din_x, int act_din_x,
                 }
             }
         }
-	if (free_b)
-	    free(free_b);
+        if (free_b)
+            free(free_b);
     }
     if (o_sense_cat)
         *o_sense_cat = scat;
@@ -240,10 +240,10 @@ sg_cmds_process_resp(struct sg_pt_base * ptvp, const char * leadin,
         if (duration > 0)
             pr2ws("      duration=%" PRIu64 " ns\n", duration);
         else {
-            int d = get_scsi_pt_duration_ms(ptvp);
+            int dur = get_scsi_pt_duration_ms(ptvp);
 
-            if (d != -1)
-                pr2ws("      duration=%u ms\n", (uint32_t)d);
+            if (dur != -1)
+                pr2ws("      duration=%u ms\n", (uint32_t)dur);
         }
     }
     get_pt_req_lengths(ptvp, &req_din_x, &req_dout_x);

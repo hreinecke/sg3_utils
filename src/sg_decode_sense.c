@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.38 20230411";
+static const char * version_str = "1.39 20230428";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -117,7 +117,7 @@ usage()
           "    --err=ES|-e ES        ES is Exit Status from utility in this "
           "package\n"
           "    --err=ES,LES|-e ES,LES    ES,LES is a range of exit status "
-	  "values\n"
+          "values\n"
           "    --file=HFN|-f HFN     HFN is a file name from which to read "
           "sense data\n"
           "                          in ASCII hexadecimal. Interpret '-' "
@@ -197,7 +197,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->do_cdb = true;
             break;
         case 'e':
-	    ccp = strchr(optarg, ',');
+            ccp = strchr(optarg, ',');
             n = sg_get_num_nomult(optarg);
             if ((n < 0) || (n > 255)) {
                 pr2serr("--err= expected number from 0 to 255 inclusive\n");
@@ -205,15 +205,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             }
             op->err_given = true;
             op->es_val = n;
-	    if (ccp) {
-		n = sg_get_num_nomult(ccp + 1);
+            if (ccp) {
+                n = sg_get_num_nomult(ccp + 1);
                 if ((n < 1) || (n > 255)) {
                     pr2serr("--err=<l>,<u> expected number from 1 to 255 "
-			    "inclusive\n");
+                            "inclusive\n");
                     return SG_LIB_SYNTAX_ERROR;
                 }
                 op->es_up_val = n;
-	    }
+            }
             break;
         case 'f':
             if (op->fname) {
@@ -348,9 +348,9 @@ enumerate_err_codes(const struct opts_t *op)
         return;
     }
     if (op->err_given) {
-	k = op->es_val;
-	if (op->es_up_val > 0)
-	    last = op->es_up_val;
+        k = op->es_val;
+        if (op->es_up_val > 0)
+            last = op->es_up_val;
     }
     for ( ; k <= last; ++k) {
         if (sg_exit2str(k, op->verbose > 1, blen, b)) {
@@ -608,7 +608,7 @@ main(int argc, char *argv[])
 fini:
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
     if (as_json) {
-        FILE * fp = stdout;
+        fp = stdout;
 
         if (op->js_file) {
             if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {

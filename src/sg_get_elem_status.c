@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.17 20230326";      /* sbc5r04 */
+static const char * version_str = "1.18 20230427";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -294,6 +294,7 @@ main(int argc, char * argv[])
     int verbose = 0;
     uint8_t filter = 0;
     uint8_t rt = 0;
+    uint16_t cur_max_num_depop, cur_num_depop;
     uint32_t num_desc, num_desc_ret, id_elem_depop;
     uint32_t starting_elem = 0;
     int64_t ll;
@@ -313,6 +314,8 @@ main(int argc, char * argv[])
     sgj_state * jsp = &json_st;
     char b[80];
     static const int blen = sizeof(b);
+    static const char * cmnode_s =
+                "Current maximum number of depopulated elements";
 
     if (getenv("SG3_UTILS_INVOCATION"))
         sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
@@ -547,11 +550,17 @@ start_response:
     num_desc = sg_get_unaligned_be32(gpesBuffp + 0);
     if (maxlen > 7) {
         num_desc_ret = sg_get_unaligned_be32(gpesBuffp + 4);
-        id_elem_depop = (maxlen > 11) ? sg_get_unaligned_be32(gpesBuffp + 8) :
-                                        0;
+        id_elem_depop = (maxlen > 11) ?
+                                sg_get_unaligned_be32(gpesBuffp + 8) : 0;
+        cur_max_num_depop = (maxlen > 13) ?
+                                sg_get_unaligned_be16(gpesBuffp + 12) : 0;
+        cur_num_depop = (maxlen > 15) ?
+                                sg_get_unaligned_be16(gpesBuffp + 14) : 0;
     } else {
         num_desc_ret = 0;
         id_elem_depop = 0;
+        cur_max_num_depop = 0;
+        cur_num_depop = 0;
     }
     rlen = (num_desc_ret * GPES_DESC_LEN) + GPES_DESC_OFFSET;
     if ((verbose > 1) || (verbose && (rlen > maxlen))) {
@@ -580,6 +589,14 @@ start_response:
                SGJ_SEP_COLON_1_SPACE, num_desc_ret, true);
     sgj_haj_vi(jsp, jop, 0, "Identifier of element being depopulated",
                SGJ_SEP_COLON_1_SPACE, id_elem_depop, true);
+    if (cur_max_num_depop > 0)
+        sgj_haj_vi(jsp, jop, 0, cmnode_s, SGJ_SEP_COLON_1_SPACE,
+                   cur_max_num_depop, false);
+    else
+        sgj_haj_vs(jsp, jop, 0, cmnode_s, SGJ_SEP_COLON_1_SPACE,
+                   "not reported");
+    sgj_haj_vi(jsp, jop, 0, "Current number of depopulated elements",
+               SGJ_SEP_COLON_1_SPACE, cur_num_depop, false);
     if (rlen < 64) {
         sgj_pr_hr(jsp, "No complete physical element status descriptors "
                   "available\n");
@@ -592,7 +609,7 @@ start_response:
 
     if (jsp->pr_as_json)
         jap = sgj_named_subarray_r(jsp, jop,
-                                   "physical_element_status_descriptor");
+                                   "physical_element_status_descriptor_list");
     for (bp = gpesBuffp + GPES_DESC_OFFSET, k = 0; k < (int)num_desc_ret;
          bp += GPES_DESC_LEN, ++k) {
         if ((0 == k) && (do_brief < 2))

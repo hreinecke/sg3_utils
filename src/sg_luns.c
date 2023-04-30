@@ -899,10 +899,10 @@ main(int argc, char * argv[])
     else if (SG_LIB_CAT_ILLEGAL_REQ == ret)
         pr2serr("Report Luns command has bad field in cdb\n");
     else {
-        char b[80];
+        char d[80];
 
-        sg_get_category_sense_str(ret, sizeof(b), b, verbose);
-        pr2serr("Report Luns command: %s\n", b);
+        sg_get_category_sense_str(ret, sizeof(d), d, verbose);
+        pr2serr("Report Luns command: %s\n", d);
     }
 
 the_end:

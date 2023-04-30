@@ -34,9 +34,9 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.41 20230407";
+static const char * version_str = "1.42 20230426";
 
-static const char * my_name = "sg_requests: ";	/* REQUEST Sense command */
+static const char * my_name = "sg_requests: ";  /* REQUEST Sense command */
 
 #define MAX_REQS_RESP_LEN 255
 #define DEF_REQS_RESP_LEN 252
@@ -115,7 +115,8 @@ dStrRaw(const uint8_t * str, int len)
 int
 main(int argc, char * argv[])
 {
-    int c, n, k, progress, rs, sense_cat, act_din_len;
+    int c, n, k, progress, rs, sense_cat;
+    int act_din_len = 0;
     int do_error = 0;
     int err = 0;
     int num_errs = 0;

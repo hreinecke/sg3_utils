@@ -64,7 +64,7 @@
 
 #define MAX_LAR_LIST_ELEMS 8
 
-static const char * version_str = "1.27 20230130";
+static const char * version_str = "1.28 20230428";
 
 struct opts_t {
     bool ck_cond;
@@ -817,10 +817,10 @@ main(int argc, char * argv[])
         /* read log directory page */
         ret = do_read_gplog(sg_fd, ata_cmd, la, inbuff, &bytes_fetched, op);
         if (0 == ret) {
-            uint8_t b[512];
+            uint8_t d[512];
 
             /* need copy of log directory cause inbuff gets overwritten */
-            memcpy(b, inbuff, bytes_fetched);
+            memcpy(d, inbuff, bytes_fetched);
             op->no_output = false;
             if (0 == la_val) {
                 prev_la_val = la_val;
@@ -834,7 +834,7 @@ main(int argc, char * argv[])
                 k = (la_val << 1);
                 if ((k + 1) >= bytes_fetched)
                     continue;
-                w = sg_get_unaligned_le16(b + k);
+                w = sg_get_unaligned_le16(d + k);
                 if (w > 0) {
                     if ((hold_pn > 0) && (w > hold_pn))
                         w = hold_pn;

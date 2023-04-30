@@ -39,7 +39,7 @@ endif
 # This is active if --enable-debug given to ./configure
 # removed -Wduplicated-branches because needs gcc-8
 if DEBUG
-DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
+DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init -Wunused -Wsizeof-array-argument
 DBG_CPPFLAGS = -DDEBUG
 else
 DBG_CFLAGS =

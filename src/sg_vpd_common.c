@@ -2258,7 +2258,6 @@ decode_format_presets_vpd(const uint8_t * buff, int len, struct opts_t * op,
     static const char * llczp = "Low LBA conventional zones percentage";
     static const char * hlczp = "High LBA conventional zones percentage";
     static const char * ztzd = "Zone type for zone domain";
-    static const char * const fp_vpdp = "Format presets VPD page";
 
     if (op->do_hex > 0) {
         if (op->do_hex > 2)
@@ -3137,7 +3136,6 @@ decode_lb_protection_vpd(const uint8_t * buff, int len, struct opts_t * op,
     const uint8_t * bp;
     sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
-    static const char * const lbpro_vpdp = "Logical block protection VPD page";
 
     if (op->do_hex > 0) {
         if (op->do_hex > 2)

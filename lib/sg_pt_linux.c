@@ -575,6 +575,7 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
                                      &ptp->os_err, verbose);
         if (ptp->is_sg && (! sg_checked_version_num)) {
             if (ioctl(dev_fd, SG_GET_VERSION_NUM, &ptp->sg_version) < 0) {
+                ptp->os_err = errno;
                 ptp->sg_version = 0;
                 if (verbose > 3)
                     pr2ws("%s: ioctl(SG_GET_VERSION_NUM) failed: errno: %d "
@@ -615,6 +616,7 @@ set_pt_file_handle(struct sg_pt_base * vp, int dev_fd, int verbose)
             seip->ctl_flags_wr_mask |= SG_CTL_FLAGM_TIME_IN_NS;
             seip->ctl_flags |= SG_CTL_FLAGM_TIME_IN_NS;
             if (ioctl(dev_fd, SG_SET_GET_EXTENDED, seip) < 0) {
+                ptp->os_err = errno;
                 if (verbose > 2)
                     pr2ws("%s: unable to override milli --> nanoseconds: "
                           "%s\n", __func__, safe_strerror(errno));
