@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.27 20230496";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.28 20230504";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -7958,7 +7958,7 @@ show_device_stats_page(const uint8_t * resp, int len,
                     sgj_pr_hr(jsp, "  %s: %" PRIu64 "\n", ccp, ull);
                 if (jsp->pr_as_json) {
                     if (cc2p) {
-                        snprintf(b, blen, "%s %s", ccp, cc2p);
+                        snprintf(b, blen, "%.90s %.60s", ccp, cc2p);
                         ccp = b;
                     }
                     sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);

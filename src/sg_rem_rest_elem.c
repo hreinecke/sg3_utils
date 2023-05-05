@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Douglas Gilbert.
+ * Copyright (c) 2022-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  *   - RESTORE ELEMENTS AND REBUILD
  */
 
-static const char * version_str = "1.01 20221027";
+static const char * version_str = "1.02 20230503";
 
 #define REMOVE_ELEM_SA 0x18
 #define RESTORE_ELEMS_SA 0x19
@@ -53,6 +53,8 @@ static struct option long_options[] = {
         {"quick", no_argument, 0, 'q'},
         {"remove", no_argument, 0, 'r'},
         {"restore", no_argument, 0, 'R'},
+        {"timeout", required_argument, 0, 't'},
+        {"tmo", required_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -68,9 +70,9 @@ usage()
     pr2serr("Usage: "
             "sg_rem_rest_elem  [--capacity=RC] [--element=EID] [--help] "
             "[--quick]\n"
-            "                         [--remove] [--restore] [--verbose] "
-            "[--version]\n"
-            "                         DEVICE\n");
+            "                         [--remove] [--restore] [--timeout=SE] "
+            "[--verbose]\n"
+            "                         [--version] DEVICE\n");
     pr2serr("  where:\n"
             "    --capacity=RC|-c RC    RC is requested capacity (unit: "
             "block; def: 0)\n"
@@ -84,6 +86,8 @@ usage()
             "command\n"
             "    --restore|-R       issue RESTORE ELEMENTS AND REBUILD "
             "command\n"
+            "    --timeout=SE|-t SE    command timeout in seconds (def: "
+            "60 secs)\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n\n"
             "Performs a SCSI REMOVE ELEMENT AND TRUNCATE or RESTORE "
@@ -95,7 +99,7 @@ usage()
  * other errors */
 static int
 sg_ll_rem_rest_elem(int sg_fd, int sa, uint64_t req_cap, uint32_t e_id,
-                    bool noisy, int verbose)
+                    int tmo, bool noisy, int verbose)
 {
     int ret, res, sense_cat;
     struct sg_pt_base * ptvp;
@@ -126,7 +130,7 @@ sg_ll_rem_rest_elem(int sg_fd, int sa, uint64_t req_cap, uint32_t e_id,
     }
     set_scsi_pt_cdb(ptvp, sai16_cdb, sizeof(sai16_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, tmo, verbose);
     ret = sg_cmds_process_resp(ptvp, cmd_name, res, noisy,
                                verbose, &sense_cat);
     if (-1 == ret) {
@@ -161,6 +165,7 @@ main(int argc, char * argv[])
     bool version_given = false;
     int res, c;
     int sg_fd = -1;
+    int tmo = DEF_PT_TIMEOUT;
     int verbose = 0;
     int ret = 0;
     int sa = 0;
@@ -173,7 +178,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "c:e:hqrRvV", long_options,
+        c = getopt_long(argc, argv, "c:e:hqrRt:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -211,6 +216,13 @@ main(int argc, char * argv[])
         case 'R':
             resar = true;
             sa = RESTORE_ELEMS_SA;
+            break;
+        case 't':
+            tmo = sg_get_num(optarg);
+            if (tmo < 0) {
+                pr2serr("bad argument to '--timeout=SE'\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'v':
             verbose_given = true;
@@ -268,6 +280,8 @@ main(int argc, char * argv[])
     }
     cmd_name = reat ? remove_cmd_s : restore_cmd_s;
 
+    if (0 == tmo)
+        tmo = DEF_PT_TIMEOUT;
     if (NULL == device_name) {
         pr2serr("missing device name!\n");
         usage();
@@ -300,7 +314,7 @@ main(int argc, char * argv[])
         sg_warn_and_wait(b, device_name, false);
     }
 
-    res = sg_ll_rem_rest_elem(sg_fd, sa, req_cap, e_id, true, verbose);
+    res = sg_ll_rem_rest_elem(sg_fd, sa, req_cap, e_id, tmo, true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)

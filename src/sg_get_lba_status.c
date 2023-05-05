@@ -35,7 +35,7 @@
  * device.
  */
 
-static const char * version_str = "1.36 20230326";      /* sbc5r04 */
+static const char * version_str = "1.37 20230501";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -174,7 +174,7 @@ decode_lba_status_desc(const uint8_t * bp, uint64_t * slbap,
         *slbap = ull;
     if (blocksp)
         *blocksp = blocks;
-    if (lba_accessp)    /* See t10.org document: 22-108r1 */
+    if (lba_accessp)    /* addition in sbc5r04.pdf */
         *lba_accessp = (bp[12] >> 4) & 0x7;
     if (add_statusp)
         *add_statusp = bp[13];

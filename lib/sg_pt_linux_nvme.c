@@ -300,9 +300,9 @@ mk_sense_invalid_fld(struct sg_pt_linux_scsi * ptp, bool in_cdb, int in_byte,
  * absence of a Unix error. If time_secs is negative it is treated as
  * a timeout in milliseconds (of abs(time_secs) ). */
 static int
-sg_nvme_admin_cmd(struct sg_pt_linux_scsi * ptp,
-                  struct sg_nvme_passthru_cmd *cmdp, void * dp, bool is_read,
-                  int time_secs, int vb)
+sg_nvme_admon_cmd_f(struct sg_pt_linux_scsi * ptp,
+                    struct sg_nvme_passthru_cmd *cmdp, void * dp,
+		    bool is_read, int time_secs, int vb)
 {
     const uint32_t cmd_len = sizeof(struct sg_nvme_passthru_cmd);
     int res;
@@ -460,7 +460,7 @@ sntl_do_identify(struct sg_pt_linux_scsi * ptp, int cns, int nsid,
     cmd.cdw10 = cns;
     cmd.addr = (uint64_t)(sg_uintptr_t)up;
     cmd.data_len = u_len;
-    return sg_nvme_admin_cmd(ptp, &cmd, up, true, time_secs, vb);
+    return sg_nvme_admon_cmd_f(ptp, &cmd, up, true, time_secs, vb);
 }
 
 /* Currently only caches associated identify controller response (4096 bytes).
@@ -506,7 +506,7 @@ sntl_get_features(struct sg_pt_linux_scsi * ptp, int feature_id, int select,
     if (din_addr)
         cmdp->addr = din_addr;
     cmdp->timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
-    res = sg_nvme_admin_cmd(ptp, cmdp, NULL, false, time_secs, vb);
+    res = sg_nvme_admon_cmd_f(ptp, cmdp, NULL, false, time_secs, vb);
     if (res)
         return res;
     ptp->os_err = 0;
@@ -899,7 +899,7 @@ sntl_mode_ss(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
                 cmdp->cdw10 |= (1U << 31);
             cmdp->cdw11 = (uint32_t)ptp->dev_stat.wce;
             cmdp->timeout_ms = (time_secs < 0) ? 0 : (1000 * time_secs);
-            res = sg_nvme_admin_cmd(ptp, cmdp, NULL, false, time_secs, vb);
+            res = sg_nvme_admon_cmd_f(ptp, cmdp, NULL, false, time_secs, vb);
             if (0 != res) {
                 if (SG_LIB_NVME_STATUS == res) {
                     mk_sense_from_nvme_status(ptp, vb);
@@ -983,7 +983,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
             return 0;
         }
         sg_put_unaligned_le32(nvme_dst, cmd_up + SG_NVME_PT_CDW10);
-        res = sg_nvme_admin_cmd(ptp, &cmd, NULL, false, time_secs, vb);
+        res = sg_nvme_admon_cmd_f(ptp, &cmd, NULL, false, time_secs, vb);
         if (0 != res) {
             if (SG_LIB_NVME_STATUS == res) {
                 mk_sense_from_nvme_status(ptp, vb);
@@ -1041,7 +1041,7 @@ sntl_senddiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     cmd.cdw10 = 0x0804;      /* NVMe Message Header */
     cmd.cdw11 = 0x9;         /* nvme_mi_ses_send; (0x8 -> mi_ses_recv) */
     cmd.cdw13 = n;
-    res = sg_nvme_admin_cmd(ptp, &cmd, dop, false, time_secs, vb);
+    res = sg_nvme_admon_cmd_f(ptp, &cmd, dop, false, time_secs, vb);
     if (0 != res) {
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
@@ -1097,7 +1097,7 @@ sntl_recvdiag(struct sg_pt_linux_scsi * ptp, const uint8_t * cdbp,
     cmd.cdw11 = 0x8;         /* nvme_mi_ses_receive */
     cmd.cdw12 = dpg_cd;
     cmd.cdw13 = n;
-    res = sg_nvme_admin_cmd(ptp, &cmd, dip, true, time_secs, vb);
+    res = sg_nvme_admon_cmd_f(ptp, &cmd, dip, true, time_secs, vb);
     if (0 != res) {
         if (SG_LIB_NVME_STATUS == res) {
             mk_sense_from_nvme_status(ptp, vb);
@@ -1839,7 +1839,7 @@ fini:
         cmd.addr = (uint64_t)(sg_uintptr_t)ptp->io_hdr.dout_xferp;
         is_read = false;
     }
-    return sg_nvme_admin_cmd(ptp, &cmd, dp, is_read, time_secs, vb);
+    return sg_nvme_admon_cmd_f(ptp, &cmd, dp, is_read, time_secs, vb);
 }
 
 #else           /* (HAVE_NVME && (! IGNORE_NVME)) [around line 140] */

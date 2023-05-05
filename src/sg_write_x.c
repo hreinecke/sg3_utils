@@ -38,9 +38,9 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.32 20230407";
+static const char * version_str = "1.33 20230502";
 
-static const char * my_name = "g_write_x: ";
+static const char * my_name = "sg_write_x: ";
 
 /* Protection Information refers to 8 bytes of extra information usually
  * associated with each logical block and is often abbreviated to PI while
@@ -48,7 +48,7 @@ static const char * my_name = "g_write_x: ";
  * tag-mask (2 bytes) are often abbreviated to RT, AT and TM respectively.
  * And the LBA Range Descriptor associated with the WRITE SCATTERED command
  * is abbreviated to RD. A degenerate RD is one where length components,
- ( and perhaps the LBA, are zero; it is not illegal according to T10 but are
+ * and perhaps the LBA, are zero; it is not illegal according to T10 but are
  * a little tricky to handle when scanning and little extra information
  * is provided. */
 
@@ -125,6 +125,7 @@ static struct option long_options[] = {
     {"tag-mask", required_argument, 0, 't'},
     {"tag_mask", required_argument, 0, 't'},
     {"timeout", required_argument, 0, 'I'},
+    {"tmo", required_argument, 0, 'I'},
     {"unmap", required_argument, 0, 'u'},
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},

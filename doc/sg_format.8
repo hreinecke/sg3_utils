@@ -352,7 +352,8 @@ system will typically abort the command. Aborting a command may escalate to
 a LUN reset (or worse). A timeout may also leave the disk or tape format
 operation incomplete. And that may result in the disk or tape being in
 a "format corrupt" state requiring another format to remedy the situation.
-So for various reasons command timeouts are best avoided.
+So for various reasons command timeouts are best avoided. An alternate
+long option form is \fI\-\-tmo=SECS\fR.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). "\-vvv" gives

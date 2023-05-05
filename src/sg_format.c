@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.71 20230326";
+static const char * version_str = "1.72 20230502";
 
 
 #define MY_NAME "sg_format"
@@ -143,6 +143,7 @@ static struct option long_options[] = {
         {"size", required_argument, 0, 's'},
         {"tape", required_argument, 0, 'T'},
         {"timeout", required_argument, 0, 'm'},
+        {"tmo", required_argument, 0, 'm'},
         {"verbose", no_argument, 0, 'v'},
         {"verify", no_argument, 0, 'y'},
         {"version", no_argument, 0, 'V'},

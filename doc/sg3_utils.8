@@ -711,13 +711,19 @@ many utilities had relatively long internal command timeouts before this
 option was introduced, the actual command timeout given to the operating
 systems is the higher of the internal timeout and \fISECS\fR.
 .br
-Many long running SCSI commands have an IMMED bit which causes the command
-to finish relatively quickly but the initialization process to continue. In
-such cases the REQUEST SENSE command can be used to monitor progress with
-its progress indication field (see the sg_requests and sg_turs utilities).
-Utilities that send such SCSI command either have an \fI\-\-immed\fR option
-or a \fI\-\-wait\fR option which is the logical inverse of the "immediate"
-action.
+Many long running SCSI commands have an IMMED bit in the CDB which causes the
+command to return relatively quickly but the requested operation has only
+been commenced, not completed. In such cases the REQUEST SENSE command can be
+used to monitor progress via its progress indication field (see the
+sg_requests and sg_turs utilities). Utilities that send such SCSI commands
+either have an \fI\-\-immed\fR option or a \fI\-\-wait\fR option which is the
+logical inverse of the "immediate" action. Sending a SCSI data access command
+to a device which is busy performing a long running SCSI command (in
+background) will typically receive a NOT READY sense key with an additional
+sense code of 0x04 and a qualifier code which indicates which long running
+operation the device is performing.
+.br
+An alternate long option form is \fI\-\-tmo=SECS\fR.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output). Can be used multiple

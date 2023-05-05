@@ -45,9 +45,11 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.54 20230413";
+static const char * version_str = "3.55 20230502";
 
 static const char * my_name = "sg_turs: ";
+
+static const char * tur_s = "Test unit ready";
 
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
@@ -64,6 +66,8 @@ static struct option long_options[] = {
         {"old", no_argument, 0, 'O'},
         {"progress", no_argument, 0, 'p'},
         {"time", no_argument, 0, 't'},
+        {"timeout", required_argument, 0, 'T'},
+        {"tmo", required_argument, 0, 'T'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -82,6 +86,7 @@ struct opts_t {
     int delay;
     int do_help;
     int do_number;
+    int tmo;
     int verbose;
     const char * device_name;
 };
@@ -100,7 +105,8 @@ usage()
            "[--low]\n"
            "               [--number=NUM] [--num=NUM] [--progress] "
            "[--time]\n"
-           "               [--verbose] [--version] DEVICE\n"
+           "               [--timeout=SE] [--verbose] [--version] "
+	   "DEVICE\n"
            "  where:\n"
            "    --ascq=ASC[,ASQ] |    check sense from TUR for match on "
            "ASC[,ASQ]\n"
@@ -120,6 +126,10 @@ usage()
            "--delay=MS given\n"
            "    --time|-t        outputs total duration and commands per "
            "second\n"
+           "    --timeout SE |-T SE    command timeout on each "
+           "test_unit_ready command\n"
+	   "                           (def: 0 which is mapped to 60 "
+	   "seconds)\n"
            "    --verbose|-v     increase verbosity\n"
            "    --version|-V     print version string then exit\n\n"
            "Performs a SCSI TEST UNIT READY command (or many of them).\n"
@@ -164,7 +174,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "a:d:hln:NOptvV", long_options,
+        c = getopt_long(argc, argv, "a:d:hln:NOptT:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -228,6 +238,15 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 't':
             op->do_time = true;
+            break;
+        case 'T':
+            n = sg_get_num(optarg);
+            if (n < 0) {
+                pr2serr("bad argument to '--timwout='\n");
+                usage();
+                return SG_LIB_SYNTAX_ERROR;
+            }
+            op->tmo = n;
             break;
         case 'v':
             op->verbose_given = true;
@@ -403,6 +422,61 @@ wait_millisecs(int millisecs)
 }
 #endif
 
+/* Invokes a SCSI TEST UNIT READY command.
+ * N.B. To access the sense buffer outside this routine then one be
+ * provided by the caller.
+ * 'pack_id' is just for diagnostics, safe to set to 0.
+ * Looks for progress indicator if 'progress' non-NULL;
+ * if found writes value [0..65535] else write -1.
+ * Returns 0 when successful, various SG_LIB_CAT_* positive values or
+ * -1 -> other errors */
+static int
+ll_test_unit_ready(struct sg_pt_base * ptvp, int pack_id, int tmo,
+                   int * progress, bool noisy, int verbose)
+{
+    int res, ret, sense_cat;
+
+    if (verbose) {
+        char b[128];
+
+        pr2serr("    %s cdb: %s\n", tur_s,
+                sg_get_command_str(get_scsi_pt_cdb_buf(ptvp),
+                                   get_scsi_pt_cdb_len(ptvp),
+                                   false, sizeof(b), b));
+    }
+    if (NULL == ptvp)
+        return SCSI_PT_DO_BAD_PARAMS;
+
+    set_scsi_pt_packet_id(ptvp, pack_id);
+    res = do_scsi_pt(ptvp, -1, tmo, verbose);
+    ret = sg_cmds_process_resp(ptvp, tur_s, res, noisy, verbose, &sense_cat);
+    if (-1 == ret) {
+        if (get_scsi_pt_transport_err(ptvp))
+            ret = SG_LIB_TRANSPORT_ERROR;
+        else
+            ret = sg_convert_errno(get_scsi_pt_os_err(ptvp));
+    } else if (-2 == ret) {
+        if (progress) {
+            int slen = get_scsi_pt_sense_len(ptvp);
+
+            if (! sg_get_sense_progress_fld(get_scsi_pt_sense_buf(ptvp),
+                                            slen, progress))
+                *progress = -1;
+        }
+        switch (sense_cat) {
+        case SG_LIB_CAT_RECOVERED:
+        case SG_LIB_CAT_NO_SENSE:
+            ret = 0;
+            break;
+        default:
+            ret = sense_cat;
+            break;
+        }
+    } else
+        ret = 0;
+    return ret;
+}
+
 /* Returns true if prints estimate of duration to ready */
 bool
 check_for_lu_becoming(struct sg_pt_base * ptvp,
@@ -447,8 +521,8 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
             set_scsi_pt_cdb(ptvp, cdb, sizeof(cdb));
             set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
             set_scsi_pt_packet_id(ptvp, ++packet_id);
-            rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, vb);
-            n = sg_cmds_process_resp(ptvp, "Test unit ready", rs, (0 == k),
+            rs = do_scsi_pt(ptvp, -1, op->tmo, vb);
+            n = sg_cmds_process_resp(ptvp, tur_s, rs, (0 == k),
                                      vb, &sense_cat);
             if (-1 == n) {
                 if (get_scsi_pt_transport_err(ptvp))
@@ -521,7 +595,7 @@ loop_turs(struct sg_pt_base * ptvp, struct loop_res_t * resp,
                 wait_millisecs(op->delay);
             set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
             /* Might get Unit Attention on first invocation */
-            res = sg_ll_test_unit_ready_pt(ptvp, k, (0 == k), vb);
+            res = ll_test_unit_ready(ptvp, k, op->tmo, NULL, (0 == k), vb);
             if (res) {
                 ++resp->num_errs;
                 resp->ret = res;
@@ -616,6 +690,8 @@ main(int argc, char * argv[])
         usage_for(op);
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (0 == op->tmo)
+        op->tmo = DEF_PT_TIMEOUT;
 
     if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
                                      op->verbose)) < 0) {
@@ -639,8 +715,8 @@ main(int argc, char * argv[])
                     wait_millisecs(op->delay);
             }
             progress = -1;
-            res = sg_ll_test_unit_ready_progress_pt(ptvp, k, &progress,
-                             (1 == op->do_number), op->verbose);
+            res = ll_test_unit_ready(ptvp, k, op->tmo, &progress,
+                                     (1 == op->do_number), op->verbose);
             if (progress < 0) {
                 ret = res;
                 break;

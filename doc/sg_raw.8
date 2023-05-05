@@ -1,4 +1,4 @@
-.TH SG_RAW "8" "May 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_RAW "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_raw \- send arbitrary SCSI or NVMe command to a device
 .SH SYNOPSIS
@@ -132,10 +132,10 @@ is ignored if \fI\-\-send\fR is not specified. If \fI\-\-send\fR is given
 and this option is not given, then zero bytes are skipped.
 .TP
 \fB\-t\fR, \fB\-\-timeout\fR=\fISECS\fR
-Wait up to \fISECS\fR seconds for command completion (default: 20).
-Note that if a command times out the operating system may start by
-aborting the command and if that is unsuccessful it may attempt
-to reset the device.
+Wait up to \fISECS\fR seconds for command completion (default: 20). Note
+that if a command times out the operating system may start by aborting the
+command and if that is unsuccessful it may attempt to reset the device. An
+alternate long option form is \fI\-\-tmo=SECS\fR.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 Increase level of verbosity. Can be used multiple times.
@@ -262,7 +262,7 @@ Written by Ingo van Lil
 .SH "REPORTING BUGS"
 Report bugs to <inguin at gmx dot de> or to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2001\-2021 Ingo van Lil
+Copyright \(co 2001\-2023 Ingo van Lil
 .br
 This software is distributed under the GPL version 2. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

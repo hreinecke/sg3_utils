@@ -1,8 +1,9 @@
-AC_INIT(sg3_utils, 1.48, dgilbert@interlog.com)
+AC_INIT([sg3_utils],[1.48],[dgilbert@interlog.com])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AM_MAINTAINER_MODE
-AM_CONFIG_HEADER(config.h)
+# AM_CONFIG_HEADER(config.h)
+AC_CONFIG_HEADERS([config.h])
 
 AC_PROG_CC
 # AC_PROG_CXX
@@ -12,10 +13,18 @@ AC_PROG_INSTALL
 ifdef([AM_PROG_AR], [AM_PROG_AR], []) 
 		
 # Adding libtools to the build seems to bring in C++ environment
-AC_PROG_LIBTOOL
+# autoupdate changed next line, was: AC_PROG_LIBTOOL
+LT_INIT
 
-# check for headers
+# check for headers; was: AC_HEADER_STDC
+# but autoupdate said that was obsolete and inserted the next line:
+# FreeBSD doesn't like that ... autoupdate is a croc
+## AC_CHECK_INCLUDES_DEFAULT
 AC_HEADER_STDC
+
+# autoupdate added AC_PROG_EGREP but FreeBSD said unsupported so:
+## AC_PROG_EGREP
+
 AC_CHECK_HEADERS([byteswap.h stdatomic.h], [], [], [])
 
 # check for functions
@@ -153,11 +162,11 @@ AC_ARG_ENABLE([pt_dummy],
 AM_CONDITIONAL([PT_DUMMY], [test x$pt_dummy = xtrue])
 
 AC_ARG_ENABLE([linuxbsg],
-  AC_HELP_STRING([--disable-linuxbsg], [option ignored, this is placeholder]),
+  AS_HELP_STRING([--disable-linuxbsg],[option ignored, this is placeholder]),
   [AC_DEFINE_UNQUOTED(IGNORE_LINUX_BSG, 1, [option ignored], )], [])
 
 AC_ARG_ENABLE([win32-spt-direct],
-  AC_HELP_STRING([--enable-win32-spt-direct], [enable Win32 SPT Direct]),
+  AS_HELP_STRING([--enable-win32-spt-direct],[enable Win32 SPT Direct]),
   AC_DEFINE_UNQUOTED(WIN32_SPT_DIRECT, 1, [enable Win32 SPT Direct], )
 )
 
@@ -167,26 +176,26 @@ AC_ARG_ENABLE([scsistrings],
   [], [AC_DEFINE_UNQUOTED(SG_SCSI_STRINGS, 1, [full SCSI sense strings and NVMe status strings], )])
 
 AC_ARG_ENABLE([nvme-supp],
-  AC_HELP_STRING([--disable-nvme-supp], [remove all or most NVMe code]),
+  AS_HELP_STRING([--disable-nvme-supp],[remove all or most NVMe code]),
   [AC_DEFINE_UNQUOTED(IGNORE_NVME, 1, [compile out NVMe support], )], [])
 
 AC_ARG_ENABLE([fast-lebe],
-  AC_HELP_STRING([--disable-fast-lebe], [use generic little-endian/big-endian code instead]),
+  AS_HELP_STRING([--disable-fast-lebe],[use generic little-endian/big-endian code instead]),
   [AC_DEFINE_UNQUOTED(IGNORE_FAST_LEBE, 1, [use generic little-endian/big-endian instead], )], [])
 
 AC_ARG_ENABLE([linux-sgv4],
-  AC_HELP_STRING([--disable-linux-sgv4], [for Linux sg driver avoid v4 interface even if available]),
+  AS_HELP_STRING([--disable-linux-sgv4],[for Linux sg driver avoid v4 interface even if available]),
   [AC_DEFINE_UNQUOTED(IGNORE_LINUX_SGV4, 1, [even if Linux sg v4 available, use v3 instead], )], [])
 
 
-AC_OUTPUT(
-	Makefile
+AC_CONFIG_FILES([Makefile
 	include/Makefile
 	lib/Makefile
 	src/Makefile
 	doc/Makefile
 	scripts/Makefile
-)
+])
+AC_OUTPUT
 
 
 # Borrowed from smartmontools configure.ac

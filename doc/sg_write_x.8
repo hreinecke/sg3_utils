@@ -1,4 +1,4 @@
-.TH SG_WRITE_X "8" "October 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_WRITE_X "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_write_x \- SCSI WRITE normal/ATOMIC/SAME/SCATTERED/STREAM, ORWRITE commands
 .SH SYNOPSIS
@@ -433,7 +433,8 @@ field is also found in the WRITE SCATTERED(32) LBA range descriptors. It is a
 \fB\-I\fR, \fB\-\-timeout\fR=\fITO\fR
 where \fITO\fR is the command timeout value in seconds. The default value is
 120 seconds. If \fINUM\fR is large on slow media then these WRITE commands
-may require considerably more time than 120 seconds to complete.
+may require considerably more time than 120 seconds to complete. An alternate
+long option form is \fI\-\-tmo=TO\fR .
 .TP
 \fB\-u\fR, \fB\-\-unmap\fR=\fIU_A\fR
 where \fIU_A\fR is OR\-ed bit values used to set the UNMAP and ANCHOR bit
@@ -590,7 +591,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2017\-2021 Douglas Gilbert
+Copyright \(co 2017\-2023 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

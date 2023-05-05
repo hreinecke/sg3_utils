@@ -40,7 +40,7 @@
  *   - SEQUENTIALIZE ZONE
  */
 
-static const char * version_str = "1.18 20220609";
+static const char * version_str = "1.19 20230503";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -66,6 +66,8 @@ static struct option long_options[] = {
         {"reset-all", no_argument, 0, 'R'},     /* same as --all */
         {"reset_all", no_argument, 0, 'R'},
         {"sequentialize", no_argument, 0, 'S'},
+        {"timeout", required_argument, 0, 't'},
+        {"tmo", required_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {"zone", required_argument, 0, 'z'},
@@ -100,7 +102,9 @@ usage()
             "[--finish]\n"
             "                [--help] [--open] [--quick] [--remove] "
             "[--sequentialize]\n"
-            "                [--verbose] [--version] [--zone=ID] DEVICE\n");
+            "                [--timeout=SE] [--verbose] [--version] "
+            "[--zone=ID]\n"
+            "                DEVICE\n");
     pr2serr("  where:\n"
             "    --all|-a           sets the ALL flag in the cdb\n"
             "    --close|-c         issue CLOSE ZONE command\n"
@@ -117,6 +121,8 @@ usage()
             "    --remove|-r        issue REMOVE ELEMENT AND MODIFY ZONES "
             "command\n"
             "    --sequentialize|-S    issue SEQUENTIALIZE ZONE command\n"
+            "    --timeout=SE|-t SE    command timeout in seconds (def: "
+            "60 secs)\n"
             "    --verbose|-v       increase verbosity\n"
             "    --version|-V       print version string and exit\n"
             "    --zone=ID|-z ID    ID is the starting LBA of the zone "
@@ -131,7 +137,7 @@ usage()
  * -> success, various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
-               bool noisy, int verbose)
+               int tmo, bool noisy, int verbose)
 {
     int ret, res, sense_cat;
     struct sg_pt_base * ptvp;
@@ -166,7 +172,7 @@ sg_ll_zone_out(int sg_fd, int sa, uint64_t zid, uint16_t zc, bool all,
     }
     set_scsi_pt_cdb(ptvp, zo_cdb, sizeof(zo_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    res = do_scsi_pt(ptvp, sg_fd, DEF_PT_TIMEOUT, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, tmo, verbose);
     ret = sg_cmds_process_resp(ptvp, b, res, noisy,
                                verbose, &sense_cat);
     if (-1 == ret) {
@@ -206,6 +212,7 @@ main(int argc, char * argv[])
     bool version_given = false;
     int res, c, n;
     int sg_fd = -1;
+    int tmo = DEF_PT_TIMEOUT;
     int verbose = 0;
     int ret = 0;
     int sa = 0;
@@ -218,7 +225,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "acC:e:fhoqrRSvVz:", long_options,
+        c = getopt_long(argc, argv, "acC:e:fhoqrRSt:vVz:", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -274,6 +281,13 @@ main(int argc, char * argv[])
         case 'S':
             sequentialize = true;
             sa = SEQUENTIALIZE_ZONE_SA;
+            break;
+        case 't':
+            tmo = sg_get_num(optarg);
+            if (tmo < 0) {
+                pr2serr("bad argument to '--timeout='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'v':
             verbose_given = true;
@@ -347,6 +361,8 @@ main(int argc, char * argv[])
     }
     sa_name = sa_name_arr[sa];
 
+    if (0 == tmo)
+        tmo = DEF_PT_TIMEOUT;
     if (NULL == device_name) {
         pr2serr("missing device name!\n");
         usage();
@@ -366,7 +382,7 @@ main(int argc, char * argv[])
         sg_warn_and_wait(sa_name_arr[REM_ELEM_MOD_ZONES_SA], device_name,
                          false);
 
-    res = sg_ll_zone_out(sg_fd, sa, zid, zc, all, true, verbose);
+    res = sg_ll_zone_out(sg_fd, sa, zid, zc, all, tmo, true, verbose);
     ret = res;
     if (res) {
         if (SG_LIB_CAT_INVALID_OP == res)

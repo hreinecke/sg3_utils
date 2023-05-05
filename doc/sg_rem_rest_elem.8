@@ -1,11 +1,12 @@
-.TH SG_REM_REST_ELEM "8" "June 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_REM_REST_ELEM "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_rem_rest_elem \- send SCSI remove or restore element command
 .SH SYNOPSIS
 .B sg_rem_rest_elem
 [\fI\-\-capacity=RC\fR] [\fI\-\-element=EID\fR] [\fI\-\-help\fR]
-[\fI\-\-quick\fR] [\fI\-\-remove\fR] [\fI\-\-restore\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-quick\fR] [\fI\-\-remove\fR] [\fI\-\-restore\fR]
+[\fI\-\-timeout=SE\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
+\fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 Sends a SCSI REMOVE ELEMENT AND TRUNCATE [RMEAT] or RESTORE ELEMENTS AND
@@ -65,6 +66,11 @@ causes the REMOVE ELEMENT AND TRUNCATE command to be sent to the
 causes the RESTORE ELEMENTS AND REBUILD command to be sent to the
 \fIDEVICE\fR.
 .TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fISE\fR
+where \fISE\fR is the command timeout in seconds. The default is 60 seconds
+and if 0 is given, it is mapped to 60. An alternate long form is
+\fI\-\-tmo=SE\fR.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
@@ -86,7 +92,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2022 Douglas Gilbert
+Copyright \(co 2022\-2023 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

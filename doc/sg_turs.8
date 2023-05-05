@@ -1,15 +1,16 @@
-.TH SG_TURS "8" "April 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_TURS "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_turs \- send one or more SCSI TEST UNIT READY commands
 .SH SYNOPSIS
 .B sg_turs
 [\fI\-\-ascq=ASC[,ASQ]\fR] [\fI\-\-delay=MS\fR] [\fI\-\-help\fR]
 [\fI\-\-low\fR] [\fI\-\-num=NUM\fR] [\fI\-\-number=NUM\fR]
-[\fI\-\-progress\fR] [\fI\-\-time\fR] [\fI\-\-verbose\fR]
-[\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-progress\fR] [\fI\-\-time\fR] [\fI\-\-timeout=SE\fR]
+[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .PP
 .B sg_turs
-[\fI\-d=MS\fR] [\fI\-n=NUM\fR] [\fI\-p\fR]  [\fI\-t\fR] [\fI\-v\fR] [\fI\-V\fR]
+[\fI\-d=MS\fR] [\fI\-n=NUM\fR] [\fI\-p\fR]  [\fI\-t\fR] [\fI\-v\fR]
+[\fI\-V\fR]
 \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
@@ -79,6 +80,11 @@ Ignores \fI\-\-time\fR option. See NOTES section below.
 \fB\-t\fR, \fB\-\-time\fR
 after completing the requested number of TEST UNIT READY commands, outputs
 the total duration and the average number of commands executed per second.
+.TP
+\fB\-T\fR, \fB\-\-timeout\fR=\fISE\fR
+where \fISE\fR is the command timeout of each TEST UNIT READY command. The
+unit for \fISE\fR is seconds and if 0 is given, it is mapped to 60 seconds
+which is the default. An alternate long option form is \fI\-\-tmo=SE\fR.
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase level or verbosity.

@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.42 20230426";
+static const char * version_str = "1.43 20230502";
 
 static const char * my_name = "sg_requests: ";  /* REQUEST Sense command */
 
@@ -60,6 +60,8 @@ static struct option long_options[] = {
         {"raw", no_argument, 0, 'r'},
         {"status", no_argument, 0, 's'},
         {"time", no_argument, 0, 't'},
+        {"timeout", required_argument, 0, 'T'},
+        {"tmo", required_argument, 0, 'T'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -72,8 +74,9 @@ usage()
             "[--maxlen=LEN]\n"
             "                   [--num=NUM] [--number=NUM] [--progress] "
             "[--raw]\n"
-            "                   [--status] [--time] [--verbose] "
-            "[--version] DEVICE\n"
+            "                   [--status] [--time] [--timeout=SE] "
+            "[--verbose]\n"
+            "                   [--version] DEVICE\n"
             "  where:\n"
             "    --desc|-d         set flag for descriptor sense "
             "format\n"
@@ -135,6 +138,7 @@ main(int argc, char * argv[])
     int num_rs = 1;
     int do_hex = 0;
     int maxlen = 0;
+    int tmo = 0;
     int verbose = 0;
     const char * device_name = NULL;
     int ret = 0;
@@ -153,7 +157,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "dehHm:n:prstvV", long_options,
+        c = getopt_long(argc, argv, "dehHm:n:prstT:vV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -181,8 +185,8 @@ main(int argc, char * argv[])
             }
             break;
         case 'n':
-           num_rs = sg_get_num(optarg);
-           if (num_rs < 1) {
+            num_rs = sg_get_num(optarg);
+            if (num_rs < 1) {
                 pr2serr("bad argument to '--num'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -200,6 +204,13 @@ main(int argc, char * argv[])
 #ifndef SG_LIB_MINGW
             do_time = true;
 #endif
+            break;
+        case 'T':
+            tmo = sg_get_num(optarg);
+            if (tmo < 0) {
+                pr2serr("bad argument to '--timeout='\n");
+                return SG_LIB_SYNTAX_ERROR;
+            }
             break;
         case 'v':
             verbose_given = true;
@@ -254,6 +265,8 @@ main(int argc, char * argv[])
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
+    if (0 == tmo)
+        tmo = DEF_PT_TIMEOUT;
     if (do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
@@ -318,7 +331,7 @@ main(int argc, char * argv[])
                             sg_get_command_str(rs_cdb, REQUEST_SENSE_CMDLEN,
                                                true, sizeof(bb), bb));
                 }
-                rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
+                rs = do_scsi_pt(ptvp, -1, tmo, verbose);
                 n = sg_cmds_process_resp(ptvp, "Request sense", rs, (0 == k),
                                          verbose, &sense_cat);
             }
@@ -414,7 +427,7 @@ main(int argc, char * argv[])
                         sg_get_command_str(rs_cdb, REQUEST_SENSE_CMDLEN,
                                            true, sizeof(bb), bb));
             }
-            rs = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
+            rs = do_scsi_pt(ptvp, -1, tmo, verbose);
             n = sg_cmds_process_resp(ptvp, "Request sense", rs, (0 == k),
                                      verbose, &sense_cat);
         }

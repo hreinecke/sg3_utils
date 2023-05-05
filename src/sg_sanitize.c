@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.20 20230126";
+static const char * version_str = "1.21 20230503";
 
 #define ME "sg_sanitize: "
 
@@ -72,6 +72,7 @@ static struct option long_options[] = {
     {"quick", no_argument, 0, 'Q'},
     {"test", required_argument, 0, 'T'},
     {"timeout", required_argument, 0, 't'},
+    {"tmo", required_argument, 0, 't'},
     {"verbose", no_argument, 0, 'v'},
     {"version", no_argument, 0, 'V'},
     {"wait", no_argument, 0, 'w'},

@@ -48,6 +48,7 @@ endif
 
 # For C++/clang testing
 ## CC = gcc-9
+## CC = gcc
 ## CC = g++
 ## CC = clang
 ## CXX = clang++
@@ -67,8 +68,9 @@ AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W -pedantic -std=c++11
 # AM_CFLAGS = -Wall -W -pedantic -std=c++14
 # AM_CFLAGS = -Wall -W -pedantic -std=c++1z
-# AM_CFLAGS = -Wall -W -pedantic -std=c++20 --analyze
-# AM_CFLAGS = -Wall -W -pedantic -std=c++23
+# AM_CFLAGS = -Wall -W -pedantic -std=c++20 --analyze $(DBG_CFLAGS)
+# AM_CFLAGS = -Wall -W -pedantic -std=c++20 $(DBG_CFLAGS)
+# AM_CFLAGS = -Wall -W -pedantic -std=c++23 $(DBG_CFLAGS)
 
 sg_bg_ctl_LDADD = ../lib/libsgutils2.la
 

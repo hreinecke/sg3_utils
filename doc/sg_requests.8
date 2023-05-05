@@ -1,4 +1,4 @@
-.TH SG_REQUESTS "8" "October 2021" "sg3_utils\-1.47" SG3_UTILS
+.TH SG_REQUESTS "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_requests \- send one or more SCSI REQUEST SENSE commands
 .SH SYNOPSIS
@@ -6,7 +6,7 @@ sg_requests \- send one or more SCSI REQUEST SENSE commands
 [\fI\-\-desc\fR] [\fI\-\-error\fR] [\fI\-\-help\fR] [\fI\-\-hex\fR]
 [\fI\-\-maxlen=LEN\fR] [\fI\-\-num=NUM\fR] [\fI\-\-number=NUM\fR]
 [\fI\-\-progress\fR] [\fI\-\-raw\fR] [\fI\-\-status\fR] [\fI\-\-time\fR]
-[\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
+[\fI\-\-timeout=SE\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 Send SCSI REQUEST SENSE command to \fIDEVICE\fR and output the parameter
@@ -83,6 +83,11 @@ for exit status values.
 time the SCSI REQUEST SENSE command(s) and calculate the average number
 of operations per second.
 .TP
+\fB\-T\fR, \fB\-\-timeout\fR=\fISE\fR
+where \fISE\fR is the command timeout of each TEST UNIT READY command. The
+unit for \fISE\fR is seconds and if 0 is given, it is mapped to 60 seconds
+which is the default. An alternate long option form is \fI\-\-tmo=SE\fR.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 Additionally the response (if received) is output in ASCII\-HEX. Use
@@ -129,7 +134,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2004\-2021 Douglas Gilbert
+Copyright \(co 2004\-2023 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

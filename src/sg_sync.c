@@ -37,7 +37,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.28 20230407";
+static const char * version_str = "1.29 20230503";
 
 static const char * my_name = "sg_sync: ";
 
@@ -56,6 +56,7 @@ static struct option long_options[] = {
         {"lba", required_argument, 0, 'l'},
         {"sync-nv", no_argument, 0, 's'},
         {"timeout", required_argument, 0, 't'},
+        {"tmo", required_argument, 0, 't'},
         {"verbose", no_argument, 0, 'v'},
         {"version", no_argument, 0, 'V'},
         {0, 0, 0, 0},
@@ -97,7 +98,7 @@ usage()
 
 static int
 sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
-                    uint64_t lba, unsigned int num_lb, int to_secs,
+                    uint64_t lba, unsigned int num_lb, int tmo_secs,
                     bool noisy, int verbose)
 {
     int res, ret, sense_cat;
@@ -129,7 +130,7 @@ sg_ll_sync_cache_16(int sg_fd, bool sync_nv, bool immed, int group,
     }
     set_scsi_pt_cdb(ptvp, sc_cdb, sizeof(sc_cdb));
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    res = do_scsi_pt(ptvp, sg_fd, to_secs, verbose);
+    res = do_scsi_pt(ptvp, sg_fd, tmo_secs, verbose);
     ret = sg_cmds_process_resp(ptvp, "synchronize cache(16)", res,
                                noisy, verbose, &sense_cat);
     if (-1 == ret) {
@@ -167,7 +168,7 @@ main(int argc, char * argv[])
     int sg_fd = -1;
     int group = 0;
     int ret = 0;
-    int to_secs = DEF_PT_TIMEOUT;
+    int tmo_secs = DEF_PT_TIMEOUT;
     int verbose = 0;
     unsigned int num_lb = 0;
     int64_t count = 0;
@@ -221,8 +222,8 @@ main(int argc, char * argv[])
             do_16 = true;
             break;
         case 't':
-            to_secs = sg_get_num(optarg);
-            if (to_secs < 0) {
+            tmo_secs = sg_get_num(optarg);
+            if (tmo_secs < 0) {
                 pr2serr("bad argument to '--timeout'\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
@@ -290,7 +291,7 @@ main(int argc, char * argv[])
 
     if (do_16)
         res = sg_ll_sync_cache_16(sg_fd, sync_nv, immed, group, lba, num_lb,
-                                  to_secs, true, verbose);
+                                  tmo_secs, true, verbose);
     else
         res = sg_ll_sync_cache_10(sg_fd, sync_nv, immed, group,
                                   (unsigned int)lba, num_lb, true, verbose);

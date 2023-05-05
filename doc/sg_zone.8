@@ -1,12 +1,12 @@
-.TH SG_ZONE "8" "June 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_ZONE "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_zone \- send a SCSI ZONE modifying command
 .SH SYNOPSIS
 .B sg_zone
 [\fI\-\-all\fR] [\fI\-\-close\fR] [\fI\-\-count=ZC\fR] [\fI\-\-element=EID\fR]
 [\fI\-\-finish\fR] [\fI\-\-help\fR] [\fI\-\-open\fR] [\fI\-\-remove\fR]
-[\fI\-\-sequentialize\fR] [\fI\-\-verbose\fR] [\fI\-\-version\fR]
-[\fI\-\-zone=ID\fR] \fIDEVICE\fR
+[\fI\-\-sequentialize\fR] [\fI\-\-timeout=SE\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] [\fI\-\-zone=ID\fR] \fIDEVICE\fR
 .SH DESCRIPTION
 .\" Add any additional description here
 Sends a SCSI OPEN ZONE, CLOSE ZONE, FINISH ZONE, REMOVE ELEMENT AND MODIFY
@@ -58,6 +58,10 @@ causes the REMOVE ELEMENT AND MODIFY ZONES command to be sent to the
 \fB\-S\fR, \fB\-\-sequentialize\fR
 causes the SEQUENTIALIZE ZONE command to be sent to the \fIDEVICE\fR.
 .TP
+\fB\-t\fR, \fB\-\-timeout\fR=\fISE\fR
+where \fISE\fR is the command timeout in seconds. The default is 60 seconds
+and if 0 is given, it is mapped to 60. An alternate form is \fI\-\-tmo=SE\fR.
+.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 increase the level of verbosity, (i.e. debug output).
 .TP
@@ -88,7 +92,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2014\-2022 Douglas Gilbert
+Copyright \(co 2014\-2023 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

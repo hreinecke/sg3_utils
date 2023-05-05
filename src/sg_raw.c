@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.40 (2023-04-07)"
+#define SG_RAW_VERSION "0.4.41 (2023-05-04)"
 
 static const char * my_name = "sg_raw: ";
 
@@ -70,6 +70,7 @@ static struct option long_options[] = {
     { "scan",    required_argument, NULL, 'Q' },
     { "send",    required_argument, NULL, 's' },
     { "timeout", required_argument, NULL, 't' },
+    { "tmo",     required_argument, NULL, 't' },
     { "verbose", no_argument,       NULL, 'v' },
     { "version", no_argument,       NULL, 'V' },
     { 0, 0, 0, 0 }
@@ -167,9 +168,9 @@ usage()
             "  --verbose|-v           Increase verbosity\n"
             "  --version|-V           Show version information and exit\n"
             "\n"
-            "Between 6 and 260 command bytes (two hex digits each) can be "
-            "specified\nand will be sent to DEVICE. Lengths RLEN, SLEN and "
-            "KLEN are decimal by\ndefault. Bidirectional commands "
+            "Between 6 and 260 command bytes (one or two hex digits each) "
+            "can be\nspecified and will be sent to DEVICE. Lengths RLEN, "
+            "SLEN and KLEN are\ndecimal by default. Bidirectional commands "
             "accepted.\n\nSimple example: Perform INQUIRY on /dev/sg0:\n"
             "  sg_raw -r 1k /dev/sg0 12 00 00 00 60 00\n");
 }
@@ -591,6 +592,8 @@ main(int argc, char *argv[])
         goto done;
     } else if (op->do_enumerate)
         goto done;
+    if (0 == op->timeout)       /* timeout of 0 seconds is not a good idea */
+        op->timeout = DEFAULT_TIMEOUT;
 
     sg_fd = scsi_pt_open_device(op->device_name, op->readonly,
                                 op->verbose);
