@@ -40,7 +40,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.45 20230409";
+static const char * version_str = "1.46 20230507";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -192,9 +192,9 @@ usage(int h)
             "twice\n"
             "                       shows decoded values in hex\n"
             "    --inhex=FN|-i FN    decode contents of FN, ignore DEVICE\n"
-            "    --json[=JO]|-j[JO]    output in JSON instead of human "
-            "readable text.\n"
-            "                          Use --json=? for JSON help\n"
+            "    --json[=JO]|-j[=JO]    output in JSON instead of plain "
+            "text\n"
+            "                           Use --json=? for JSON help\n"
             "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
             "output is\n"
             "                            written (def: stdout); truncates "
@@ -1143,6 +1143,67 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
     return res;
 }
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, SG_LIB_SYNTAX_ERROR for syntax error
+ * and SG_LIB_OK_FALSE for exit with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct opts_t * op)
+{
+    /* only need to process short, non-argument options */
+    switch (sopt_ch) {
+    case 'b':
+        op->do_brief = true;
+        break;
+    case 'd':
+        op->do_zdomains = true;
+        op->serv_act = REPORT_ZONE_DOMAINS_SA;
+        break;
+    case 'e':
+        op->do_realms = true;
+        op->serv_act = REPORT_REALMS_SA;
+        break;
+    case 'f':
+        op->do_force = true;
+        break;
+    case 'h':
+    case '?':
+        ++op->do_help;
+        break;
+    case 'H':
+        ++op->do_hex;
+        break;
+    case 'j':
+        break;  /* simply ignore second 'j' (e.g. '-jxj') */
+    case 'p':
+        op->do_partial = true;
+        break;
+    case 'r':
+        op->do_raw = true;
+        break;
+    case 'R':
+        op->o_readonly = true;
+        break;
+    case 'S':
+        op->statistics = true;
+        break;
+    case 'v':
+        op->verbose_given = true;
+        ++op->vb;
+        break;
+    case 'V':
+        op->version_given = true;
+        break;
+    case 'w':
+        op->wp_only = true;
+        break;
+    default:
+        pr2serr("unrecognised option code %c [0x%x] ??\n", sopt_ch, sopt_ch);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    return 0;
+}
+
 
 int
 main(int argc, char * argv[])
@@ -1228,7 +1289,24 @@ main(int argc, char * argv[])
             break;
        case 'j':
             op->do_json = true;
-            op->json_arg = optarg;
+            /* Now want '=' to precede JSON optional arguments */
+            if (optarg) {
+                int k, n, q;
+
+                if ('=' == *optarg) {
+                    op->json_arg = optarg + 1;
+                    break;
+                }
+                n = strlen(optarg);
+                for (k = 0; k < n; ++k) {
+                    q = chk_short_opts(*(optarg + k), op);
+                    if (SG_LIB_SYNTAX_ERROR == q)
+                        return SG_LIB_SYNTAX_ERROR;
+                    if (SG_LIB_OK_FALSE == q)
+                        return 0;
+                }
+            } else
+                op->json_arg = NULL;
             break;
        case 'J':
             op->do_json = true;

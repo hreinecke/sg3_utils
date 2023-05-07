@@ -34,12 +34,43 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.53 20230406";      /* spc6r07 */
+static const char * version_str = "1.54 20230506";      /* spc6r08 */
 
 #define MY_NAME "sg_luns"
 
 #define MAX_RLUNS_BUFF_LEN (1024 * 1024)
 #define DEF_RLUNS_BUFF_LEN (1024 * 8)
+
+struct opts_t {
+    bool do_json;
+#ifdef SG_LIB_LINUX
+    bool do_linux;
+#endif
+    bool do_quiet;
+    bool do_raw;
+    bool lu_cong_arg_given;
+    bool o_readonly;
+    bool std_inq_a_valid;
+#ifdef SG_LIB_LINUX
+    bool test_linux_in;
+    bool test_linux_out;
+#endif
+    bool verbose_given;
+    bool version_given;
+    int do_hex;
+    int lu_cong_arg;
+    int maxlen;
+    int decode_arg;
+    int select_rep;
+    int verbose;
+    const char * device_name;
+    const char * inhex_fn;
+    const char * json_arg;
+    const char * js_file;
+    const char * sinq_inraw_fn;
+    const char * test_arg;
+    sgj_state json_st;
+};
 
 
 static struct option long_options[] = {
@@ -111,9 +142,9 @@ usage()
             "    --inner-hex|-I     when --decode given, output decoded "
             "values in\n"
             "                       hex (def: decimal)\n"
-            "    --json[=JO]|-jJO    output in JSON instead of human "
-            "readable\n"
-            "                        test. Use --json=? for JSON help\n"
+            "    --json[=JO]|-j[=JO]    output in JSON instead of plain "
+            "text\n"
+            "                           Use --json=? for JSON help\n"
             "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
             "output is\n"
             "                            written (def: stdout); truncates "
@@ -162,14 +193,16 @@ usage()
  * defines its own "bridge addressing method" in place of the SAM-3
  * "logical addressing method".  */
 static void
-decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
-           int do_hex, int verbose, sgj_state * jsp, sgj_opaque_p jop)
+decode_lun(const char * leadin, const uint8_t * lunp, struct opts_t * op,
+           sgj_opaque_p jop)
 {
     bool next_level, admin_lu_cong, decoded;
+    bool lu_cong = (op->lu_cong_arg % 2);
     int k, x, a_method, bus_id, target, lun, len_fld, e_a_method;
     uint64_t ull;
     const char * am_s;
     const char * second_s;
+    sgj_state * jsp = &op->json_st;
     sgj_opaque_p jo2p = NULL;
     char l_leadin[128];
     char b[256];
@@ -197,7 +230,7 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                                 "Administrative logical unit");
                     sgj_js_nv_ihex(jsp, jo2p, "administrative", 1);
                     sgj_js_nv_ihex(jsp, jo2p, "decoded", 1);
-                    if (do_hex || verbose)
+                    if (op->do_hex || op->verbose)
                         sgj_pr_hr(jsp, "        since Subsidiary element "
                                   "is 0x0000\n");
                     break;
@@ -232,7 +265,7 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                 sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
                 x = 0x3fff & sg_get_unaligned_be16(lunp + 0);
                 sgj_js_nv_ihex(jsp, jo2p, "value", x);
-                if (do_hex)
+                if (op->do_hex)
                      sgj_pr_hr(jsp, "%s%s: 0x%04x\n", l_leadin, am_s, x);
                 else
                      sgj_pr_hr(jsp, "%s%s: %d\n", l_leadin, am_s, x);
@@ -243,9 +276,9 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                 x = lunp[1];
                 am_s = "Peripheral device addressing";
                 sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
-                if ((0 == bus_id) && (0 == verbose)) {
+                if ((0 == bus_id) && (0 == op->verbose)) {
                     sgj_js_nv_ihex(jsp, jo2p, "lun", x);
-                    if (do_hex)
+                    if (op->do_hex)
                          sgj_pr_hr(jsp, "%s%s: lun=0x%02x\n", l_leadin, am_s,
                                    x);
                     else
@@ -253,7 +286,7 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                 } else {
                     sgj_js_nv_ihex(jsp, jo2p, "bus_identifier", bus_id);
                     sgj_js_nv_ihex(jsp, jo2p, "target_or_lun", x);
-                    if (do_hex)
+                    if (op->do_hex)
                          sgj_pr_hr(jsp, "%s%s: bus_id=0x%02x, %s=0x%02x\n",
                                    l_leadin, am_s, bus_id,
                                    (bus_id ? "target" : "lun"), x);
@@ -276,7 +309,7 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                            "lun=0x%04x\n", l_leadin, am_s, lun);
                 break;
             }
-            if (do_hex)
+            if (op->do_hex)
                  sgj_pr_hr(jsp, "%s%s: lun=0x%04x\n", l_leadin, am_s, lun);
             else
                  sgj_pr_hr(jsp, "%s%s: lun=%d\n", l_leadin, am_s, lun);
@@ -296,7 +329,7 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                           l_leadin, am_s, bus_id, target, lun);
                 break;
             }
-            if (do_hex)
+            if (op->do_hex)
                 sgj_pr_hr(jsp, "%s%s: bus_id=0x%x, target=0x%02x, lun="
                           "0x%02x\n", l_leadin, am_s, bus_id, target, lun);
             else
@@ -338,7 +371,7 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                     am_s = "Extended flat space addressing";
                     sgj_js_nv_s(jsp, jo2p, tname_sn, am_s);
                     sgj_js_nv_ihex(jsp, jo2p, "extended_flat_space_lun", x);
-                    if (do_hex)
+                    if (op->do_hex)
                         sgj_pr_hr(jsp, "%s%s: lun=0x%06x\n", l_leadin, am_s,
                                   x);
                     else
@@ -349,7 +382,7 @@ decode_lun(const char * leadin, const uint8_t * lunp, bool lu_cong,
                     ull = sg_get_unaligned_be(5, lunp + 1);
                     sgj_js_nv_ihex(jsp, jo2p, "long_extended_flat_space_lun",
                                    ull);
-                    if (do_hex)
+                    if (op->do_hex)
                         sgj_pr_hr(jsp, "%s%s: lun=0x%010" PRIx64 "\n",
                                   l_leadin, am_s, ull);
                     else
@@ -417,7 +450,6 @@ t10_2linux_lun(const uint8_t t10_lun[])
 }
 #endif  /* SG_LIB_LINUX */
 
-
 static void
 dStrRaw(const char * str, int len)
 {
@@ -427,43 +459,75 @@ dStrRaw(const char * str, int len)
         printf("%c", str[k]);
 }
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, SG_LIB_SYNTAX_ERROR for syntax error
+ * and SG_LIB_OK_FALSE for exit with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct opts_t * op)
+{
+    /* only need to process short, non-argument options */
+    switch (sopt_ch) {
+    case 'd':
+        ++op->decode_arg;
+        break;
+    case 'h':
+    case '?':
+        usage();
+        return SG_LIB_OK_FALSE;
+    case 'H':
+        ++op->do_hex;
+        break;
+    case 'I':
+        op->do_hex = 2;
+        break;
+    case 'j':
+        break;  /* simply ignore second 'j' (e.g. '-jxj') */
+#ifdef SG_LIB_LINUX
+    case 'l':
+        op->do_linux = false;
+        break;
+#endif
+    case 'L':
+        ++op->lu_cong_arg;
+        op->lu_cong_arg_given = true;
+        break;
+    case 'q':
+        op->do_quiet = true;
+        break;
+    case 'r':
+        op->do_raw = true;
+        break;
+    case 'R':
+        op->o_readonly = true;
+        break;
+    case 'v':
+        op->verbose_given = true;
+        ++op->verbose;
+        break;
+    case 'V':
+        op->version_given = true;
+        break;
+    default:
+        pr2serr("unrecognised option code %c, [0x%x] ??\n", sopt_ch, sopt_ch);
+        usage();
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    return 0;
+}
+
+
 int
 main(int argc, char * argv[])
 {
-    bool do_json = false;
-#ifdef SG_LIB_LINUX
-    bool do_linux = false;
-#endif
-    bool do_quiet = false;
-    bool do_raw = false;
-    bool lu_cong_arg_given = false;
-    bool o_readonly = false;
-    bool std_inq_a_valid = false;
-#ifdef SG_LIB_LINUX
-    bool test_linux_in = false;
-    bool test_linux_out = false;
-#endif
     bool trunc;
-    bool verbose_given = false;
-    bool version_given = false;
     int sg_fd, k, m, n, off, c, list_len, len_cap, luns, in_len;
     int inraw_len;
-    int decode_arg = 0;
-    int do_hex = 0;
-    int lu_cong_arg = 0;
-    int maxlen = 0;
     int ret = 0;
-    int select_rep = 0;
-    int verbose = 0;
     unsigned int h;
     const uint32_t pg_sz = sg_get_page_size();
-    const char * test_arg = NULL;
-    const char * device_name = NULL;
-    const char * inhex_fn = NULL;
     const char * cp;
-    const char * json_arg = NULL;
-    const char * js_file = NULL;
-    const char * sinq_inraw_fn = NULL;
+    struct opts_t * op;
     sgj_state * jsp;
     sgj_opaque_p jop = NULL;
     sgj_opaque_p jo2p = NULL;
@@ -472,12 +536,13 @@ main(int argc, char * argv[])
     uint8_t * reportLunsBuff = NULL;
     uint8_t * free_reportLunsBuff = NULL;
     uint8_t lun_arr[8];
-    uint8_t std_inq_a[36];
+    uint8_t std_inq_a[36] SG_C_CPP_ZERO_INIT;
     char b[144];
-    sgj_state json_st SG_C_CPP_ZERO_INIT;
+    struct opts_t opts SG_C_CPP_ZERO_INIT;
     struct sg_simple_inquiry_resp sir;
     static const int blen = sizeof(b);
 
+    op = &opts;
     if (getenv("SG3_UTILS_INVOCATION"))
         sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     while (1) {
@@ -495,87 +560,103 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'd':
-            ++decode_arg;
+            ++op->decode_arg;
             break;
         case 'h':
         case '?':
             usage();
             return 0;
         case 'H':
-            ++do_hex;
+            ++op->do_hex;
             break;
        case 'i':
-            inhex_fn = optarg;
+            op->inhex_fn = optarg;
             break;
        case 'I':
-            do_hex = 2;
+            op->do_hex = 2;
             break;
         case 'j':
-            do_json = true;
-            json_arg = optarg;
+            op->do_json = true;
+            /* Now want '=' to precede JSON optional arguments */
+            if (optarg) {
+                if ('=' == *optarg) {
+                    op->json_arg = optarg + 1;
+                    break;
+                }
+                n = strlen(optarg);
+                for (k = 0; k < n; ++k) {
+                    int q = chk_short_opts(*(optarg + k), op);
+
+                    if (SG_LIB_SYNTAX_ERROR == q)
+                        return SG_LIB_SYNTAX_ERROR;
+                    if (SG_LIB_OK_FALSE == q)
+                        return 0;
+                }
+            } else
+                op->json_arg = NULL;
             break;
         case 'J':
-            do_json = true;
-            js_file = optarg;
+            op->do_json = true;
+            op->js_file = optarg;
             break;
 #ifdef SG_LIB_LINUX
         case 'l':
-            do_linux = false;
+            op->do_linux = false;
             break;
 #endif
         case 'L':
-            ++lu_cong_arg;
-            lu_cong_arg_given = true;
+            ++op->lu_cong_arg;
+            op->lu_cong_arg_given = true;
             break;
         case 'm':
-            maxlen = sg_get_num(optarg);
-            if ((maxlen < 0) || (maxlen > MAX_RLUNS_BUFF_LEN)) {
+            op->maxlen = sg_get_num(optarg);
+            if ((op->maxlen < 0) || (op->maxlen > MAX_RLUNS_BUFF_LEN)) {
                 pr2serr("argument to '--maxlen' should be %d or less\n",
                         MAX_RLUNS_BUFF_LEN);
                 return SG_LIB_SYNTAX_ERROR;
-            } else if (maxlen < 4) {
+            } else if (op->maxlen < 4) {
                 pr2serr("Warning: setting '--maxlen' to 4\n");
-                maxlen = 4;
+                op->maxlen = 4;
             }
             break;
         case 'q':
-            do_quiet = true;
+            op->do_quiet = true;
             break;
         case 'Q':
-            sinq_inraw_fn = optarg;
+            op->sinq_inraw_fn = optarg;
             break;
         case 'r':
-            do_raw = true;
+            op->do_raw = true;
             break;
         case 'R':
-            o_readonly = true;
+            op->o_readonly = true;
             break;
         case 's':
-           select_rep = sg_get_num(optarg);
-           if ((select_rep < 0) || (select_rep > 255)) {
+           op->select_rep = sg_get_num(optarg);
+           if ((op->select_rep < 0) || (op->select_rep > 255)) {
                 pr2serr("bad argument to '--select', expect 0 to 255\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
             break;
         case 't':
-            test_arg = optarg;
+            op->test_arg = optarg;
             break;
         case 'v':
-            verbose_given = true;
-            ++verbose;
+            op->verbose_given = true;
+            ++op->verbose;
             break;
         case 'V':
-            version_given = true;
+            op->version_given = true;
             break;
         default:
-            pr2serr("unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code %c [0x%x] ??\n", c, c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
     }
     if (optind < argc) {
-        if (NULL == device_name) {
-            device_name = argv[optind];
+        if (NULL == op->device_name) {
+            op->device_name = argv[optind];
             ++optind;
         }
         if (optind < argc) {
@@ -587,27 +668,27 @@ main(int argc, char * argv[])
     }
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
-    if (verbose_given && version_given) {
+    if (op->verbose_given && op->version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
-        version_given = false;
-        verbose = 0;
-    } else if (! verbose_given) {
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
         pr2serr("set '-vv'\n");
-        verbose = 2;
+        op->verbose = 2;
     } else
-        pr2serr("keep verbose=%d\n", verbose);
+        pr2serr("keep verbose=%d\n", op->verbose);
 #else
-    if (verbose_given && version_given)
+    if (op->verbose_given && op->version_given)
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
-    if (version_given) {
+    if (op->version_given) {
         pr2serr("version: %s\n", version_str);
         return 0;
     }
-    jsp = &json_st;
-    if (do_json) {
-        if (! sgj_init_state(jsp, json_arg)) {
+    jsp = &op->json_st;
+    if (op->do_json) {
+        if (! sgj_init_state(jsp, op->json_arg)) {
             int bad_char = jsp->first_bad_char;
             char e[1500];
 
@@ -621,13 +702,13 @@ main(int argc, char * argv[])
         }
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
         jo2p = sgj_named_subobject_r(jsp, jop, "pseudo_inquiry_data");
-        sgj_js_nv_ihex(jsp, jo2p, "lu_cong", 1 == (lu_cong_arg % 2));
+        sgj_js_nv_ihex(jsp, jo2p, "lu_cong", 1 == (op->lu_cong_arg % 2));
         jo2p = sgj_named_subobject_r(jsp, jop, rl_pd_sn);
     }
 
-    if (test_arg) {
+    if (op->test_arg) {
         memset(lun_arr, 0, sizeof(lun_arr));
-        cp = test_arg;
+        cp = op->test_arg;
         /* check for leading 'L' */
 #ifdef SG_LIB_LINUX
         if ('L' == toupper(cp[0])) {
@@ -643,7 +724,7 @@ main(int argc, char * argv[])
                 return SG_LIB_SYNTAX_ERROR;
             }
             linux2t10_lun(ull, lun_arr);
-            test_linux_in = true;
+            op->test_linux_in = true;
         } else
 #endif
         {
@@ -651,7 +732,7 @@ main(int argc, char * argv[])
 #ifdef SG_LIB_LINUX
             m = strlen(cp);    /* must be at least 1 char in test_arg */
             if ('L' == toupper(cp[m - 1]))
-                test_linux_out = true;
+                op->test_linux_out = true;
 #endif
             if (('0' == cp[0]) && ('X' == toupper((uint8_t)cp[1])))
                 cp += 2;
@@ -680,12 +761,12 @@ main(int argc, char * argv[])
             }
         }
 #ifdef SG_LIB_LINUX
-        if (verbose || test_linux_in || decode_arg)
+        if (op->verbose || op->test_linux_in || op->decode_arg)
 #else
-        if (verbose || decode_arg)
+        if (op->verbose || op->decode_arg)
 #endif
         {
-            if (decode_arg > 1) {
+            if (op->decode_arg > 1) {
                 n = sg_scnpr(b, blen, "64 bit LUN in T10 (hex, dashed) "
                              "format: ");
                 for (k = 0; k < 8; k += 2)
@@ -701,51 +782,52 @@ main(int argc, char * argv[])
             sgj_pr_hr(jsp, "%s\n", b);
         }
 #ifdef SG_LIB_LINUX
-        if (test_linux_out) {
+        if (op->test_linux_out) {
             uint64_t lin_lun = t10_2linux_lun(lun_arr);
             static const char * lwfilr_s = "Linux 'word flipped' integer LUN "
                                            "representation";
-            if (do_hex > 1)
+            if (op->do_hex > 1)
                 sgj_pr_hr(jsp, "%s: 0x%016" PRIx64 "\n", lwfilr_s, lin_lun);
-            else if (do_hex)
+            else if (op->do_hex)
                 sgj_pr_hr(jsp, "%s: 0x%" PRIx64 "\n", lwfilr_s, lin_lun);
             else
                 sgj_pr_hr(jsp, "%s: %" PRIu64 "\n", lwfilr_s, lin_lun);
         }
 #endif
         sgj_pr_hr(jsp, "Decoded LUN:\n");
-        decode_lun("  ", lun_arr, (lu_cong_arg % 2), do_hex, verbose, jsp,
-                   jo2p);
+        decode_lun("  ", lun_arr, op, jo2p);
         return 0;
     }
 
-    if (inhex_fn) {
-        if (device_name) {
-            if (! do_json)
+    if (op->inhex_fn) {
+        if (op->device_name) {
+            if (! op->do_json)
                 pr2serr("ignoring DEVICE, best to give DEVICE or "
                         "--inhex=FN, but not both\n");
-            device_name = NULL;
+            op->device_name = NULL;
         }
-    } else if (NULL == device_name) {
+    } else if (NULL == op->device_name) {
         pr2serr("missing device name!\n\n");
         usage();
         return SG_LIB_SYNTAX_ERROR;
     }
 
-    if (do_raw) {
+    if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
             return SG_LIB_FILE_ERROR;
         }
     }
 
-    if (NULL == inhex_fn) {
-        sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
+    if (NULL == op->inhex_fn) {
+        sg_fd = sg_cmds_open_device(op->device_name, op->o_readonly,
+                                    op->verbose);
         if (sg_fd < 0) {
             int err = -sg_fd;
 
-            pr2serr("open error: %s: %s\n", device_name, safe_strerror(err));
-            if ((! o_readonly) && ((err == EACCES) || (err == EROFS)))
+            pr2serr("open error: %s: %s\n", op->device_name,
+                    safe_strerror(err));
+            if ((! op->o_readonly) && ((err == EACCES) || (err == EROFS)))
                 pr2serr("Perhaps try again with --readonly option or with "
                         "root permissions\n");
             return sg_convert_errno(-sg_fd);
@@ -753,92 +835,93 @@ main(int argc, char * argv[])
     } else
         sg_fd = -1;
 
-    if (0 == maxlen)
-        maxlen = DEF_RLUNS_BUFF_LEN;
-    reportLunsBuff = (uint8_t *)sg_memalign(maxlen, 0, &free_reportLunsBuff,
-                                            verbose > 3);
+    if (0 == op->maxlen)
+        op->maxlen = DEF_RLUNS_BUFF_LEN;
+    reportLunsBuff = (uint8_t *)sg_memalign(op->maxlen, 0,
+                                            &free_reportLunsBuff,
+                                            op->verbose > 3);
     if (NULL == reportLunsBuff) {
-        pr2serr("unable to sg_memalign %d bytes\n", maxlen);
+        pr2serr("unable to sg_memalign %d bytes\n", op->maxlen);
         return sg_convert_errno(ENOMEM);
     }
     trunc = false;
-    if (sinq_inraw_fn) {
+    if (op->sinq_inraw_fn) {
         /* Note: want to support both --sinq_inraw= and --inhex= options */
-        if ((ret = sg_f2hex_arr(sinq_inraw_fn, true, false, reportLunsBuff,
-                                &inraw_len, maxlen))) {
+        if ((ret = sg_f2hex_arr(op->sinq_inraw_fn, true, false,
+                                reportLunsBuff, &inraw_len, op->maxlen))) {
             goto the_end;
         }
         if (inraw_len < 36) {
             pr2serr("Unable to read 36 or more bytes from %s\n",
-                    sinq_inraw_fn);
+                    op->sinq_inraw_fn);
             ret = SG_LIB_FILE_ERROR;
             goto the_end;
         }
         memcpy(std_inq_a,  reportLunsBuff, 36);
-        std_inq_a_valid = true;
+        op->std_inq_a_valid = true;
     }
-    if (decode_arg) {
-        if (std_inq_a_valid) {
+    if (op->decode_arg) {
+        if (op->std_inq_a_valid) {
             int lu_cong = !!(0x40 & std_inq_a[1]);
 
-            if (lu_cong_arg_given && (lu_cong != (lu_cong_arg % 2))) {
+            if (op->lu_cong_arg_given && (lu_cong != (op->lu_cong_arg % 2))) {
                 pr2serr("LU_CONG in --sinq_inraw and --lu_cong= "
                         "contradict\n");
                 return SG_LIB_CONTRADICT;
             }
-            lu_cong_arg = lu_cong;
-        } else if ((! lu_cong_arg_given) && (sg_fd >= 0)) {
-            if (verbose > 1)
+            op->lu_cong_arg = lu_cong;
+        } else if ((! op->lu_cong_arg_given) && (sg_fd >= 0)) {
+            if (op->verbose > 1)
                 pr2serr("in order to decode LUN and since --lu_cong not "
                         "given, do standard\nINQUIRY to find LU_CONG bit\n");
             /* check if LU_CONG set in standard INQUIRY response */
-            ret = sg_simple_inquiry(sg_fd, &sir, false, verbose);
+            ret = sg_simple_inquiry(sg_fd, &sir, false, op->verbose);
             if (ret) {
                 pr2serr("fetching standard INQUIRY response failed\n");
                 goto the_end;
             }
-            lu_cong_arg = !!(0x40 & sir.byte_1);
+            op->lu_cong_arg = !!(0x40 & sir.byte_1);
         }
-        if (verbose && lu_cong_arg)
+        if (op->verbose && op->lu_cong_arg)
             pr2serr("LU_CONG bit set in standard INQUIRY response\n");
     }
-    if (inhex_fn) {
-        if ((ret = sg_f2hex_arr(inhex_fn, do_raw, false, reportLunsBuff,
-                                &in_len, pg_sz))) {
+    if (op->inhex_fn) {
+        if ((ret = sg_f2hex_arr(op->inhex_fn, op->do_raw, false,
+                                reportLunsBuff, &in_len, pg_sz))) {
             if (SG_LIB_LBA_OUT_OF_RANGE == ret)
                 pr2serr("decode buffer [%d] not large enough??\n", pg_sz);
             goto the_end;
         }
-        if (verbose > 2)
+        if (op->verbose > 2)
             pr2serr("Read %d [0x%x] bytes of user supplied data\n",
                     in_len, in_len);
-        if (do_raw)
-            do_raw = false;    /* can interfere on decode */
+        if (op->do_raw)
+            op->do_raw = false;    /* can interfere on decode */
         if (in_len < 4) {
             pr2serr("--inhex=%s only decoded %d bytes (needs 4 at "
-                    "least)\n", inhex_fn, in_len);
+                    "least)\n", op->inhex_fn, in_len);
             ret = SG_LIB_SYNTAX_ERROR;
             goto the_end;
         }
         ret = 0;
     } else
-        ret = sg_ll_report_luns(sg_fd, select_rep, reportLunsBuff, maxlen,
-                                true, verbose);
+        ret = sg_ll_report_luns(sg_fd, op->select_rep, reportLunsBuff,
+                                op->maxlen, true, op->verbose);
     if (0 == ret) {
         list_len = sg_get_unaligned_be32(reportLunsBuff + 0);
         len_cap = list_len + 8;
-        if (len_cap > maxlen)
-            len_cap = maxlen;
-        if (do_raw) {
+        if (len_cap > op->maxlen)
+            len_cap = op->maxlen;
+        if (op->do_raw) {
             dStrRaw((const char *)reportLunsBuff, len_cap);
             goto the_end;
         }
-        if (do_hex > 0) {
-            if (1 == do_hex) {
+        if (op->do_hex > 0) {
+            if (1 == op->do_hex) {
                 hex2stdout(reportLunsBuff, len_cap, 1);
                 goto the_end;
-            } else if (do_hex > 2) {
-                if (do_hex > 3)
+            } else if (op->do_hex > 2) {
+                if (op->do_hex > 3)
                     sgj_pr_hr(jsp, "\n# %s\n", rl_pd_sn);
                 hex2stdout(reportLunsBuff, len_cap, -1);
                 goto the_end;
@@ -847,48 +930,48 @@ main(int argc, char * argv[])
         sgj_js_nv_ihex(jsp, jo2p, "lun_list_length", list_len);
         jap = sgj_named_subarray_r(jsp, jo2p, "lun_list");
         luns = (list_len / 8);
-        if (! do_quiet)
-            sgj_pr_hr(jsp, "Lun list length = %d which imples %d lun entr%s\n",
-                   list_len, luns, ((1 == luns) ? "y" : "ies"));
-        if ((list_len + 8) > maxlen) {
-            luns = ((maxlen - 8) / 8);
+        if (! op->do_quiet)
+            sgj_pr_hr(jsp, "Lun list length = %d which imples %d lun "
+                      "entr%s\n", list_len, luns,
+                      ((1 == luns) ? "y" : "ies"));
+        if ((list_len + 8) > op->maxlen) {
+            luns = ((op->maxlen - 8) / 8);
             trunc = true;
             pr2serr("  <<too many luns for internal buffer, will show %d "
                     "lun%s>>\n", luns, ((1 == luns) ? "" : "s"));
         }
-        if (verbose > 1) {
+        if (op->verbose > 1) {
             pr2serr("\nOutput response in hex\n");
-            hex2stderr(reportLunsBuff, (trunc ? maxlen : list_len + 8), 1);
+            hex2stderr(reportLunsBuff,
+                       (trunc ? op->maxlen : list_len + 8), 1);
         }
         for (k = 0, off = 8; k < luns; ++k, off += 8) {
             jo3p = sgj_new_unattached_object_r(jsp);
             sgj_js_nv_hex_bytes(jsp, jo3p, "lun", reportLunsBuff + off, 8);
             n = 0;
-            if (! do_quiet) {
+            if (! op->do_quiet) {
                 if (0 == k)
                     sgj_pr_hr(jsp, "Report luns [select_report=0x%x]:\n",
-                              select_rep);
+                              op->select_rep);
                 n = sg_scnpr(b + n, blen - n, "    ");
             }
             for (m = 0; m < 8; ++m)
                 n += sg_scnpr(b + n, blen - n, "%02x",
                               reportLunsBuff[off + m]);
 #ifdef SG_LIB_LINUX
-            if (do_linux) {
+            if (op->do_linux) {
                 uint64_t lin_lun;
 
                 lin_lun = t10_2linux_lun(reportLunsBuff + off);
-                if (do_hex > 1)
+                if (op->do_hex > 1)
                     sg_scnpr(b + n, blen - n, "    [0x%" PRIx64 "]", lin_lun);
                 else
                     sg_scnpr(b + n, blen - n, "    [%" PRIu64 "]", lin_lun);
             }
 #endif
             sgj_pr_hr(jsp, "%s\n", b);
-            if (decode_arg)
-                decode_lun("      ", reportLunsBuff + off,
-                           (bool)(lu_cong_arg % 2), do_hex, verbose, jsp,
-                           jo3p);
+            if (op->decode_arg)
+                decode_lun("      ", reportLunsBuff + off, op, jo3p);
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
         }
     } else if (SG_LIB_CAT_INVALID_OP == ret)
@@ -901,7 +984,7 @@ main(int argc, char * argv[])
     else {
         char d[80];
 
-        sg_get_category_sense_str(ret, sizeof(d), d, verbose);
+        sg_get_category_sense_str(ret, sizeof(d), d, op->verbose);
         pr2serr("Report Luns command: %s\n", d);
     }
 
@@ -917,20 +1000,20 @@ the_end:
                 ret = sg_convert_errno(-res);
         }
     }
-    if (0 == verbose) {
+    if (0 == op->verbose) {
         if (! sg_if_can2stderr("sg_luns failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
     }
     ret = (ret >= 0) ? ret : SG_LIB_CAT_OTHER;
-    if (do_json) {
+    if (op->do_json) {
         FILE * fp = stdout;
 
-        if (js_file) {
-            if ((1 != strlen(js_file)) || ('-' != js_file[0])) {
-                fp = fopen(js_file, "w");   /* truncate if exists */
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
                 if (NULL == fp) {
-                    pr2serr("unable to open file: %s\n", js_file);
+                    pr2serr("unable to open file: %s\n", op->js_file);
                     if (0 == ret)
                         ret = SG_LIB_FILE_ERROR;
                 }
@@ -939,7 +1022,7 @@ the_end:
         }
         if (fp)
             sgj_js2file(jsp, NULL, ret, fp);
-        if (js_file && fp && (stdout != fp))
+        if (op->js_file && fp && (stdout != fp))
             fclose(fp);
         sgj_finish(jsp);
     }

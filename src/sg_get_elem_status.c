@@ -37,7 +37,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.18 20230427";      /* sbc5r04 */
+static const char * version_str = "1.19 20230505";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -54,6 +54,25 @@ static const char * version_str = "1.18 20230427";      /* sbc5r04 */
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
+
+struct opts_t {
+    bool do_json;
+    bool do_raw;
+    bool o_readonly;
+    bool verbose_given;
+    bool version_given;
+    uint8_t filter;
+    uint8_t rt;
+    int do_brief;
+    int do_hex;
+    int maxlen;
+    int verbose;
+    uint32_t starting_elem;
+    const char * in_fn;
+    const char * json_arg;
+    const char * js_file;
+    sgj_state json_st;
+};
 
 struct gpes_desc_t {    /* info in returned physical status descriptor */
     bool restoration_allowed;   /* RALWD bit in sbc4r20a */
@@ -111,9 +130,9 @@ usage()
             "DEVICE,\n"
             "                        assumed to be ASCII hex or, if --raw, "
             "in binary\n"
-            "    --json[=JO]|-j[JO]     output in JSON instead of human "
-            "readable text\n"
-            "                           use --json=? for JSON help\n"
+            "    --json[=JO]|-j[=JO]     output in JSON instead of plain "
+            "text\n"
+            "                            use --json=? for JSON help\n"
             "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
             "output is\n"
             "                            written (def: stdout); truncates "
@@ -150,10 +169,8 @@ usage()
 /* Invokes a SCSI GET PHYSICAL ELEMENT STATUS command (SBC-4).  Return of
  * 0 -> success, various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
-sg_ll_get_phy_elem_status(int sg_fd, uint32_t starting_elem, uint8_t filter,
-                          uint8_t report_type, uint8_t * resp,
-                          uint32_t alloc_len, int * residp, bool noisy,
-                          int verbose)
+sg_ll_get_phy_elem_status(int sg_fd, uint8_t * resp, int * residp,
+			  struct opts_t * op)
 {
     int k, ret, res, sense_cat;
     uint8_t gpesCmd[16] = {SG_SERVICE_ACTION_IN_16,
@@ -163,14 +180,14 @@ sg_ll_get_phy_elem_status(int sg_fd, uint32_t starting_elem, uint8_t filter,
     struct sg_pt_base * ptvp;
     static const char * const cmd_name = "Get physical element status";
 
-    if (starting_elem)
-        sg_put_unaligned_be32(starting_elem, gpesCmd + 6);
-    sg_put_unaligned_be32(alloc_len, gpesCmd + 10);
-    if (filter)
-        gpesCmd[14] |= filter << 6;
-    if (report_type)
-        gpesCmd[14] |= (0xf & report_type);
-    if (verbose) {
+    if (op->starting_elem)
+        sg_put_unaligned_be32(op->starting_elem, gpesCmd + 6);
+    sg_put_unaligned_be32(op->maxlen, gpesCmd + 10);
+    if (op->filter)
+        gpesCmd[14] |= op->filter << 6;
+    if (op->rt)
+        gpesCmd[14] |= (0xf & op->rt);
+    if (op->verbose) {
         char b[128];
 
         pr2serr("    %s cdb: %s\n", cmd_name,
@@ -178,16 +195,16 @@ sg_ll_get_phy_elem_status(int sg_fd, uint32_t starting_elem, uint8_t filter,
                                    sizeof(b), b));
     }
 
-    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, verbose);
+    ptvp = construct_scsi_pt_obj_with_fd(sg_fd, op->verbose);
     if (NULL == ptvp) {
         pr2serr("%s: out of memory\n", cmd_name);
         return -1;
     }
     set_scsi_pt_cdb(ptvp, gpesCmd, sizeof(gpesCmd));
-    set_scsi_pt_data_in(ptvp, resp, alloc_len);
+    set_scsi_pt_data_in(ptvp, resp, op->maxlen);
     set_scsi_pt_sense(ptvp, sense_b, sizeof(sense_b));
-    res = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, verbose);
-    ret = sg_cmds_process_resp(ptvp, cmd_name, res, noisy, verbose,
+    res = do_scsi_pt(ptvp, -1, DEF_PT_TIMEOUT, op->verbose);
+    ret = sg_cmds_process_resp(ptvp, cmd_name, res, true, op->verbose,
                                &sense_cat);
     if (-1 == ret) {
         if (get_scsi_pt_transport_err(ptvp))
@@ -206,13 +223,13 @@ sg_ll_get_phy_elem_status(int sg_fd, uint32_t starting_elem, uint8_t filter,
         }
     } else
         ret = 0;
-    k = ret ? (int)alloc_len : get_scsi_pt_resid(ptvp);
+    k = ret ? (int)op->maxlen : get_scsi_pt_resid(ptvp);
     if (residp)
         *residp = k;
-    if ((verbose > 2) && ((alloc_len - k) > 0)) {
+    if ((op->verbose > 2) && ((op->maxlen - k) > 0)) {
         pr2serr("%s: parameter data returned:\n", cmd_name);
-        hex2stderr((const uint8_t *)resp, alloc_len - k,
-                   ((verbose > 3) ? -1 : 1));
+        hex2stderr((const uint8_t *)resp, op->maxlen - k,
+                   ((op->verbose > 3) ? -1 : 1));
     }
     destruct_scsi_pt_obj(ptvp);
     return ret;
@@ -274,49 +291,79 @@ fetch_health_str(uint8_t health, char * bp, int max_blen)
     return add_val;
 }
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, SG_LIB_SYNTAX_ERROR for syntax error
+ * and SG_LIB_OK_FALSE for exit with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct opts_t * op)
+{
+    /* only need to process short, non-argument options */
+    switch (sopt_ch) {
+    case 'b':
+        ++op->do_brief;
+        break;
+    case 'h':
+    case '?':
+        usage();
+        return SG_LIB_OK_FALSE;
+    case 'H':
+        ++op->do_hex;
+        break;
+    case 'j':
+        break;  /* simply ignore second 'j' (e.g. '-jxj') */
+    case 'r':
+        op->do_raw = true;
+        break;
+    case 'R':
+        op->o_readonly = true;
+        break;
+    case 'v':
+        op->verbose_given = true;
+        ++op->verbose;
+        break;
+    case 'V':
+        op->version_given = true;
+        break;
+    default:
+        pr2serr("unrecognised option code %c [0x%x] ??\n", sopt_ch, sopt_ch);
+        usage();
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    return 0;
+}
+
 
 int
 main(int argc, char * argv[])
 {
-    bool do_json = false;
-    bool do_raw = false;
     bool no_final_msg = false;
-    bool o_readonly = false;
-    bool verbose_given = false;
-    bool version_given = false;
-    int k, j, m, n, res, c, rlen, in_len;
+    int k, j, m, n, q, res, c, rlen, in_len;
     int sg_fd = -1;
-    int do_brief = 0;
-    int do_hex = 0;
     int resid = 0;
     int ret = 0;
-    int maxlen = DEF_GPES_BUFF_LEN;
-    int verbose = 0;
-    uint8_t filter = 0;
-    uint8_t rt = 0;
     uint16_t cur_max_num_depop, cur_num_depop;
     uint32_t num_desc, num_desc_ret, id_elem_depop;
-    uint32_t starting_elem = 0;
     int64_t ll;
     const char * device_name = NULL;
-    const char * in_fn = NULL;
-    const char * json_arg = NULL;
-    const char * js_file = NULL;
     const char * cp;
     const uint8_t * bp;
     uint8_t * gpesBuffp = gpesBuff;
     uint8_t * free_gpesBuffp = NULL;
+    struct opts_t * op;
     sgj_opaque_p jop = NULL;
     sgj_opaque_p jo2p;
     sgj_opaque_p jap = NULL;
+    sgj_state * jsp;
     struct gpes_desc_t a_ped;
-    sgj_state json_st SG_C_CPP_ZERO_INIT;
-    sgj_state * jsp = &json_st;
     char b[80];
+    struct opts_t opts SG_C_CPP_ZERO_INIT;
     static const int blen = sizeof(b);
     static const char * cmnode_s =
                 "Current maximum number of depopulated elements";
 
+    op = &opts;
+    op->maxlen = DEF_GPES_BUFF_LEN;
     if (getenv("SG3_UTILS_INVOCATION"))
         sg_rep_invocation(MY_NAME, version_str, argc, argv, stderr);
     while (1) {
@@ -329,7 +376,7 @@ main(int argc, char * argv[])
 
         switch (c) {
         case 'b':
-            ++do_brief;
+            ++op->do_brief;
             break;
         case 'f':
             n = sg_get_num_nomult(optarg);
@@ -338,46 +385,61 @@ main(int argc, char * argv[])
                         "(inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            filter = n;
+            op->filter = n;
             break;
         case 'h':
         case '?':
             usage();
             return 0;
         case 'H':
-            ++do_hex;
+            ++op->do_hex;
             break;
         case 'i':
-            in_fn = optarg;
+            op->in_fn = optarg;
             break;
         case 'j':
-            do_json = true;
-            json_arg = optarg;
+            op->do_json = true;
+            /* Now want '=' to precede JSON optional arguments */
+            if (optarg) {
+                if ('=' == *optarg) {
+                    op->json_arg = optarg + 1;
+                    break;
+                }
+                n = strlen(optarg);
+                for (k = 0; k < n; ++k) {
+                    q = chk_short_opts(*(optarg + k), op);
+                    if (SG_LIB_SYNTAX_ERROR == q)
+                        return SG_LIB_SYNTAX_ERROR;
+                    if (SG_LIB_OK_FALSE == q)
+                        return 0;
+                }
+            } else
+                op->json_arg = NULL;
             break;
         case 'J':
-            do_json = true;
-            js_file = optarg;
+            op->do_json = true;
+            op->js_file = optarg;
             break;
         case 'm':
-            maxlen = sg_get_num(optarg);
-            if ((maxlen < 0) || (maxlen > MAX_GPES_BUFF_LEN)) {
+            op->maxlen = sg_get_num(optarg);
+            if ((op->maxlen < 0) || (op->maxlen > MAX_GPES_BUFF_LEN)) {
                 pr2serr("argument to '--maxlen' should be %d or less\n",
                         MAX_GPES_BUFF_LEN);
                 return SG_LIB_SYNTAX_ERROR;
             }
-            if (0 == maxlen)
-                maxlen = DEF_GPES_BUFF_LEN;
-            else if (maxlen < MIN_MAXLEN) {
+            if (0 == op->maxlen)
+                op->maxlen = DEF_GPES_BUFF_LEN;
+            else if (op->maxlen < MIN_MAXLEN) {
                 pr2serr("Warning: --maxlen=LEN less than %d ignored\n",
                         MIN_MAXLEN);
-                maxlen = DEF_GPES_BUFF_LEN;
+                op->maxlen = DEF_GPES_BUFF_LEN;
             }
             break;
         case 'r':
-            do_raw = true;
+            op->do_raw = true;
             break;
         case 'R':
-            o_readonly = true;
+            op->o_readonly = true;
             break;
         case 's':
             ll = sg_get_llnum(optarg);
@@ -385,7 +447,7 @@ main(int argc, char * argv[])
                 pr2serr("bad argument to '--starting='\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            starting_elem = (uint32_t)ll;
+            op->starting_elem = (uint32_t)ll;
             break;
         case 't':       /* --report-type=RT */
             n = sg_get_num_nomult(optarg);
@@ -394,17 +456,17 @@ main(int argc, char * argv[])
                         "(inclusive)\n");
                 return SG_LIB_SYNTAX_ERROR;
             }
-            rt = n;
+            op->rt = n;
             break;
         case 'v':
-            verbose_given = true;
-            ++verbose;
+            op->verbose_given = true;
+            ++op->verbose;
             break;
         case 'V':
-            version_given = true;
+            op->version_given = true;
             break;
         default:
-            pr2serr("unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code %c [0x%x] ??\n", c, c);
             usage();
             return SG_LIB_SYNTAX_ERROR;
         }
@@ -424,26 +486,27 @@ main(int argc, char * argv[])
 
 #ifdef DEBUG
     pr2serr("In DEBUG mode, ");
-    if (verbose_given && version_given) {
+    if (op->verbose_given && op->version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
-        version_given = false;
-        verbose = 0;
-    } else if (! verbose_given) {
+        op->verbose_given = false;
+        op->version_given = false;
+        op->verbose = 0;
+    } else if (! op->verbose_given) {
         pr2serr("set '-vv'\n");
-        verbose = 2;
+        op->verbose = 2;
     } else
-        pr2serr("keep verbose=%d\n", verbose);
+        pr2serr("keep verbose=%d\n", op->verbose);
 #else
-    if (verbose_given && version_given)
+    if (op->verbose_given && op->version_given)
         pr2serr("Not in DEBUG mode, so '-vV' has no special action\n");
 #endif
-    if (version_given) {
+    if (op->version_given) {
         pr2serr("version: %s\n", version_str);
         return 0;
     }
-    if (do_json) {
-       if (! sgj_init_state(jsp, json_arg)) {
+    jsp = &op->json_st;
+    if (op->do_json) {
+       if (! sgj_init_state(jsp, op->json_arg)) {
             int bad_char = jsp->first_bad_char;
             char e[1500];
 
@@ -459,25 +522,25 @@ main(int argc, char * argv[])
         jop = sgj_start_r(MY_NAME, version_str, argc, argv, jsp);
     }
 
-    if (maxlen > DEF_GPES_BUFF_LEN) {
-        gpesBuffp = (uint8_t *)sg_memalign(maxlen, 0, &free_gpesBuffp,
-                                           verbose > 3);
+    if (op->maxlen > DEF_GPES_BUFF_LEN) {
+        gpesBuffp = (uint8_t *)sg_memalign(op->maxlen, 0, &free_gpesBuffp,
+                                           op->verbose > 3);
         if (NULL == gpesBuffp) {
-            pr2serr("unable to allocate %d bytes on heap\n", maxlen);
+            pr2serr("unable to allocate %d bytes on heap\n", op->maxlen);
             return sg_convert_errno(ENOMEM);
         }
     }
-    if (device_name && in_fn) {
+    if (device_name && op->in_fn) {
         pr2serr("ignoring DEVICE, best to give DEVICE or --inhex=FN, but "
                 "not both\n");
         device_name = NULL;
     }
     if (NULL == device_name) {
-        if (in_fn) {
-            if ((ret = sg_f2hex_arr(in_fn, do_raw, false, gpesBuffp,
-                                    &in_len, maxlen))) {
+        if (op->in_fn) {
+            if ((ret = sg_f2hex_arr(op->in_fn, op->do_raw, false, gpesBuffp,
+                                    &in_len, op->maxlen))) {
                 if (SG_LIB_LBA_OUT_OF_RANGE == ret) {
-                    pr2serr("--maxlen=%d needs to be increased", maxlen);
+                    pr2serr("--maxlen=%d needs to be increased", op->maxlen);
                     if (in_len > 7) {
                         n = (sg_get_unaligned_be32(gpesBuffp + 4) *
                              GPES_DESC_LEN) + GPES_DESC_OFFSET;
@@ -489,14 +552,14 @@ main(int argc, char * argv[])
                 } else
                     goto fini;
             }
-            if (verbose > 2)
+            if (op->verbose > 2)
                 pr2serr("Read %d [0x%x] bytes of user supplied data\n",
                         in_len, in_len);
-            if (do_raw)
-                do_raw = false;    /* can interfere on decode */
+            if (op->do_raw)
+                op->do_raw = false;    /* can interfere on decode */
             if (in_len < 4) {
                 pr2serr("--in=%s only decoded %d bytes (needs 4 at least)\n",
-                        in_fn, in_len);
+                        op->in_fn, in_len);
                 ret = SG_LIB_SYNTAX_ERROR;
                 goto fini;
             }
@@ -509,52 +572,51 @@ main(int argc, char * argv[])
             goto fini;
         }
     }
-    if (do_raw) {
+    if (op->do_raw) {
         if (sg_set_binary_mode(STDOUT_FILENO) < 0) {
             perror("sg_set_binary_mode");
             ret = SG_LIB_FILE_ERROR;
             goto fini;
         }
     }
-    sg_fd = sg_cmds_open_device(device_name, o_readonly, verbose);
+    sg_fd = sg_cmds_open_device(device_name, op->o_readonly, op->verbose);
     if (sg_fd < 0) {
         pr2serr("open error: %s: %s\n", device_name, safe_strerror(-sg_fd));
         ret = sg_convert_errno(-sg_fd);
         goto fini;
     }
 
-    res = sg_ll_get_phy_elem_status(sg_fd, starting_elem, filter, rt,
-                                    gpesBuffp, maxlen, &resid, true, verbose);
+    res = sg_ll_get_phy_elem_status(sg_fd, gpesBuffp, &resid, op);
     ret = res;
     if (res)
         goto error;
 
 start_response:
-    k = maxlen - resid;
+    k = op->maxlen - resid;
     if (k < 4) {
         pr2serr("Response too short (%d bytes) due to resid (%d)\n", k,
                 resid);
-        if ((k > 0) && (do_raw || do_hex)) {
-            if (do_hex) {
-                if (do_hex > 2)
+        if ((k > 0) && (op->do_raw || op->do_hex)) {
+            if (op->do_hex) {
+                if (op->do_hex > 2)
                     hex2stdout(gpesBuffp, k, -1);
                 else
-                    hex2stdout(gpesBuffp, k, (2 == do_hex) ? 0 : 1);
+                    hex2stdout(gpesBuffp, k, (2 == op->do_hex) ? 0 : 1);
             } else
                 dStrRaw((const char *)gpesBuffp, k);
         }
         ret = SG_LIB_CAT_MALFORMED;
         goto fini;
     } else
-        maxlen -= resid;
+        op->maxlen -= resid;
     num_desc = sg_get_unaligned_be32(gpesBuffp + 0);
-    if (maxlen > 7) {
+    if (op->maxlen > 7) {
         num_desc_ret = sg_get_unaligned_be32(gpesBuffp + 4);
-        id_elem_depop = (maxlen > 11) ?
+        id_elem_depop = (op->maxlen > 11) ?
                                 sg_get_unaligned_be32(gpesBuffp + 8) : 0;
-        cur_max_num_depop = (maxlen > 13) ?
+        cur_max_num_depop = (op->maxlen > 13) ?
                                 sg_get_unaligned_be16(gpesBuffp + 12) : 0;
-        cur_num_depop = (maxlen > 15) ?
+        cur_num_depop = (op->maxlen > 15) ?
                                 sg_get_unaligned_be16(gpesBuffp + 14) : 0;
     } else {
         num_desc_ret = 0;
@@ -563,23 +625,23 @@ start_response:
         cur_num_depop = 0;
     }
     rlen = (num_desc_ret * GPES_DESC_LEN) + GPES_DESC_OFFSET;
-    if ((verbose > 1) || (verbose && (rlen > maxlen))) {
+    if ((op->verbose > 1) || (op->verbose && (rlen > op->maxlen))) {
         pr2serr("response length %d bytes\n", rlen);
-        if (rlen > maxlen)
+        if (rlen > op->maxlen)
             pr2serr("  ... which is greater than maxlen (allocation "
-                    "length %d), truncation\n", maxlen);
+                    "length %d), truncation\n", op->maxlen);
     }
-    if (rlen > maxlen)
-        rlen = maxlen;
-    if (do_raw) {
+    if (rlen > op->maxlen)
+        rlen = op->maxlen;
+    if (op->do_raw) {
         dStrRaw((const char *)gpesBuffp, rlen);
         goto fini;
     }
-    if (do_hex) {
-        if (do_hex > 2)
+    if (op->do_hex) {
+        if (op->do_hex > 2)
             hex2stdout(gpesBuffp, rlen, -1);
         else
-            hex2stdout(gpesBuffp, rlen,  (2 == do_hex) ? 0 : 1);
+            hex2stdout(gpesBuffp, rlen,  (2 == op->do_hex) ? 0 : 1);
         goto fini;
     }
 
@@ -602,7 +664,7 @@ start_response:
                   "available\n");
         goto fini;
     } else {
-        if (do_brief > 2)
+        if (op->do_brief > 2)
             goto fini;
         sgj_pr_hr(jsp, "\n");
     }
@@ -612,7 +674,7 @@ start_response:
                                    "physical_element_status_descriptor_list");
     for (bp = gpesBuffp + GPES_DESC_OFFSET, k = 0; k < (int)num_desc_ret;
          bp += GPES_DESC_LEN, ++k) {
-        if ((0 == k) && (do_brief < 2))
+        if ((0 == k) && (op->do_brief < 2))
             sgj_pr_hr(jsp, "Element descriptors:\n");
         decode_elem_status_desc(bp, &a_ped);
         if (jsp->pr_as_json) {
@@ -628,7 +690,7 @@ start_response:
             sgj_js_nv_ihex(jsp, jo2p, "associated_capacity",
                            (int64_t)a_ped.assoc_cap);
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
-        } else if (do_brief) {
+        } else if (op->do_brief) {
             sgj_pr_hr(jsp, "%u: %u,%u\n", a_ped.elem_id, a_ped.phys_elem_type,
                       a_ped.phys_elem_health);
         } else {
@@ -663,7 +725,7 @@ error:
     else if (SG_LIB_CAT_ILLEGAL_REQ == res)
         pr2serr("Get LBA Status command: bad field in cdb\n");
     else {
-        sg_get_category_sense_str(res, sizeof(b), b, verbose);
+        sg_get_category_sense_str(res, sizeof(b), b, op->verbose);
         pr2serr("Get LBA Status command: %s\n", b);
     }
 
@@ -678,7 +740,7 @@ fini:
     }
     if (free_gpesBuffp)
         free(free_gpesBuffp);
-    if ((0 == verbose) && (! no_final_msg)) {
+    if ((0 == op->verbose) && (! no_final_msg)) {
         if (! sg_if_can2stderr("sg_get_elem_status failed: ", ret))
             pr2serr("Some error occurred, try again with '-v' or '-vv' for "
                     "more information\n");
@@ -687,13 +749,13 @@ fini:
     if (jsp->pr_as_json) {
         FILE * fp = stdout;
 
-        if (js_file) {
-            if ((1 != strlen(js_file)) || ('-' != js_file[0])) {
-                fp = fopen(js_file, "w");   /* truncate if exists */
+        if (op->js_file) {
+            if ((1 != strlen(op->js_file)) || ('-' != op->js_file[0])) {
+                fp = fopen(op->js_file, "w");   /* truncate if exists */
                 if (NULL == fp) {
                     int e = errno;
 
-                    pr2serr("unable to open file: %s [%s]\n", js_file,
+                    pr2serr("unable to open file: %s [%s]\n", op->js_file,
                             safe_strerror(e));
                     ret = sg_convert_errno(e);
                 }
@@ -702,7 +764,7 @@ fini:
         }
         if (fp)
             sgj_js2file(jsp, NULL, ret, fp);
-        if (js_file && fp && (stdout != fp))
+        if (op->js_file && fp && (stdout != fp))
             fclose(fp);
         sgj_finish(jsp);
     }

@@ -126,7 +126,7 @@ sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
         negate = false;
         switch (c) {
         case '=':
-            if (0 == k)
+            if (0 == k) /* should remove this, allows '-j==h' */
                 break;  /* allow and ignore leading '=' */
             bad_arg = true;
             if (0 == jsp->first_bad_char)
@@ -214,7 +214,7 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
         goto fini;
     n +=  sg_scnpr(b + n, blen - n, "JSON option usage:\n");
     n +=  sg_scnpr(b + n, blen - n,
-                   "     --json[-JO] | -%c[JO]\n\n", short_opt);
+                   "     --json[=JO] | -%c[=JO]\n\n", short_opt);
     n +=  sg_scnpr(b + n, blen - n, "  where JO is a string of one or more "
                    "of:\n");
     n +=  sg_scnpr(b + n, blen - n,
@@ -248,9 +248,6 @@ sg_json_usage(int char_if_not_j, char * b, int blen)
                    "'meaning')\n");
     n +=  sg_scnpr(b + n, blen - n,
                    "      v    make JSON output more verbose\n");
-    n +=  sg_scnpr(b + n, blen - n,
-                   "      =    ignored if first character, else it's an "
-                   "error\n");
     n +=  sg_scnpr(b + n, blen - n,
                    "      - | ~ | !    toggle next letter setting\n");
 

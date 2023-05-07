@@ -63,18 +63,19 @@ stderr: 'error parsing SG3_UTILS_JSON_OPTS environment variable, ignore'.
 Since the argument to \fI\-\-json[=JO]\fR is optional, in the shorter form
 there can be no space(s) between the option and its argument.
 .TP
-\fB\-j[JO]\fR, \fB\-\-json\fR\fI[=JO]\fR
-\fIJO\fR is a string of 0 or more characters whose order is not significant
+\fB\-j[=JO]\fR, \fB\-\-json\fR\fI[=JO]\fR
+\fIJO\fR is a string of zero or more characters whose order is not significant
 apart from the negation characters ('\-' is preferred). The negation character
 must appear immediately before the (boolean) feature it is toggling.
 .br
 In the short form the option letter may be other than \fI\-j\fR if that letter
 has already been used (\fI\-J\fR is preferred next). For example the sg_ses
 utility uses \fI\-j\fR for its 'join' operation. Also since the argument to
-the short form option is itself optional, there can be no space between the
-short form option and \fIJO\fR, if it is given. To make this read a little
-better on the command line, '=' may be first character of \fIJO\fR, so for
-example, this is valid '\-j=av'.
+the short form option is itself optional, there can be no spaces between the
+short form option, the "=", and \fIJO\fR, if it is given. Some short form
+examples: '-jl' requests JSON output (with no argument option) and whatever
+the '-l' short option means in the invoked utility; '-j=h' requests JSON
+output with some integers additional rendered as JSON strings of hex.
 .TP
 \fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
 output is in JSON format and it is sent to a file named \fIJFN\fR. If that

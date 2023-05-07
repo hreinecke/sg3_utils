@@ -1,4 +1,4 @@
-.TH SG_SES "8" "April 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_SES "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_ses \- access a SCSI Enclosure Services (SES) device
 .SH SYNOPSIS
@@ -336,10 +336,12 @@ NAME, DEVICE SLOT NUMBER AND SAS ADDRESS sections below.
 This option implies the \fI\-\-status\fR option. Giving the \fI\-\-control\fR
 option with this option is an error.
 .TP
-\fB\-J\fR, \fB\-\-json[\fR=\fIJO\fR]
-output is in JSON format instead of human readable form. For general
-information about JSON usage in this package see the sg3_utils_json manpage
-or use '?' for \fIJO\fR in order to have a summary printed to stderr.
+\fB\-J\fR[=\fIJO\fR], \fB\-\-json\fR[=\fIJO\fR]
+output is in JSON format instead of plain text form. Note that arguments
+to the short and long form are themselves optional and if present start
+with "=" and no whitespace is permitted around that "=".
+.br
+See sg3_utils_json manpage or use '?' for \fIJO\fR to get a summary.
 For more specific information about JSON output with this utility, see the
 JSON INFORMATION section below.
 .TP
@@ -788,7 +790,7 @@ Status" dpage's Enclosure status element. As required, the corresponding
 Additional element status, Element descriptor by type element, and
 Threshold status descriptors may also appear.
 .PP
-The human readable output (which is output by default) tends to trim output
+The plain text output (which is output by default) tends to trim output
 when a line of element values are all 0. On the other hand when JSON output
 is chosen, all fields, that meet the requirements of the command line
 options, are output.

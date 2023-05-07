@@ -316,8 +316,8 @@ usage()
             "DEVICE;\n"
             "                        if used with --raw then read binary "
             "from FN\n"
-            "    --json[=JO]|-j[JO]    output in JSON instead of human "
-            "readable text.\n"
+            "    --json[=JO]|-j[=JO]    output in JSON instead of plain "
+            "text\n"
             "                          Use --json=? for JSON help\n"
             "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
             "output is\n"
@@ -394,8 +394,7 @@ usage_old()
             "    -H    output in hex (ASCII to the right) [same as '-h']\n"
             "    -i    decode device identification VPD page (0x83)\n"
             "    -I=FN    use ASCII hex in file FN instead of DEVICE\n"
-            "    -j[=JO]    output in JSON instead of human readable "
-            "text.\n"
+            "    -j[=JO]    output in JSON instead of plain text\n"
             "    -l=LEN    requested response length (def: 0 "
             "-> fetch 36\n"
             "                    bytes first, then fetch again as "
@@ -441,12 +440,112 @@ usage_for(const struct opts_t * op)
 
 #endif /* SG_SCSI_STRINGS */
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, SG_LIB_SYNTAX_ERROR for syntax error
+ * and SG_LIB_OK_FALSE for exit with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct opts_t * op)
+{
+    /* only need to process short, non-argument options */
+    switch (sopt_ch) {
+#if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
+    defined(HDIO_GET_IDENTITY)
+    case 'a':
+        op->do_ata = true;
+        break;
+#endif
+    case 'c':
+        ++op->do_cmddt;
+        break;
+    case 'd':
+        op->do_descriptors = true;
+        break;
+    case 'D':
+        op->do_debug = true;
+        break;
+    case 'e':
+        op->do_vpd = true;
+        break;
+    case 'E':       /* --extended */
+    case 'x':
+        op->do_decode = true;
+        op->do_vpd = true;
+        op->vpd_pn = VPD_EXT_INQ;
+        op->page_given = true;
+        break;
+    case 'f':
+        op->do_force = true;
+        break;
+    case 'h':
+        ++op->do_help;
+        break;
+    case 'j':
+        break;  /* simply ignore second 'j' (e.g. '-jxj') */
+    case 'o':
+        op->do_only = true;
+        break;
+    case '?':
+        if (! op->do_help)
+            ++op->do_help;
+        break;
+    case 'H':
+        ++op->do_hex;
+        break;
+    case 'i':
+        op->do_decode = true;
+        op->do_vpd = true;
+        op->vpd_pn = VPD_DEVICE_ID;
+        op->page_given = true;
+        break;
+    case 'I':
+        op->inhex_fn = optarg;
+        break;
+    case 'L':
+        ++op->do_long;
+        break;
+#ifdef SG_SCSI_STRINGS
+    case 'N':
+        break;      /* ignore */
+    case 'O':
+        op->opt_new = false;
+        return 0;
+#endif
+    case 'q':
+        op->do_quiet = true;
+        break;
+    case 'r':
+        ++op->do_raw;
+        break;
+    case 's':
+        ++op->do_vendor;
+        break;
+    case 'u':
+        op->do_export = true;
+        break;
+    case 'v':
+        op->verbose_given = true;
+        ++op->verbose;
+        break;
+    case 'V':
+        op->version_given = true;
+        break;
+    default:
+        pr2serr("unrecognised option code %c [0x%x]\n", sopt_ch, sopt_ch);
+        if (op->do_help)
+            break;
+        usage_for(op);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    return 0;
+}
+
 /* Processes command line options according to new option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
 new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
 {
-    int c, n;
+    int c, k, n, q;
 
     while (1) {
         int option_index = 0;
@@ -519,7 +618,22 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             break;
         case 'j':
             op->do_json = true;
-            op->json_arg = optarg;
+            /* Now want '=' to precede JSON optional arguments */
+            if (optarg) {
+                if ('=' == *optarg) {
+                    op->json_arg = optarg + 1;
+                    break;
+                }
+                n = strlen(optarg);
+                for (k = 0; k < n; ++k) {
+                    q = chk_short_opts(*(optarg + k), op);
+                    if (SG_LIB_SYNTAX_ERROR == q)
+                        return SG_LIB_SYNTAX_ERROR;
+                    if (SG_LIB_OK_FALSE == q)
+                        return 0;
+                }
+            } else
+                op->json_arg = NULL;
             break;
         case 'J':
             op->do_json = true;

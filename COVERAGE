@@ -173,7 +173,7 @@ by examining the response to the NVMe Identify command.
 
 (2) this command was known as REPORT DEVICE IDENTIFIER prior to spc4r07
 (3) this command was known as SET DEVICE IDENTIFIER prior to spc4r07
-<J> decoded results may be output in JSON instead of human readable form
+<J> decoded results may be output in JSON instead of plain test form
     which is the default
 
 Note that any SCSI command, including bi-directional and variable length
@@ -187,4 +187,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-20 April 2023
+5 May 2023

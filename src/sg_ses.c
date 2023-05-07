@@ -40,7 +40,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.79 20230420";    /* ses4r04 */
+static const char * version_str = "2.80 20230506";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 
@@ -1056,9 +1056,9 @@ usage(int help_num)
             "                        and Additional Element Status pages. "
             "Use twice\n"
             "                        to add Threshold In page\n"
-            "    --json[=JO]|-J[JO]    output in JSON instead of human "
-            "readable\n"
-            "                          test. Use --json=? for JSON help\n"
+            "    --json[=JO]|-J[=JO]    output in JSON instead of plain "
+            "text.\n"
+            "                           Use --json=? for JSON help\n"
             "    --page=PG|-p PG     diagnostic page code (abbreviation "
             "or number)\n"
             "                        (def: 'ssp' [0x0] (supported diagnostic "
@@ -1377,6 +1377,89 @@ dpage_has_control_variant(int page_num)
     return false;
 }
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, SG_LIB_SYNTAX_ERROR for syntax error
+ * and SG_LIB_OK_FALSE for exit with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct opts_t * op)
+{
+    /* only need to process short, non-argument options */
+    switch (sopt_ch) {
+    case 'a':       /* --all is synonym for --join */
+        ++op->do_join;
+        op->do_all = true;
+        break;
+    case 'c':
+        op->do_control = true;
+        break;
+    case 'e':
+        ++op->enumerate;
+        break;
+    case 'f':
+        ++op->do_filter;
+        break;
+    case 'F':
+        op->no_config = true;
+        break;
+    case 'h':
+    case '?':
+        ++op->do_help;
+        break;
+    case 'H':
+        ++op->do_hex;
+        break;
+    case 'i':
+        ++op->inner_hex;
+        break;
+    case 'j':
+        ++op->do_join;
+        break;
+    case 'J':  /* corresponds to --json[=JO] ; ignore as have one already */
+        break;
+    case 'l':
+        op->do_list = true;
+        break;
+    case 'M':
+        op->mask_ign = true;
+        break;
+    case 'q':
+        op->quiet = true;
+        break;
+    case 'r':
+        ++op->do_raw;
+        break;
+    case 'R':
+        op->o_readonly = true;
+        break;
+    case 's':
+        op->do_status = true;
+        break;
+    case 'v':
+        op->verbose_given = true;
+        ++op->verbose;
+        break;
+    case 'V':
+        op->version_given = true;
+        break;
+    case 'w':
+        op->do_warn = true;
+        break;
+    case 'y':
+        op->no_time = true;
+        break;
+    case 'z':       /* --ALL */
+        /* -A already used for --sas-addr=SA shortened form */
+        op->do_join += 2;
+        op->do_all = true;
+        break;
+    default:
+        pr2serr("unrecognised option code %c [0x%x] ??\n", sopt_ch, sopt_ch);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    return 0;
+}
+
 /* command line process, options and arguments. Returns 0 if ok. */
 static int
 parse_cmd_line(struct opts_t *op, int argc, char *argv[])
@@ -1508,9 +1591,26 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'j':
             ++op->do_join;
             break;
-        case 'J':       /* corresponds to --json[=JO] */
-            op->json_arg = optarg;
+        case 'J':       /* corresponds to --json[=JO] ; --js-file= --> -Q */
             op->do_json = true;
+           /* Now want '=' to precede JSON optional arguments */
+            if (optarg) {
+                int k, q;
+
+                if ('=' == *optarg) {
+                    op->json_arg = optarg + 1;
+                    break;
+                }
+                n = strlen(optarg);
+                for (k = 0; k < n; ++k) {
+                    q = chk_short_opts(*(optarg + k), op);
+                    if (SG_LIB_SYNTAX_ERROR == q)
+                        return SG_LIB_SYNTAX_ERROR;
+                    if (SG_LIB_OK_FALSE == q)
+                        return 0;
+                }
+            } else
+                op->json_arg = NULL;
             break;
         case 'l':
             op->do_list = true;
@@ -1636,7 +1736,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->do_all = true;
             break;
         default:
-            pr2serr("unrecognised option code 0x%x ??\n", c);
+            pr2serr("unrecognised option code %c [0x%x] ??\n", c, c);
             goto err_help;
         }
     }

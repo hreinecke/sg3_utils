@@ -1,4 +1,4 @@
-.TH SG_LOGS "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_LOGS "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_logs \- access log pages with SCSI LOG SENSE command
 .SH SYNOPSIS
@@ -203,9 +203,12 @@ comma separated. Anything from and including a hash mark to the end of line
 is ignored. If the \fI\-\-raw\fR option is also given then \fIFN\fR is
 treated as binary.
 .TP
-\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
-output is in JSON format instead of human readable form. See sg3_utils_json
-manpage or use '?' for \fIJO\fR in order to have a summary printed to stderr.
+\fB\-j\fR[=\fIJO\fR], \fB\-\-json\fR[=\fIJO\fR]
+output is in JSON format instead of plain text form. Note that arguments
+to the short and long form are themselves optional and if present start
+with "=" and no whitespace is permitted around that "=".
+.br
+See sg3_utils_json manpage or use '?' for \fIJO\fR to get a summary.
 .TP
 \fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
 output is in JSON format and it is sent to a file named \fIJFN\fR. If that

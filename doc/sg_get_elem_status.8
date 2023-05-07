@@ -1,4 +1,4 @@
-.TH SG_GET_ELEM_STATUS "8" "November 2022" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_GET_ELEM_STATUS "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_get_elem_status \- send SCSI GET PHYSICAL ELEMENT STATUS command
 .SH SYNOPSIS
@@ -70,9 +70,12 @@ a warning is issued and the utility continues, decoding the file named
 sg3_utils manpage for more information. If the \fI\-\-raw\fR option is
 also given then the contents of \fIFN\fR are treated as binary.
 .TP
-\fB\-j\fR, \fB\-\-json[\fR=\fIJO\fR]
-output is in JSON format instead of human readable form. See sg3_utils_json
-manpage or use '?' for \fIJO\fR for a summary.
+\fB\-j\fR[=\fIJO\fR], \fB\-\-json\fR[=\fIJO\fR]
+output is in JSON format instead of plain text form. Note that arguments
+to the short and long form are themselves optional and if present start
+with "=" and no whitespace is permitted around that "=".
+.br
+See sg3_utils_json manpage or use '?' for \fIJO\fR to get a summary.
 .TP
 \fB\-J\fR, \fB\-\-js\-file\fR=\fIJFN\fR
 output is in JSON format and it is sent to a file named \fIJFN\fR. If that

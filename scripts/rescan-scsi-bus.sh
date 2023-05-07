@@ -75,7 +75,7 @@ findhosts_26 ()
     echo "No SCSI host adapters found in sysfs"
     exit 1;
   fi
-  # ensure numeric ordering. No quotes arount $hosts to skip leading space.
+  # ensure numeric ordering. No quotes around $hosts to skip leading space.
   hosts=$(echo $hosts | tr ' ' '\n' | sort -n)
 }
 
@@ -547,7 +547,7 @@ dolunscan()
       else
         echo "scsi remove-single-device $devnr" > /proc/scsi/scsi
         if [ $RC -eq 1 ] || [ "$lun" -eq 0 ] ; then
-          # Try readding, should fail if device is gone
+          # Try reading, should fail if device is gone
           echo "scsi add-single-device $devnr" > /proc/scsi/scsi
         fi
       fi
@@ -1165,7 +1165,7 @@ if [ "@$1" = @--help ] || [ "@$1" = @-h ] || [ "@$1" = "@-?" ] ; then
     echo "--color:         use coloured prefixes OLD/NEW/DEL"
     echo "--flush:         same as -f"
     echo "--forceremove:   Remove stale devices (DANGEROUS)"
-    echo "--forcerescan:   Remove and readd existing devices (DANGEROUS)"
+    echo "--forcerescan:   Remove and read existing devices (DANGEROUS)"
     echo "--help:          print this usage message then exit"
     echo "--hosts=LIST:    Scan only host(s) in LIST"
     echo "--ids=LIST:      Scan only target ID(s) in LIST"

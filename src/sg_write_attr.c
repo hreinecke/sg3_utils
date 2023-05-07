@@ -35,7 +35,7 @@
  * device and decodes the response. Based on spc5r19.pdf
  */
 
-static const char * version_str = "1.06 20230410";
+static const char * version_str = "1.07 20230507";
 
 static const char * my_name = "sg_write_attr: ";
 
@@ -877,6 +877,8 @@ parse_attributes_from_file(const char * fname, const struct opts_t * op,
     }
 
     for (;;) {
+        struct attr_value_pair_t * avp2s;
+
         if (NULL == fgets(line, sizeof(line), fp))
             break;
 
@@ -888,14 +890,16 @@ parse_attributes_from_file(const char * fname, const struct opts_t * op,
         if ('\0' == *lcp || '#' == *lcp)
             continue;
 
-        avps = (struct attr_value_pair_t *) realloc(avps,
-                                                    (avps_num+1) * avp_sz);
-        if (NULL == avps) {
+        avp2s = (struct attr_value_pair_t *) realloc(avps,
+                                                     (avps_num+1) * avp_sz);
+        if (NULL == avp2s) {
+            /* if realloc() fails, (pre-)avps is _not_ freed, ouch */
             pr2serr("%s: out of memory allocating %zu bytes\n", __func__,
                     (avps_num+1) * avp_sz);
             ret = sg_convert_errno(ENOMEM);
             goto fini;
         }
+        avps = avp2s;
         ret = parse_attribute(lcp, avps_num+1, &avps[avps_num]);
         if (ret)
             goto fini;
@@ -918,11 +922,11 @@ main(int argc, char * argv[])
     int sg_fd, res, c;
     int in_len = 0;
     int ret = 0;
-    int avps_num = 0;
+    int argvps_num = 0;
     const int maxlen = MAX_ATTR_BUFF_LEN;
     const char * device_name = NULL;
     const char * fname = NULL;
-    char ** avps = NULL;
+    char ** argvps = NULL;
     uint8_t * wabp = NULL;
     uint8_t * free_wabp = NULL;
     struct opts_t opts;
@@ -1001,8 +1005,8 @@ main(int argc, char * argv[])
         ++optind;
     }
     if (optind < argc) {
-        avps = &argv[optind];
-        avps_num = argc - optind;
+        argvps = &argv[optind];
+        argvps_num = argc - optind;
     }
 
 #ifdef DEBUG
@@ -1044,10 +1048,10 @@ main(int argc, char * argv[])
     }
 
     if (fname) {
-        if (avps) {
+        if (argvps) {
             pr2serr("since '--in=FN' given, ignoring attribute-value pairs "
                     "arguments\n");
-            avps = NULL;
+            argvps = NULL;
         }
         if (op->do_raw || op->do_hex) {
             if (op->do_raw && op->do_hex)
@@ -1065,12 +1069,12 @@ main(int argc, char * argv[])
             ret = parse_attributes_from_file(fname, op, wabp, &in_len,
                                              maxlen);
     } else {
-        if (NULL == avps) {
+        if (NULL == argvps) {
             pr2serr("missing attribute-value pairs!\n");
             usage();
             ret = SG_LIB_SYNTAX_ERROR;
         } else
-            ret = parse_attributes(avps, avps_num, wabp, &in_len, maxlen);
+            ret = parse_attributes(argvps, argvps_num, wabp, &in_len, maxlen);
     }
     if (0 != ret)
         goto fini;

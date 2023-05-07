@@ -30,7 +30,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.39 20230428";
+static const char * version_str = "1.40 20230558";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -136,9 +136,9 @@ usage()
           "skip\n"
           "                          the first hexadecimal value on each "
           "line\n"
-          "    --json[=JO]|-j[JO]    output in JSON instead of human "
-          "readable text.\n"
-          "                          Use --json=? for JSON help\n"
+          "    --json[=JO]|-j[=JO]    output in JSON instead of plain "
+          "text\n"
+          "                           Use --json=? for JSON help\n"
           "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
           "output is\n"
           "                            written (def: stdout); truncates "
@@ -167,10 +167,57 @@ usage()
           );
 }
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, SG_LIB_SYNTAX_ERROR for syntax error
+ * and SG_LIB_OK_FALSE for exit with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct opts_t * op)
+{
+    /* only need to process short, non-argument options */
+    switch (sopt_ch) {
+    case 'c':
+        op->do_cdb = true;
+        break;
+    case 'h':
+    case '?':
+        op->do_help = true;
+        return 0;
+    case 'H':
+        op->hex_count++;
+        break;
+    case 'I':
+        op->ignore_first = true;
+        break;
+    case 'j':
+        break;  /* simply ignore second 'j' (e.g. '-jxj') */
+    case 'l':
+        op->do_list_err = true;
+        break;
+    case 'n':
+        op->no_space = true;
+        break;
+    case 'N':
+        op->no_decode = true;
+        break;
+    case 'v':
+        op->verbose_given = true;
+        ++op->verbose;
+        break;
+    case 'V':
+        op->version_given = true;
+        break;
+    default:
+        pr2serr("unrecognised option code %c [0x%x] ??\n", sopt_ch, sopt_ch);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    return 0;
+}
+
 static int
 parse_cmd_line(struct opts_t *op, int argc, char *argv[])
 {
-    int c, n;
+    int c, k, n, q;
     unsigned int ui;
     long val;
     char * avp;
@@ -245,7 +292,22 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             break;
        case 'j':
             op->do_json = true;
-            op->json_arg = optarg;
+            /* Now want '=' to precede JSON optional arguments */
+            if (optarg) {
+                if ('=' == *optarg) {
+                    op->json_arg = optarg + 1;
+                    break;
+                }
+                n = strlen(optarg);
+                for (k = 0; k < n; ++k) {
+                    q = chk_short_opts(*(optarg + k), op);
+                    if (SG_LIB_SYNTAX_ERROR == q)
+                        return SG_LIB_SYNTAX_ERROR;
+                    if (SG_LIB_OK_FALSE == q)
+                        return 0;
+                }
+            } else
+                op->json_arg = NULL;
             break;
        case 'J':
             op->do_json = true;
@@ -283,6 +345,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
             op->wfname = optarg;
             break;
         default:
+            pr2serr("unrecognised option code %c [0x%x] ??\n", c, c);
             return SG_LIB_SYNTAX_ERROR;
         }
     }

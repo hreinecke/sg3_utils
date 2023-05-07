@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.28 20230504";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.29 20230506";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -449,9 +449,9 @@ usage(int hval)
            "                        or binary if --raw also given. --inhex=FN "
            "also accepted\n"
            "    --in=FN|-i FN    same as --inhex=FN\n"
-           "    --json[=JO]|-j[JO]    output in JSON instead of human "
-           "readable\n"
-           "                          test. Use --json=? for JSON help\n"
+           "    --json[=JO]|-j[=JO]    output in JSON instead of plain "
+           "text\n"
+           "                           Use --json=? for JSON help\n"
            "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
            "output is\n"
            "                            written (def: stdout); truncates "
@@ -561,7 +561,7 @@ usage_old()
            "    -H     output in hex (same as '-h')\n"
            "    -i=FN    FN is a filename containing a log page "
            "in ASCII hex.\n"
-           "    -j     produce JSON output instead of human readable "
+           "    -j     produce JSON output instead of plain text "
            "form\n"
            "    -l     list supported log page names (equivalent to "
            "'-p=0')\n"
@@ -879,6 +879,104 @@ usage_for(int hval, const struct opts_t * op)
         usage_old();
 }
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, SG_LIB_SYNTAX_ERROR for syntax error
+ * and SG_LIB_OK_FALSE for exit with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct opts_t * op)
+{
+    /* only need to process short, non-argument options */
+    switch (sopt_ch) {
+    case 'a':
+        ++op->do_all;
+        break;
+    case 'A':
+        op->do_all += 2;
+        break;
+    case 'b':
+        ++op->do_brief;
+        break;
+    case 'e':
+        ++op->do_enumerate;
+        break;
+    case 'E':
+        op->exclude_vendor = true;
+        break;
+    case 'F':
+        op->do_full = true;
+        break;
+    case 'h':
+    case '?':
+        ++op->do_help;
+        break;
+    case 'H':
+        ++op->do_hex;
+        break;
+    case 'j':
+        break;  /* simply ignore second 'j' (e.g. '-jxj') */
+    case 'l':
+        ++op->do_list;
+        break;
+    case 'L':
+        op->do_list += 2;
+        break;
+    case 'n':
+        op->do_name = true;
+        break;
+    case 'N':
+        break;      /* ignore */
+    case 'O':
+        op->opt_new = false;
+        break;
+    case 'q':
+        op->do_pcb = true;
+        break;
+    case 'Q':       /* N.B. PPC bit obsoleted in SPC-4 rev 18 */
+        op->do_ppc = true;
+        break;
+    case 'r':
+        ++op->do_raw;
+        break;
+    case 'R':
+        op->do_pcreset = true;
+        op->do_select = true;
+        break;
+    case 's':
+        op->do_sp = true;
+        break;
+    case 'S':
+        op->do_select = true;
+        break;
+    case 't':
+        op->do_temperature = true;
+        break;
+    case 'T':
+        op->do_transport = true;
+        break;
+    case 'u':
+        ++op->undefined_hex;
+        break;
+    case 'v':
+        op->verbose_given = true;
+        ++op->verbose;
+        break;
+    case 'V':
+        op->version_given = true;
+        break;
+    case 'x':
+        ++op->no_inq;
+        break;
+    case 'X':
+        op->o_readonly = true;
+        break;
+    default:
+        pr2serr("unrecognised option code %c [0x%x]\n", sopt_ch, sopt_ch);
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    return 0;
+}
+
 /* Processes command line options according to new option format. Returns
  * 0 is ok, else SG_LIB_SYNTAX_ERROR is returned. */
 static int
@@ -972,8 +1070,25 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
             op->inhex_fn = optarg;
             break;
         case 'j':
-            op->json_arg = optarg;
             op->do_json = true;
+            /* Now want '=' to precede JSON optional arguments */
+            if (optarg) {
+                int k, q;
+
+                if ('=' == *optarg) {
+                    op->json_arg = optarg + 1;
+                    break;
+                }
+                n = strlen(optarg);
+                for (k = 0; k < n; ++k) {
+                    q = chk_short_opts(*(optarg + k), op);
+                    if (SG_LIB_SYNTAX_ERROR == q)
+                        return SG_LIB_SYNTAX_ERROR;
+                    if (SG_LIB_OK_FALSE == q)
+                        return 0;
+                }
+            } else
+                op->json_arg = NULL;
             break;
         case 'J':
             op->js_file = optarg;

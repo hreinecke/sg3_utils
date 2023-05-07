@@ -43,7 +43,7 @@
 
 */
 
-static const char * version_str = "1.93 20230414";  /* spc6r07 + sbc5r04 */
+static const char * version_str = "1.94 20230505";  /* spc6r08 + sbc5r04 */
 
 #define MY_NAME "sg_vpd"
 
@@ -208,9 +208,9 @@ usage()
             "DEVICE;\n"
             "                        if used with --raw then read binary "
             "from FN\n"
-            "    --json[=JO]|-j[JO]    output in JSON instead of human "
-            "readable text.\n"
-            "                          Use --json=? for JSON help\n"
+            "    --json[=JO]|-j[=JO]    output in JSON instead of plain "
+            "text\n"
+            "                           Use --json=? for JSON help\n"
             "    --js-file=JFN|-J JFN    JFN is a filename to which JSON "
             "output is\n"
             "                            written (def: stdout); truncates "
@@ -2423,12 +2423,75 @@ svpd_examine_all(struct sg_pt_base * ptvp, struct opts_t * op,
     return any_err;
 }
 
+/* Handles short options after '-j' including a sequence of short options
+ * that include one 'j' (for JSON). Want optional argument to '-j' to be
+ * prefixed by '='. Return 0 for good, SG_LIB_SYNTAX_ERROR for syntax error
+ * and SG_LIB_OK_FALSE for exit with no error. */
+static int
+chk_short_opts(const char sopt_ch, struct opts_t * op)
+{
+    /* only need to process short, non-argument options */
+    switch (sopt_ch) {
+    case 'a':
+        op->do_all = true;
+        break;
+    case 'D':
+        op->do_debug = true;
+        break;
+    case 'e':
+        op->do_enum = true;
+        break;
+    case 'E':
+        ++op->examine;
+        op->examine_given = true;
+        break;
+    case 'f':
+        op->do_force = true;
+        break;
+    case 'h':
+    case '?':
+        usage();
+        return SG_LIB_OK_FALSE;
+    case 'H':
+        ++op->do_hex;
+        break;
+    case 'i':
+        ++op->do_ident;
+        break;
+    case 'j':
+        break;  /* simply ignore second 'j' (e.g. '-jxj') */
+    case 'l':
+        op->do_long = true;
+        break;
+   case 'q':
+        op->do_quiet = true;
+        break;
+    case 'r':
+        ++op->do_raw;
+        break;
+    case 'v':
+        op->verbose_given = true;
+        ++op->verbose;
+        break;
+    case 'V':
+        op->version_given = true;
+        break;
+    default:
+        pr2serr("unrecognised option code 0x%x ??\n", sopt_ch);
+        if (op->do_help)
+            break;
+        usage();
+        return SG_LIB_SYNTAX_ERROR;
+    }
+    return 0;
+}
+
 
 int
 main(int argc, char * argv[])
 {
     bool as_json = false;
-    int c, res, matches, vb;
+    int c, k, n, q, res, matches, vb;
     int sg_fd = -1;
     int inhex_len = 0;
     int inraw_len = 0;
@@ -2490,7 +2553,22 @@ main(int argc, char * argv[])
             break;
         case 'j':
             op->do_json = true;
-            op->json_arg = optarg;
+            /* Now want '=' to precede JSON optional arguments */
+            if (optarg) {
+                if ('=' == *optarg) {
+                    op->json_arg = optarg + 1;
+                    break;
+                }
+                n = strlen(optarg);
+                for (k = 0; k < n; ++k) {
+                    q = chk_short_opts(*(optarg + k), op);
+                    if (SG_LIB_SYNTAX_ERROR == q)
+                        return SG_LIB_SYNTAX_ERROR;
+                    if (SG_LIB_OK_FALSE == q)
+                        return 0;
+                }
+            } else
+                op->json_arg = NULL;
             break;
         case 'J':
             op->do_json = true;
