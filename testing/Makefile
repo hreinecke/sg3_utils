@@ -52,7 +52,8 @@ LIBFILESNEW = ../lib/sg_pt_linux_nvme.o ../lib/sg_lib.o ../lib/sg_lib_data.o \
 		../lib/sg_pt_linux.o ../lib/sg_io_linux.o \
 		../lib/sg_pt_common.o  ../lib/sg_cmds_basic.o \
 		../lib/sg_cmds_basic2.o ../lib/sg_lib_names.o \
-		../lib/sg_json_builder.o ../lib/sg_pr2serr.o
+		../lib/sg_json_builder.o ../lib/sg_pr2serr.o \
+		../lib/sg_json.o
 
 all: $(EXECS)
 

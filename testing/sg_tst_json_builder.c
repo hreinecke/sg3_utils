@@ -25,10 +25,11 @@
 #include "../lib/sg_json_builder.h"
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
+#include "sg_json.h"
 
 #define MY_NAME "sg_tst_json_builder"
 
-static const char * version_str = "1.02 20230408";
+static const char * version_str = "1.03 20230513";
 
 
 static struct option long_options[] = {

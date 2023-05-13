@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.29 20230506";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.31 20230513";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -7059,7 +7059,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                            sg_get_unaligned_be32(bp + 8), false);
             }
             break;
-        case 0x4:
+        case 0x4:       /* (obsolete: zbc3r02) */
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     trunc = true;
@@ -7085,7 +7085,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                            sg_get_unaligned_be32(bp + 8), false);
             }
             break;
-        case 0x6:
+        case 0x6:       /* (obsolete: zbc3r02) */
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     trunc = true;
@@ -7098,7 +7098,7 @@ show_zoned_block_dev_stats(const uint8_t * resp, int len,
                            sg_get_unaligned_be32(bp + 8), false);
             }
             break;
-        case 0x7:
+        case 0x7:       /* (obsolete: zbc3r02) */
             if ((pl < 8) || (num < 8)) {
                 if (num < 8)
                     trunc = true;

@@ -31,6 +31,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
+#include "sg_json.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -40,7 +41,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.46 20230507";
+static const char * version_str = "1.47 20230513";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -131,7 +132,7 @@ static struct zt_num2abbrev_t zt_num2abbrev[] = {
     {0, "none"},
     {1, "c"},           /* conventionial */
     {2, "swr"},         /* sequential write required */
-    {3, "swp"},         /* sequential write preferred */
+    {3, "swp"},         /* sequential write preferred (obsolete: zbc3r02) */
     {4, "sobr"},        /* sequential or before required */
     {5, "g"},           /* gap */
     {-1, NULL},         /* sentinel */
@@ -240,7 +241,7 @@ h_twoormore:
             "    0x8    list zones with a zone condition of INACTIVE\n"
             "    0x10   list zones with RWP Recommended set to true\n"
             "    0x11   list zones with Non-sequential write resources "
-            "active set to true\n"
+            "active set to true\n"      /* obsolete zbc3r02 */
             "    0x3e   list zones except those with zone type: GAP\n"
             "    0x3f   list zones with a zone condition of NOT WRITE "
             "POINTER\n\n");
@@ -257,7 +258,7 @@ h_twoormore:
             "    0x2    list all realms that contain active Sequential Write "
             "Required zones\n"
             "    0x3    list all realms that contain active Sequential Write "
-            "Preferred zones\n");
+            "Preferred zones\n" /* obsolete zbc3r02 */ );
     pr2serr("\n");
     prn_zone_type_abbrevs();
 }
@@ -408,10 +409,12 @@ prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op,
     zone_condition_str(zc, b, sizeof(b), op->vb);
     sgj_pr_hr(jsp, "   Zone condition: %s\n", b);
     sgj_js_nv_istr(jsp, jop, "zone_condition", zc, meaning_s, b);
-    sgj_haj_vi(jsp, jop, 3, "PUEP", SGJ_SEP_COLON_1_SPACE,
-               !!(bp[1] & 0x4), false);
-    sgj_haj_vi(jsp, jop, 3, "NON_SEQ", SGJ_SEP_COLON_1_SPACE,
-               !!(bp[1] & 0x2), false);
+    sgj_haj_vi_nex(jsp, jop, 3, "PUEP", SGJ_SEP_COLON_1_SPACE,
+                   !!(bp[1] & 0x4), false,
+                   "Predicted Unrecovered Errors Present");
+    sgj_haj_vi_nex(jsp, jop, 3, "NON_SEQ", SGJ_SEP_COLON_1_SPACE,
+                   !!(bp[1] & 0x2), false,
+                   "Non-Sequential (obsolete: zbc3r02)");
     sgj_haj_vi(jsp, jop, 3, "RESET", SGJ_SEP_COLON_1_SPACE,
                !!(bp[1] & 0x1), false);
     len = sg_get_unaligned_be64(bp + 8);
@@ -462,6 +465,7 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
         printf("\n");
     } else {
         uint64_t rzslbag = sg_get_unaligned_be64(rzBuff + 16);
+        char b[80];
         static const char * rzslbag_s = "Reported zone starting LBA "
                                         "granularity";
 
@@ -471,7 +475,8 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
         sgj_pr_hr(jsp, "  Maximum LBA: 0x%" PRIx64 "\n\n", mx_lba);
         sgj_js_nv_ihex(jsp, jop, "maximum_lba", mx_lba);
         sgj_pr_hr(jsp, "  %s: 0x%" PRIx64 "\n\n", rzslbag_s, rzslbag);
-        sgj_js_nv_ihex(jsp, jop, rzslbag_s, rzslbag);
+        sgj_js_nv_ihex(jsp, jop, sgj_convert2snake(rzslbag_s, b, sizeof(b)),
+                       rzslbag);
     }
     if (op->do_num > 0)
             num_zd = (num_zd > op->do_num) ? op->do_num : num_zd;
@@ -562,12 +567,12 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
         nr_locator = sg_get_unaligned_be64(rzBuff + 12);
     else
         nr_locator = 0;
-    sgj_haj_vi(jsp, jop, 0, "Realms_count", SGJ_SEP_EQUAL_NO_SPACE,
+    sgj_haj_vi(jsp, jop, 0, "Realms count", SGJ_SEP_EQUAL_NO_SPACE,
                realms_count, true);
-    sgj_haj_vi(jsp, jop, 0, "Realms_descriptor_length",
+    sgj_haj_vi(jsp, jop, 0, "Realms descriptor length",
                SGJ_SEP_EQUAL_NO_SPACE, r_desc_len, true);
-    sgj_pr_hr(jsp, "Next_realm_locator=0x%" PRIx64 "\n", nr_locator);
-    sgj_js_nv_ihex(jsp, jop, "Next_realm_locator", nr_locator);
+    sgj_pr_hr(jsp, "Next realm locator=0x%" PRIx64 "\n", nr_locator);
+    sgj_js_nv_ihex(jsp, jop, "next_realm_locator", nr_locator);
     if ((realms_count < 1) || (act_len < (64 + 16)) || (r_desc_len < 16)) {
         if (op->vb) {
             pr2serr("%s: exiting early because ", __func__);
@@ -606,16 +611,16 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
         sgj_opaque_p jo2p;
 
         jo2p = sgj_new_unattached_object_r(jsp);
-        sgj_haj_vi(jsp, jo2p, 1, "Realms_id", SGJ_SEP_EQUAL_NO_SPACE,
+        sgj_haj_vi(jsp, jo2p, 1, "Realm id", SGJ_SEP_EQUAL_NO_SPACE,
                    sg_get_unaligned_be32(bp + 0), true);
         if (op->do_hex) {
             hex2stdout(bp, r_desc_len, -1);
             continue;
         }
         restrictions = sg_get_unaligned_be16(bp + 4);
-        sgj_pr_hr(jsp, "   realm_restrictions=0x%hu\n", restrictions);
+        sgj_pr_hr(jsp, "   Realm restrictions=0x%hu\n", restrictions);
         sgj_js_nv_ihex(jsp, jo2p, "realm_restrictions", restrictions);
-        sgj_haj_vi(jsp, jo2p, 3, "active_zone_domain_id",
+        sgj_haj_vi(jsp, jo2p, 3, "Active zone domain id",
                    SGJ_SEP_EQUAL_NO_SPACE, bp[7], true);
 
         ja2p = sgj_named_subarray_r(jsp, jo2p,
@@ -625,13 +630,13 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
             sgj_opaque_p jo3p;
 
             jo3p = sgj_new_unattached_object_r(jsp);
-            sgj_pr_hr(jsp, "   zone_domain=%u\n", j);
+            sgj_pr_hr(jsp, "   Zone domain=%u\n", j);
             sgj_js_nv_i(jsp, jo3p, "corresponding_zone_domain_id", j);
             lba = sg_get_unaligned_be64(zp + 0);
-            sgj_pr_hr(jsp, "     starting_lba=0x%" PRIx64 "\n", lba);
+            sgj_pr_hr(jsp, "     Starting LBA=0x%" PRIx64 "\n", lba);
             sgj_js_nv_ihex(jsp, jo3p, "realm_starting_lba", (int64_t)lba);
             lba = sg_get_unaligned_be64(zp + 8);
-            sgj_pr_hr(jsp, "     ending_lba=0x%" PRIx64 "\n", lba);
+            sgj_pr_hr(jsp, "     Ending LBA=0x%" PRIx64 "\n", lba);
             sgj_js_nv_ihex(jsp, jo3p, "realm_ending_lba", (int64_t)lba);
             sgj_js_nv_o(jsp, ja2p, NULL /* name */, jo3p);
         }
@@ -664,16 +669,16 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
         zd_locator = sg_get_unaligned_be64(rzBuff + 16);
     else
         zd_locator = 0;
-    sgj_haj_vi(jsp, jop, 0, "Zone_domains_returned_list_length=",
+    sgj_haj_vi(jsp, jop, 0, "Zone domains returned list length",
                SGJ_SEP_EQUAL_NO_SPACE, zd_ret_len, true);
-    sgj_haj_vi(jsp, jop, 0, "Zone_domains_supported",
+    sgj_haj_vi(jsp, jop, 0, "Number of zone domains supported",
                SGJ_SEP_EQUAL_NO_SPACE, zdoms_sup, true);
-    sgj_haj_vi(jsp, jop, 0, "Zone_domains_reported",
+    sgj_haj_vi(jsp, jop, 0, "Zone domains reported",
                SGJ_SEP_EQUAL_NO_SPACE, zdoms_rep, true);
-    sgj_pr_hr(jsp, "Reporting_options=0x%x\n", zd_rep_opts);
-    sgj_js_nv_ihex(jsp, jop, "Reporting_options", zd_rep_opts);
-    sgj_pr_hr(jsp, "Zone_domain_locator=0x%" PRIx64 "\n", zd_locator);
-    sgj_js_nv_ihex(jsp, jop, "Zone_domain_locator", zd_locator);
+    sgj_pr_hr(jsp, "Reporting options=0x%x\n", zd_rep_opts);
+    sgj_js_nv_ihex(jsp, jop, "reporting_options", zd_rep_opts);
+    sgj_pr_hr(jsp, "Zone domain locator=0x%" PRIx64 "\n", zd_locator);
+    sgj_js_nv_ihex(jsp, jop, "zone_domain_locator", zd_locator);
 
     der_zdoms = zd_len / 96;
     if (op->vb > 1)
@@ -686,23 +691,24 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
         sgj_opaque_p jo2p;
 
         jo2p = sgj_new_unattached_object_r(jsp);
-        sgj_haj_vi(jsp, jo2p, 3, "zone_domain",
+        sgj_haj_vi(jsp, jo2p, 3, "Zone domain",
                    SGJ_SEP_EQUAL_NO_SPACE, bp[0], true);
         lba = sg_get_unaligned_be64(bp + 16);
-        sgj_pr_hr(jsp, "     zone_count=%" PRIu64 "\n", lba);
+        sgj_pr_hr(jsp, "     Zone count=%" PRIu64 "\n", lba);
         sgj_js_nv_ihex(jsp, jo2p, "zone_count", lba);
         lba = sg_get_unaligned_be64(bp + 24);
-        sgj_pr_hr(jsp, "     starting_lba=0x%" PRIx64 "\n", lba);
+        sgj_pr_hr(jsp, "     Starting LBA=0x%" PRIx64 "\n", lba);
         sgj_js_nv_ihex(jsp, jo2p, "starting_lba", lba);
         lba = sg_get_unaligned_be64(bp + 32);
-        sgj_pr_hr(jsp, "     ending_lba=0x%" PRIx64 "\n", lba);
+        sgj_pr_hr(jsp, "     Ending LBA=0x%" PRIx64 "\n", lba);
         sgj_js_nv_ihex(jsp, jo2p, "ending_lba", lba);
-        sgj_pr_hr(jsp, "     zone_domain_zone_type=0x%x\n", bp[40]);
+        sgj_pr_hr(jsp, "     Zone domain zone type=0x%x\n", bp[40]);
         sgj_js_nv_ihex(jsp, jo2p, "zone_domain_zone_type", bp[40]);
-        sgj_haj_vi(jsp, jo2p, 5, "VZDZT", SGJ_SEP_EQUAL_NO_SPACE,
-                   !!(0x2 & bp[42]), false);
-        sgj_haj_vi(jsp, jo2p, 5, "SRB", SGJ_SEP_EQUAL_NO_SPACE,
-                   !!(0x1 & bp[42]), false);
+        sgj_haj_vi_nex(jsp, jo2p, 5, "VZDZT", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(0x2 & bp[42]), false,
+                       "Valid Zone Domain Zone Type");
+        sgj_haj_vi_nex(jsp, jo2p, 5, "SRB", SGJ_SEP_EQUAL_NO_SPACE,
+                       !!(0x1 & bp[42]), false, "Shifting Realm Boundaries");
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     return 0;
@@ -807,7 +813,7 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
 struct statistics_t {
     uint32_t zt_conv_num;
     uint32_t zt_swr_num;
-    uint32_t zt_swp_num;
+    uint32_t zt_swp_num;        /* obsolete zbc3r02 */
     uint32_t zt_sob_num;
     uint32_t zt_gap_num;
     uint32_t zt_unk_num;
@@ -825,7 +831,7 @@ struct statistics_t {
 
     /* The following LBAs have 1 added to them, initialized to 0 */
     uint64_t zt_swr_1st_lba1;
-    uint64_t zt_swp_1st_lba1;
+    uint64_t zt_swp_1st_lba1;   /* obsolete zbc3r02 */
     uint64_t zt_sob_1st_lba1;
     uint64_t zt_gap_1st_lba1;
 
@@ -909,7 +915,7 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
                 if (0 == st.zt_swr_1st_lba1)
                     st.zt_swr_1st_lba1 = zs_lba + 1;
                 break;
-            case 3:     /* sequential write preferred */
+            case 3:     /* sequential write preferred, obsolete zbc3r02 */
                 ++st.zt_swp_num;
                 if (0 == st.zt_swp_1st_lba1)
                     st.zt_swp_1st_lba1 = zs_lba + 1;
@@ -1004,7 +1010,7 @@ gather_statistics(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
     if (st.zt_swr_1st_lba1 > 0)
         printf("    Lowest starting LBA: 0x%" PRIx64 "\n",
               st.zt_swr_1st_lba1 - 1);
-    if (st.zt_swp_num > 0)
+    if (st.zt_swp_num > 0)      /* obsolete: zbc3r02 */
         printf("Number of sequential write preferred type zones: %u\n",
                st.zt_swp_num);
     if (st.zt_swp_1st_lba1 > 0)

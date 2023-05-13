@@ -30,10 +30,11 @@
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
+#include "sg_json.h"
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.97 20230507";    /* spc6r08 */
+static const char * version_str = "0.98 20230513";    /* spc6r08 */
 
 #define MY_NAME "sg_opcodes"
 

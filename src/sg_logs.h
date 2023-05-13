@@ -21,7 +21,7 @@
 #endif
 
 #include "sg_lib.h"
-#include "sg_pr2serr.h"
+#include "sg_json.h"
 
 #ifdef __cplusplus
 extern "C" {

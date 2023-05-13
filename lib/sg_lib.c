@@ -982,7 +982,7 @@ sg_get_zone_type_str(uint8_t zt, int buff_len, char * buff)
     case 2:
         sg_scnpr(buff, buff_len, "sequential write required");
         break;
-    case 3:
+    case 3:             /* obsolete: zbc3r02 */
         sg_scnpr(buff, buff_len, "sequential write preferred");
         break;
     case 4:

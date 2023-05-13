@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022 Douglas Gilbert.
+ * Copyright (c) 2013-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -31,6 +31,7 @@
 
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
+#include "sg_json.h"
 
 /* Uncomment the next two undefs to force use of the generic (i.e. shifting)
  * unaligned functions (i.e. sg_get_* and sg_put_*). Use "-b 16|32|64
@@ -44,7 +45,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.18 20221220";
+static const char * version_str = "1.19 20230513";
 
 
 #define MY_NAME "tst_sg_lib"

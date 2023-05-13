@@ -1,4 +1,4 @@
-.TH SG3_UTILS_JSON "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG3_UTILS_JSON "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg3_utils_json \- JSON output for some sg3_utils utilities
 .SH SYNOPSIS
@@ -45,11 +45,12 @@ based on what has been done by Christian Franke and others in smartctl, a
 utility in the smartmontools package for getting S.M.A.R.T. information
 from disks (and other storage devices).
 .PP
-This manpage discusses the \fI\-\-json\fR option which may or may not itself
-have an optional argument. In its shorter form it may either be \fI\-j\fR or
-\fI\-J\fR (lower case preferred if not already in use). The shorter form may
-also take an argument but there must not be a space (or whitespace) between
-\fI\-j\fR and that argument.
+This manpage discusses the \fI\-\-json[=JO]\fR and \fI\-\-js\-file=JFN\fR
+commmand line options. Notice that the argument to \fI\-\-json\fR is itself
+optional. In its shorter form the \fI\-\-json\fR option may either be
+\fI\-j\fR or \fI\-J\fR (lower case preferred if not already in use). The
+shorter form may also take an argument but an "=" must precede the \fIJO\f
+argument with no spaces either side of the "=".
 .PP
 Some care has been taken with quotes in this manpage. Double quotes are used
 around JSON object names, single quotes are used for all other purposes.

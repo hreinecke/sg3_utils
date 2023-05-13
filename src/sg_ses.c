@@ -34,13 +34,14 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"
 #include "sg_pr2serr.h"
+#include "sg_json.h"
 
 /*
  * This program issues SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.80 20230506";    /* ses4r04 */
+static const char * version_str = "2.82 20230513";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 
@@ -2498,13 +2499,13 @@ decode:
         if (rsp_lenp)
             *rsp_lenp = rsp_len;
         if ((rsp_len > 1) && (page_code != rsp_buff[0])) {
-            if ((0x9 == rsp_buff[0]) && (1 & rsp_buff[1])) {
-                pr2serr("Enclosure busy, try again later\n");
+            if ((ENC_BUSY_DPC == rsp_buff[0]) && (1 & rsp_buff[1])) {
+                pr2serr("%s busy, try again later\n", enc_s);
                 if (op->do_hex)
                     hex2stderr(rsp_buff, rsp_len, 0);
-            } else if (0x8 == rsp_buff[0]) {
-                pr2serr("Enclosure only supports Short %s: 0x%x\n",
-                        es_s, rsp_buff[1]);
+            } else if (SHORT_ENC_STATUS_DPC == rsp_buff[0]) {
+                pr2serr("%s only supports Short %s %s, status=0x%x\n",
+                        enc_s, es_s, dp_s, rsp_buff[1]);
             } else {
                 pr2serr("Invalid response, wanted page code: 0x%x but got "
                         "0x%x\n", page_code, rsp_buff[0]);
@@ -6295,7 +6296,7 @@ process_status_dpage(struct sg_pt_base * ptvp, int page_code, uint8_t * resp,
         sgj_pr_hr(jsp, "Short %s %s, status=0x%x\n", es_s, dp_s, resp[1]);
         break;
     case ENC_BUSY_DPC:
-        sgj_pr_hr(jsp, "Enclosure Busy %s, busy=%d [%s=0x%x]\n", dp_s,
+        sgj_pr_hr(jsp, "%s Busy %s, busy=%d [%s=0x%x]\n", enc_s, dp_s,
                   resp[1] & 1, vs_s, (resp[1] >> 1) & 0xff);
         break;
     case ADD_ELEM_STATUS_DPC:
@@ -6783,7 +6784,7 @@ join_array_display(struct th_es_t * tesp, struct opts_t * op,
         } else
             sgj_pr_hr(jsp, "[%d,%d]  %s: %s\n", jrp->th_i, jrp->indiv_i,
                       et_s, cp);
-        sgj_pr_hr(jsp, "  Enclosure Status:\n");
+        sgj_pr_hr(jsp, "  %s Status:\n", enc_s);
         if (jsp->pr_as_json) {
             jo2p = sgj_new_unattached_object_r(jsp);
             sgj_js_nv_ihexstr(jsp, jo2p, et_sn, jrp->etype, NULL, cp);
@@ -7020,7 +7021,7 @@ join_work(struct sg_pt_base * ptvp, bool display, struct opts_t * op,
     if (res)
         return res;
     if (enc_stat_rsp_len < 8) {
-        pr2serr("Enclosure Status %s\n", rts_s);
+        pr2serr("%s Status %s\n", enc_s, rts_s);
         return -1;
     }
     gen_code = sg_get_unaligned_be32(enc_stat_rsp + 4);
@@ -7297,7 +7298,7 @@ cgs_enc_ctl_stat(struct sg_pt_base * ptvp, struct join_row_t * jrp,
                                   op->verbose);
 
             if (ret) {
-                pr2serr("couldn't send Enclosure Control page\n");
+                pr2serr("couldn't send %s Control page\n", enc_s);
                 return -1;
             }
         }
@@ -7651,8 +7652,8 @@ enumerate_work(const struct opts_t * op)
         char bb[64];
 
         /* command line has multiple --enumerate and/or --list options */
-        printf("--clear, --get, --set acronyms for Enclosure Status/Control "
-               "['es' or 'ec'] page");
+        printf("--clear, --get, --set acronyms for %s Status/Control "
+               "['es' or 'ec'] page", enc_s);
         if (op->ind_given && op->ind_etp &&
             (cp = etype_str(op->ind_etp->elem_type_code, bb, sizeof(bb)))) {
             printf("\n(element type: %s)", cp);
@@ -7844,14 +7845,14 @@ main(int argc, char * argv[])
                (THRESHOLD_DPC == op->page_code) ||
                (ADD_ELEM_STATUS_DPC == op->page_code))) {
             pr2serr("--clear, --get or --set options only supported for the "
-                    "Enclosure\nControl/Status, Threshold In/Out and "
-                    "%ss\n", aes_dp);
+                    "%s\nControl/Status, Threshold In/Out and %ss\n",
+                    enc_s, aes_dp);
             ret = SG_LIB_SYNTAX_ERROR;
             goto err_out;
         }
         if (! (op->ind_given || op->desc_name || (op->dev_slot_num >= 0) ||
                saddr_non_zero(op->sas_addr))) {
-            pr2serr("with --clear, --get or --set option need either\n   "
+            pr2serr("with --clear, --get or --set option, need either\n   "
                     "--index, --descriptor, --dev-slot-num or --sas-addr\n");
             ret = SG_LIB_CONTRADICT;
             goto err_out;
@@ -8049,11 +8050,11 @@ main(int argc, char * argv[])
         sg_put_unaligned_be16((uint16_t)op->arr_len, op->data_arr + 2);
         switch (op->page_code) {
         case ENC_CONTROL_DPC:  /* Enclosure Control diagnostic page [0x2] */
-            sgj_pr_hr(jsp, "Sending Enclosure Control [0x%x] page, with page "
-                      "length=%d bytes\n", op->page_code, op->arr_len);
+            sgj_pr_hr(jsp, "Sending %s Control [0x%x] page, with page "
+                      "length=%d bytes\n", enc_s, op->page_code, op->arr_len);
             ret = do_senddiag(ptvp, op->data_arr, d_len, ! op->quiet, vb);
             if (ret) {
-                pr2serr("couldn't send Enclosure Control page\n");
+                pr2serr("couldn't send %s Control page\n", enc_s);
                 goto err_out;
             }
             break;

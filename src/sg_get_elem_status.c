@@ -29,6 +29,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
+#include "sg_json.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -170,7 +171,7 @@ usage()
  * 0 -> success, various SG_LIB_CAT_* positive values or -1 -> other errors */
 static int
 sg_ll_get_phy_elem_status(int sg_fd, uint8_t * resp, int * residp,
-			  struct opts_t * op)
+                          struct opts_t * op)
 {
     int k, ret, res, sense_cat;
     uint8_t gpesCmd[16] = {SG_SERVICE_ACTION_IN_16,

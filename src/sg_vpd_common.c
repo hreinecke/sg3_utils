@@ -44,6 +44,7 @@ const char * product_id_hr = "Product_identification";
 const char * product_id_sn = "product_identification";
 const char * product_rev_lev_hr = "Product_revision_level";
 const char * product_rev_lev_sn = "product_revision_level";
+const char * pdt_sn = "peripheral_device_type";
 const char * vpd_pg_s = "VPD page";
 const char * lts_s = "length too short";
 
@@ -346,8 +347,7 @@ sg_vpd_js_hdr(sgj_state * jsp, sgj_opaque_p jop, const char * name,
     pdt_str = sg_get_pdt_str(pdt, sizeof(d), d);
     sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_qualifier",
                       pqual, NULL, pqual_str(pqual));
-    sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
-                      pdt, NULL, pdt_str);
+    sgj_js_nv_ihexstr(jsp, jo2p, pdt_sn, pdt, NULL, pdt_str);
     sgj_js_nv_ihex(jsp, jo2p, "page_code", pn);
     return jo2p;
 }
@@ -1276,7 +1276,7 @@ std_inq_decode_js(const uint8_t * b, int len, struct opts_t * op,
     jo2p = sgj_named_subobject_r(jsp, jop, "standard_inquiry_data_format");
     sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_qualifier", pqual, NULL,
                       pqual_str(pqual));
-    sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_device_type", pdt, NULL,
+    sgj_js_nv_ihexstr(jsp, jo2p, pdt_sn, pdt, NULL,
                       sg_get_pdt_str(pdt, clen, c));
     sgj_js_nv_ihex_nex(jsp, jo2p, "rmb", !!(b[1] & 0x80), false,
                        "Removable Medium Bit");
@@ -1631,7 +1631,7 @@ static const char * product_type_arr[] =
  * Zone Domains and Realms (see ZBC-2) */
 static const char * bdc_zoned_strs[] = {
     nr_s,
-    "host-aware",
+    "host-aware",       /* obsolete: zbc3r02 */
     "host-managed",
     rsv_s,
 };
@@ -2104,7 +2104,7 @@ decode_zbdch_vpd(const uint8_t * buff, int len, struct opts_t * op,
         else
             strcpy(b, nr_s);
         break;
-    case 1:
+    case 1:     /* obsolete: zbc3r02 */
         strcpy(b, "host aware zoned block device model");
         break;
     case 2:
@@ -2123,14 +2123,16 @@ decode_zbdch_vpd(const uint8_t * buff, int len, struct opts_t * op,
                    !!(buff[4] & 0x1), false,
                    "Unrestricted Read in Sequential Write Required Zone");
     u = sg_get_unaligned_be32(buff + 8);
-    sgj_haj_vistr(jsp, jop, 2, "Optimal number of open sequential write "
-                  "preferred zones", SGJ_SEP_COLON_1_SPACE, u, true,
-                  (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL);
+    sgj_haj_vistr_nex(jsp, jop, 2, "Optimal number of open sequential write "
+                      "preferred zones", SGJ_SEP_COLON_1_SPACE, u, true,
+                      (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL,
+                      "obsolete zbc3r02");
     u = sg_get_unaligned_be32(buff + 12);
-    sgj_haj_vistr(jsp, jop, 2, "Optimal number of non-sequentially "
-                  "written sequential write preferred zones",
-                  SGJ_SEP_COLON_1_SPACE, u, true,
-                  (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL);
+    sgj_haj_vistr_nex(jsp, jop, 2, "Optimal number of non-sequentially "
+                      "written sequential write preferred zones",
+                      SGJ_SEP_COLON_1_SPACE, u, true,
+                      (SG_LIB_UNBOUNDED_32BIT == u) ? nr_s : NULL,
+                      "obsolete zbc3r02");
     u = sg_get_unaligned_be32(buff + 16);
     sgj_haj_vistr(jsp, jop, 2, "Maximum number of open sequential write "
                   "required zones", SGJ_SEP_COLON_1_SPACE, u, true,
@@ -2461,9 +2463,9 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
         switch (pdt) {
         case 0:
             /* Block ROD device type specific descriptor */
-            sgj_js_nv_ihexstr_nex(jsp, jo2p, "peripheral_device_type",
-                                  pdt, false, NULL, "Block ROD device "
-                                  "type specific descriptor", ab_pdt);
+            sgj_js_nv_ihexstr_nex(jsp, jo2p, pdt_sn, pdt, false, NULL,
+				  "Block ROD device type specific descriptor",
+				  ab_pdt);
             sgj_haj_vi_nex(jsp, jo2p, 4, "Optimal block ROD length "
                            "granularity", SGJ_SEP_COLON_1_SPACE,
                            sg_get_unaligned_be16(bp + 6), true, "unit: LB");
@@ -2485,9 +2487,9 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
             break;
         case 1:
             /* Stream ROD device type specific descriptor */
-            sgj_js_nv_ihexstr_nex(jsp, jo2p, "peripheral_device_type",
-                                  pdt, false, NULL, "Stream ROD device "
-                                  "type specific descriptor", ab_pdt);
+            sgj_js_nv_ihexstr_nex(jsp, jo2p, pdt_sn, pdt, false, NULL,
+				  "Stream ROD device type specific "
+				  "descriptor", ab_pdt);
             ull = sg_get_unaligned_be64(bp + 8);
             sgj_haj_vi(jsp, jo2p, 4, "Maximum bytes in stream ROD",
                        SGJ_SEP_COLON_1_SPACE, ull, true);
@@ -2500,10 +2502,9 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
             break;
         case 3:
             /* Copy manager ROD device type specific descriptor */
-            sgj_js_nv_ihexstr_nex(jsp, jo2p, "peripheral_device_type",
-                                  pdt, false, NULL, "Copy manager ROD "
-                                  "device type specific descriptor",
-                                  ab_pdt);
+            sgj_js_nv_ihexstr_nex(jsp, jo2p, pdt_sn, pdt, false, NULL,
+				  "Copy manager ROD device type specific "
+				  "descriptor", ab_pdt);
             sgj_pr_hr(jsp, "  Maximum Bytes in processor ROD: %" PRIu64 "\n",
                       sg_get_unaligned_be64(bp + 8));
             ull = sg_get_unaligned_be64(bp + 16);
@@ -2514,8 +2515,7 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
                 sgj_pr_hr(jsp, "%s%" PRIu64 "\n", b, ull);
             break;
         default:
-            sgj_js_nv_ihexstr(jsp, jo2p, "peripheral_device_type",
-                              pdt, NULL, "unknown");
+            sgj_js_nv_ihexstr(jsp, jo2p, pdt_sn, pdt, NULL, "unknown");
             break;
         }
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
