@@ -17,23 +17,9 @@
 
 #include "sg_pr2serr.h"
 
-/*
- * Some users of sg_pr2serr may not need fixed and descriptor sense decoded
- * for JSON output. If the following define is commented out the effective
- * compile size of this file is reduced by 800 lines plus dependencies on
- * other large components of the sg3_utils library.
- * Comment out the next line to remove dependency on sg_lib.h and its code.
- */
-#define SG_PRSE_SENSE_DECODE 1
-
-#ifdef SG_PRSE_SENSE_DECODE
-#include "sg_lib.h"
-#include "sg_lib_data.h"
-#include "sg_unaligned.h"
-#endif
+FILE * sg_warnings_strm = NULL;        /* would like to default to stderr */
 
 
-/* Users of the sg_pr2serr.h header need this function definition */
 int
 pr2serr(const char * fmt, ...)
 {
@@ -46,7 +32,17 @@ pr2serr(const char * fmt, ...)
     return n;
 }
 
-#ifndef SG_PRSE_SENSE_DECODE
+int
+pr2ws(const char * fmt, ...)
+{
+    va_list args;
+    int n;
+
+    va_start(args, fmt);
+    n = vfprintf(sg_warnings_strm ? sg_warnings_strm : stderr, fmt, args);
+    va_end(args);
+    return n;
+}
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
  * functions. Returns number of chars placed in cp excluding the
@@ -69,56 +65,3 @@ sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...)
     va_end(args);
     return (n < cp_max_len) ? n : (cp_max_len - 1);
 }
-
-int
-pr2ws(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
-
-#endif
-
-#ifndef SG_PRSE_SENSE_DECODE
-static bool
-has_control_char(const uint8_t * up, int len)
-{
-    int k;
-    uint8_t u;
-
-    for (k = 0; k < len; ++k) {
-        u = up[k];
-        if ((u < 0x20) || (0x7f == u))
-            return true;
-    }
-    return false;
-}
-#endif
-
-#ifndef SG_PRSE_SENSE_DECODE
-static void
-h2str(const uint8_t * byte_arr, int num_bytes, char * bp, int blen)
-{
-    int j, k, n;
-
-    for (k = 0, n = 0; (k < num_bytes) && (n < blen); ) {
-        j = sg_scnpr(bp + n, blen - n, "%02x ", byte_arr[k]);
-        if (j < 2)
-            break;
-        n += j;
-        ++k;
-        if ((0 == (k % 8)) && (k < num_bytes) && (n < blen)) {
-            bp[n++] = ' ';
-        }
-    }
-    j = strlen(bp);
-    if ((j > 0) && (' ' == bp[j - 1]))
-        bp[j - 1] = '\0';    /* chop off trailing space */
-}
-#endif
-

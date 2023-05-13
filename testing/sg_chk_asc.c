@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2021 Douglas Gilbert.
+ * Copyright (c) 2006-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -17,6 +17,7 @@
 #include <errno.h>
 
 #include "sg_lib.h"
+#include "sg_pr2serr.h"
 
 /* A utility program for the Linux OS SCSI subsystem.
  *
@@ -27,7 +28,7 @@
  * https://www.t10.org/lists/asc-num.txt
  */
 
-static const char * version_str = "1.09 20210226";
+static const char * version_str = "1.10 20230513";
 
 
 #define MAX_LINE_LEN 1024

@@ -21,6 +21,15 @@ extern "C" {
 /* JSON support functions and structures follow. The prefix "sgj_" is used
  * for sg3_utils JSON functions, types and values. */
 
+/* Following macro for sgj_pr_hr() which takes printf() like arguments */
+#if __USE_MINGW_ANSI_STDIO -0 == 1
+#define __printf(a, b) __attribute__((__format__(gnu_printf, a, b)))
+#elif defined(__GNUC__) || defined(__clang__)
+#define __printf(a, b) __attribute__((__format__(printf, a, b)))
+#else
+#define __printf(a, b)
+#endif
+
 enum sgj_separator_t {
     SGJ_SEP_NONE = 0,
     SGJ_SEP_SPACE_1,

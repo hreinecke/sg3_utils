@@ -82,7 +82,7 @@ sg_tst_ioctl: sg_tst_ioctl.o $(LIBFILESOLD)
 	$(LD) -o $@ $(LDFLAGS) $^
 
 # building sg_chk_asc depends on a prior successful make in ../lib
-sg_chk_asc: sg_chk_asc.o ../lib/sg_lib.o ../lib/sg_lib_data.o
+sg_chk_asc: sg_chk_asc.o ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pr2serr.o
 	$(LD) -o $@ $(LDFLAGS) $^
 
 sg_tst_nvme: sg_tst_nvme.o $(LIBFILESNEW)

@@ -21,15 +21,15 @@
 #include "sg_json_builder.h"
 
 /*
- * Some users of sg_pr2serr may not need fixed and descriptor sense decoded
+ * Some users of sg_json may not need fixed and descriptor sense decoded
  * for JSON output. If the following define is commented out the effective
  * compile size of this file is reduced by 800 lines plus dependencies on
  * other large components of the sg3_utils library.
  * Comment out the next line to remove dependency on sg_lib.h and its code.
  */
-#define SG_PRSE_SENSE_DECODE 1
+#define SG_WANT_SENSE_DECODE 1
 
-#ifdef SG_PRSE_SENSE_DECODE
+#ifdef SG_WANT_SENSE_DECODE
 #include "sg_lib.h"
 #include "sg_lib_data.h"
 #include "sg_unaligned.h"
@@ -59,44 +59,6 @@ static const json_serialize_opts def_out_settings = {
 
 static int sgj_name_to_snake(const char * in, char * out, int maxlen_out);
 
-
-#ifndef SG_PRSE_SENSE_DECODE
-
-/* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
- * functions. Returns number of chars placed in cp excluding the
- * trailing null char. So for cp_max_len > 0 the return value is always
- * < cp_max_len; for cp_max_len <= 1 the return value is 0 and no chars are
- * written to cp. Note this means that when cp_max_len = 1, this function
- * assumes that cp[0] is the null character and does nothing (and returns
- * 0). Linux kernel has a similar function called  scnprintf(). Public
- * declaration in sg_pr2serr.h header  */
-int
-sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    if (cp_max_len < 2)
-        return 0;
-    va_start(args, fmt);
-    n = vsnprintf(cp, cp_max_len, fmt, args);
-    va_end(args);
-    return (n < cp_max_len) ? n : (cp_max_len - 1);
-}
-
-int
-pr2ws(const char * fmt, ...)
-{
-    va_list args;
-    int n;
-
-    va_start(args, fmt);
-    n = vfprintf(stderr, fmt, args);
-    va_end(args);
-    return n;
-}
-
-#endif
 
 static bool
 sgj_parse_opts(sgj_state * jsp, const char * j_optarg)
@@ -397,7 +359,7 @@ sgj_js2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
     if ((NULL == jop) && jsp->pr_exit_status) {
         char d[80];
 
-#ifdef SG_PRSE_SENSE_DECODE
+#ifdef SG_WANT_SENSE_DECODE
         if (sg_exit2str(exit_status, jsp->verbose, sizeof(d), d)) {
             if (0 == strlen(d))
                 strncpy(d, "no errors", sizeof(d) - 1);
@@ -662,7 +624,7 @@ sgj_js_nv_s_len(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
         return NULL;
 }
 
-#ifndef SG_PRSE_SENSE_DECODE
+#ifndef SG_WANT_SENSE_DECODE
 static bool
 has_control_char(const uint8_t * up, int len)
 {
@@ -684,7 +646,7 @@ sgj_js_nv_s_len_chk(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
 {
     sgj_opaque_p res = NULL;
 
-#ifdef SG_PRSE_SENSE_DECODE
+#ifdef SG_WANT_SENSE_DECODE
     if (value && (vlen > 0) &&
         sg_has_control_char(value, vlen))
 #else
@@ -879,7 +841,7 @@ sgj_js_nv_s_nex(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
     }
 }
 
-#ifndef SG_PRSE_SENSE_DECODE
+#ifndef SG_WANT_SENSE_DECODE
 static void
 h2str(const uint8_t * byte_arr, int num_bytes, char * bp, int blen)
 {
@@ -913,7 +875,7 @@ sgj_js_nv_hex_bytes(sgj_state * jsp, sgj_opaque_p jop, const char * sn_name,
         return;
     bp = (char *)calloc(blen + 4, 1);
     if (bp) {
-#ifdef SG_PRSE_SENSE_DECODE
+#ifdef SG_WANT_SENSE_DECODE
         hex2str(byte_arr, num_bytes, NULL, 2, blen, bp);
 #else
         h2str(byte_arr, num_bytes, bp, blen);
@@ -1458,7 +1420,7 @@ sgj_conv2json_string(const uint8_t * cup, int ulen, char * op, int olen_max)
 }
 
 
-#ifdef SG_PRSE_SENSE_DECODE
+#ifdef SG_WANT_SENSE_DECODE
 
 static const char * dtsp = "descriptor too short";
 static const char * sksvp = "sense-key specific valid";
@@ -2265,4 +2227,4 @@ fini:
     return ret;
 }
 
-#endif          /* end of SG_PRSE_SENSE_DECODE conditional */
+#endif          /* end of SG_WANT_SENSE_DECODE conditional */

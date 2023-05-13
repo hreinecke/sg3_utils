@@ -34,6 +34,13 @@ extern "C" {
 
 int pr2serr(const char * fmt, ...) __printf(1, 2);
 
+extern FILE * sg_warnings_strm;
+
+/* Only difference between pr2serr() and pr2ws() is that the former always
+ * send output to stderr. By default, pr2ws() also sends it output to
+ * stderr. The sg_set_warnings_strm() function found in sg_lib.h (if used)
+ * set another FILE * value. The functions in sg_lib.h send their error
+ * output to pr2ws() . */
 int pr2ws(const char * fmt, ...) __printf(1, 2);
 
 /* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of

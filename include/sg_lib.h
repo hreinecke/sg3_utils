@@ -435,8 +435,6 @@ bool sg_pdt_s_eq(int l_pdt_s, int r_pdt_s);
  * acronyms, for each pdt value, to stderr (and returns -3). */
 int sg_get_pdt_from_acronym(const char * acron);
 
-extern FILE * sg_warnings_strm;
-
 void sg_set_warnings_strm(FILE * warnings_strm);
 
 /* Given a SCSI command pointed to by cdbp of sz bytes this function forms a
