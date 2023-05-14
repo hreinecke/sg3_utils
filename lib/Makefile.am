@@ -1,6 +1,7 @@
 libsgutils2_la_SOURCES = \
 	sg_lib.c \
 	sg_json.c \
+	sg_json_sense.c \
 	sg_pr2serr.c \
 	sg_lib_data.c \
 	sg_lib_names.c \

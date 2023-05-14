@@ -10,6 +10,7 @@ scsiinclude_HEADERS = \
 	sg_cmds_extra.h \
 	sg_cmds_mmc.h \
 	sg_json.h \
+	sg_json_sense.h \
 	sg_pr2serr.h \
 	sg_unaligned.h \
 	sg_pt.h \

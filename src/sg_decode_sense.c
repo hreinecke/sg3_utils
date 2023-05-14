@@ -27,7 +27,7 @@
 #endif
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
-#include "sg_json.h"
+#include "sg_json_sense.h"
 #include "sg_unaligned.h"
 
 

@@ -20,7 +20,7 @@
 #endif
 
 #include "sg_lib.h"
-#include "sg_json.h"
+#include "sg_json_sense.h"
 
 #ifdef __cplusplus
 extern "C" {

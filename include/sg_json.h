@@ -356,16 +356,6 @@ void sgj_haj_vb(sgj_state * jsp, sgj_opaque_p jop, int leadin_sp,
  * to jsp->out_hrp JSON array (if conditions met). Outputs to stdout. */
 void sgj_hr_str_out(sgj_state * jsp, const char * sp, int slen);
 
-/* This function only produces JSON output if jsp is non-NULL and
- * jsp->pr_as_json is true. 'sbp' is assumed to point to sense data as
- * defined by T10 with a length of 'sb_len' bytes. Returns false if an
- * issue is detected, else it returns true. */
-bool sgj_js_sense(sgj_state * jsp, sgj_opaque_p jop, const uint8_t * sbp,
-                  int sb_len);
-
-bool sgj_js_designation_descriptor(sgj_state * jsp, sgj_opaque_p jop,
-                                   const uint8_t * ddp, int dd_len);
-
 /* Nothing in the in-core JSON tree is actually printed to 'fp' (typically
  * stdout) until this call is made. If jsp is NULL, jsp->pr_as_json is false
  * or jsp->basep is NULL then this function does nothing. If jsp->exit_status

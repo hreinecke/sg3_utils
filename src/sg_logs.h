@@ -21,7 +21,7 @@
 #endif
 
 #include "sg_lib.h"
-#include "sg_json.h"
+#include "sg_json_sense.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -187,7 +187,7 @@ extern const char * const vend_spec;
 void
 dStrRaw(const uint8_t * str, int len);
 sgj_opaque_p sg_log_js_hdr(sgj_state * jsp, sgj_opaque_p jop,
-			   const char * name, const uint8_t * log_hdrp);
+                           const char * name, const uint8_t * log_hdrp);
 void js_pcb(sgj_state * jsp, sgj_opaque_p jop, int pcb);
 char * get_pcb_str(int pcb, char * outp, int maxoutlen);
 
