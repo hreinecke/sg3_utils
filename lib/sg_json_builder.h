@@ -38,7 +38,8 @@
  * This header file is in this 'lib' directory so its interface is _not_
  * published with sg3_utils other header files found in the 'include'
  * directory. Currently only this header's implementation (i.e.
- * sg_json_builder.c) and sg_pr2serr.c are the only users of this header. */
+ * sg_json_builder.c), sg_json.c and sg_json_sglib.c are the only users of
+ * this header. */
 
 /*
  * Used to require json.h from json-parser but what was needed as been

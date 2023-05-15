@@ -27,11 +27,11 @@
 #endif
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
-#include "sg_json_sense.h"
+#include "sg_json_sg_lib.h"
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.41 20230513";
+static const char * version_str = "1.42 20230514";
 
 #define MY_NAME "sg_decode_sense"
 

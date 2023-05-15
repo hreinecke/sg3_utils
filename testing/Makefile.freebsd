@@ -37,7 +37,9 @@ CFLAGS_PTHREADS = -D_REENTRANT
 
 # there is no rule to make the following in the parent directory,
 # it is assumed they are already built.
-D_FILES = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pr2serr.o ../lib/sg_cmds_basic.o ../lib/sg_pt_common.o ../lib/sg_pt_freebsd.o
+D_FILES = ../lib/sg_lib.o ../lib/sg_lib_data.o ../lib/sg_pr2serr.o \
+	../lib/sg_json_builder.o ../lib/sg_json.o ../lib/sg_json_sg_lib.o \
+	../lib/sg_cmds_basic.o ../lib/sg_pt_common.o ../lib/sg_pt_freebsd.o
 
 LDFLAGS = -lcam
 

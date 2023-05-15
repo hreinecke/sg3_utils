@@ -31,7 +31,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
-#include "sg_json.h"
+#include "sg_json_sg_lib.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -41,7 +41,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.47 20230513";
+static const char * version_str = "1.48 20230514";
 
 #define MY_NAME "sg_rep_zones"
 

@@ -26,7 +26,7 @@
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
-#include "sg_json.h"
+#include "sg_json_sg_lib.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -35,7 +35,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.55 20230513";      /* spc6r08 */
+static const char * version_str = "1.56 20230514";      /* spc6r08 */
 
 #define MY_NAME "sg_luns"
 

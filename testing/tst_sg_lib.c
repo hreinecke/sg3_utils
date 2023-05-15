@@ -31,7 +31,7 @@
 
 #include "sg_lib.h"
 #include "sg_pr2serr.h"
-#include "sg_json.h"
+#include "sg_json_sg_lib.h"
 
 /* Uncomment the next two undefs to force use of the generic (i.e. shifting)
  * unaligned functions (i.e. sg_get_* and sg_put_*). Use "-b 16|32|64
@@ -45,7 +45,7 @@
  * related to snprintf().
  */
 
-static const char * version_str = "1.19 20230513";
+static const char * version_str = "1.20 20230514";
 
 
 #define MY_NAME "tst_sg_lib"
@@ -212,7 +212,9 @@ get_exit_status_str(int exit_status, bool longer, int b_len, char * b)
     return b;
 }
 
+#if defined(__GNUC__) && ! defined(SG_LIB_FREEBSD)
 static uint8_t arr[64];
+#endif
 
 #define OFF 7   /* in byteswap mode, can test different alignments (def: 8) */
 

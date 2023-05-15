@@ -34,10 +34,10 @@
 #include "sg_cmds_basic.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
-#include "sg_json.h"
+#include "sg_json_sg_lib.h"
 
 
-static const char * version_str = "4.10 20230513";
+static const char * version_str = "4.11 20230514";
 
 static const char * my_name = "sg_readcap: ";
 

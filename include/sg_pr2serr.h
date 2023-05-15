@@ -22,7 +22,9 @@ extern "C" {
  * long-winded fprintf(stderr, ....). The second form (i.e. pr2ws() ) is for
  * internal library use and may place its output somewhere other than stderr;
  * it depends on the external variable sg_warnings_strm which can be set
- * with sg_set_warnings_strm(). By default it uses stderr. */
+ * with sg_set_warnings_strm(). By default it uses stderr.
+ * Note that this header and its implementation do not depend on sg_lib.[hc]
+ * or any other sg3_utils components. */
 
 #if __USE_MINGW_ANSI_STDIO -0 == 1
 #define __printf(a, b) __attribute__((__format__(gnu_printf, a, b)))

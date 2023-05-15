@@ -34,14 +34,14 @@
 #include "sg_unaligned.h"
 #include "sg_pt.h"
 #include "sg_pr2serr.h"
-#include "sg_json.h"
+#include "sg_json_sg_lib.h"
 
 /*
  * This program issues SCSI SEND DIAGNOSTIC and RECEIVE DIAGNOSTIC RESULTS
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.82 20230513";    /* ses4r04 */
+static const char * version_str = "2.83 20230514";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 

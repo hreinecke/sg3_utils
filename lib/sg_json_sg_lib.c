@@ -15,7 +15,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "sg_json_sense.h"
+#include "sg_json_sg_lib.h"
 #include "sg_pr2serr.h"
 
 #include "sg_lib.h"
@@ -827,4 +827,18 @@ fini:
     if ((! ret) && ebp)
         sgj_js_nv_s(jsp, jop, "sense_decode_error", ebp);
     return ret;
+}
+
+void
+sgj_js2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status, FILE * fp)
+{
+    const char * estr = NULL;
+    char d[128];
+    static const int dlen = sizeof(d);
+
+    if (sg_exit2str(exit_status, jsp->verbose, dlen, d)) {
+        if (strlen(d) > 0)
+            estr = d;
+    }
+    sgj_js2file_estr(jsp, jop, exit_status, estr, fp);
 }

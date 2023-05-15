@@ -27,7 +27,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
-#include "sg_json.h"
+#include "sg_json_sg_lib.h"
 
 /* A utility program originally written for the Linux OS SCSI subsystem.
  *
@@ -36,7 +36,7 @@
  * device.
  */
 
-static const char * version_str = "1.39 20230523";      /* sbc5r04 */
+static const char * version_str = "1.40 20230514";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_lba_status"
 

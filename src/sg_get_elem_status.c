@@ -38,7 +38,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.19 20230505";      /* sbc5r04 */
+static const char * version_str = "1.20 20230514";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -763,8 +763,15 @@ fini:
             }
             /* '--js-file=-' will send JSON output to stdout */
         }
-        if (fp)
-            sgj_js2file(jsp, NULL, ret, fp);
+        if (fp) {
+            const char * estr = NULL;
+
+            if (sg_exit2str(ret, jsp->verbose, blen, b)) {
+                if (strlen(b) > 0)
+                    estr = b;
+            }
+            sgj_js2file_estr(jsp, NULL, ret, estr, fp);
+        }
         if (op->js_file && fp && (stdout != fp))
             fclose(fp);
         sgj_finish(jsp);

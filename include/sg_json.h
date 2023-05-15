@@ -362,8 +362,8 @@ void sgj_hr_str_out(sgj_state * jsp, const char * sp, int slen);
  * is true then a new JSON object named "exit_status" and the 'exit_status'
  * value rendered as a JSON integer is appended to jsp->basep. The in-core
  * JSON tree with jsp->basep as its root is streamed to 'fp'. */
-void sgj_js2file(sgj_state * jsp, sgj_opaque_p jop, int exit_status,
-                 FILE * fp);
+void sgj_js2file_estr(sgj_state * jsp, sgj_opaque_p jop, int exit_status,
+                      const char * estr, FILE * fp);
 
 /* This function is only needed if the pointer returned from either
  * sgj_new_unattached_object_r() or sgj_new_unattached_array_r() has not
