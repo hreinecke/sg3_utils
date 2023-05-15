@@ -2,9 +2,11 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230514] [svn: r1033]
+Changelog for pre-release sg3_utils-1.48 [20230514] [svn: r1034]
   - decoding utilities: add --json[=JO] and --js-file=JFN
     options, short form changed to -j[=JO]
+  - sg_sat_datetime: new utility for setting or accessing
+    the data and time on a ATA device using a SAT layer.
   - sg_z_act_query: new utility for sending either a
     Zone activate or Zone query command
   - sg_rep_density: new utility for decoding the response of

@@ -8,8 +8,9 @@ third table list supported NVMe commands.
 SCSI command        sg3_utils utilities that use this SCSI command
 ------------        -------------------------------------------------
 ATA COMMAND PASS-THROUGH(12)  sg_sat_identify
-ATA COMMAND PASS-THROUGH(16)  sg_sat_identify, sg_sat_set_features,
-                    sg_sat_phy_event, sg_sat_read_gplog
+ATA COMMAND PASS-THROUGH(16)  sg_sat_datetime, sg_sat_identify,
+                    sg_sat_phy_event, sg_sat_read_gplog,
+                    sg_sat_set_features,
                     [sg_sat_chk_power, sg__sat_identify,
                      sg__sat_set_features, sg_sat_smart_rd_data
                      (previous four in the examples directory)]
@@ -140,7 +141,8 @@ IDENTIFY PACKET DEVICE     sg_inq, sg_sat_identify,
                     examples/sg__sat_identify
 READ LOG EXT        sg_sat_phy_event, examples/sg__sat_phy_event
                     sg_sat_read_gplog
-READ LOG DMA EXT    sg_sat_read_gplog
+READ LOG DMA EXT    sg_sat_datetime, sg_sat_read_gplog
+SET DATE & TIME EXT    sg_sat_datetime
 SET FEATURES        sg_sat_set_features
                     examples/sg__sat_set_features
 SMART READ LOG      sg_sat_read_gplog, examples/sg_sat_smart_rd_data
@@ -187,4 +189,4 @@ THIRD PARTY COPY IN (0x83).
 
 
 Douglas Gilbert
-5 May 2023
+14 May 2023

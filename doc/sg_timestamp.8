@@ -23,6 +23,11 @@ bit unsigned integer. That same epoch is used by Unix machines, but they
 usually hold the number of seconds since that epoch. The Unix date command
 and especially its "+%s" format is useful in converting to and from
 timestamps and more humanly readable forms. See the EXAMPLES section below.
+.PP
+A companion utility called sg_sat_datetime with similar options is available
+to access or set the date and time in an ATA device (typically a SATA disk).
+sg_sat_datetime issues ATA commands via the SCSI to ATA Translation (SAT)
+layer.
 .SH OPTIONS
 Arguments to long options are mandatory for short options as well.
 .TP
@@ -142,4 +147,4 @@ Copyright \(co 2015\-2018 Douglas Gilbert
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
-.B sdparm(sdparm), sg_logs(sg3_utils)
+.B sdparm(sdparm), sg_logs(sg3_utils), sg_sat_datetime(sg3_utils)

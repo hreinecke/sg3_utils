@@ -6,12 +6,12 @@ bin_PROGRAMS = \
 	sg_rdac sg_read_attr sg_read_block_limits sg_read_buffer \
 	sg_read_long sg_readcap sg_reassign sg_referrals sg_rem_rest_elem \
 	sg_rep_density sg_rep_pip sg_rep_zones sg_requests sg_reset_wp \
-	sg_rmsn sg_rtpg sg_safte sg_sanitize sg_sat_identify sg_sat_phy_event \
-	sg_sat_read_gplog sg_sat_set_features sg_seek sg_senddiag sg_ses \
-	sg_ses_microcode sg_start sg_stpg sg_stream_ctl sg_sync sg_timestamp \
-	sg_turs sg_unmap sg_verify sg_vpd sg_wr_mode sg_write_attr \
-	sg_write_buffer sg_write_long sg_write_same sg_write_verify \
-	sg_write_x sg_zone sg_z_act_query
+	sg_rmsn sg_rtpg sg_safte sg_sanitize sg_sat_datetime sg_sat_identify \
+	sg_sat_phy_event sg_sat_read_gplog sg_sat_set_features \
+	sg_seek sg_senddiag sg_ses sg_ses_microcode sg_start sg_stpg \
+	sg_stream_ctl sg_sync sg_timestamp sg_turs sg_unmap sg_verify \
+	sg_vpd sg_wr_mode sg_write_attr sg_write_buffer sg_write_long \
+	sg_write_same sg_write_verify sg_write_x sg_zone sg_z_act_query
 sg_scan_SOURCES =
 
 
@@ -161,6 +161,8 @@ sg_rtpg_LDADD = ../lib/libsgutils2.la
 sg_safte_LDADD = ../lib/libsgutils2.la
 
 sg_sanitize_LDADD = ../lib/libsgutils2.la
+
+sg_sat_datetime_LDADD = ../lib/libsgutils2.la
 
 sg_sat_identify_LDADD = ../lib/libsgutils2.la
 

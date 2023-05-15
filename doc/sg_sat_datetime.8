@@ -1,0 +1,151 @@
+.TH SG_SAT_DATETIME "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
+.SH NAME
+sg_sat_datetime \- report or set date and time on a ATA device
+.SH SYNOPSIS
+.B sg_sat_datetime
+[\fI\-\-dma\fR] [\fI\-\-elapsed\fR] [\fI\-\-format\fR] [\fI\-\-help\fR]
+[\fI\-\-hex\fR] [\fI\-\-milliseconds=MS\fR] [\fI\-\-readonly\fR]
+[\fI\-\-seconds=SECS\fR] [\fI\-\-srep\fR] [\fI\-\-verbose\fR]
+[\fI\-\-version\fR] \fIDEVICE\fR
+.SH DESCRIPTION
+.\" Add any additional description here
+Sends a SET DATE & TIME EXT or READ LOG [DMA] EXT command to the ATA
+\fIDEVICE\fR to set the date and time or read it from the Device Statistics
+log address(04h), General Statistics page (01h). These commands are found in
+the ATA Command Set (ACS\-5) standard.  ATA commands are sent using ATA
+PASS-THROUGH SCSI commands.
+.PP
+If either the \fI\-\-milliseconds=MS\fR or \fI\-\-seconds=SECS\fR option is
+given (and both can't be given) then the SET DATE & TIME command is sent.
+Otherwise, the READ LOG EXT command, or if the \-\-dma option is used,
+the READ LOG DMA EXT command is sent to the device.
+.PP
+The date and time is sent and received from the \fIDEVICE\fR generally as the
+number of milliseconds since the epoch of 1970\-01\-01 00:00:00 UTC and is held
+in a 48 bit unsigned integer. That same epoch is used by Unix machines, but they
+usually hold the number of seconds since that epoch. The Unix date command
+and especially its "+%s" format is useful in converting to and from
+timestamps and more humanly readable forms. See the EXAMPLES section below. If
+the date and time is not set after power-on reset, the value is the same as the
+device power-on hours in milliseconds.
+.SH OPTIONS
+Arguments to long options are mandatory for short options as well.
+.TP
+\fB\-d\fR, \fB\-\-dma\fR
+use READ LOG DMA EXT to read the date and time value from the device.  Ignored
+if setting the date and time.
+.TP
+\fB\-e\fR, \fB\-\-elapsed\fR
+assume the date and time from READ LOG [DMA] EXT is an elapsed time from an
+event such as a power cycle or hard reset and format the output as '<n>
+days hh:mm:ss.xxx' where hh is hours (00 to 23 inclusive); mm is
+minutes (00 to 59 inclusive); ss is seconds (00 to 59 inclusive) and xxx
+is milliseconds (000 to 999 inclusive). If the number of days is 0
+then '0 days' is not output unless this option is given two or more times.
+.br
+This option is especially useful if the date and time has not been set. Per
+ACS-5, when not set, the date and time is initialized to the power-on hours of
+the device in milliseconds.
+.TP
+\fB\-f\fR, \fB\-\-format\fR
+output the date and time formatted using the default locale.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+output the usage message then exit.
+.TP
+\fB\-H\fR, \fB\-\-hex\fR
+output the date and time in ASCII hexadecimal.
+.TP
+\fB\-m\fR, \fB\-\-milliseconds\fR=\fIMS\fR
+where \fIMS\fR is the number of milliseconds since 1970\-01\-01 00:00:00 UTC
+to set in the \fIDEVICE\fR with the ATA SET DATE & TIME EXT command.
+.TP
+\fB\-R\fR, \fB\-\-readonly\fR
+open the \fIDEVICE\fR read\-only. The default action is to open the
+\fIDEVICE\fR read\-write.
+.TP
+\fB\-s\fR, \fB\-\-seconds\fR=\fISECS\fR
+where \fISECS\fR is the number of seconds since 1970\-01\-01 00:00:00 UTC
+to set in the \fIDEVICE\fR with the ATA SET DATE & TIME command. \fISECS\fR
+is multiplied by 1000 before being used in the ATA SET DATE & TIME command.
+.TP
+\fB\-S\fR, \fB\-\-srep\fR
+report the number of seconds since 1970\-01\-01 00:00:00 UTC. This is done
+by dividing the value returned by the ATA READ LOG [DMA] EXT command by 1000.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+increase the level of verbosity, (i.e. debug output).
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+print the version string and then exit.
+.SH EXIT STATUS
+The exit status of sg_sat_datetime is 0 when it is successful. Otherwise,
+see the sg3_utils(8) man page.
+.SH NOTES
+The \fIDEVICE\fR should immediately start accumulating time after the date
+and time is set.  ie. If you set and then retrieve the date and time, the
+returned values will likely have increased.
+
+The ACS-5 standard makes no provision for a power-safe date and time storage.
+Unless the device has vendor-specific power-safe capability, after a power-on
+reset, per ACS-5, the date and time should be the power-on hours of the device
+returned in milliseconds (or seconds if \-\-srep option is used).
+.SH EXAMPLES
+On Unix machines (e.g. Linux, FreeBSD, and Solaris) the date command is useful
+when working with timestamps.
+.PP
+To fetch the timestamp from a \fIDEVICE\fR and display it in a humanly
+readable form the following could be used:
+.PP
+   # sg_sat_datetime \-S /dev/sg2
+.br
+1681156506
+.PP
+   # date \-\-date=@1681156506
+.br
+Mon Apr 10 02:55:06 PM CDT 2023
+.PP
+   # date \-R \-\-date="@1681156506"
+.br
+Mon, 10 Apr 2023 14:55:06 -0500
+.PP
+The latter two date commands show different forms of the same date (i.e.
+1681156506 seconds since 1970\-01\-01 00:00:00 UTC). The
+sg_sat_datetime and date commands can be combined using backquotes:
+.PP
+   # date \-R \-\-date=@`sg_sat_datetime \-S /dev/sg2`
+.br
+Mon, 10 Apr 2023 14:55:06 -0500
+.PP
+Alternatively, the \-\-format option can be used to format the date and time
+using the default locale.
+   # sg_sat_datetime \-\-format /dev/sg2
+.br
+Mon Apr 10 15:02:54 2023
+.PP
+To set the date and time on the \fIDEVICE\fR to now (approximately) the
+following could be used:
+.PP
+   # date +%s
+.br
+1681157099
+.PP
+   # sg_sat_datetime \-\-seconds=1681157099 /dev/sg0
+.PP
+Those two command lines could be combined into one by using backquotes:
+.PP
+   # sg_sat_datetime \-\-seconds=`date +%s` /dev/sg0
+.SH AUTHORS
+Written by Jeremy Bauer and Daniel Woeste with extensive use of sg_timestamp
+and sg_sat_read_gplog by Douglas Gilbert.
+.SH "REPORTING BUGS"
+Report bugs to <dgilbert at interlog dot com>.
+.SH COPYRIGHT
+Copyright \(co 2023 Jeremy Bauer and Daniel Woeste of Western Digital
+Corporation
+.br
+This software is distributed under a FreeBSD license. There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+.SH "SEE ALSO"
+.B sdparm(sdparm), sg_logs(sg3_utils), sg_timestamp(sg3_utils),
+.B sg_sat_read_gplog(sg3_utils)

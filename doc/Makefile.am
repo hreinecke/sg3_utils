@@ -9,13 +9,13 @@ dist_man_MANS = \
 	sg_read_block_limits.8 sg_read_buffer.8 sg_read_long.8 sg_readcap.8 \
 	sg_reassign.8 sg_referrals.8 sg_rem_rest_elem.8 sg_rep_density.8 \
 	sg_rep_pip.8 sg_rep_zones.8 sg_requests.8 sg_reset_wp.8 sg_rmsn.8 \
-	sg_rtpg.8 sg_safte.8 sg_sanitize.8 sg_sat_identify.8 \
-	sg_sat_phy_event.8 sg_sat_read_gplog.8 sg_sat_set_features.8 \
-	sg_seek.8 sg_senddiag.8 sg_ses.8 sg_ses_microcode.8 sg_start.8 \
-	sg_stpg.8 sg_stream_ctl.8 sg_sync.8 sg_timestamp.8 sg_turs.8 \
-	sg_unmap.8 sg_verify.8 sg_vpd.8 sg_wr_mode.8 sg_write_attr.8 \
-	sg_write_buffer.8 sg_write_long.8 sg_write_same.8 sg_write_verify.8 \
-	sg_write_x.8 sg_zone.8 sg_z_act_query.8
+	sg_rtpg.8 sg_safte.8 sg_sanitize.8 sg_sat_datetime.8 \
+	sg_sat_identify.8 sg_sat_phy_event.8 sg_sat_read_gplog.8 \
+	sg_sat_set_features.8 sg_seek.8 sg_senddiag.8 sg_ses.8 \
+	sg_ses_microcode.8 sg_start.8 sg_stpg.8 sg_stream_ctl.8 sg_sync.8 \
+	sg_timestamp.8 sg_turs.8 sg_unmap.8 sg_verify.8 sg_vpd.8 sg_wr_mode.8 \
+	sg_write_attr.8 sg_write_buffer.8 sg_write_long.8 sg_write_same.8 \
+	sg_write_verify.8 sg_write_x.8 sg_zone.8 sg_z_act_query.8
 CLEANFILES =
 
 if OS_LINUX
