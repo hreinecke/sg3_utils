@@ -62,7 +62,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.01 20230414";
+static const char * version_str = "1.02 20230415";
 
 static struct option long_options[] = {
     {"ck_cond", no_argument, 0, 'C'},
@@ -271,7 +271,8 @@ do_read_datetime(int sg_fd, int ata_cmd, bool ck_cond, int verbose,
             printf("%02d:%02d:%02d.%03d\n", hours, mins,
                    secs_in_min, rem_msecs);
         } else
-            pr2serr("%lu\n", do_srep ? (timestamp / 1000) : timestamp);
+            pr2serr("%" PRIu64 "\n",
+		    do_srep ? (timestamp / 1000) : timestamp);
 
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
         if (verbose > 1) {
