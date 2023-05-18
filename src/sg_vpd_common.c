@@ -1306,7 +1306,7 @@ std_inq_decode_js(const uint8_t * b, int len, struct opts_t * op,
                           tpgs_str(tpgs), "Target Port Group Support");
     sgj_js_nv_ihex_nex(jsp, jo2p, "3pc", !!(b[5] & 0x8), false,
                        "Third Party Copy");
-    sgj_js_nv_ihex(jsp, jo2p, "protect", !!(b[5] & 0x1));
+    sgj_js_nv_ihex_nex(jsp, jo2p, "protect", !!(b[5] & 0x1), false, NULL);
     /* Skip SPI specific flags which have been obsolete for a while) */
     sgj_js_nv_ihex_nex(jsp, jo2p, "bque", !!(b[6] & 0x80), false,
                        "Basic task management model (obsolete SPC-4)");
@@ -2464,8 +2464,8 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
         case 0:
             /* Block ROD device type specific descriptor */
             sgj_js_nv_ihexstr_nex(jsp, jo2p, pdt_sn, pdt, false, NULL,
-				  "Block ROD device type specific descriptor",
-				  ab_pdt);
+                                  "Block ROD device type specific descriptor",
+                                  ab_pdt);
             sgj_haj_vi_nex(jsp, jo2p, 4, "Optimal block ROD length "
                            "granularity", SGJ_SEP_COLON_1_SPACE,
                            sg_get_unaligned_be16(bp + 6), true, "unit: LB");
@@ -2488,8 +2488,8 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
         case 1:
             /* Stream ROD device type specific descriptor */
             sgj_js_nv_ihexstr_nex(jsp, jo2p, pdt_sn, pdt, false, NULL,
-				  "Stream ROD device type specific "
-				  "descriptor", ab_pdt);
+                                  "Stream ROD device type specific "
+                                  "descriptor", ab_pdt);
             ull = sg_get_unaligned_be64(bp + 8);
             sgj_haj_vi(jsp, jo2p, 4, "Maximum bytes in stream ROD",
                        SGJ_SEP_COLON_1_SPACE, ull, true);
@@ -2503,8 +2503,8 @@ decode_rod_descriptor(const uint8_t * buff, int len, struct opts_t * op,
         case 3:
             /* Copy manager ROD device type specific descriptor */
             sgj_js_nv_ihexstr_nex(jsp, jo2p, pdt_sn, pdt, false, NULL,
-				  "Copy manager ROD device type specific "
-				  "descriptor", ab_pdt);
+                                  "Copy manager ROD device type specific "
+                                  "descriptor", ab_pdt);
             sgj_pr_hr(jsp, "  Maximum Bytes in processor ROD: %" PRIu64 "\n",
                       sg_get_unaligned_be64(bp + 8));
             ull = sg_get_unaligned_be64(bp + 16);

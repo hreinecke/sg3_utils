@@ -38,7 +38,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.20 20230514";      /* sbc5r04 */
+static const char * version_str = "1.21 20230517";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -93,7 +93,7 @@ static struct option long_options[] = {
     {"hex", no_argument, 0, 'H'},
     {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
     {"inhex", required_argument, 0, 'i'},
-    {"json", optional_argument, 0, 'j'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-j' */
     {"js-file", required_argument, 0, 'J'},
     {"js_file", required_argument, 0, 'J'},
     {"maxlen", required_argument, 0, 'm'},
@@ -370,7 +370,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bf:hHi:j::J:m:rRs:St:TvV", long_options,
+        c = getopt_long(argc, argv, "^bf:hHi:j::J:m:rRs:St:TvV", long_options,
                         &option_index);
         if (c == -1)
             break;
@@ -398,11 +398,15 @@ main(int argc, char * argv[])
         case 'i':
             op->in_fn = optarg;
             break;
-        case 'j':
+        case 'j':       /* for: -j[=JO] */
+        case '^':       /* for: --json[=JO] */
             op->do_json = true;
-            /* Now want '=' to precede JSON optional arguments */
+            /* Now want '=' to precede all JSON optional arguments */
             if (optarg) {
-                if ('=' == *optarg) {
+                if ('^' == c) {
+                    op->json_arg = optarg;
+                    break;
+                } else if ('=' == *optarg) {
                     op->json_arg = optarg + 1;
                     break;
                 }

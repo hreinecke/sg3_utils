@@ -34,7 +34,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "0.99 20230514";    /* spc6r08 */
+static const char * version_str = "1.00 20230517";    /* spc6r08 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -59,33 +59,33 @@ static int peri_dtype = -1; /* ugly but not easy to pass to alpha compare */
 static bool no_final_msg = false;
 
 static struct option long_options[] = {
-        {"alpha", no_argument, 0, 'a'},
-        {"compact", no_argument, 0, 'c'},
-        {"enumerate", no_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"inhex", required_argument, 0, 'i'},
-        {"in", required_argument, 0, 'i'},
-        {"json", optional_argument, 0, 'j'},
-        {"js-file", required_argument, 0, 'J'},
-        {"js_file", required_argument, 0, 'J'},
-        {"mask", no_argument, 0, 'm'},
-        {"mlu", no_argument, 0, 'M'},           /* added in spc5r20 */
-        {"no-inquiry", no_argument, 0, 'n'},
-        {"no_inquiry", no_argument, 0, 'n'},
-        {"new", no_argument, 0, 'N'},
-        {"opcode", required_argument, 0, 'o'},
-        {"old", no_argument, 0, 'O'},
-        {"pdt", required_argument, 0, 'p'},
-        {"raw", no_argument, 0, 'r'},
-        {"rctd", no_argument, 0, 'R'},
-        {"repd", no_argument, 0, 'q'},
-        {"sa", required_argument, 0, 's'},
-        {"tmf", no_argument, 0, 't'},
-        {"unsorted", no_argument, 0, 'u'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+    {"alpha", no_argument, 0, 'a'},
+    {"compact", no_argument, 0, 'c'},
+    {"enumerate", no_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"inhex", required_argument, 0, 'i'},
+    {"in", required_argument, 0, 'i'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-j' */
+    {"js-file", required_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'J'},
+    {"mask", no_argument, 0, 'm'},
+    {"mlu", no_argument, 0, 'M'},           /* added in spc5r20 */
+    {"no-inquiry", no_argument, 0, 'n'},
+    {"no_inquiry", no_argument, 0, 'n'},
+    {"new", no_argument, 0, 'N'},
+    {"opcode", required_argument, 0, 'o'},
+    {"old", no_argument, 0, 'O'},
+    {"pdt", required_argument, 0, 'p'},
+    {"raw", no_argument, 0, 'r'},
+    {"rctd", no_argument, 0, 'R'},
+    {"repd", no_argument, 0, 'q'},
+    {"sa", required_argument, 0, 's'},
+    {"tmf", no_argument, 0, 't'},
+    {"unsorted", no_argument, 0, 'u'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 struct opts_t {
@@ -423,7 +423,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "acehHi:j::J:mMnNo:Op:qrRs:tuvV",
+        c = getopt_long(argc, argv, "^acehHi:j::J:mMnNo:Op:qrRs:tuvV",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -448,13 +448,17 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         case 'i':
             op->inhex_fn = optarg;
             break;
-        case 'j':
+        case 'j':       /* for: -j[=JO] */
+        case '^':       /* for: --json[=JO] */
             op->do_json = true;
-            /* Now want '=' to precede JSON optional arguments */
+            /* Now want '=' to precede all JSON optional arguments */
             if (optarg) {
                 int k, q;
 
-                if ('=' == *optarg) {
+                if ('^' == c) {
+                    op->json_arg = optarg;
+                    break;
+                } else if ('=' == *optarg) {
                     op->json_arg = optarg + 1;
                     break;
                 }

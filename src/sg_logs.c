@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.31 20230513";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.32 20230517";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -89,7 +89,7 @@ static struct option long_options[] = {
     {"hex", no_argument, 0, 'H'},
     {"in", required_argument, 0, 'i'},
     {"inhex", required_argument, 0, 'i'},
-    {"json", optional_argument, 0, 'j'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-j' */
     {"js_file", required_argument, 0, 'J'},
     {"js-file", required_argument, 0, 'J'},
     {"list", no_argument, 0, 'l'},
@@ -986,7 +986,7 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         int c, n;
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aAbc:D:eEf:FhHi:j::J:lLm:M:nNOp:P:qQrR"
+        c = getopt_long(argc, argv, "^aAbc:D:eEf:FhHi:j::J:lLm:M:nNOp:P:qQrR"
                         "sStTuvVxX", long_options, &option_index);
         if (c == -1)
             break;
@@ -1069,13 +1069,17 @@ new_parse_cmd_line(struct opts_t * op, int argc, char * argv[])
         case 'i':
             op->inhex_fn = optarg;
             break;
-        case 'j':
+        case 'j':       /* for: -j[=JO] */
+        case '^':       /* for: --json[=JO] */
             op->do_json = true;
-            /* Now want '=' to precede JSON optional arguments */
+            /* Now want '=' to precede all JSON optional arguments */
             if (optarg) {
                 int k, q;
 
-                if ('=' == *optarg) {
+                if ('^' == c) {
+                    op->json_arg = optarg;
+                    break;
+                } else if ('=' == *optarg) {
                     op->json_arg = optarg + 1;
                     break;
                 }

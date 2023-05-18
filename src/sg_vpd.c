@@ -43,7 +43,7 @@
 
 */
 
-static const char * version_str = "1.94 20230505";  /* spc6r08 + sbc5r04 */
+static const char * version_str = "1.95 20230517";  /* spc6r08 + sbc5r04 */
 
 #define MY_NAME "sg_vpd"
 
@@ -94,7 +94,7 @@ static struct option long_options[] = {
         {"hex", no_argument, 0, 'H'},
         {"ident", no_argument, 0, 'i'},
         {"inhex", required_argument, 0, 'I'},
-        {"json", optional_argument, 0, 'j'},
+        {"json", optional_argument, 0, '^'},    /* short option is '-j' */
         {"js-file", required_argument, 0, 'J'},
         {"js_file", required_argument, 0, 'J'},
         {"long", no_argument, 0, 'l'},
@@ -2511,7 +2511,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aDeEfhHiI:j::J:lm:M:p:qQ:rvV",
+        c = getopt_long(argc, argv, "^aDeEfhHiI:j::J:lm:M:p:qQ:rvV",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -2551,11 +2551,15 @@ main(int argc, char * argv[])
             } else
                 op->inhex_fn = optarg;
             break;
-        case 'j':
+        case 'j':       /* for: -j[=JO] */
+        case '^':       /* for: --json[=JO] */
             op->do_json = true;
-            /* Now want '=' to precede JSON optional arguments */
+            /* Now want '=' to precede all JSON optional arguments */
             if (optarg) {
-                if ('=' == *optarg) {
+                if ('^' == c) {
+                    op->json_arg = optarg;
+                    break;
+                } else if ('=' == *optarg) {
                     op->json_arg = optarg + 1;
                     break;
                 }

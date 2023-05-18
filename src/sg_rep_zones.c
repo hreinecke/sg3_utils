@@ -41,7 +41,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.48 20230514";
+static const char * version_str = "1.49 20230517";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -97,34 +97,34 @@ struct zt_num2abbrev_t {
 };
 
 static struct option long_options[] = {
-        {"brief", no_argument, 0, 'b'}, /* only header and last descriptor */
-        {"domain", no_argument, 0, 'd'},
-        {"domains", no_argument, 0, 'd'},
-        {"force", no_argument, 0, 'f'},
-        {"find", required_argument, 0, 'F'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
-        {"inhex", required_argument, 0, 'i'},
-        {"json", optional_argument, 0, 'j'},
-        {"js-file", required_argument, 0, 'J'},
-        {"js_file", required_argument, 0, 'J'},
-        {"locator", required_argument, 0, 'l'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"num", required_argument, 0, 'n'},
-        {"partial", no_argument, 0, 'p'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"realm", no_argument, 0, 'e'},
-        {"realms", no_argument, 0, 'e'},
-        {"report", required_argument, 0, 'o'},
-        {"start", required_argument, 0, 's'},
-        {"statistics", no_argument, 0, 'S'},
-        {"stats", no_argument, 0, 'S'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"wp", no_argument, 0, 'w'},
-        {0, 0, 0, 0},
+    {"brief", no_argument, 0, 'b'}, /* only header and last descriptor */
+    {"domain", no_argument, 0, 'd'},
+    {"domains", no_argument, 0, 'd'},
+    {"force", no_argument, 0, 'f'},
+    {"find", required_argument, 0, 'F'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
+    {"inhex", required_argument, 0, 'i'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-j' */
+    {"js-file", required_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'J'},
+    {"locator", required_argument, 0, 'l'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"num", required_argument, 0, 'n'},
+    {"partial", no_argument, 0, 'p'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"realm", no_argument, 0, 'e'},
+    {"realms", no_argument, 0, 'e'},
+    {"report", required_argument, 0, 'o'},
+    {"start", required_argument, 0, 's'},
+    {"statistics", no_argument, 0, 'S'},
+    {"stats", no_argument, 0, 'S'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"wp", no_argument, 0, 'w'},
+    {0, 0, 0, 0},
 };
 
 /* Zone types */
@@ -1238,7 +1238,7 @@ main(int argc, char * argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "bdefF:hHi:j::J:l:m:n:o:prRs:SvVw",
+        c = getopt_long(argc, argv, "^bdefF:hHi:j::J:l:m:n:o:prRs:SvVw",
                         long_options, &option_index);
         if (c == -1)
             break;
@@ -1290,16 +1290,20 @@ main(int argc, char * argv[])
         case 'H':
             ++op->do_hex;
             break;
-       case 'i':
+        case 'i':
             op->in_fn = optarg;
             break;
-       case 'j':
+        case 'j':       /* for: -j[=JO] */
+        case '^':       /* for: --json[=JO] */
             op->do_json = true;
-            /* Now want '=' to precede JSON optional arguments */
+            /* Now want '=' to precede all JSON optional arguments */
             if (optarg) {
                 int k, n, q;
 
-                if ('=' == *optarg) {
+                if ('^' == c) {
+                    op->json_arg = optarg;
+                    break;
+                } else if ('=' == *optarg) {
                     op->json_arg = optarg + 1;
                     break;
                 }

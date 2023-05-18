@@ -35,7 +35,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.56 20230514";      /* spc6r08 */
+static const char * version_str = "1.57 20230517";      /* spc6r08 */
 
 #define MY_NAME "sg_luns"
 
@@ -81,7 +81,7 @@ static struct option long_options[] = {
     {"inhex", required_argument, 0, 'i'},
     {"inner-hex", no_argument, 0, 'I'},
     {"inner_hex", no_argument, 0, 'I'},
-    {"json", optional_argument, 0, 'j'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-j' */
     {"js-file", required_argument, 0, 'J'},
     {"js_file", required_argument, 0, 'J'},
 #ifdef SG_LIB_LINUX
@@ -550,11 +550,11 @@ main(int argc, char * argv[])
         int option_index = 0;
 
 #ifdef SG_LIB_LINUX
-        c = getopt_long(argc, argv, "dhHi:Ij::J:lLm:qQ:rRs:t:vV",
+        c = getopt_long(argc, argv, "^dhHi:Ij::J:lLm:qQ:rRs:t:vV",
                         long_options, &option_index);
 #else
-        c = getopt_long(argc, argv, "dhHi:Ij::J:Lm:qQ:rRs:t:vV", long_options,
-                        &option_index);
+        c = getopt_long(argc, argv, "^dhHi:Ij::J:Lm:qQ:rRs:t:vV",
+                        long_options, &option_index);
 #endif
         if (c == -1)
             break;
@@ -576,11 +576,15 @@ main(int argc, char * argv[])
        case 'I':
             op->do_hex = 2;
             break;
-        case 'j':
+        case 'j':       /* for: -j[=JO] */
+        case '^':       /* for: --json[=JO] */
             op->do_json = true;
-            /* Now want '=' to precede JSON optional arguments */
+            /* Now want '=' to precede all JSON optional arguments */
             if (optarg) {
-                if ('=' == *optarg) {
+                if ('^' == c) {
+                    op->json_arg = optarg;
+                    break;
+                } else if ('=' == *optarg) {
                     op->json_arg = optarg + 1;
                     break;
                 }

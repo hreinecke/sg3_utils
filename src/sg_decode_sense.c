@@ -31,7 +31,7 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.42 20230514";
+static const char * version_str = "1.43 20230517";
 
 #define MY_NAME "sg_decode_sense"
 
@@ -50,7 +50,7 @@ static struct option long_options[] = {
     {"inhex", required_argument, 0, 'i'},       /* same as --file */
     {"ignore-first", no_argument, 0, 'I'},
     {"ignore_first", no_argument, 0, 'I'},
-    {"json", optional_argument, 0, 'j'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-j' */
     {"js-file", required_argument, 0, 'J'},
     {"js_file", required_argument, 0, 'J'},
     {"list-err", no_argument, 0, 'l'},
@@ -226,7 +226,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     char * endptr;
 
     while (1) {
-        c = getopt_long(argc, argv, "b:ce:f:hHi:Ij::J:lnNs:vVw:",
+        c = getopt_long(argc, argv, "^b:ce:f:hHi:Ij::J:lnNs:vVw:",
                         long_options, NULL);
         if (c == -1)
             break;
@@ -291,11 +291,15 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'I':
             op->ignore_first = true;
             break;
-       case 'j':
+        case 'j':       /* for: -j[=JO] */
+        case '^':       /* for: --json[=JO] */
             op->do_json = true;
-            /* Now want '=' to precede JSON optional arguments */
+            /* Now want '=' to precede all JSON optional arguments */
             if (optarg) {
-                if ('=' == *optarg) {
+                if ('^' == c) {
+                    op->json_arg = optarg;
+                    break;
+                } else if ('=' == *optarg) {
                     op->json_arg = optarg + 1;
                     break;
                 }

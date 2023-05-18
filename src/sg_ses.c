@@ -41,7 +41,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.83 20230514";    /* ses4r04 */
+static const char * version_str = "2.84 20230517";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 
@@ -458,7 +458,7 @@ static const struct option long_options[] = {
     {"inhex", required_argument, 0, 'X'},
     {"inner-hex", no_argument, 0, 'i'},
     {"inner_hex", no_argument, 0, 'i'},
-    {"json", optional_argument, 0, 'J'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-J' */
     {"js_file", required_argument, 0, 'Q'},
     {"js-file", required_argument, 0, 'Q'},
     {"join", no_argument, 0, 'j'},
@@ -1475,7 +1475,7 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
     while (1) {
         int option_index = 0;
 
-        c = getopt_long(argc, argv, "aA:b:cC:d:D:eE:fFG:hHiI:jJ::ln:N:m:Mp:"
+        c = getopt_long(argc, argv, "^aA:b:cC:d:D:eE:fFG:hHiI:jJ::ln:N:m:Mp:"
                         "qQ:rRsS:vVwx:X:yz", long_options, &option_index);
         if (c == -1)
             break;
@@ -1592,13 +1592,17 @@ parse_cmd_line(struct opts_t *op, int argc, char *argv[])
         case 'j':
             ++op->do_join;
             break;
-        case 'J':       /* corresponds to --json[=JO] ; --js-file= --> -Q */
+        case 'J':       /* for: -J[=JO] ; --js-file= --> -Q */
+        case '^':       /* for: --json[=JO] */
             op->do_json = true;
-           /* Now want '=' to precede JSON optional arguments */
+            /* Now want '=' to precede all JSON optional arguments */
             if (optarg) {
                 int k, q;
 
-                if ('=' == *optarg) {
+                if ('^' == c) {
+                    op->json_arg = optarg;
+                    break;
+                } else if ('=' == *optarg) {
                     op->json_arg = optarg + 1;
                     break;
                 }
