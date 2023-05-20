@@ -51,7 +51,7 @@ endif
 # For C++/clang testing
 ## CC = gcc-9
 ## CC = gcc
-CC = g++
+## CC = g++
 ## CC = clang
 ## CXX = clang++
 ## CC = clang++
@@ -60,7 +60,7 @@ CC = g++
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu11
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
 AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 $(DBG_CPPFLAGS)
-###AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
+AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W -flto=auto $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W $(DBG_CFLAGS) -fanalyzer
 # AM_CFLAGS = -Wall -W -pedantic -std=c99
@@ -71,7 +71,7 @@ AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET
 # AM_CFLAGS = -Wall -W -pedantic -std=c++14
 # AM_CFLAGS = -Wall -W -pedantic -std=c++17 $(DBG_CXXFLAGS)
 # AM_CFLAGS = -Wall -W -pedantic -std=c++20 --analyze $(DBG_CXXFLAGS)
-AM_CFLAGS = -Wall -W -pedantic -std=c++20 $(DBG_CXXFLAGS)
+# AM_CFLAGS = -Wall -W -pedantic -std=c++20 $(DBG_CXXFLAGS)
 # AM_CFLAGS = -Wall -W -pedantic -std=c++23 $(DBG_CXXFLAGS)
 
 sg_bg_ctl_LDADD = ../lib/libsgutils2.la

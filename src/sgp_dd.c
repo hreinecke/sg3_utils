@@ -75,8 +75,11 @@
 #endif
 #endif
 
+#if 0
+/* The following warning produces a warning itself pre c++23 and c23 */
 #ifndef HAVE_C11_ATOMICS
 #warning "Don't have C11 Atomics, using mutex with pack_id"
+#endif
 #endif
 
 #include "sg_lib.h"
@@ -86,7 +89,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.91 20230519";
+static const char * version_str = "5.92 20230519";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
