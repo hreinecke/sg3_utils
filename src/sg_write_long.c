@@ -1,5 +1,5 @@
 /* A utility program for the Linux OS SCSI subsystem.
- *  Copyright (C) 2004-2018 D. Gilbert
+ *  Copyright (C) 2004-2023 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -198,7 +198,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

@@ -803,12 +803,11 @@ decode_mode_policy_vpd(const uint8_t * buff, int len, struct opts_t * op,
         if (op->do_hex > 1)
             hex2stdout(bp, 4, 1);
         else {
-            n = 0;
             ppc =  (bp[0] & 0x3f);
             pspc = bp[1];
-            n = sg_scnpr(b + n, blen - n, "  Policy page code: 0x%x", ppc);
+            n = sg_scnpr(b, blen, "  Policy page code: 0x%x", ppc);
             if (pspc)
-                sg_scnpr(b + n, blen - n, ",  subpage code: 0x%x", pspc);
+                sg_scn3pr(b, blen, n, ",  subpage code: 0x%x", pspc);
             sgj_pr_hr(jsp, "%s\n", b);
             if ((0 == k) && (0x3f == (0x3f & bp[0])) && (0xff == bp[1]))
                 sgj_pr_hr(jsp, "  therefore the policy applies to all modes "
@@ -967,20 +966,20 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
         cp = NULL;
     is_be = sg_is_big_endian();
     if (cp) {
-        n += sg_scnpr(b + n, blen - n, "  ATA command IDENTIFY %sDEVICE "
+        n += sg_scn3pr(b, blen, n, "  ATA command IDENTIFY %sDEVICE "
                       "response summary:\n", cp);
         num = sg_ata_get_chars((const unsigned short *)(buff + 60), 27, 20,
                                is_be, d);
         d[num] = '\0';
-        n += sg_scnpr(b + n, blen - n, "    model: %s\n", d);
+        n += sg_scn3pr(b, blen, n, "    model: %s\n", d);
         num = sg_ata_get_chars((const unsigned short *)(buff + 60), 10, 10,
                                is_be, d);
         d[num] = '\0';
-        n += sg_scnpr(b + n, blen - n, "    serial number: %s\n", d);
+        n += sg_scn3pr(b, blen, n, "    serial number: %s\n", d);
         num = sg_ata_get_chars((const unsigned short *)(buff + 60), 23, 4,
                                is_be, d);
         d[num] = '\0';
-        sg_scnpr(b + n, blen - n, "    firmware revision: %s\n", d);
+        sg_scn3pr(b, blen, n, "    firmware revision: %s\n", d);
         sgj_pr_hr(jsp, "%s", b);
         if (do_long_nq)
             sgj_pr_hr(jsp, "  ATA command IDENTIFY %sDEVICE response in "
@@ -2060,11 +2059,11 @@ decode_block_dev_char_ext_vpd(const uint8_t * buff, int len,
                   u, true, (b_active ? NULL : rsv_s));
     n = sg_scnpr(b, blen, "%s: ", "Designed utilization");
     if (b_active)
-        n += sg_scnpr(b + n, blen - n, "%u %s for reads and ", u, uup);
+        n += sg_scn3pr(b, blen, n, "%u %s for reads and ", u, uup);
     u = sg_get_unaligned_be32(buff + 12);
     sgj_haj_vi(jsp, jop, 2, "Utilization A", SGJ_SEP_COLON_1_SPACE, u, true);
-    sg_scnpr(b + n, blen - n, "%u %s for %swrites, %s", u, uup,
-             combined ? "reads and " : null_s, uip);
+    sg_scn3pr(b, blen, n, "%u %s for %swrites, %s", u, uup,
+              combined ? "reads and " : null_s, uip);
     sgj_pr_hr(jsp, "  %s\n", b);
     if (jsp->pr_string)
         sgj_js_nv_s(jsp, jop, "summary", b);
@@ -3218,9 +3217,9 @@ decode_tapealert_supported_vpd(const uint8_t * buff, int len,
                 sgj_pr_hr(jsp, "%s\n", b);
                 n = 0;
             }
-            n += sg_scnpr(b + n, blen - n, "  Flag%02Xh: %d", k, supp);
+            n += sg_scn3pr(b, blen, n, "  Flag%02Xh: %d", k, supp);
         } else
-            n += sg_scnpr(b + n, blen - n, "  %02Xh: %d", k, supp);
+            n += sg_scn3pr(b, blen, n, "  %02Xh: %d", k, supp);
     }
     sgj_pr_hr(jsp, "%s\n", b);
 }
@@ -3308,7 +3307,7 @@ decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
         return;
     }
     for (k = 0, n = 0; k < 16; ++k)
-        n += sg_scnpr(b + n, blen - n, "%02x", buff[10 + k]);
+        n += sg_scn3pr(b, blen, n, "%02x", buff[10 + k]);
     sgj_haj_vs(jsp, jop, 2, "LUN WWN", SGJ_SEP_COLON_1_SPACE, b);
     snprintf(b, blen, "%.*s", buff[49], buff + 50);
     sgj_haj_vs(jsp, jop, 2, "Array Serial Number", SGJ_SEP_COLON_1_SPACE, b);
@@ -3323,11 +3322,11 @@ decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
     uc = buff[8];
     n = 0;
     if (uc > 0x01)
-       n += sg_scnpr(b + n, blen - n, "Unknown SP (%x)", uc);
+       n += sg_scn3pr(b, blen, n, "Unknown SP (%x)", uc);
     else
-       n += sg_scnpr(b + n, blen - n, "%s", sp_arr[uc]);
+       n += sg_scn3pr(b, blen, n, "%s", sp_arr[uc]);
     sgj_js_nv_ihexstr(jsp, jop, "path_connects_to", uc, NULL, b);
-    sg_scnpr(b + n, blen - n, ", Port Number: %u", buff[7]);
+    sg_scn3pr(b, blen, n, ", Port Number: %u", buff[7]);
     sgj_pr_hr(jsp, "  This path connects to: %s\n", b);
     sgj_js_nv_ihex(jsp, jop, "port_number", buff[7]);
 
@@ -3359,7 +3358,7 @@ decode_upr_vpd_c0_emc(uint8_t * buff, int len, struct opts_t * op,
         printf("  SP IPv6 address: ");
         n = 0;
         for (k = 0; k < 16; ++k)
-            n += sg_scnpr(b + n, blen - n, "%02x", buff[32 + k]);
+            n += sg_scn3pr(b, blen, n, "%02x", buff[32 + k]);
         sgj_pr_hr(jsp, "  SP IPv6 address: %s\n", b);
         sgj_js_nv_hex_bytes(jsp, jop, "sp_ipv6_address", buff + 32, 16);
     }
@@ -3425,17 +3424,17 @@ decode_rdac_vpd_c2(uint8_t * buff, int len, struct opts_t * op,
     snprintf(b, blen, "%02d/%02d/%02d\n", buff[11], buff[12], buff[13]);
     sgj_haj_vs(jsp, jop, 2, "Software Date", SGJ_SEP_COLON_1_SPACE, b);
     n = 0;
-    n += sg_scnpr(b + n, blen - n, "  Features:");
+    n += sg_scn3pr(b, blen, n, "  Features:");
     if (buff[14] & 0x01)
-        n += sg_scnpr(b + n, blen - n, " Dual Active,");
+        n += sg_scn3pr(b, blen, n, " Dual Active,");
     if (buff[14] & 0x02)
-        n += sg_scnpr(b + n, blen - n, " Series 3,");
+        n += sg_scn3pr(b, blen, n, " Series 3,");
     if (buff[14] & 0x04)
-        n += sg_scnpr(b + n, blen - n, " Multiple Sub-enclosures,");
+        n += sg_scn3pr(b, blen, n, " Multiple Sub-enclosures,");
     if (buff[14] & 0x08)
-        n += sg_scnpr(b + n, blen - n, " DCE/DRM/DSS/DVE,");
+        n += sg_scn3pr(b, blen, n, " DCE/DRM/DSS/DVE,");
     if (buff[14] & 0x10)
-        sg_scnpr(b + n, blen - n, " Asymmetric Logical Unit Access,");
+        sg_scn3pr(b, blen, n, " Asymmetric Logical Unit Access,");
     sgj_pr_hr(jsp, "%s\n", b);
     if (jsp->pr_as_json) {
         jo2p = sgj_snake_named_subobject_r(jsp, jop, "features");
@@ -3601,9 +3600,9 @@ decode_rdac_vpd_c9(uint8_t * buff, int len, struct opts_t * op,
         n = snprintf(b, blen, "  AVT:");
         n_hold = n;
         if (buff[8] & 0x80) {
-            n += sg_scnpr(b + n, blen - n, " Enabled");
+            n += sg_scn3pr(b, blen, n, " Enabled");
             if (buff[8] & 0x40)
-                sg_scnpr(b + n, blen - n, " (Allow reads on sector 0)");
+                sg_scn3pr(b, blen, n, " (Allow reads on sector 0)");
             sgj_pr_hr(jsp, "%s\n", b);
             sgj_js_nv_ihexstr(jsp, jop, "avt", buff[8], NULL, b + n_hold);
 

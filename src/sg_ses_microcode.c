@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021 Douglas Gilbert.
+ * Copyright (c) 2014-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -45,7 +45,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.19 20210610";    /* ses4r02 */
+static const char * version_str = "1.20 20230519";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -652,7 +652,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         op->verbose = 0;
     } else if (! verbose_given) {

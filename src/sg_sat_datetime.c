@@ -62,7 +62,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.02 20230415";
+static const char * version_str = "1.03 20230519";
 
 static struct option long_options[] = {
     {"ck_cond", no_argument, 0, 'C'},
@@ -272,7 +272,7 @@ do_read_datetime(int sg_fd, int ata_cmd, bool ck_cond, int verbose,
                    secs_in_min, rem_msecs);
         } else
             pr2serr("%" PRIu64 "\n",
-		    do_srep ? (timestamp / 1000) : timestamp);
+                    do_srep ? (timestamp / 1000) : timestamp);
 
     } else if ((res > 0) && (res & SAM_STAT_CHECK_CONDITION)) {
         if (verbose > 1) {
@@ -659,7 +659,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

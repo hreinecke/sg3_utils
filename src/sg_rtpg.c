@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2018 Christophe Varoqui and Douglas Gilbert.
+ * Copyright (c) 2004-2023 Christophe Varoqui and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.27 20180628";
+static const char * version_str = "1.28 20230519";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -218,7 +218,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

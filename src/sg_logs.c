@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.32 20230517";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.33 20230519";    /* spc6r07 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -4199,7 +4199,7 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val,
 {
     int n = 0;
     unsigned int u;
-    const char * cp = "";
+    const char * cp;
     static const char * pvdt = "Peak value detector threshold";
 
     switch (pes) {
@@ -4286,7 +4286,7 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val,
     case 0x2b:
         cp = "Peak transmitted pathway blocked count";
         n = sg_scnpr(b, blen, "%s: %u", cp, val & 0xff);
-        sg_scnpr(b + n, blen - n, "\t%s: %u", pvdt, thresh_val & 0xff);
+        sg_scn3pr(b, blen, n, "\t%s: %u", pvdt, thresh_val & 0xff);
         break;
     case 0x2c:
         cp = "Peak transmitted arbitration wait time";
@@ -4297,20 +4297,19 @@ show_sas_phy_event_info(int pes, unsigned int val, unsigned int thresh_val,
             n = sg_scnpr(b, blen, "%s (ms): %u", cp, 33 + (u - 0x8000));
         u = thresh_val & 0xffff;
         if (u < 0x8000)
-            sg_scnpr(b + n, blen - n, "\t%s (us): %u", pvdt, u);
+            sg_scn3pr(b, blen, n, "\t%s (us): %u", pvdt, u);
         else
-            sg_scnpr(b + n, blen - n, "\t%s (ms): %u", pvdt,
-                     33 + (u - 0x8000));
+            sg_scn3pr(b, blen, n, "\t%s (ms): %u", pvdt, 33 + (u - 0x8000));
         break;
     case 0x2d:
         cp = "Peak arbitration time";
         n = sg_scnpr(b, blen, "%s (us): %u", cp, val);
-        sg_scnpr(b + n, blen - n, "\t%s: %u", pvdt, thresh_val);
+        sg_scn3pr(b, blen, n, "\t%s: %u", pvdt, thresh_val);
         break;
     case 0x2e:
         cp = "Peak connection time";
         n = sg_scnpr(b, blen, "%s (us): %u", cp, val);
-        sg_scnpr(b + n, blen - n, "\t%s: %u", pvdt, thresh_val);
+        sg_scn3pr(b, blen, n, "\t%s: %u", pvdt, thresh_val);
         break;
     case 0x2f:
         cp = "Persistent connection count";
@@ -4661,7 +4660,7 @@ show_sas_port_param(const uint8_t * bp, int param_len, struct opts_t * op,
                         snprintf(s, sz, "%s_pes_0x%x", unkn_s, pes);
                         sgj_js_nv_ihex(jsp, jo3p, s, ui);
                         n = strlen(s);
-                        sg_scnpr(s + n, sz - n, "_%s", "threshold");
+                        sg_scn3pr(s, sz, n, "_%s", "threshold");
                         sgj_js_nv_ihex(jsp, jo3p, s, pvdt_v);
                     }
                 } else {
@@ -6344,9 +6343,10 @@ show_tapealert_response_page(const uint8_t * resp, int len,
                 if (0 == mod) {
                     if (div > 0)
                         sgj_pr_hr(jsp, "%s\n", b);
+		    /* restart filling 'b' */
                     n = sg_scnpr(b, blen, "  Flag%02Xh: %d", k, v);
                 } else
-                    n += sg_scnpr(b + n, blen - n, "  %02Xh: %d", k, v);
+                    n += sg_scn3pr(b, blen, n, "  %02Xh: %d", k, v);
                 if (jsp->pr_as_json) {
                     snprintf(e, elen, "flag%02x", k);
                     sgj_js_nv_ihex(jsp, jo3p, e, v);
@@ -6904,7 +6904,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
             if (op->verbose) {
                 n = sg_scnpr(b, blen, "    vendor bytes [11 -> 15]: ");
                 for (m = 0; m < 5; ++m)
-                    n += sg_scnpr(b + n, blen - n, "0x%02x ", bp[11 + m]);
+                    n += sg_scn3pr(b, blen, n, "0x%02x ", bp[11 + m]);
                  sgj_pr_hr(jsp, "%s\n", b);
             }
             n = sg_scnpr(b, blen, "    LBA (associated with medium error): "
@@ -6913,7 +6913,7 @@ show_background_scan_results_page(const uint8_t * resp, int len,
                 sgj_pr_hr(jsp, "%s0\n", b);
             else {
                 for (m = 0; m < 8; ++m)
-                    n += sg_scnpr(b + n, blen - n, "%02x", bp[16 + m]);
+                    n += sg_scn3pr(b, blen, n, "%02x", bp[16 + m]);
                 sgj_pr_hr(jsp, "%s\n", b);
             }
             if (jsp->pr_as_json)
@@ -7731,7 +7731,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
             ccp = "Data bytes received with WRITE operations";
             n = sg_scnpr(b, blen, "  %s: %" PRIu64 " GB", ccp, gbytes);
             if (op->verbose)
-                sg_scnpr(b + n, blen - n, " [%" PRIu64 " bytes]", ull);
+                sg_scn3pr(b, blen, n, " [%" PRIu64 " bytes]", ull);
             sgj_pr_hr(jsp, "%s\n", b);
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);
@@ -7742,7 +7742,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
             ccp = "Data bytes written to media by WRITE operations";
             n = sg_scnpr(b, blen, "  %s: %" PRIu64 " GB", ccp, gbytes);
             if (op->verbose)
-                sg_scnpr(b + n, blen - n, " [%" PRIu64 " bytes]", ull);
+                sg_scn3pr(b, blen, n, " [%" PRIu64 " bytes]", ull);
             sgj_pr_hr(jsp, "%s\n", b);
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);
@@ -7753,7 +7753,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
             ccp = "Data bytes read from media by READ operations";
             n = sg_scnpr(b, blen, "  %s: %" PRIu64 " GB", ccp, gbytes);
             if (op->verbose)
-                sg_scnpr(b + n, blen - n, " [%" PRIu64 " bytes]", ull);
+                sg_scn3pr(b, blen, n, " [%" PRIu64 " bytes]", ull);
             sgj_pr_hr(jsp, "%s\n", b);
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);
@@ -7764,7 +7764,7 @@ show_sequential_access_page(const uint8_t * resp, int len,
             ccp = "Data bytes transferred by READ operations";
             n = sg_scnpr(b, blen, "  %s: %" PRIu64 " GB", ccp, gbytes);
             if (op->verbose)
-                sg_scnpr(b + n, blen - n, " [%" PRIu64 " bytes]", ull);
+                sg_scn3pr(b, blen, n, " [%" PRIu64 " bytes]", ull);
             sgj_pr_hr(jsp, "%s\n", b);
             if (jsp->pr_as_json) {
                 sgj_js_nv_ihexstr(jsp, jo3p, param_c_sn, pc, NULL, ccp);
@@ -9914,8 +9914,7 @@ main(int argc, char * argv[])
                 nn = sg_scnpr(b, blen, "Unable to find page=0x%x",
                               op->pg_code);
                 if (op->subpg_code > 0)
-                    sg_scnpr(b + nn, blen - nn, ", subpage=0x%x",
-                             op->subpg_code);
+                    sg_scn3pr(b, blen, nn, ", subpage=0x%x", op->subpg_code);
                 sgj_pr_hr(jsp, "%s\n", b);
                 if (jsp->pr_as_json)
                     sgj_js_nv_i(jsp, jop, "page_not_found", 1);

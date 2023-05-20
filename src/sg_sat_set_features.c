@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2022 Douglas Gilbert.
+ * Copyright (c) 2006-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -52,7 +52,7 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.19 20220425";
+static const char * version_str = "1.20 20230519";
 
 static struct option long_options[] = {
     {"count", required_argument, 0, 'c'},
@@ -396,7 +396,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

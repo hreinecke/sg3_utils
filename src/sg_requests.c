@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.43 20230502";
+static const char * version_str = "1.44 20230519";
 
 static const char * my_name = "sg_requests: ";  /* REQUEST Sense command */
 
@@ -241,7 +241,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

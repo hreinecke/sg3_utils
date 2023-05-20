@@ -36,7 +36,7 @@
  * device.
  */
 
-static const char * version_str = "1.41 20230517";      /* sbc5r04 */
+static const char * version_str = "1.42 20230519";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -735,14 +735,13 @@ start_response:
         if (jsp->pr_as_json)
             jo2p = sgj_new_unattached_object_r(jsp);
         if (op->do_brief) { /* no LBA accessibility field */
-            n = 0;
-            n += sg_scnpr(b + n, blen - n, "0x%" PRIx64, d_lba);
+            n = sg_scnpr(b, blen, "0x%" PRIx64, d_lba);
             if ((0 == op->blockhex) || (1 == (op->blockhex % 2)))
-                sg_scnpr(b + n, blen - n, "  0x%x  %d  %d",
-                         (unsigned int)d_blocks, res, add_status);
+                sg_scn3pr(b, blen, n, "  0x%x  %d  %d",
+                          (unsigned int)d_blocks, res, add_status);
             else
-                sg_scnpr(b + n, blen - n, "  %u  %d  %d",
-                         (unsigned int)d_blocks, res, add_status);
+                sg_scn3pr(b, blen, n, "  %u  %d  %d",
+                          (unsigned int)d_blocks, res, add_status);
             sgj_pr_hr(jsp, "%s\n", b);
             sgj_js_nv_ihex(jsp, jo2p, "lba", d_lba);
             sgj_js_nv_ihex(jsp, jo2p, "blocks", d_blocks);
@@ -763,20 +762,20 @@ start_response:
 
                 n = sg_scnpr(b, blen, "[%d] LBA: 0x%" PRIx64, k + 1, d_lba);
                 if (n < 24)     /* add some padding spaces */
-                    n += sg_scnpr(b + n, blen - n,  "%*c", 24 - n, ' ');
+                    n += sg_scn3pr(b, blen, n,  "%*c", 24 - n, ' ');
                 if (1 == (op->blockhex % 2)) {
 
                     snprintf(d, sizeof(d), "0x%x", d_blocks);
-                    n += sg_scnpr(b + n, blen - n, " blocks: %10s", d);
+                    n += sg_scn3pr(b, blen, n, " blocks: %10s", d);
                 } else
-                    n += sg_scnpr(b + n, blen - n, " blocks: %10u", d_blocks);
+                    n += sg_scn3pr(b, blen, n, " blocks: %10u", d_blocks);
                 get_prov_status_str(res, d, sizeof(d));
-                n += sg_scnpr(b + n, blen - n, "  %s;", d);
+                n += sg_scn3pr(b, blen, n, "  %s;", d);
                 get_lba_access_str(lba_access, d, sizeof(d), true);
-                n += sg_scnpr(b + n, blen - n, "  %s", d);
+                n += sg_scn3pr(b, blen, n, "  %s", d);
                 get_pr_status_str(add_status, d, sizeof(d));
                 if (strlen(d) > 0)
-                    sg_scnpr(b + n, blen - n, "  [%s]", d);
+                    sg_scn3pr(b, blen, n, "  [%s]", d);
                 sgj_pr_hr(jsp, "%s\n", b);
             }
         }

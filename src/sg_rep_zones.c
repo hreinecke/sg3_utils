@@ -41,7 +41,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.49 20230517";
+static const char * version_str = "1.50 20230518";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -393,14 +393,14 @@ static const char * same_desc_arr[16] = {
 };
 
 static uint64_t
-prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op,
-              sgj_state * jsp, sgj_opaque_p jop)
+prt_a_zn_desc(const uint8_t *bp, struct opts_t * op, sgj_opaque_p jop)
 {
     uint8_t zt, zc;
     uint64_t lba, len, wp;
+    sgj_state * jsp = &op->json_st;
     char b[80];
 
-    jop = jop ? jop : jsp->basep;
+    // jop = jop ? jop : jsp->basep;
     zt = bp[0] & 0xf;
     zc = (bp[1] >> 4) & 0xf;
     sg_get_zone_type_str(zt, sizeof(b), b);
@@ -434,15 +434,16 @@ prt_a_zn_desc(const uint8_t *bp, const struct opts_t * op,
 
 static int
 decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
-                 const struct opts_t * op, sgj_state * jsp)
+                 struct opts_t * op,  sgj_opaque_p jop)
 {
-    bool as_json = jsp ? jsp->pr_as_json : false;
+    bool as_json;
     int k, same, num_zd;
     uint64_t wp, ul, mx_lba;
-    sgj_opaque_p jop = jsp ? jsp->basep : NULL;
+    sgj_state * jsp = &op->json_st;
     sgj_opaque_p jap = NULL;
     const uint8_t * bp;
 
+    as_json = jsp ? jsp->pr_as_json : false;
     if ((uint32_t)act_len < decod_len) {
         num_zd = (act_len >= 64) ? ((act_len - 64) / REPORT_ZONES_DESC_LEN)
                                  : 0;
@@ -498,7 +499,7 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
         sgj_pr_hr(jsp, "From last descriptor in this response:\n");
         sgj_pr_hr(jsp, " %s%d\n", zn_dnum_s, num_zd - 1);
         sgj_js_nv_i(jsp, jop, "zone_descriptor_index", num_zd - 1);
-        ul = prt_a_zn_desc(bp, op, jsp, jop);
+        ul = prt_a_zn_desc(bp, op, jop);
         if (ul > mx_lba)
             sgj_pr_hr(jsp, "   >> This zone seems to be the last one\n");
         else
@@ -534,7 +535,7 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
             continue;
         }
         jo2p = sgj_new_unattached_object_r(jsp);
-        prt_a_zn_desc(bp, op, jsp, jo2p);
+        prt_a_zn_desc(bp, op, jo2p);
         sgj_js_nv_o(jsp, jap, NULL /* name */, jo2p);
     }
     if ((op->do_num == 0) && (! op->wp_only) && (! op->do_hex)) {
@@ -546,14 +547,14 @@ decode_rep_zones(const uint8_t * rzBuff, int act_len, uint32_t decod_len,
 }
 
 static int
-decode_rep_realms(const uint8_t * rzBuff, int act_len,
-                  const struct opts_t * op, sgj_state * jsp)
+decode_rep_realms(const uint8_t * rzBuff, int act_len, struct opts_t * op,
+                  sgj_opaque_p jop)
 {
     uint32_t k, realms_count, derived_realms_count, r_desc_len,
              zdomains_count;
     uint64_t nr_locator;
     const uint8_t * bp;
-    sgj_opaque_p jop = jsp ? jsp->basep : NULL;
+    sgj_state * jsp = &op->json_st;
     sgj_opaque_p jap = NULL;
     sgj_opaque_p ja2p = NULL;
 
@@ -646,13 +647,13 @@ decode_rep_realms(const uint8_t * rzBuff, int act_len,
 }
 
 static int
-decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
-                   const struct opts_t * op, sgj_state * jsp)
+decode_rep_zdomains(const uint8_t * rzBuff, int act_len, struct opts_t * op,
+                    sgj_opaque_p jop)
 {
     uint32_t k, zd_len, zd_ret_len, zdoms_sup, zdoms_rep, zd_rep_opts;
     uint32_t num, der_zdoms;
     uint64_t zd_locator;
-    sgj_opaque_p jop = jsp ? jsp->basep : NULL;
+    sgj_state * jsp = &op->json_st;
     sgj_opaque_p jap = NULL;
     const uint8_t * bp;
 
@@ -716,9 +717,9 @@ decode_rep_zdomains(const uint8_t * rzBuff, int act_len,
 
 static int
 find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
-                  struct opts_t * op, sgj_state * jsp)
+                  struct opts_t * op, sgj_opaque_p jop)
 {
-    bool as_json = (jsp && (0 == op->do_hex)) ?  jsp->pr_as_json : false;
+    bool as_json;
     bool found = false;
     uint8_t zt;
     int k, resid, rlen, num_zd, num_rem;
@@ -726,9 +727,11 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
     uint32_t zn_dnum = 0;
     uint64_t slba = op->st_lba;
     uint64_t mx_lba = 0;
+    sgj_state * jsp = &op->json_st;
     const uint8_t * bp = rzBuff;
     char b[96];
 
+    as_json = (jsp && (0 == op->do_hex)) ?  jsp->pr_as_json : false;
     num_rem = op->do_num ? op->do_num : INT_MAX;
     for ( ; num_rem > 0; num_rem -= num_zd) {
         resid = 0;
@@ -776,9 +779,10 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
             break;
     }           /* end of outer for loop */
     if (res == 0) {
-        sgj_opaque_p jo2p = as_json ?
-                sgj_named_subobject_r(jsp, NULL, "find_condition") : NULL;
+        sgj_opaque_p jo2p = NULL;
 
+        if (as_json)
+            jo2p = sgj_named_subobject_r(jsp, jop, "find_condition");
         if (found) {
             if (op->do_hex) {
                 hex2stdout(rzBuff, 64, -1);
@@ -789,7 +793,7 @@ find_report_zones(int sg_fd, uint8_t * rzBuff, const char * cmd_name,
                 sgj_pr_hr(jsp, " %s: %d\n", zn_dnum_s, zn_dnum);
                 sgj_js_nv_b(jsp, jo2p, "met", true);
                 sgj_js_nv_i(jsp, jo2p, "zone_descriptor_index", zn_dnum);
-                prt_a_zn_desc(bp, op, jsp, jo2p);
+                prt_a_zn_desc(bp, op, jo2p);
             }
         } else {
             if (op->do_hex) {
@@ -1495,7 +1499,7 @@ main(int argc, char * argv[])
             res = 0;
             if (op->find_zt) {  /* so '-F none' will drop through */
                 op->maxlen = in_len;
-                ret = find_report_zones(sg_fd, rzBuff, cmd_name, op, jsp);
+                ret = find_report_zones(sg_fd, rzBuff, cmd_name, op, jop);
                 goto the_end;
             } else if (op->statistics) {
                 op->maxlen = in_len;
@@ -1530,7 +1534,7 @@ main(int argc, char * argv[])
     }
 
     if (op->find_zt) {  /* so '-F none' will drop through */
-        ret = find_report_zones(sg_fd, rzBuff, cmd_name, op, jsp);
+        ret = find_report_zones(sg_fd, rzBuff, cmd_name, op, jop);
         goto the_end;
     } else if (op->statistics) {
         ret = gather_statistics(sg_fd, rzBuff, cmd_name, op);
@@ -1596,11 +1600,11 @@ start_response:
             goto the_end;
         }
         if (REPORT_ZONES_SA == op->serv_act)
-            ret = decode_rep_zones(rzBuff, act_len, decod_len, op, jsp);
+            ret = decode_rep_zones(rzBuff, act_len, decod_len, op, jop);
         else if (op->do_realms)
-            ret = decode_rep_realms(rzBuff, act_len, op, jsp);
+            ret = decode_rep_realms(rzBuff, act_len, op, jop);
         else if (op->do_zdomains)
-            ret = decode_rep_zdomains(rzBuff, act_len, op, jsp);
+            ret = decode_rep_zdomains(rzBuff, act_len, op, jop);
     } else if (SG_LIB_CAT_INVALID_OP == res)
         pr2serr("%s command not supported\n", cmd_name);
     else {

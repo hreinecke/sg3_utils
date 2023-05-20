@@ -69,7 +69,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.74 20230126";
+static const char * version_str = "0.75 20230519";
 
 #define ME "sg_xcopy: "
 
@@ -403,26 +403,26 @@ dd_filetype(struct xcopy_fp_t * fp)
 
 
 static char *
-dd_filetype_str(int ft, char * buff)
+dd_filetype_str(int ft, char * buff, int bufflen)
 {
     int off = 0;
 
     if (FT_DEV_NULL & ft)
-        off += sg_scnpr(buff + off, 32, "null device ");
+        off += sg_scn3pr(buff, bufflen, off, "null device ");
     if (FT_SG & ft)
-        off += sg_scnpr(buff + off, 32, "SCSI generic (sg) device ");
+        off += sg_scn3pr(buff, bufflen, off, "SCSI generic (sg) device ");
     if (FT_BLOCK & ft)
-        off += sg_scnpr(buff + off, 32, "block device ");
+        off += sg_scn3pr(buff, bufflen, off, "block device ");
     if (FT_FIFO & ft)
-        off += sg_scnpr(buff + off, 32, "fifo (named pipe) ");
+        off += sg_scn3pr(buff, bufflen, off, "fifo (named pipe) ");
     if (FT_ST & ft)
-        off += sg_scnpr(buff + off, 32, "SCSI tape device ");
+        off += sg_scn3pr(buff, bufflen, off, "SCSI tape device ");
     if (FT_RAW & ft)
-        off += sg_scnpr(buff + off, 32, "raw device ");
+        off += sg_scn3pr(buff, bufflen, off, "raw device ");
     if (FT_OTHER & ft)
-        off += sg_scnpr(buff + off, 32, "other (perhaps ordinary file) ");
+        off += sg_scn3pr(buff, bufflen, off, "other (perhaps ordinary file) ");
     if (FT_ERROR & ft)
-        sg_scnpr(buff + off, 32, "unable to 'stat' file ");
+        sg_scn3pr(buff, bufflen, off, "unable to 'stat' file ");
     return buff;
 }
 
@@ -1218,7 +1218,7 @@ open_if(struct xcopy_fp_t * ifp, int vb)
 
     if (vb)
         pr2serr(" >> Input file type: %s, devno %d:%d\n",
-                dd_filetype_str(ifp->sg_type, ebuff),
+                dd_filetype_str(ifp->sg_type, ebuff, sizeof(ebuff)),
                 major(ifp->devno), minor(ifp->devno));
     if (FT_ERROR & ifp->sg_type) {
         pr2serr(ME "unable access %s\n", ifp->fname);
@@ -1267,7 +1267,7 @@ open_of(struct xcopy_fp_t * ofp, int vb)
     ofp->sg_type = dd_filetype(ofp);
     if (vb)
         pr2serr(" >> Output file type: %s, devno %d:%d\n",
-                dd_filetype_str(ofp->sg_type, ebuff),
+                dd_filetype_str(ofp->sg_type, ebuff, sizeof(ebuff)),
                 major(ofp->devno), minor(ofp->devno));
 
     if (!(FT_DEV_NULL & ofp->sg_type)) {
@@ -1548,7 +1548,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

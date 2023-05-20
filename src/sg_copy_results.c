@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 Hannes Reinecke, SUSE Labs
+ * Copyright (c) 2011-2023 Hannes Reinecke, SUSE Labs
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -41,7 +41,7 @@
  * and the optional list identifier passed as the list_id argument.
  */
 
-static const char * version_str = "1.23 20180625";
+static const char * version_str = "1.24 20230519";
 
 
 #define MAX_XFER_LEN 10000
@@ -400,7 +400,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

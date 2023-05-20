@@ -34,7 +34,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "1.00 20230517";    /* spc6r08 */
+static const char * version_str = "1.01 20230519";    /* spc6r08 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -923,26 +923,24 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
             memset(sa_buff, ' ', sizeof(sa_buff));
         }
         if (op->do_rctd) {
-            n = 0;
             if (ctdp) {
                 /* don't show CDLP because it makes line too long */
                 if (op->do_compact)
-                    n += sg_scnpr(b + n, blen - n, " %.2x%c%.4s", opcode,
-                                  (sa_v ? ',' : ' '), sa_buff);
+                    n = sg_scnpr(b, blen, " %.2x%c%.4s", opcode,
+                                 (sa_v ? ',' : ' '), sa_buff);
                 else
-                    n += sg_scnpr(b + n, blen - n, " %.2x     %.4s       %3d",
-                                  opcode,
-                                  sa_buff, sg_get_unaligned_be16(bp + 6));
+                    n = sg_scnpr(b, blen, " %.2x     %.4s       %3d", opcode,
+                                 sa_buff, sg_get_unaligned_be16(bp + 6));
                 timeout = sg_get_unaligned_be32(bp + 12);
                 if (0 == timeout)
-                    n += sg_scnpr(b + n, blen - n, "         -");
+                    n += sg_scn3pr(b, blen, n, "         -");
                 else
-                    n += sg_scnpr(b + n, blen - n, "  %8u", timeout);
+                    n += sg_scn3pr(b, blen, n, "  %8u", timeout);
                 timeout = sg_get_unaligned_be32(bp + 16);
                 if (0 == timeout)
-                    sg_scnpr(b + n, blen - n, "          -");
+                    sg_scn3pr(b, blen, n, "          -");
                 else
-                    sg_scnpr(b + n, blen - n, "   %8u", timeout);
+                    sg_scn3pr(b, blen, n, "   %8u", timeout);
                 sgj_pr_hr(jsp, "%s    %s\n", b, name_buff);
             } else                      /* CTDP clear */
                 if (op->do_compact)
@@ -1005,14 +1003,13 @@ list_all_codes(uint8_t * rsoc_buff, int rsoc_len, struct opts_t * op,
                 cdb_sz = (cdb_sz < act_len) ? cdb_sz : act_len;
                 if ((cdb_sz > 0) && (cdb_sz <= 80)) {
                     if (op->do_compact)
-                        n += sg_scnpr(b + n, blen - n,
-                                      "             usage: ");
+                        n += sg_scn3pr(b, blen, n, "             usage: ");
                     else
-                        n += sg_scnpr(b + n, blen - n, "        cdb usage: ");
+                        n += sg_scn3pr(b, blen, n, "        cdb usage: ");
                     nn = n;
                     for (m = 0; (m < cdb_sz) && ((4 + m) < (int)sizeof(d));
                          ++m)
-                        n += sg_scnpr(b + n, blen - n, "%.2x ", d[4 + m]);
+                        n += sg_scn3pr(b, blen, n, "%.2x ", d[4 + m]);
                     sgj_pr_hr(jsp, "%s\n", b);
                     if (jsp->pr_as_json) {
                         int l;
@@ -1087,7 +1084,7 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
 {
     bool valid = false;
     int k, mlu, cdlp, rwcdlp, support, ctdp;
-    int n = 0;
+    int n;
     uint8_t * bp;
     const char * cp;
     const char * dlp;
@@ -1101,9 +1098,9 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
 
 
     jop = sgj_named_subobject_r(jsp, jsp->basep, "one_command_descriptor");
-    n += sg_scnpr(b + n, blen - n, "\n  Opcode=0x%.2x", op->opcode);
+    n = sg_scnpr(b, blen, "\n  Opcode=0x%.2x", op->opcode);
     if (rep_opts > 1)
-        sg_scnpr(b + n, blen - n, "  Service_action=0x%.4x", op->servact);
+        sg_scn3pr(b, blen, n, "  Service_action=0x%.4x", op->servact);
     sgj_pr_hr(jsp, "%s\n", b);
     sg_get_opcode_sa_name(((op->opcode > 0) ? op->opcode : 0),
                           ((op->servact > 0) ? op->servact : 0),
@@ -1180,11 +1177,10 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
     }
     sgj_pr_hr(jsp, "  Multiple Logical Units (MLU): %s\n", mlu_p);
     if (valid) {
-        n = 0;
-        n += sg_scnpr(b + n, blen - n, "  Usage data: ");
+        n = sg_scnpr(b, blen, "  Usage data: ");
         bp = rsoc_buff + 4;
         for (k = 0; k < cd_len; ++k)
-            n += sg_scnpr(b + n, blen - n, "%.2x ", bp[k]);
+            n += sg_scn3pr(b, blen, n, "%.2x ", bp[k]);
         sgj_pr_hr(jsp, "%s\n", b);
     }
     if (jsp->pr_as_json) {
@@ -1205,7 +1201,7 @@ list_one(uint8_t * rsoc_buff, int cd_len, int rep_opts,
         sgj_js_nv_i(jsp, jop, "cdb_size", cd_len);
         n = 0;
         for (k = 0; k < cd_len; ++k)
-            n += sg_scnpr(b + n, blen - n, "%.2x ", rsoc_buff[k + 4]);
+            n += sg_scn3pr(b, blen, n, "%.2x ", rsoc_buff[k + 4]);
         l = strlen(b);
         if ((l > 0) && (' ' == b[l - 1]))
             b[l - 1] = '\0';

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2022 Douglas Gilbert
+ * Copyright (c) 2014-2023 Douglas Gilbert
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -40,7 +40,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.21 20220127";
+static const char * version_str = "1.22 20230519";
 
 
 #define ME "sg_write_verify: "
@@ -425,7 +425,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

@@ -86,7 +86,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.90 20230419";
+static const char * version_str = "5.91 20230519";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -330,9 +330,9 @@ calc_duration_throughput(bool contin)
         if ((a > 0.00001) && (b > 511)) {
             r = b / (a * 1000000.0);
             if (r < 1.0)
-                n += sg_scnpr(f + n, flen - n, " at %.1f kB/sec", r * 1000);
+                n += sg_scn3pr(f, flen, n, " at %.1f kB/sec", r * 1000);
             else
-                n += sg_scnpr(f + n, flen - n, " at %.2f MB/sec", r);
+                n += sg_scn3pr(f, flen, n, " at %.2f MB/sec", r);
         }
         if (prev_valid && (da > 0.00001)) {
             db = (double)blk_sz * (blks - prev_blks);
@@ -340,10 +340,9 @@ calc_duration_throughput(bool contin)
                 double dr = db / (da * 1000000.0);
 
                 if (dr < 1.0)
-                    sg_scnpr(f + n, flen - n, " (delta %.1f KB/sec)",
-                             dr * 1000);
+                    sg_scn3pr(f, flen, n, " (delta %.1f KB/sec)", dr * 1000);
                 else
-                    sg_scnpr(f + n, flen - n, " (delta %.2f MB/sec)", dr);
+                    sg_scn3pr(f, flen, n, " (delta %.2f MB/sec)", dr);
             }
         }
         pr2serr("%s\n", f);
@@ -358,11 +357,11 @@ calc_duration_throughput(bool contin)
                 secs = secs - (h * 3600);
                 m = secs / 60;
                 secs = secs - (m * 60);
-                n += sg_scnpr(f + n, flen - n, "estimated time remaining: ");
+                n += sg_scn3pr(f, flen, n, "estimated time remaining: ");
                 if (h > 0)
-                    sg_scnpr(f + n, flen - n, "%d:%02d:%02d", h, m, secs);
+                    sg_scn3pr(f, flen, n, "%d:%02d:%02d", h, m, secs);
                 else
-                    sg_scnpr(f + n, flen - n, "%d:%02d", m, secs);
+                    sg_scn3pr(f, flen, n, "%d:%02d", m, secs);
                 pr2serr("%s\n", f);
             }
         }
@@ -1832,7 +1831,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false;	*/
         version_given = false;
         clp->debug = 0;
     } else if (! verbose_given) {

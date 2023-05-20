@@ -38,7 +38,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.21 20230517";      /* sbc5r04 */
+static const char * version_str = "1.22 20230519";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -702,23 +702,22 @@ start_response:
             char b2[144];
             static const int b2len = sizeof(b2);
 
-            m = 0;
-            m += sg_scnpr(b2 + m, b2len - m, "[%d] identifier: 0x%06x",
-                          k + 1, a_ped.elem_id);
+            m = sg_scnpr(b2, b2len, "[%d] identifier: 0x%06x", k + 1,
+                         a_ped.elem_id);
             if (sg_all_ffs((const uint8_t *)&a_ped.assoc_cap, 8))
-                m += sg_scnpr(b2 + m, b2len - m,
-                              "  associated LBs: not specified;  ");
+                m += sg_scn3pr(b2, b2len, m,
+                               "  associated LBs: not specified;  ");
             else
-                m += sg_scnpr(b2 + m, b2len - m, "  associated LBs: 0x%"
-                              PRIx64 ";  ", a_ped.assoc_cap);
-            m += sg_scnpr(b2 + m, b2len - m, "health: ");
+                m += sg_scn3pr(b2, b2len, m, "  associated LBs: 0x%" PRIx64
+                               ";  ", a_ped.assoc_cap);
+            m += sg_scn3pr(b2, b2len, m, "health: ");
             j = a_ped.phys_elem_health;
             if (fetch_health_str(j, b, blen))
-                m += sg_scnpr(b2 + m, b2len - m, "%s <%d>", b, j);
+                m += sg_scn3pr(b2, b2len, m, "%s <%d>", b, j);
             else
-                m += sg_scnpr(b2 + m, b2len - m, "%s", b);
+                m += sg_scn3pr(b2, b2len, m, "%s", b);
             if (a_ped.restoration_allowed)
-                sg_scnpr(b2 + m, b2len - m, " [restoration allowed [RALWD]]");
+                sg_scn3pr(b2, b2len, m, " [restoration allowed [RALWD]]");
             sgj_pr_hr(jsp, "%s\n", b2);
         }
     }

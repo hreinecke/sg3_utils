@@ -71,16 +71,18 @@ if DEBUG
 # This is active if --enable-debug given to ./configure
 # removed -Wduplicated-branches because needs gcc-8
 DBG_CFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init -Wunused -Wsizeof-array-argument
+DBG_CXXFLAGS = -Wextra -Wmisleading-indentation -Wduplicated-cond -Wlogical-op -Wnull-dereference -Wshadow -Wunused -Wsizeof-array-argument
 DBG_CPPFLAGS = -DDEBUG
 else
 DBG_CFLAGS =
+DBG_CXXFLAGS =
 DBG_CPPFLAGS =
 endif
 
 # For C++/clang testing
 ## CC = gcc-9
 ## CXX = g++
-## CC = g++
+CC = g++
 ## CC = clang
 ## CXX = clang++
 ## CC = clang++
@@ -89,19 +91,18 @@ endif
 # -std=<s> can be c99, c11, gnu11, etc. Default is gnu11 for C code
 # -Wall is no longer all warnings. Add -W (since renamed to -Wextra) for more
 AM_CPPFLAGS = -iquote ${top_srcdir}/include -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 $(DBG_CPPFLAGS)
-AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
+###AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W -flto=auto $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W $(DBG_CFLAGS) -fanalyzer
-# AM_CFLAGS = -Wall -W -Wextra -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wshadow -Wjump-misses-init
 # AM_CFLAGS = -Wall -W -pedantic -std=c99
 # AM_CFLAGS = -Wall -W -pedantic -std=c11
 # AM_CFLAGS = -Wall -W -pedantic -std=c11 --analyze
 # AM_CFLAGS = -Wall -W -pedantic -std=c++11
 # AM_CFLAGS = -Wall -W -pedantic -std=c++14
-# AM_CFLAGS = -Wall -W -pedantic -std=c++1z
+# AM_CFLAGS = -Wall -W -pedantic -std=c++17 $(DBG_CXXFLAGS)
 # AM_CFLAGS = -Wall -W -pedantic -std=c++20 --analyze
-# AM_CFLAGS = -Wall -W -pedantic -std=c++20 $(DBG_CFLAGS)
-# AM_CFLAGS = -Wall -W -pedantic -std=c++23 $(DBG_CFLAGS)
+AM_CFLAGS = -Wall -W -pedantic -std=c++20 $(DBG_CXXFLAGS)
+# AM_CFLAGS = -Wall -W -pedantic -std=c++23 $(DBG_CXXFLAGS)
 
 lib_LTLIBRARIES = libsgutils2.la
 

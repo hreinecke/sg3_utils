@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230517] [svn: r1036]
+Changelog for pre-release sg3_utils-1.48 [20230519] [svn: r1037]
   - decoding utilities: add --json[=JO] and --js-file=JFN
     options, short form changed to -j[=JO]
   - sg_sat_datetime: new utility for setting or accessing
@@ -142,6 +142,7 @@ Changelog for pre-release sg3_utils-1.48 [20230517] [svn: r1036]
       exit status. Useful for sg_turs
     - add SG_LIB_CAT_INVALID_PARAM exit status
   - initialize all sense buffers to 0
+  - sg_pr2serr in sg_lib: add sg_scn3pr() similar to sg_scnpr()
   - linux: replace references to /proc/scsi/sg with
     /sys/module/sg/parameters/
   - sg_pt_linux: support nvme generic device nodes: ng<c>n<n>

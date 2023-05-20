@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2018 Hannes Reinecke and Douglas Gilbert.
+ * Copyright (c) 2004-2023 Hannes Reinecke and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -34,7 +34,7 @@
  *  to the 'SCSI Accessed Fault-Tolerant Enclosures' (SAF-TE) spec.
  */
 
-static const char * version_str = "0.33 20180628";
+static const char * version_str = "0.34 20230519";
 
 
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
@@ -606,7 +606,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

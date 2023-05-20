@@ -70,7 +70,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.23 20230407";
+static const char * version_str = "1.24 20230519";
 
 static const char * my_name = "sgm_dd: ";
 
@@ -213,9 +213,9 @@ calc_duration_throughput(bool contin)
         if ((a > 0.00001) && (b > 511)) {
             r = b / (a * 1000000.0);
             if (r < 1.0)
-                n += sg_scnpr(f + n, flen - n, " at %.1f kB/sec", r * 1000);
+                n += sg_scn3pr(f, flen, n, " at %.1f kB/sec", r * 1000);
             else
-                n += sg_scnpr(f + n, flen - n, " at %.2f MB/sec", r);
+                n += sg_scn3pr(f, flen, n, " at %.2f MB/sec", r);
         }
         if (prev_valid && (da > 0.00001)) {
             db = (double)blk_sz * (blks - prev_blks);
@@ -223,10 +223,9 @@ calc_duration_throughput(bool contin)
                 double dr = db / (da * 1000000.0);
 
                 if (dr < 1.0)
-                    sg_scnpr(f + n, flen - n, " (delta %.1f KB/sec)",
-                             dr * 1000);
+                    sg_scn3pr(f, flen, n, " (delta %.1f KB/sec)", dr * 1000);
                 else
-                    sg_scnpr(f + n, flen - n, " (delta %.2f MB/sec)", dr);
+                    sg_scn3pr(f, flen, n, " (delta %.2f MB/sec)", dr);
             }
         }
         pr2serr("%s\n", f);
@@ -241,11 +240,11 @@ calc_duration_throughput(bool contin)
                 secs = secs - (h * 3600);
                 m = secs / 60;
                 secs = secs - (m * 60);
-                n += sg_scnpr(f + n, flen - n, "estimated time remaining: ");
+                n += sg_scn3pr(f, flen, n, "estimated time remaining: ");
                 if (h > 0)
-                    sg_scnpr(f + n, flen - n, "%d:%02d:%02d", h, m, secs);
+                    sg_scn3pr(f, flen, n, "%d:%02d:%02d", h, m, secs);
                 else
-                    sg_scnpr(f + n, flen - n, "%d:%02d", m, secs);
+                    sg_scn3pr(f, flen, n, "%d:%02d", m, secs);
                 pr2serr("%s\n", f);
             }
         }
@@ -337,24 +336,24 @@ dd_filetype(const char * filename)
 }
 
 static char *
-dd_filetype_str(int ft, char * buff)
+dd_filetype_str(int ft, char * buff, int bufflen)
 {
     int off = 0;
 
     if (FT_DEV_NULL & ft)
-        off += sg_scnpr(buff + off, 32, "null device ");
+        off += sg_scn3pr(buff, bufflen, off, "null device ");
     if (FT_SG & ft)
-        off += sg_scnpr(buff + off, 32, "SCSI generic (sg) device ");
+        off += sg_scn3pr(buff, bufflen, off, "SCSI generic (sg) device ");
     if (FT_BLOCK & ft)
-        off += sg_scnpr(buff + off, 32, "block device ");
+        off += sg_scn3pr(buff, bufflen, off, "block device ");
     if (FT_ST & ft)
-        off += sg_scnpr(buff + off, 32, "SCSI tape device ");
+        off += sg_scn3pr(buff, bufflen, off, "SCSI tape device ");
     if (FT_RAW & ft)
-        off += sg_scnpr(buff + off, 32, "raw device ");
+        off += sg_scn3pr(buff, bufflen, off, "raw device ");
     if (FT_OTHER & ft)
-        off += sg_scnpr(buff + off, 32, "other (perhaps ordinary file) ");
+        off += sg_scn3pr(buff, bufflen, off, "other (perhaps ordinary file) ");
     if (FT_ERROR & ft)
-        sg_scnpr(buff + off, 32, "unable to 'stat' file ");
+        sg_scn3pr(buff, bufflen, off, "unable to 'stat' file ");
     return buff;
 }
 
@@ -1163,7 +1162,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {
@@ -1223,7 +1222,7 @@ main(int argc, char * argv[])
         in_type = dd_filetype(inf);
         if (verbose > 1)
             pr2serr(" >> Input file type: %s\n",
-                    dd_filetype_str(in_type, ebuff));
+                    dd_filetype_str(in_type, ebuff, sizeof(ebuff)));
 
         if (FT_ERROR == in_type) {
             pr2serr("%sunable to access %s\n", my_name, inf);
@@ -1318,7 +1317,7 @@ main(int argc, char * argv[])
         out_type = dd_filetype(outf);
         if (verbose > 1)
             pr2serr(" >> Output file type: %s\n",
-                    dd_filetype_str(out_type, ebuff));
+                    dd_filetype_str(out_type, ebuff, sizeof(ebuff)));
 
         if (FT_ST == out_type) {
             pr2serr("%sunable to use scsi tape device %s\n", my_name, outf);

@@ -71,7 +71,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"              /* used to get to SNTL for NVMe devices */
 
-static const char * version_str = "6.43 20230421";
+static const char * version_str = "6.44 20230518";
 
 static const char * my_name = "sg_dd: ";
 
@@ -430,34 +430,32 @@ dd_filetype_str(int ft, char * b, bool sgio_pt)
     static const int blen = 64;
 
     if (FT_DEV_NULL & ft)
-        off += sg_scnpr(b + off, blen - off, "null device");
+        off += sg_scn3pr(b, blen, off, "null device");
     if (FT_NVME & ft) {
         if (FT_BLOCK & ft) {
-            off += sg_scnpr(b + off, blen - off, "NVMe block device");
+            off += sg_scn3pr(b, blen, off, "NVMe block device");
             if (sgio_pt)
-                off += sg_scnpr(b + off, blen - off, ", %s", abpt_s);
+                off += sg_scn3pr(b, blen, off, ", %s", abpt_s);
         } else
-            off += sg_scnpr(b + off, blen - off, "NVMe char device, %s",
-                            abpt_s);
+            off += sg_scn3pr(b, blen, off, "NVMe char device, %s", abpt_s);
     } else if (FT_SG & ft)
-        off += sg_scnpr(b + off, blen - off, "SCSI generic (sg) device, %s",
-                        abpt_s);
+        off += sg_scn3pr(b, blen, off, "SCSI generic (sg) device, %s", abpt_s);
     else if (FT_BLOCK & ft) {
-        off += sg_scnpr(b + off, blen - off, "block device");
+        off += sg_scn3pr(b, blen, off, "block device");
         if (sgio_pt)
-            off += sg_scnpr(b + off, blen - off, ", %s", abpt_s);
+            off += sg_scn3pr(b, blen, off, ", %s", abpt_s);
     }
     if (FT_FIFO & ft)
-        off += sg_scnpr(b + off, blen - off, "fifo (named pipe)");
+        off += sg_scn3pr(b, blen, off, "fifo (named pipe)");
     if (FT_ST & ft)
-        off += sg_scnpr(b + off, blen - off, "SCSI tape device");
+        off += sg_scn3pr(b, blen, off, "SCSI tape device");
     if (FT_RAW & ft)
-        off += sg_scnpr(b + off, blen - off, "raw device");
+        off += sg_scn3pr(b, blen, off, "raw device");
     if (FT_OTHER & ft)
-        off += sg_scnpr(b + off, blen - off, "other (perhaps ordinary file)");
+        off += sg_scn3pr(b, blen, off, "other (perhaps ordinary file)");
     if (FT_ERROR & ft)
-        off += sg_scnpr(b + off, blen - off, "unable to 'stat' file");
-    sg_scnpr(b + off, blen - off, " ");
+        off += sg_scn3pr(b, blen, off, "unable to 'stat' file");
+    sg_scn3pr(b, blen, off, " ");
     return b;
 }
 
@@ -1434,9 +1432,9 @@ calc_duration_throughput(bool contin)
         if ((a > 0.00001) && (b > 511)) {
             r = b / (a * 1000000.0);
             if (r < 1.0)
-                n += sg_scnpr(f + n, flen - n, " at %.1f kB/sec", r * 1000);
+                n += sg_scn3pr(f, flen, n, " at %.1f kB/sec", r * 1000);
             else
-                n += sg_scnpr(f + n, flen - n, " at %.2f MB/sec", r);
+                n += sg_scn3pr(f, flen, n, " at %.2f MB/sec", r);
         }
         if (prev_valid && (da > 0.00001)) {
             db = (double)fop->blk_sz * (blks - prev_blks);
@@ -1444,10 +1442,10 @@ calc_duration_throughput(bool contin)
                 double dr = db / (da * 1000000.0);
 
                 if (dr < 1.0)
-                    sg_scnpr(f + n, flen - n, " (delta %.1f KB/sec)",
+                    sg_scn3pr(f, flen, n, " (delta %.1f KB/sec)",
                              dr * 1000);
                 else
-                    sg_scnpr(f + n, flen - n, " (delta %.2f MB/sec)", dr);
+                    sg_scn3pr(f, flen, n, " (delta %.2f MB/sec)", dr);
             }
         }
         pr2serr("%s\n", f);
@@ -1463,11 +1461,11 @@ calc_duration_throughput(bool contin)
                 secs = secs - (h * 3600);
                 m = secs / 60;
                 secs = secs - (m * 60);
-                n += sg_scnpr(f + n, flen - n, "estimated time remaining: ");
+                n += sg_scn3pr(f, flen, n, "estimated time remaining: ");
                 if (h > 0)
-                    sg_scnpr(f + n, flen - n, "%d:%02d:%02d", h, m, secs);
+                    sg_scn3pr(f, flen, n, "%d:%02d:%02d", h, m, secs);
                 else
-                    sg_scnpr(f + n, flen - n, "%d:%02d", m, secs);
+                    sg_scn3pr(f, flen, n, "%d:%02d", m, secs);
                 pr2serr("%s\n", f);
             }
         }
@@ -2265,27 +2263,16 @@ parse_cmd_line(int argc, char * argv[], struct opts_t * op)
 int
 main(int argc, char * argv[])
 {
-    // bool bpt_given = false;
-    // bool cdbsz_given = false;
-    // bool cdl_given = false;
     bool dio_tmp, first;
     bool do_sync = false;
     bool penult_sparse_skip = false;
     bool sparse_skip = false;
-    // bool verbose_given = false;
-    // bool version_given = false;
     int k, res, buf_sz, blocks_per, bs;
     int retries_tmp, blks_read, bytes_read, bytes_of2, bytes_of;
     int in_sect_sz, out_sect_sz;
     int blocks = 0;
-    // int bpt = DEF_BLOCKS_PER_TRANSFER;
-    // int ibs = 0;
-    // int obs = 0;
-    // int out2fd = -1;
     int penult_blocks = 0;
     int ret = 0;
-    // int64_t skip = 0;
-    // int64_t seek = 0;
     int64_t in_num_sect = -1;
     int64_t out_num_sect = -1;
     const char * ccp = NULL;
@@ -2296,9 +2283,6 @@ main(int argc, char * argv[])
     struct flags_t * ifp;
     struct flags_t * ofp;
     struct opts_t opts SG_C_CPP_ZERO_INIT;
-    // char inf[INOUTF_SZ];
-    // char outf[INOUTF_SZ];
-    // char out2f[INOUTF_SZ];
     char ebuff[EBUFF_SZ];
 
     op = &opts;
@@ -2325,7 +2309,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (op->verbose_given && op->version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        op->verbose_given = false;
+        /* op->verbose_given = false; */
         op->version_given = false;
         op->verbose = 0;
     } else if (! op->verbose_given) {

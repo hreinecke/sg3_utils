@@ -37,7 +37,7 @@
  *   - RESTORE ELEMENTS AND REBUILD
  */
 
-static const char * version_str = "1.02 20230503";
+static const char * version_str = "1.03 20230519";
 
 #define REMOVE_ELEM_SA 0x18
 #define RESTORE_ELEMS_SA 0x19
@@ -255,7 +255,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2018 Hannes Reinecke.
+ * Copyright (c) 2010-2023 Hannes Reinecke.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -37,7 +37,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.13 20180628";    /* sbc4r10 */
+static const char * version_str = "1.14 20230519";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -261,7 +261,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

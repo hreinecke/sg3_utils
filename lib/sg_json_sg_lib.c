@@ -612,11 +612,10 @@ sgj_js_sense_descriptors(sgj_state * jsp, sgj_opaque_p jop,
             else if (sds > 9)
                 snprintf(b, blen, "%s [%d]", "Reserved", sds);
             else {
-                n = 0;
-                n += sg_scnpr(b + n, blen - n, "EXTENDED COPY command copy %s",
+                n = sg_scnpr(b, blen, "EXTENDED COPY command copy %s",
                               (sds == 1) ? "source" : "destination");
                 if (sds > 1)
-                    sg_scnpr(b + n, blen - n, " %d", sds - 1);
+                    sg_scn3pr(b, blen, n, " %d", sds - 1);
             }
             sgj_js_nv_ihexstr(jsp, jo2p, "sense_data_source",
                               (0x7 & descp[2]), NULL, b);

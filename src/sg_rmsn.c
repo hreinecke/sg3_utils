@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2018 Douglas Gilbert.
+ * Copyright (c) 2005-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.18 20180628";
+static const char * version_str = "1.19 20230519";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
@@ -125,7 +125,7 @@ int main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         verbose = 0;
     } else if (! verbose_given) {

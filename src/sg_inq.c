@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.46 20230517";  /* spc6r08, sbc5r04 */
+static const char * version_str = "2.47 20230518";  /* spc6r08, sbc5r04 */
 
 #define MY_NAME "sg_inq"
 
@@ -1529,8 +1529,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                       sg_get_trans_proto_str(p_id, dlen, d));
         n = 0;
         cp = sg_get_desig_type_str(desig_type);
-        sg_scnpr(b + n, blen - n, "    designator_type: %s,  ",
-                 cp ? cp : "-");
+        sg_scn3pr(b, blen, n, "    designator_type: %s,  ", cp ? cp : "-");
         cp = sg_get_desig_code_set_str(c_set);
         sgj_pr_hr(jsp, "%scode_set: %s\n", b, cp ? cp : "-");
         cp = sg_get_desig_assoc_str(assoc);
@@ -1566,10 +1565,9 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                               ip + 8);
                 } else {
                     n = 0;
-                    n += sg_scnpr(b + n, blen - n,
-                                  "      vendor specific: 0x");
+                    n += sg_scn3pr(b, blen, n, "      vendor specific: 0x");
                     for (m = 8; m < i_len; ++m)
-                        n += sg_scnpr(b + n, blen - n, "%02x", ip[m]);
+                        n += sg_scn3pr(b, blen, n, "%02x", ip[m]);
                     sgj_pr_hr(jsp, "%s\n", b);
                 }
             }
@@ -1587,8 +1585,8 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
             if (16 == i_len) {
                 ci_off = 8;
                 id_ext = sg_get_unaligned_be64(ip);
-                sg_scnpr(b + n, blen - n, "      Identifier extension: 0x%"
-                         PRIx64 "\n", id_ext);
+                sg_scn3pr(b, blen, n, "      Identifier extension: 0x%"
+                          PRIx64 "\n", id_ext);
             } else if ((8 != i_len) && (12 != i_len)) {
                 pr2serr("      << can only decode 8, 12 and 16 "
                         "byte ids>>\n");
@@ -1602,10 +1600,9 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                 d_id = sg_get_unaligned_be32(ip + 8);
                 sgj_pr_hr(jsp, "      Directory ID: 0x%x\n", d_id);
             }
-            n = 0;
-            n += sg_scnpr(b + n, blen - n, "      [0x");
+            n = sg_scnpr(b, blen, "      [0x");
             for (m = 0; m < i_len; ++m)
-                n += sg_scnpr(b + n, blen - n, "%02x", ip[m]);
+                n += sg_scn3pr(b, blen, n, "%02x", ip[m]);
             sgj_pr_hr(jsp, "%s]\n", b);
             break;
         case 3: /* NAA <n> */
@@ -1632,10 +1629,9 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                 sgj_pr_hr(jsp, "      AOI: 0x%x\n", c_id);
                 sgj_pr_hr(jsp, "      vendor specific identifier B: 0x%x\n",
                           vsi);
-                n = 0;
-                n += sg_scnpr(b + n, blen - n, "      [0x");
+                n = sg_scnpr(b, blen, "      [0x");
                 for (m = 0; m < 8; ++m)
-                    n += sg_scnpr(b + n, blen - n, "%02x", ip[m]);
+                    n += sg_scn3pr(b, blen, n, "%02x", ip[m]);
                 sgj_pr_hr(jsp, "%s]\n", b);
                 break;
             case 3:     /* NAA 3: Locally assigned */
@@ -1646,10 +1642,9 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                     break;
                 }
                 sgj_pr_hr(jsp, "      NAA 3, Locally assigned:\n");
-                n = 0;
-                n += sg_scnpr(b + n, blen - n, "      [0x");
+                n = sg_scnpr(b, blen, "      [0x");
                 for (m = 0; m < 8; ++m)
-                    n += sg_scnpr(b + n, blen - n, "%02x", ip[m]);
+                    n += sg_scn3pr(b, blen, n, "%02x", ip[m]);
                 sgj_pr_hr(jsp, "%s]\n", b);
                 break;
             case 5:     /* NAA 5: IEEE Registered */
@@ -1667,12 +1662,11 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                     vsei |= ip[3 + m];
                 }
                 sgj_pr_hr(jsp, "      NAA 5, AOI: 0x%x\n", c_id);
-                n = 0;
-                n += sg_scnpr(b + n, blen - n, "      Vendor Specific "
-                              "Identifier: 0x%" PRIx64 "\n", vsei);
-                n += sg_scnpr(b + n, blen - n, "      [0x");
+                n = sg_scnpr(b, blen, "      Vendor Specific Identifier: "
+                             "0x%" PRIx64 "\n", vsei);
+                n += sg_scn3pr(b, blen, n, "      [0x");
                 for (m = 0; m < 8; ++m)
-                    n += sg_scnpr(b + n, blen - n, "%02x", ip[m]);
+                    n += sg_scn3pr(b, blen, n, "%02x", ip[m]);
                 sgj_pr_hr(jsp, "%s]\n", b);
                 break;
             case 6:     /* NAA 6: IEEE Registered extended */
@@ -1695,10 +1689,9 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                 vsei = sg_get_unaligned_be64(ip + 8);
                 sgj_pr_hr(jsp, "      Vendor Specific Identifier Extension: "
                           "0x%" PRIx64 "\n", vsei);
-                n = 0;
-                n += sg_scnpr(b + n, blen - n, "      [0x");
+                n = sg_scnpr(b, blen, "      [0x");
                 for (m = 0; m < 16; ++m)
-                    n += sg_scnpr(b + n, blen - n, "%02x", ip[m]);
+                    n += sg_scn3pr(b, blen, n, "%02x", ip[m]);
                 sgj_pr_hr(jsp, "%s]\n", b);
                 break;
             default:
@@ -1805,12 +1798,11 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                 hex2stderr(ip, i_len, no_ascii_4hex(op));
                 break;
             }
-            n = 0;
-            n += sg_scnpr(b + n, blen - n, "      Locally assigned UUID: ");
+            n = sg_scnpr(b, blen, "      Locally assigned UUID: ");
             for (m = 0; m < 16; ++m) {
                 if ((4 == m) || (6 == m) || (8 == m) || (10 == m))
-                    n += sg_scnpr(b + n, blen - n, "-");
-                n += sg_scnpr(b + n, blen - n, "%02x", ip[2 + m]);
+                    n += sg_scn3pr(b, blen, n, "-");
+                n += sg_scn3pr(b, blen, n, "%02x", ip[2 + m]);
             }
             sgj_pr_hr(jsp, "%s\n", b);
             break;
@@ -3889,7 +3881,7 @@ if (jop) {}
     if (got_eui_128) {          /* N.B. big endian */
         n = sg_scnpr(b, blen, "    NGUID: 0x%02x", dinp[104]);
         for (k = 1; k < 16; ++k)
-            n += sg_scnpr(b + n, blen - n, "%02x", dinp[104 + k]);
+            n += sg_scn3pr(b, blen, n, "%02x", dinp[104 + k]);
         sgj_pr_hr(jsp, "%s\n", b);
     } else if (op->do_long)
         sgj_pr_hr(jsp, "    NGUID: 0x0\n");
@@ -3898,7 +3890,7 @@ if (jop) {}
     sgj_pr_hr(jsp, "    Number of LBA formats: %u\n", num_lbaf);
     sgj_pr_hr(jsp, "    Index LBA size: %u\n", flbas);
     for (k = 0, off = 128; k < num_lbaf; ++k, off += 4) {
-        n = sg_scnpr(b, blen, "    LBA format %u support:", k);
+        sg_scnpr(b, blen, "    LBA format %u support:", k);
         if (k == flbas)
             sgj_pr_hr(jsp, "%s <-- active\n", b);
         else
@@ -4051,7 +4043,7 @@ if (jop) {}
     if (got_fguid) {
         n = sg_scnpr(b, blen, "  FGUID: 0x%02x", dinp[112]);
         for (k = 1; k < 16; ++k)
-            n += sg_scnpr(b + n, blen - n, "%02x", dinp[112 + k]);
+            n += sg_scn3pr(b, blen, n, "%02x", dinp[112 + k]);
         sgj_pr_hr(jsp, "%s\n", b);
     } else if (op->do_long)
         sgj_pr_hr(jsp, "  FGUID: 0x0\n");
@@ -4111,15 +4103,15 @@ if (jop) {}
                 q = sg_scnpr(b, blen, "    ENLAT=%u, ", n);
             n = sg_get_unaligned_le32(up + 8);
             if (0 == n)
-                q += sg_scnpr(b + q, blen - q, "[EXLAT], ");
+                q += sg_scn3pr(b, blen, q, "[EXLAT], ");
             else
-                q += sg_scnpr(b + q, blen - q, "EXLAT=%u, ", n);
+                q += sg_scn3pr(b, blen, q, "EXLAT=%u, ", n);
             n = 0x1f & up[12];
-            q += sg_scnpr(b + q, blen - q, "RRT=%u, ", n);
+            q += sg_scn3pr(b, blen, q, "RRT=%u, ", n);
             n = 0x1f & up[13];
-            q += sg_scnpr(b + q, blen - q, "RRL=%u, ", n);
+            q += sg_scn3pr(b, blen, q, "RRL=%u, ", n);
             n = 0x1f & up[14];
-            q += sg_scnpr(b + q, blen - q, "RWT=%u, ", n);
+            sg_scn3pr(b, blen, q, "RWT=%u, ", n);
             n = 0x1f & up[15];
             sgj_pr_hr(jsp, "%sRWL=%u\n", b, n);
         }

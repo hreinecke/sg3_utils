@@ -37,7 +37,7 @@
 #include "sg_json_sg_lib.h"
 
 
-static const char * version_str = "4.12 20230517";
+static const char * version_str = "4.13 20230519";
 
 static const char * my_name = "sg_readcap: ";
 
@@ -743,9 +743,9 @@ main(int argc, char * argv[])
 #endif
                     if (sz_gb > 2000) {
 #ifdef SG_LIB_MINGW
-                        sg_scnpr(b + n, blen - n, ", %g TB", sz_gb / 1000);
+                        sg_scn3pr(b, blen, n, ", %g TB", sz_gb / 1000);
 #else
-                        sg_scnpr(b + n, blen - n, ", %.2f TB", sz_gb / 1000);
+                        sg_scn3pr(b, blen, n, ", %.2f TB", sz_gb / 1000);
 #endif
                     }
                     sgj_pr_hr(jsp, "%s\n", b);
@@ -881,9 +881,9 @@ main(int argc, char * argv[])
 #endif
                 if (sz_gb > 2000) {
 #ifdef SG_LIB_MINGW
-                    sg_scnpr(b + n, blen - n,", %g TB", sz_gb / 1000);
+                    sg_scn3pr(b, blen, n,", %g TB", sz_gb / 1000);
 #else
-                    sg_scnpr(b + n, blen - n, ", %.2f TB", sz_gb / 1000);
+                    sg_scn3pr(b, blen, n, ", %.2f TB", sz_gb / 1000);
 #endif
                 }
                 sgj_pr_hr(jsp, "%s\n", b);

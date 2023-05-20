@@ -64,7 +64,7 @@
 
 #define MAX_LAR_LIST_ELEMS 8
 
-static const char * version_str = "1.28 20230428";
+static const char * version_str = "1.29 20230519";
 
 struct opts_t {
     bool ck_cond;
@@ -737,7 +737,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        verbose_given = false;
+        /* verbose_given = false; */
         version_given = false;
         op->verbose = 0;
     } else if (! verbose_given) {

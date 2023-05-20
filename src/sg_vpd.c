@@ -43,7 +43,7 @@
 
 */
 
-static const char * version_str = "1.95 20230517";  /* spc6r08 + sbc5r04 */
+static const char * version_str = "1.96 20230518";  /* spc6r08 + sbc5r04 */
 
 #define MY_NAME "sg_vpd"
 
@@ -393,14 +393,13 @@ std_inq_decode(uint8_t * b, int len, struct opts_t * op, sgj_opaque_p jop)
               "[BQue=%d]\n", !!(b[5] & 0x80), !!(b[5] & 0x40),
               ((b[5] & 0x30) >> 4), !!(b[5] & 0x08), !!(b[5] & 0x01),
               !!(b[6] & 0x80));
-    n = 0;
-    n += sg_scnpr(c + n, clen - n, "EncServ=%d  ", !!(b[6] & 0x40));
+    n = sg_scnpr(c, clen, "EncServ=%d  ", !!(b[6] & 0x40));
     if (b[6] & 0x10)
-        n += sg_scnpr(c + n, clen - n, "MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
+        n += sg_scn3pr(c, clen, n, "MultiP=1 (VS=%d)  ", !!(b[6] & 0x20));
     else
-        n += sg_scnpr(c + n, clen - n, "MultiP=0  ");
-    sg_scnpr(c + n, clen - n, "[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d",
-             !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01));
+        n += sg_scn3pr(c, clen, n, "MultiP=0  ");
+    sg_scn3pr(c, clen, n, "[MChngr=%d]  [ACKREQQ=%d]  Addr16=%d",
+              !!(b[6] & 0x08), !!(b[6] & 0x04), !!(b[6] & 0x01));
     sgj_pr_hr(jsp, "  %s\n", c);
     sgj_pr_hr(jsp, "  [RelAdr=%d]  WBus16=%d  Sync=%d  [Linked=%d]  "
               "[TranDis=%d]  CmdQue=%d\n", !!(b[7] & 0x80), !!(b[7] & 0x20),

@@ -35,7 +35,7 @@
  * and decodes the response.
  */
 
-static const char * version_str = "1.57 20230517";      /* spc6r08 */
+static const char * version_str = "1.58 20230519";      /* spc6r08 */
 
 #define MY_NAME "sg_luns"
 
@@ -775,14 +775,13 @@ main(int argc, char * argv[])
                 n = sg_scnpr(b, blen, "64 bit LUN in T10 (hex, dashed) "
                              "format: ");
                 for (k = 0; k < 8; k += 2)
-                    n += sg_scnpr(b + n, blen - n, "%c%02x%02x",
-                                  (k ? '-' : ' '), lun_arr[k],
-                                  lun_arr[k + 1]);
+                    n += sg_scn3pr(b, blen, n, "%c%02x%02x", (k ? '-' : ' '),
+                                   lun_arr[k], lun_arr[k + 1]);
             } else {
                 n = sg_scnpr(b, blen, "64 bit LUN in T10 preferred (hex) "
                              "format: ");
                 for (k = 0; k < 8; ++k)
-                    n += sg_scnpr(b + n, blen - n, " %02x", lun_arr[k]);
+                    n += sg_scn3pr(b, blen, n, " %02x", lun_arr[k]);
             }
             sgj_pr_hr(jsp, "%s\n", b);
         }
@@ -953,25 +952,24 @@ main(int argc, char * argv[])
         for (k = 0, off = 8; k < luns; ++k, off += 8) {
             jo3p = sgj_new_unattached_object_r(jsp);
             sgj_js_nv_hex_bytes(jsp, jo3p, "lun", reportLunsBuff + off, 8);
-            n = 0;
             if (! op->do_quiet) {
                 if (0 == k)
                     sgj_pr_hr(jsp, "Report luns [select_report=0x%x]:\n",
                               op->select_rep);
-                n = sg_scnpr(b + n, blen - n, "    ");
-            }
+                n = sg_scnpr(b, blen, "    ");
+            } else
+                n = 0;
             for (m = 0; m < 8; ++m)
-                n += sg_scnpr(b + n, blen - n, "%02x",
-                              reportLunsBuff[off + m]);
+                n += sg_scn3pr(b, blen, n, "%02x", reportLunsBuff[off + m]);
 #ifdef SG_LIB_LINUX
             if (op->do_linux) {
                 uint64_t lin_lun;
 
                 lin_lun = t10_2linux_lun(reportLunsBuff + off);
                 if (op->do_hex > 1)
-                    sg_scnpr(b + n, blen - n, "    [0x%" PRIx64 "]", lin_lun);
+                    sg_scn3pr(b, blen, n, "    [0x%" PRIx64 "]", lin_lun);
                 else
-                    sg_scnpr(b + n, blen - n, "    [%" PRIu64 "]", lin_lun);
+                    sg_scn3pr(b, blen, n, "    [%" PRIu64 "]", lin_lun);
             }
 #endif
             sgj_pr_hr(jsp, "%s\n", b);

@@ -41,7 +41,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.84 20230517";    /* ses4r04 */
+static const char * version_str = "2.85 20230518";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 
@@ -2216,16 +2216,16 @@ fetch_decode_timestamp(struct sg_pt_base * ptvp, struct opts_t * op)
                 n = sg_scnpr(b, blen, "%u day%s, ", (uint32_t)days,
                              (1 == days) ? "" : "s");
             if (rem_hours > 0)
-                n += sg_scnpr(b + n, blen - n, "%u hour%s, ", rem_hours,
-                              (1 == rem_hours) ? "" : "s");
+                n += sg_scn3pr(b, blen, n, "%u hour%s, ", rem_hours,
+                               (1 == rem_hours) ? "" : "s");
             else if (days > 0)
-                n += sg_scnpr(b + n, blen - n, "0 hours, ");
+                n += sg_scn3pr(b, blen, n, "0 hours, ");
             if (rem_mins > 0)
-                n += sg_scnpr(b + n, blen - n, "%u minute%s, ", rem_mins,
-                              (1 == rem_mins) ? "" : "s");
+                n += sg_scn3pr(b, blen, n, "%u minute%s, ", rem_mins,
+                               (1 == rem_mins) ? "" : "s");
             else if ((days > 0) || (rem_mins > 0))
-                n += sg_scnpr(b + n, blen - n, "0 minutes, ");
-            sg_scnpr(b + n, blen - n, "%u.%03u seconds", rem_secs, rem_ms);
+                n += sg_scn3pr(b, blen, n, "0 minutes, ");
+            sg_scn3pr(b, blen, n, "%u.%03u seconds", rem_secs, rem_ms);
             sgj_pr_hr(jsp, "    %s since powerup or reset\n", b);
             return;
         }
@@ -2236,7 +2236,7 @@ fetch_decode_timestamp(struct sg_pt_base * ptvp, struct opts_t * op)
         loc_secs_tm  = localtime(&tt_secs);
         strftime(b, blen, "%a, %d %b %Y %H:%M:%S", loc_secs_tm);
         n = strlen(b);
-        n += sg_scnpr(b + n, blen - n, ".%03u", rem_ms);
+        n += sg_scn3pr(b, blen, n, ".%03u", rem_ms);
         strftime(b + n, blen - n, " %z", loc_secs_tm);
         sgj_pr_hr(jsp, "    %s:\n", b);
         switch (ts_origin) {
@@ -3197,8 +3197,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
     s2 = statp[2];
     s3 = statp[3];
     if (op->inner_hex || op->no_config) {
-        n += sg_scnpr(a + n, alen - n, "%s%02x %02x %02x %02x\n", pad,
-                      s0, s1, s2, s3);
+        n += sg_scn3pr(a, alen, n, "%s%02x %02x %02x %02x\n", pad, s0, s1,
+                       s2, s3);
         if (jsp->pr_as_json)
             sgj_js_nv_hex_bytes(jsp, jop, "status_element", statp, 4);
         return n;
@@ -3207,9 +3207,9 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         int status = s0 & 0xf;
 
         ccp = elem_status_code_desc[status];
-        n += sg_scnpr(a + n, alen - n, "%sPredicted failure=%d, Disabled=%d, "
-                      "Swap=%d, status: %s\n", pad, !!(s0 & 0x40),
-                      !!(s0 & 0x20), !!(s0 & 0x10), ccp);
+        n += sg_scn3pr(a, alen, n, "%sPredicted failure=%d, Disabled=%d, "
+                       "Swap=%d, status: %s\n", pad, !!(s0 & 0x40),
+                       !!(s0 & 0x20), !!(s0 & 0x10), ccp);
         sgj_js_nv_ihexstr_nex(jsp, jop, "prdfail", !!(s0 & 0x40), false,
                               NULL, NULL, "PReDicted FAILure");
         sgj_js_nv_i(jsp, jop, "disabled", !!(s0 & 0x20));
@@ -3222,54 +3222,54 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
     switch (etype) { /* element type code */
     case UNSPECIFIED_ETC:
         if (op->verbose)
-            n += sg_scnpr(a + n, alen - n, "%sstatus in hex: %02x %02x %02x "
-                          "%02x\n", pad, s0, s1, s2, s3);
+            n += sg_scn3pr(a, alen, n, "%sstatus in hex: %02x %02x %02x "
+                           "%02x\n", pad, s0, s1, s2, s3);
         break;
     case DEVICE_ETC:
         if (ARRAY_STATUS_DPC == op->page_code) {  /* obsolete after SES-1 */
             if (nofilter || (0xf0 & s1))
-                n += sg_scnpr(a + n, alen - n, "%sOK=%d, Reserved device=%d, "
-                              "Hot spare=%d, Cons check=%d\n", pad,
-                              !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x20),
-                              !!(s1 & 0x10));
+                n += sg_scn3pr(a, alen, n, "%sOK=%d, Reserved device=%d, "
+                               "Hot spare=%d, Cons check=%d\n", pad,
+                               !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x20),
+                               !!(s1 & 0x10));
             if (nofilter || (0xf & s1))
-                n += sg_scnpr(a + n, alen - n, "%sIn crit array=%d, In "
-                              "failed array=%d, Rebuild/remap=%d, R/R "
-                              "abort=%d\n", pad, !!(s1 & 0x8), !!(s1 & 0x4),
-                              !!(s1 & 0x2), !!(s1 & 0x1));
+                n += sg_scn3pr(a, alen, n, "%sIn crit array=%d, In failed "
+                               "array=%d, Rebuild/remap=%d, R/R abort=%d\n",
+                               pad, !!(s1 & 0x8), !!(s1 & 0x4), !!(s1 & 0x2),
+                               !!(s1 & 0x1));
             if (nofilter || ((0x46 & s2) || (0x8 & s3)))
-                n += sg_scnpr(a + n, alen - n, "%sDo not remove=%d, RMV=%d, "
-                              "Ident=%d, Enable bypass A=%d\n", pad,
-                              !!(s2 & 0x40), !!(s2 & 0x4), !!(s2 & 0x2),
-                              !!(s3 & 0x8));
+                n += sg_scn3pr(a, alen, n, "%sDo not remove=%d, RMV=%d, "
+                               "Ident=%d, Enable bypass A=%d\n", pad,
+                               !!(s2 & 0x40), !!(s2 & 0x4), !!(s2 & 0x2),
+                               !!(s3 & 0x8));
             if (nofilter || (0x7 & s3))
-                n += sg_scnpr(a + n, alen - n, "%sEnable bypass B=%d, "
-                              "Bypass A enabled=%d, Bypass B enabled=%d\n",
-                              pad, !!(s3 & 0x4), !!(s3 & 0x2), !!(s3 & 0x1));
+                n += sg_scn3pr(a, alen, n, "%sEnable bypass B=%d, Bypass A "
+                               "enabled=%d, Bypass B enabled=%d\n", pad,
+                               !!(s3 & 0x4), !!(s3 & 0x2), !!(s3 & 0x1));
             break;
         }
-        n += sg_scnpr(a + n, alen - n, "%sSlot address: %d\n", pad, s1);
+        n += sg_scn3pr(a, alen, n, "%sSlot address: %d\n", pad, s1);
         if (nofilter || (0xe0 & s2))
-            n += sg_scnpr(a + n, alen - n, "%sApp client bypassed A=%d, Do "
-                          "not remove=%d, Enc bypassed A=%d\n", pad,
-                          !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20));
+            n += sg_scn3pr(a, alen, n, "%sApp client bypassed A=%d, Do not "
+                           "remove=%d, Enc bypassed A=%d\n", pad,
+                           !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20));
         if (nofilter || (0x1c & s2))
-            n += sg_scnpr(a + n, alen - n, "%sEnc bypassed B=%d, Ready to "
-                          "insert=%d, RMV=%d, Ident=%d\n", pad, !!(s2 & 0x10),
-                          !!(s2 & 0x8), !!(s2 & 0x4), !!(s2 & 0x2));
+            n += sg_scn3pr(a, alen, n, "%sEnc bypassed B=%d, Ready to insert="
+                           "%d, RMV=%d, Ident=%d\n", pad, !!(s2 & 0x10),
+                           !!(s2 & 0x8), !!(s2 & 0x4), !!(s2 & 0x2));
         if (nofilter || ((1 & s2) || (0xe0 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sReport=%d, App client bypassed "
-                          "B=%d, Fault sensed=%d, Fault requested=%d\n", pad,
-                          !!(s2 & 0x1), !!(s3 & 0x80), !!(s3 & 0x40),
-                          !!(s3 & 0x20));
+            n += sg_scn3pr(a, alen, n, "%sReport=%d, App client bypassed "
+                           "B=%d, Fault sensed=%d, Fault requested=%d\n", pad,
+                           !!(s2 & 0x1), !!(s3 & 0x80), !!(s3 & 0x40),
+                           !!(s3 & 0x20));
         if (nofilter || (0x1e & s3))
-            n += sg_scnpr(a + n, alen - n, "%sDevice off=%d, Bypassed A=%d, "
-                          "Bypassed B=%d, Device bypassed A=%d\n", pad,
-                          !!(s3 & 0x10), !!(s3 & 0x8), !!(s3 & 0x4),
-                          !!(s3 & 0x2));
+            n += sg_scn3pr(a, alen, n, "%sDevice off=%d, Bypassed A=%d, "
+                           "Bypassed B=%d, Device bypassed A=%d\n", pad,
+                           !!(s3 & 0x10), !!(s3 & 0x8), !!(s3 & 0x4),
+                           !!(s3 & 0x2));
         if (nofilter || (0x1 & s3))
-            n += sg_scnpr(a + n, alen - n, "%sDevice bypassed B=%d\n", pad,
-                          !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sDevice bypassed B=%d\n", pad,
+                           !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex(jsp, jop, "slot_address", s1);
             sgj_js_nv_i(jsp, jop, "app_client_bypassed_a", !!(s2 & 0x80));
@@ -3298,21 +3298,21 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case POWER_SUPPLY_ETC:
         if (nofilter || ((0xc0 & s1) || (0xc & s2))) {
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Do not remove=%d, DC "
-                          "overvoltage=%d, DC undervoltage=%d\n", pad,
-                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x8),
-                          !!(s2 & 0x4));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Do not remove=%d, DC "
+                           "overvoltage=%d, DC undervoltage=%d\n", pad,
+                           !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x8),
+                           !!(s2 & 0x4));
         }
         if (nofilter || ((0x2 & s2) || (0xf0 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sDC overcurrent=%d, Hot "
-                          "swap=%d, Fail=%d, Requested on=%d, Off=%d\n", pad,
-                          !!(s2 & 0x2), !!(s3 & 0x80), !!(s3 & 0x40),
-                          !!(s3 & 0x20), !!(s3 & 0x10));
+            n += sg_scn3pr(a, alen, n, "%sDC overcurrent=%d, Hot swap=%d, "
+                           "Fail=%d, Requested on=%d, Off=%d\n", pad,
+                           !!(s2 & 0x2), !!(s3 & 0x80), !!(s3 & 0x40),
+                           !!(s3 & 0x20), !!(s3 & 0x10));
         if (nofilter || (0xf & s3))
-            n += sg_scnpr(a + n, alen - n, "%sOvertmp fail=%d, Temperature "
-                          "warn=%d, AC fail=%d, DC fail=%d\n", pad,
-                          !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
-                          !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sOvertmp fail=%d, Temperature "
+                           "warn=%d, AC fail=%d, DC fail=%d\n", pad,
+                           !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
+                           !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3335,17 +3335,17 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case COOLING_ETC:
         if (nofilter || ((0xc0 & s1) || (0xf0 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Do not remove=%d, "
-                          "Hot swap=%d, Fail=%d, Requested on=%d\n", pad,
-                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s3 & 0x80),
-                          !!(s3 & 0x40), !!(s3 & 0x20));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Do not remove=%d, Hot "
+                           "swap=%d, Fail=%d, Requested on=%d\n", pad,
+                           !!(s1 & 0x80), !!(s1 & 0x40), !!(s3 & 0x80),
+                           !!(s3 & 0x40), !!(s3 & 0x20));
         fsf = (s1 >> 3) & 0x3;
         afs = ((0x7 & s1) << 8) + s2;
-        n += sg_scnpr(a + n, alen - n, "%sOff=%d, Actual speed=%d rpm, Fan "
-                      "%s\n", pad, !!(s3 & 0x10), calc_fan_speed(fsf, afs),
-                      actual_speed_desc[7 & s3]);
+        n += sg_scn3pr(a, alen, n, "%sOff=%d, Actual speed=%d rpm, Fan %s\n",
+                       pad, !!(s3 & 0x10), calc_fan_speed(fsf, afs),
+                       actual_speed_desc[7 & s3]);
         if (op->verbose > 1)    /* show real field values */
-            n += sg_scnpr(a + n, alen - n, "%s  [Fan_speed_factor=%d, "
+            n += sg_scn3pr(a, alen, n, "%s  [Fan_speed_factor=%d, "
                           "Actual_fan_speed=%d]\n", pad, (s1 >> 3) & 0x3,
                           ((0x7 & s1) << 8) + s2);
         if (jsp->pr_as_json) {
@@ -3370,19 +3370,18 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case TEMPERATURE_ETC:     /* temperature sensor */
         if (nofilter || ((0xc0 & s1) || (0xf & s3))) {
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, OT "
-                          "failure=%d, OT warning=%d, UT failure=%d\n", pad,
-                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s3 & 0x8),
-                          !!(s3 & 0x4), !!(s3 & 0x2));
-            n += sg_scnpr(a + n, alen - n, "%sUT warning=%d\n", pad,
-                          !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, OT failure=%d, "
+                           "OT warning=%d, UT failure=%d\n", pad,
+                           !!(s1 & 0x80), !!(s1 & 0x40), !!(s3 & 0x8),
+                           !!(s3 & 0x4), !!(s3 & 0x2));
+            n += sg_scn3pr(a, alen, n, "%sUT warning=%d\n", pad,
+                           !!(s3 & 0x1));
         }
         if (s2)
-            n += sg_scnpr(a + n, alen - n, "%sTemperature=%d C\n", pad,
-                          (int)s2 - TEMPERAT_OFF);
+            n += sg_scn3pr(a, alen, n, "%sTemperature=%d C\n", pad,
+                           (int)s2 - TEMPERAT_OFF);
         else
-            n += sg_scnpr(a + n, alen - n, "%sTemperature: <%s>\n", pad,
-                          rsv_s);
+            n += sg_scn3pr(a, alen, n, "%sTemperature: <%s>\n", pad, rsv_s);
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3402,9 +3401,9 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case DOOR_ETC:      /* OPEN field added in ses3r05 */
         if (nofilter || ((0xc0 & s1) || (0x1 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Open=%d, "
-                          "Unlock=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
-                          !!(s3 & 0x2), !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Open=%d, "
+                           "Unlock=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
+                           !!(s3 & 0x2), !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3415,15 +3414,15 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case AUD_ALARM_ETC:     /* audible alarm */
         if (nofilter || ((0xc0 & s1) || (0xd0 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Request "
-                          "mute=%d, Mute=%d, Remind=%d\n", pad, !!(s1 & 0x80),
-                          !!(s1 & 0x40), !!(s3 & 0x80), !!(s3 & 0x40),
-                          !!(s3 & 0x10));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Request "
+                           "mute=%d, Mute=%d, Remind=%d\n", pad,
+                           !!(s1 & 0x80), !!(s1 & 0x40), !!(s3 & 0x80),
+                           !!(s3 & 0x40), !!(s3 & 0x10));
         if (nofilter || (0xf & s3))
-            n += sg_scnpr(a + n, alen - n, "%sTone indicator: Info=%d, "
-                          "Non-crit=%d, Crit=%d, Unrecov=%d\n", pad,
-                          !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
-                          !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sTone indicator: Info=%d, "
+                           "Non-crit=%d, Crit=%d, Unrecov=%d\n", pad,
+                           !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
+                           !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3443,10 +3442,10 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case ENC_SCELECTR_ETC: /* enclosure services controller electronics */
         if (nofilter || (0xe0 & s1) || (0x1 & s2) || (0x80 & s3))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Do not "
-                          "remove=%d, Report=%d, Hot swap=%d\n", pad,
-                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x20),
-                          !!(s2 & 0x1), !!(s3 & 0x80));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Do not "
+                           "remove=%d, Report=%d, Hot swap=%d\n", pad,
+                           !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x20),
+                           !!(s2 & 0x1), !!(s3 & 0x80));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3462,8 +3461,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case SCC_CELECTR_ETC:     /* SCC controller electronics */
         if (nofilter || ((0xc0 & s1) || (0x1 & s2)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Report=%d\n",
-                          pad, !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Report=%d\n",
+                           pad, !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3474,11 +3473,11 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
     case NV_CACHE_ETC:     /* Non volatile cache */
         ccp = nv_cache_unit[s1 & 0x3];
         res = sg_get_unaligned_be16(statp + 2);
-        n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Size "
-                      "multiplier=%d, Non volatile cache size=0x%x\n", pad,
-                      !!(s1 & 0x80), !!(s1 & 0x40), (s1 & 0x3), res);
-        n += sg_scnpr(a + n, alen - n, "%sHence non volatile cache size: %d "
-                      "%s\n", pad, res, ccp);
+        n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Size multiplier=%d, "
+                       "Non volatile cache size=0x%x\n", pad, !!(s1 & 0x80),
+                       !!(s1 & 0x40), (s1 & 0x3), res);
+        n += sg_scn3pr(a, alen, n, "%sHence non volatile cache size: %d %s\n",
+                       pad, res, ccp);
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3493,23 +3492,22 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
     case INV_OP_REASON_ETC:   /* Invalid operation reason */
         res = ((s1 >> 6) & 3);
         ccp = invop_type_desc[res];
-        n += sg_scnpr(a + n, alen - n, "%sInvop type=%d   %s\n", pad, res,
-                      ccp);
+        n += sg_scn3pr(a, alen, n, "%sInvop type=%d   %s\n", pad, res, ccp);
         if (jsp->pr_as_json)
             sgj_js_nv_ihexstr(jsp, jop, "invop_type", res, NULL, ccp);
         ccp = vs_s;
 
         switch (res) {
         case 0:
-            n += sg_scnpr(a + n, alen - n, "%sPage not supported=%d\n", pad,
+            n += sg_scn3pr(a, alen, n, "%sPage not supported=%d\n", pad,
                           (s1 & 1));
             if (jsp->pr_as_json)
                 sgj_js_nv_i(jsp, jop, "page_not_supported", !!(s1 & 0x1));
             break;
         case 1:
             res = sg_get_unaligned_be16(statp + 2);
-            n += sg_scnpr(a + n, alen - n, "%sByte offset=%d, bit "
-                          "number=%d\n", pad, res, (s1 & 7));
+            n += sg_scn3pr(a, alen, n, "%sByte offset=%d, bit number=%d\n",
+                           pad, res, (s1 & 7));
             if (jsp->pr_as_json) {
                 sgj_js_nv_i(jsp, jop, "bit_number", !!(s1 & 0x7));
                 sgj_js_nv_i(jsp, jop, "byte_offset", res);
@@ -3521,8 +3519,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
             // [[fallthrough]];
             /* FALLTHRU */
         case 3:
-            n += sg_scnpr(a + n, alen - n, "%s%s, last 3 bytes (hex): %02x "
-                          "%02x %02x\n", pad, ccp, s1, s2, s3);
+            n += sg_scn3pr(a, alen, n, "%s%s, last 3 bytes (hex): %02x "
+                           "%02x %02x\n", pad, ccp, s1, s2, s3);
             if (jsp->pr_as_json)
                 sgj_js_nv_s_len_chk(jsp, jop, "bytes_1_2_3", statp + 1, 3);
             break;
@@ -3530,26 +3528,26 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case UI_POWER_SUPPLY_ETC:   /* Uninterruptible power supply */
         if (0 == s1)
-            n += sg_scnpr(a + n, alen - n, "%sBattery status: discharged or "
-                          "unknown\n", pad);
+            n += sg_scn3pr(a, alen, n, "%sBattery status: discharged or "
+                           "unknown\n", pad);
         else if (255 == s1)
-            n += sg_scnpr(a + n, alen - n, "%sBattery status: 255 or more "
-                          "minutes remaining\n", pad);
+            n += sg_scn3pr(a, alen, n, "%sBattery status: 255 or more "
+                           "minutes remaining\n", pad);
         else
-            n += sg_scnpr(a + n, alen - n, "%sBattery status: %d minutes "
-                          "remaining\n", pad, s1);
+            n += sg_scn3pr(a, alen, n, "%sBattery status: %d minutes "
+                           "remaining\n", pad, s1);
         if (nofilter || (0xf8 & s2))
-            n += sg_scnpr(a + n, alen - n, "%sAC low=%d, AC high=%d, AC "
-                          "qual=%d, AC fail=%d, DC fail=%d\n", pad,
-                          !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20),
-                          !!(s2 & 0x10), !!(s2 & 0x8));
+            n += sg_scn3pr(a, alen, n, "%sAC low=%d, AC high=%d, AC "
+                           "qual=%d, AC fail=%d, DC fail=%d\n", pad,
+                           !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20),
+                           !!(s2 & 0x10), !!(s2 & 0x8));
         if (nofilter || ((0x7 & s2) || (0xe3 & s3))) {
-            n += sg_scnpr(a + n, alen - n, "%sUPS fail=%d, Warn=%d, Intf "
-                          "fail=%d, Ident=%d, Fail=%d, Do not remove=%d\n",
-                          pad, !!(s2 & 0x4), !!(s2 & 0x2), !!(s2 & 0x1),
-                          !!(s3 & 0x80), !!(s3 & 0x40), !!(s3 & 0x20));
-            n += sg_scnpr(a + n, alen - n, "%sBatt fail=%d, BPF=%d\n", pad,
-                          !!(s3 & 0x2), !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sUPS fail=%d, Warn=%d, Intf "
+                           "fail=%d, Ident=%d, Fail=%d, Do not remove=%d\n",
+                           pad, !!(s2 & 0x4), !!(s2 & 0x2), !!(s2 & 0x1),
+                           !!(s3 & 0x80), !!(s3 & 0x40), !!(s3 & 0x20));
+            n += sg_scn3pr(a, alen, n, "%sBatt fail=%d, BPF=%d\n", pad,
+                           !!(s3 & 0x2), !!(s3 & 0x1));
         }
         if (jsp->pr_as_json) {
             sgj_js_nv_ihexstr(jsp, jop, "battery_status", s1, NULL,
@@ -3574,12 +3572,12 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
             if ((1 == dms) || (2 == dms)) {
                 uint16_t dcs = sg_get_unaligned_be16(statp + 2);
 
-                m += sg_scnpr(b + m, blen - m, ", Display character "
-                              "status=0x%x", dcs);
+                m += sg_scn3pr(b, blen, m, ", Display character status=0x%x",
+                               dcs);
                 if (s2 && (0 == s3))
-                    sg_scnpr(b + m, blen - m, " ['%c']", s2);
+                    sg_scn3pr(b, blen, m, " ['%c']", s2);
             }
-            n += sg_scnpr(a + n, alen - n, "%s\n", b);
+            n += sg_scn3pr(a, alen, n, "%s\n", b);
         }
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
@@ -3593,8 +3591,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case KEY_PAD_ETC:   /* Key pad entry */
         if (nofilter || (0xc0 & s1))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d\n", pad,
-                          !!(s1 & 0x80), !!(s1 & 0x40));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d\n", pad,
+                           !!(s1 & 0x80), !!(s1 & 0x40));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3604,17 +3602,17 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
     case ENCLOSURE_ETC:
         tpc = ((s2 >> 2) & 0x3f);
         if (nofilter || ((0x80 & s1) || tpc || (0x2 & s2)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Time until power "
-                          "cycle=%d, Failure indication=%d\n", pad,
-                          !!(s1 & 0x80), tpc, !!(s2 & 0x2));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Time until power "
+                           "cycle=%d, Failure indication=%d\n", pad,
+                           !!(s1 & 0x80), tpc, !!(s2 & 0x2));
         d = ((s3 >> 2) & 0x3f);
         if (nofilter || (0x1 & s2) || tpc || d)
-            n += sg_scnpr(a + n, alen - n, "%sWarning indication=%d, "
-                          "Requested power off duration=%d\n", pad,
-                          !!(s2 & 0x1), d);
+            n += sg_scn3pr(a, alen, n, "%sWarning indication=%d, "
+                           "Requested power off duration=%d\n", pad,
+                           !!(s2 & 0x1), d);
         if (nofilter || (0x3 & s3))
-            n += sg_scnpr(a + n, alen - n, "%sFailure requested=%d, Warning "
-                          "requested=%d\n", pad, !!(s3 & 0x2), !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sFailure requested=%d, Warning "
+                           "requested=%d\n", pad, !!(s3 & 0x2), !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3649,10 +3647,10 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case SCSI_PORT_TRAN_ETC:   /* SCSI port/transceiver */
         if (nofilter || ((0xc0 & s1) || (0x1 & s2) || (0x13 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Report=%d, "
-                          "Disabled=%d, Loss of link=%d, Xmit fail=%d\n",
-                          pad, !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x1),
-                          !!(s3 & 0x10), !!(s3 & 0x2), !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Report=%d, "
+                           "Disabled=%d, Loss of link=%d, Xmit fail=%d\n",
+                           pad, !!(s1 & 0x80), !!(s1 & 0x40), !!(s2 & 0x1),
+                           !!(s3 & 0x10), !!(s3 & 0x2), !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3669,10 +3667,10 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         m = sg_get_unaligned_be16(statp + 2);
         snprintf(b, blen, "%sIdent=%d, ", pad, !!(s1 & 0x80));
         if (0 == m)
-            n += sg_scnpr(a + n, alen - n, "%sLanguage: English\n", b);
+            n += sg_scn3pr(a, alen, n, "%sLanguage: English\n", b);
         else
-            n += sg_scnpr(a + n, alen - n, "%sLanguage code: %.2s\n", b,
-                      (const char *)statp + 2);
+            n += sg_scn3pr(a, alen, n, "%sLanguage code: %.2s\n", b,
+                           (const char *)statp + 2);
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3686,9 +3684,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case COMM_PORT_ETC:   /* Communication port */
         if (nofilter || ((0xc0 & s1) || (0x1 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, "
-                          "Disabled=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
-                          !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Disabled=%d\n",
+                           pad, !!(s1 & 0x80), !!(s1 & 0x40), !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3698,16 +3695,16 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case VOLT_SENSOR_ETC:   /* Voltage sensor */
         if (nofilter || (0xcf & s1)) {
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d,  Warn "
-                          "Over=%d, Warn Under=%d, Crit Over=%d\n", pad,
-                          !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x8),
-                          !!(s1 & 0x4), !!(s1 & 0x2));
-            n += sg_scnpr(a + n, alen - n, "%sCrit Under=%d\n", pad,
-                          !!(s1 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d,  Warn Over=%d, "
+                           "Warn Under=%d, Crit Over=%d\n", pad,
+                           !!(s1 & 0x80), !!(s1 & 0x40), !!(s1 & 0x8),
+                           !!(s1 & 0x4), !!(s1 & 0x2));
+            n += sg_scn3pr(a, alen, n, "%sCrit Under=%d\n", pad,
+                           !!(s1 & 0x1));
         }
         voltage = sg_get_unaligned_be16(statp + 2); /* unit: 10 mV */
-        n += sg_scnpr(a + n, alen - n, "%sVoltage: %d.%02d Volts\n", pad,
-                      voltage / 100, voltage % 100);
+        n += sg_scn3pr(a, alen, n, "%sVoltage: %d.%02d Volts\n", pad,
+                       voltage / 100, voltage % 100);
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3725,12 +3722,12 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case CURR_SENSOR_ETC:   /* Current sensor */
         if (nofilter || (0xca & s1))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Warn "
-                          "Over=%d, Crit Over=%d\n", pad, !!(s1 & 0x80),
-                          !!(s1 & 0x40), !!(s1 & 0x8), !!(s1 & 0x2));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Warn "
+                           "Over=%d, Crit Over=%d\n", pad, !!(s1 & 0x80),
+                           !!(s1 & 0x40), !!(s1 & 0x8), !!(s1 & 0x2));
         amperage = sg_get_unaligned_be16(statp + 2); /* unit: 10 mV */
-        n += sg_scnpr(a + n, alen - n, "%sCurrent: %d.%02d Amps\n", pad,
-                      amperage / 100, amperage % 100);
+        n += sg_scn3pr(a, alen, n, "%sCurrent: %d.%02d Amps\n", pad,
+                       amperage / 100, amperage % 100);
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3746,9 +3743,9 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case SCSI_TPORT_ETC:   /* SCSI target port */
         if (nofilter || ((0xc0 & s1) || (0x1 & s2) || (0x1 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Report=%d, "
-                          "Enabled=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
-                          !!(s2 & 0x1), !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Report=%d, "
+                           "Enabled=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
+                           !!(s2 & 0x1), !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3759,9 +3756,9 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case SCSI_IPORT_ETC:   /* SCSI initiator port */
         if (nofilter || ((0xc0 & s1) || (0x1 & s2) || (0x1 & s3)))
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Report=%d, "
-                          "Enabled=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
-                          !!(s2 & 0x1), !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Report=%d, "
+                           "Enabled=%d\n", pad, !!(s1 & 0x80), !!(s1 & 0x40),
+                           !!(s2 & 0x1), !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3771,8 +3768,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         }
         break;
     case SIMPLE_SUBENC_ETC:   /* Simple subenclosure */
-        n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d, Short %s: "
-                      "0x%x\n", pad, !!(s1 & 0x80), !!(s1 & 0x40), es_s, s3);
+        n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d, Short %s: "
+                       "0x%x\n", pad, !!(s1 & 0x80), !!(s1 & 0x40), es_s, s3);
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3782,33 +3779,33 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     case ARRAY_DEV_ETC:   /* Array device */
         if (nofilter || (0xf0 & s1))
-            n += sg_scnpr(a + n, alen - n, "%sOK=%d, Reserved device=%d, Hot "
-                          "spare=%d, Cons check=%d\n", pad, !!(s1 & 0x80),
-                          !!(s1 & 0x40), !!(s1 & 0x20), !!(s1 & 0x10));
+            n += sg_scn3pr(a, alen, n, "%sOK=%d, Reserved device=%d, Hot "
+                           "spare=%d, Cons check=%d\n", pad, !!(s1 & 0x80),
+                           !!(s1 & 0x40), !!(s1 & 0x20), !!(s1 & 0x10));
         if (nofilter || (0xf & s1))
-            n += sg_scnpr(a + n, alen - n, "%sIn crit array=%d, In failed "
-                          "array=%d, Rebuild/remap=%d, R/R abort=%d\n", pad,
-                          !!(s1 & 0x8), !!(s1 & 0x4), !!(s1 & 0x2),
-                          !!(s1 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sIn crit array=%d, In failed "
+                           "array=%d, Rebuild/remap=%d, R/R abort=%d\n", pad,
+                           !!(s1 & 0x8), !!(s1 & 0x4), !!(s1 & 0x2),
+                           !!(s1 & 0x1));
         if (nofilter || (0xf0 & s2))
-            n += sg_scnpr(a + n, alen - n, "%sApp client bypass A=%d, Do not "
-                          "remove=%d, Enc bypass A=%d, Enc bypass B=%d\n",
-                          pad, !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20),
-                          !!(s2 & 0x10));
+            n += sg_scn3pr(a, alen, n, "%sApp client bypass A=%d, Do not "
+                           "remove=%d, Enc bypass A=%d, Enc bypass B=%d\n",
+                           pad, !!(s2 & 0x80), !!(s2 & 0x40), !!(s2 & 0x20),
+                           !!(s2 & 0x10));
         if (nofilter || (0xf & s2))
-            n += sg_scnpr(a + n, alen - n, "%sReady to insert=%d, RMV=%d, "
-                          "Ident=%d, Report=%d\n", pad, !!(s2 & 0x8),
-                          !!(s2 & 0x4), !!(s2 & 0x2), !!(s2 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sReady to insert=%d, RMV=%d, "
+                           "Ident=%d, Report=%d\n", pad, !!(s2 & 0x8),
+                           !!(s2 & 0x4), !!(s2 & 0x2), !!(s2 & 0x1));
         if (nofilter || (0xf0 & s3))
-            n += sg_scnpr(a + n, alen - n, "%sApp client bypass B=%d, Fault "
-                          "sensed=%d, Fault reqstd=%d, Device off=%d\n", pad,
-                          !!(s3 & 0x80), !!(s3 & 0x40), !!(s3 & 0x20),
-                          !!(s3 & 0x10));
+            n += sg_scn3pr(a, alen, n, "%sApp client bypass B=%d, Fault "
+                           "sensed=%d, Fault reqstd=%d, Device off=%d\n", pad,
+                           !!(s3 & 0x80), !!(s3 & 0x40), !!(s3 & 0x20),
+                           !!(s3 & 0x10));
         if (nofilter || (0xf & s3))
-            n += sg_scnpr(a + n, alen - n, "%sBypassed A=%d, Bypassed B=%d, "
-                          "Dev bypassed A=%d, Dev bypassed B=%d\n", pad,
-                          !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
-                          !!(s3 & 0x1));
+            n += sg_scn3pr(a, alen, n, "%sBypassed A=%d, Bypassed B=%d, "
+                           "Dev bypassed A=%d, Dev bypassed B=%d\n", pad,
+                           !!(s3 & 0x8), !!(s3 & 0x4), !!(s3 & 0x2),
+                           !!(s3 & 0x1));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "rqst_ok", !!(s1 & 0x80), false,
                                "ReQueST OKay, device ok indicator");
@@ -3855,8 +3852,8 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         }
         break;
     case SAS_EXPANDER_ETC:
-        n += sg_scnpr(a + n, alen - n, "%sIdent=%d, Fail=%d\n", pad,
-                      !!(s1 & 0x80), !!(s1 & 0x40));
+        n += sg_scn3pr(a, alen, n, "%sIdent=%d, Fail=%d\n", pad,
+                       !!(s1 & 0x80), !!(s1 & 0x40));
         if (jsp->pr_as_json) {
             sgj_js_nv_ihex_nex(jsp, jop, "ident", !!(s1 & 0x80), false,
                                "identify (visual indicator)");
@@ -3867,13 +3864,13 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         ct = (s1 & 0x7f);
         if (abridged) {
             ccp = find_sas_connector_type(ct, true, b, blen);
-            n += sg_scnpr(a + n, alen - n, "%s%s, pl=%u", pad, ccp, s2);
+            n += sg_scn3pr(a, alen, n, "%s%s, pl=%u", pad, ccp, s2);
         } else {
             ccp = find_sas_connector_type(ct, false, b, blen);
-            n += sg_scnpr(a + n, alen - n, "%sIdent=%d, %s\n", pad,
+            n += sg_scn3pr(a, alen, n, "%sIdent=%d, %s\n", pad,
                           !!(s1 & 0x80), ccp);
             /* Mated added in ses3r10 */
-            n += sg_scnpr(a + n, alen - n, "%sConnector physical link=0x%x, "
+            n += sg_scn3pr(a, alen, n, "%sConnector physical link=0x%x, "
                           "Mated=%d, Fail=%d, OC=%d\n", pad, s2,
                           !!(s3 & 0x80), !!(s3 & 0x40), !!(s3 & 0x20));
         }
@@ -3890,13 +3887,13 @@ enc_status_helper(const char * pad, const uint8_t * statp, int etype,
         break;
     default:
         if (etype < 0x80)
-            n += sg_scnpr(a + n, alen - n, "%sUnknown element type, status "
-                          "in hex: %02x %02x %02x %02x\n", pad, s0, s1, s2,
-                          s3);
+            n += sg_scn3pr(a, alen, n, "%sUnknown element type, status "
+                           "in hex: %02x %02x %02x %02x\n", pad, s0, s1, s2,
+                           s3);
         else
-            n += sg_scnpr(a + n, alen - n, "%s%s element type, status in "
-                          "hex: %02x %02x %02x %02x\n", pad, vs_s, s0, s1,
-                          s2, s3);
+            n += sg_scn3pr(a, alen, n, "%s%s element type, status in "
+                           "hex: %02x %02x %02x %02x\n", pad, vs_s, s0, s1,
+                           s2, s3);
         if (jsp->pr_as_json)
             sgj_js_nv_hex_bytes(jsp, jop, "unknown_element_type_bytes",
                                 statp, 4);
@@ -4221,7 +4218,7 @@ array_status_sdp(const struct th_es_t * tesp, uint32_t ref_gen_code,
         n = sg_scnpr(b, blen, "      >>> no match on --index=%d,%d",
                      op->ind_th, op->ind_indiv);
         if (op->ind_indiv_last > op->ind_indiv)
-            sg_scnpr(b + n, blen - n, ":%d\n", op->ind_indiv_last);
+            sg_scn3pr(b, blen, n, ":%d\n", op->ind_indiv_last);
         else
             sgj_pr_hr(jsp, "%s\n", b);
     }
@@ -4785,8 +4782,8 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
         n = sg_scnpr(b, blen, "%snumber of phys: %d, not all phys: %d", pad,
                      phys, ae_bp[3 + eip_offset] & 1);
         if (eip_offset)
-            sg_scnpr(b + n, blen - n, ", device slot number: %d",
-                     ae_bp[5 + eip_offset]);
+            sg_scn3pr(b, blen, n, ", device slot number: %d",
+                      ae_bp[5 + eip_offset]);
         sgj_pr_hr(jsp, "%s\n", b);
         if (as_json) {
             sgj_js_nv_ihex(jsp, jop, "number_of_phy_descriptors", phys);
@@ -4911,7 +4908,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                 }
                 n = sg_scnpr(b, blen, "%s  [%d] ", pad, j);
                 if (0xff == cei)
-                    n += sg_scnpr(b + n, blen - n, "no connector");
+                    n += sg_scn3pr(b, blen, n, "no connector");
                 else {
                     if (tesp->j_base) {
                         if (0 == eiioe)
@@ -4922,21 +4919,19 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                             jrp = find_join_row_cnst(tesp, cei, FJ_EOE);
                         if ((NULL == jrp) || (NULL == jrp->enc_statp) ||
                             (SAS_CONNECTOR_ETC != jrp->etype))
-                            n += sg_scnpr(b + n, blen - n,
-                                          "broken [conn_idx=%d]", cei);
+                            n += sg_scn3pr(b, blen, n,
+                                           "broken [conn_idx=%d]", cei);
                         else {
                             n += enc_status_helper("", jrp->enc_statp,
                                                    jrp->etype, true, op,
                                                    jo2p, b + n, blen - n);
-                            n += sg_scnpr(b + n, blen - n, " [%d]",
-                                          jrp->indiv_i);
+                            n += sg_scn3pr(b, blen, n, " [%d]", jrp->indiv_i);
                         }
                     } else
-                        n += sg_scnpr(b + n, blen - n, "connector ei: %d",
-                                      cei);
+                        n += sg_scn3pr(b, blen, n, "connector ei: %d", cei);
                 }
                 if (0xff != oei) {
-                    n += sg_scnpr(b + n, blen - n, "; ");
+                    n += sg_scn3pr(b, blen, n, "; ");
                     if (tesp->j_base) {
                         if (0 == eiioe)
                             jrp = find_join_row_cnst(tesp, oei, FJ_AESS);
@@ -4945,29 +4940,27 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                         else
                             jrp = find_join_row_cnst(tesp, oei, FJ_EOE);
                         if (NULL == jrp)
-                            sg_scnpr(b + n, blen - n,
-                                     "broken [oth_elem_idx=%d]", oei);
+                            sg_scn3pr(b, blen, n,
+                                      "broken [oth_elem_idx=%d]", oei);
                         else if (jrp->elem_descp) {
                             ccp = etype_str(jrp->etype, e, elen);
                             ed_bp = jrp->elem_descp;
                             q = sg_get_unaligned_be16(ed_bp + 2);
                             if (q > 0)
-                                sg_scnpr(b + n, blen - n,
-                                         "%.*s [%d,%d] etype: %s", q,
-                                         (const char *)(ed_bp + 4),
-                                         jrp->th_i, jrp->indiv_i, ccp);
+                                sg_scn3pr(b, blen, n,
+                                          "%.*s [%d,%d] etype: %s", q,
+                                          (const char *)(ed_bp + 4),
+                                          jrp->th_i, jrp->indiv_i, ccp);
                             else
-                                sg_scnpr(b + n, blen - n,
-                                         "[%d,%d] etype: %s", jrp->th_i,
-                                          jrp->indiv_i, ccp);
+                                sg_scn3pr(b, blen, n, "[%d,%d] etype: %s",
+                                          jrp->th_i, jrp->indiv_i, ccp);
                         } else {
                             ccp = etype_str(jrp->etype, e, elen);
-                            sg_scnpr(b + n, blen - n,
-                                     "[%d,%d] etype: %s", jrp->th_i,
-                                     jrp->indiv_i, ccp);
+                            sg_scn3pr(b, blen, n, "[%d,%d] etype: %s",
+                                      jrp->th_i, jrp->indiv_i, ccp);
                         }
                     } else
-                        sg_scnpr(b + n, blen - n, "other ei: %d", oei);
+                        sg_scn3pr(b, blen, n, "other ei: %d", oei);
                 }
                 sgj_pr_hr(jsp, "%s\n", b);
                 if (as_json)
@@ -5006,7 +4999,7 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                 sgj_pr_hr(jsp, "%s  phy_id: 0x%x\n", pad, aep[0]);
                 n = sg_scnpr(b, blen, "%s  ", pad);
                 if (0xff == cei)
-                    n += sg_scnpr(b + n, blen - n, "no connector");
+                    n += sg_scn3pr(b, blen, n, "no connector");
                 else {
                     if (tesp->j_base) {
                         if (0 == eiioe)
@@ -5017,21 +5010,19 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                             jrp = find_join_row_cnst(tesp, cei, FJ_EOE);
                         if ((NULL == jrp) || (NULL == jrp->enc_statp) ||
                             (SAS_CONNECTOR_ETC != jrp->etype))
-                            n += sg_scnpr(b + n, blen - n,
-                                          "broken [conn_idx=%d]", cei);
+                            n += sg_scn3pr(b, blen, n, "broken [conn_idx=%d]",
+                                           cei);
                         else {
                             n += enc_status_helper("", jrp->enc_statp,
                                                    jrp->etype, true, op,
                                                    jo2p, b + n, blen - n);
-                            n += sg_scnpr(b + n, blen - n, " [%d]",
-                                          jrp->indiv_i);
+                            n += sg_scn3pr(b, blen, n, " [%d]", jrp->indiv_i);
                         }
                     } else
-                        n += sg_scnpr(b + n, blen - n, "connector ei: %d",
-                                      cei);
+                        n += sg_scn3pr(b, blen, n, "connector ei: %d", cei);
                 }
                 if (0xff != oei) {
-                    n += sg_scnpr(b + n, blen - n, "; ");
+                    n += sg_scn3pr(b, blen, n, "; ");
                     if (tesp->j_base) {
                         if (0 == eiioe)
                             jrp = find_join_row_cnst(tesp, oei, FJ_AESS);
@@ -5040,29 +5031,26 @@ additional_elem_sas(const char * pad, const uint8_t * ae_bp, int etype,
                         else
                             jrp = find_join_row_cnst(tesp, oei, FJ_EOE);
                         if (NULL == jrp)
-                            sg_scnpr(b + n, blen - n,
-                                     "broken [oth_elem_idx=%d]", oei);
+                            sg_scn3pr(b, blen, n, "broken [oth_elem_idx=%d]",
+                                      oei);
                         else if (jrp->elem_descp) {
                             ccp = etype_str(jrp->etype, e, elen);
                             ed_bp = jrp->elem_descp;
                             q = sg_get_unaligned_be16(ed_bp + 2);
                             if (q > 0)
-                                sg_scnpr(b + n, blen - n,
-                                         "%.*s [%d,%d] etype: %s", q,
-                                         (const char *)(ed_bp + 4),
-                                         jrp->th_i, jrp->indiv_i, ccp);
+                                sg_scn3pr(b, blen, n, "%.*s [%d,%d] etype: "
+                                          "%s", q, (const char *)(ed_bp + 4),
+                                          jrp->th_i, jrp->indiv_i, ccp);
                             else
-                                sg_scnpr(b + n, blen - n,
-                                         "[%d,%d] etype: %s", jrp->th_i,
-                                         jrp->indiv_i, ccp);
+                                sg_scn3pr(b, blen, n, "[%d,%d] etype: %s",
+                                          jrp->th_i, jrp->indiv_i, ccp);
                         } else {
                             ccp = etype_str(jrp->etype, e, elen);
-                            sg_scnpr(b + n, blen - n,
-                                     "[%d,%d] etype: %s", jrp->th_i,
-                                     jrp->indiv_i, ccp);
+                            sg_scn3pr(b, blen, n, "[%d,%d] etype: %s",
+                                      jrp->th_i, jrp->indiv_i, ccp);
                         }
                     } else
-                        sg_scnpr(b + n, blen - n, "other ei: %d", oei);
+                        sg_scn3pr(b, blen, n, "other ei: %d", oei);
                 }
                 sgj_pr_hr(jsp, "%s\n", b);
                 sgj_pr_hr(jsp, "%s  SAS address: 0x%" PRIx64 "\n", pad, sa);
@@ -5129,10 +5117,10 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
         sgj_pr_hr(jsp, "%snumber of ports: %d\n", pad, ports);
         n = sg_scnpr(b, blen, "%snode_name: ", pad);
         for (m = 0; m < 8; ++m)
-            n += sg_scnpr(b + n, blen - n, "%02x", ae_bp[6 + eip_offset + m]);
+            n += sg_scn3pr(b, blen, n, "%02x", ae_bp[6 + eip_offset + m]);
         if (eip_offset)
-            sg_scnpr(b + n, blen - n, ", device slot number: %d",
-                     ae_bp[5 + eip_offset]);
+            sg_scn3pr(b, blen, n, ", device slot number: %d",
+                      ae_bp[5 + eip_offset]);
         sgj_pr_hr(jsp, "%s\n", b);
         if (as_json) {
             sgj_js_nv_ihex(jsp, jop, "number_of_ports", ports);
@@ -5151,7 +5139,7 @@ additional_elem_helper(const char * pad, const uint8_t * ae_bp,
                       "%02x%02x%02x\n", pad, aep[4], aep[5], aep[6], aep[7]);
             n = sg_scnpr(b, blen, "%s  n_port name: ", pad);
             for (m = 0; m < 8; ++m)
-                n += sg_scnpr(b + n, blen - n, "%02x", aep[8 + m]);
+                n += sg_scn3pr(b, blen, n, "%02x", aep[8 + m]);
             sgj_pr_hr(jsp, "%s\n", b);
             if (as_json) {
                 jo2p = sgj_new_unattached_object_r(jsp);
@@ -5753,8 +5741,8 @@ supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
             n = sg_scnpr(b, blen, "  %s [", ccp);
             for (ap = dp_abbrev, got1 = false; ap->abbrev; ++ap) {
                 if (ap->page_code == code) {
-                    n += sg_scnpr(b + n, blen - n, "%s%s", (got1 ? "," : ""),
-                                  ap->abbrev);
+                    n += sg_scn3pr(b, blen, n, "%s%s", (got1 ? "," : ""),
+                                   ap->abbrev);
                     got1 = true;
                 }
             }
@@ -6830,7 +6818,7 @@ join_array_display(struct th_es_t * tesp, struct opts_t * op,
             n = sg_scnpr(b, blen, "      >>> no match on --index=%d,%d",
                          op->ind_th, op->ind_indiv);
             if (op->ind_indiv_last > op->ind_indiv)
-                sg_scnpr(b + n, blen - n, ":%d\n", op->ind_indiv_last);
+                sg_scn3pr(b, blen, n, ":%d\n", op->ind_indiv_last);
             else
                 sgj_pr_hr(jsp, "%s\n", b);
         } else if (op->desc_name)
@@ -7013,8 +7001,8 @@ join_work(struct sg_pt_base * ptvp, bool display, struct opts_t * op,
 
         n = sg_scnpr(b, blen, "%s (hex): ", peli);
         for (j = 0; j < 8; ++j)
-            n += sg_scnpr(b + n, blen - n, "%02x",
-                          primary_info.enc_log_id[j]);
+            n += sg_scn3pr(b, blen, n, "%02x",
+                           primary_info.enc_log_id[j]);
         sgj_pr_hr(jsp, "  %s\n", b);
     }
     mlen = enc_stat_rsp_sz;

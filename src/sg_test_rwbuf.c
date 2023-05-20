@@ -1,7 +1,7 @@
 /*
  * (c) 2000 Kurt Garloff
  * heavily based on Douglas Gilbert's sg_rbuf program.
- * (c) 1999-2022 Douglas Gilbert
+ * (c) 1999-2023 Douglas Gilbert
  *
  * Program to test the SCSI host adapter by issuing
  * write and read operations on a device's buffer
@@ -47,7 +47,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.21 20220118";
+static const char * version_str = "1.22 20230519";
 
 #define BPI (signed)(sizeof(int))
 
@@ -503,7 +503,7 @@ int main (int argc, char * argv[])
         if (verbose_given && version_given) {
                 pr2serr("but override: '-vV' given, zero verbose and "
                         "continue\n");
-                verbose_given = false;
+                /* verbose_given = false; */
                 version_given = false;
                 verbose = 0;
         } else if (! verbose_given) {

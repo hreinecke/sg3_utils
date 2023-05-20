@@ -45,8 +45,11 @@ extern FILE * sg_warnings_strm;
  * output to pr2ws() . */
 int pr2ws(const char * fmt, ...) __printf(1, 2);
 
-/* Want safe, 'n += snprintf(b + n, blen - n, ...)' style sequence of
- * functions that can be called multiple times. Returns number of chars
+/* Want safe, 'n += snprintf(b + n, blen - n, ...);' pattern that can
+ * be called repeatedly. However snprintf() takes an unsigned second argument
+ * (size_t) that explodes if 'blen - n' goes negative. This function instead
+ * uses signed integers (second argument and return value) and is safe if the
+ * second argument is negative. It returns number of chars actually
  * placed in cp excluding the trailing null char. So for cp_max_len > 0 the
  * return value is always < cp_max_len; for cp_max_len <= 1 the return value
  * is 0 and no chars are written to cp. Note this means that when
@@ -54,6 +57,13 @@ int pr2ws(const char * fmt, ...) __printf(1, 2);
  * and does nothing (and returns 0). Linux kernel has a similar function
  * called  scnprintf().  */
 int sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...) __printf(3, 4);
+
+/* This function is similar to sg_scnpr() but takes the "n" in that pattern
+ * as an extra, third argument where it is renamed 'off'. This function will
+ * start writing chars at 'fcp + off' for no more than 'fcp_len - off - 1'
+ * characters. The return value is the same as sg_scnpr(). */
+int sg_scn3pr(char * fcp, int fcp_len, int off,
+              const char * fmt, ...) __printf(4, 5);
 
 #ifdef __cplusplus
 }
