@@ -1,4 +1,4 @@
-.TH SG_LUNS "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_LUNS "8" "June 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_luns \- send SCSI REPORT LUNS command or decode given LUN
 .SH SYNOPSIS
@@ -71,9 +71,9 @@ is still parsable by the \fI\-\-inhex=FN\fR option.
 \fB\-i\fR, \fB\-\-inhex\fR=\fIFN\fR
 \fIFN\fR is expected to be a file name (or '\-' for stdin) which contains
 ASCII hexadecimal or binary representing a REPORT LUNS response. This utility
-will then decode that response. See the "FORMAT OF FILES CONTAINING ASCII
-HEX" section in the sg3_utils manpage for more information. If the
-\fI\-\-raw\fR option is also given then \fIFN\fR is treated as binary.
+will then decode that response. See the "HEX, BINARY AND JSON FORMATS"
+section in the sg3_utils manpage for more information. If the \fI\-\-raw\fR
+option is also given then \fIFN\fR is treated as binary.
 .TP
 \fB\-I\fR, \fB\-\-inner\-hex\fR
 used together with the \fI\-\-decode\fR option so that the decoded values are
@@ -142,14 +142,14 @@ a leading "0x" or a trailing "h". For detailed information see the
 REPORT LUNS command in SPC (most recent is SPC\-4 revision 37 in section
 6.33). To simplify, for the I_T nexus associated with the \fIDEVICE\fR, the
 meanings of the \fISR\fR values defined to date for SPC\-4 are:
-  \fB0\fR : most luns excluding well known logical unit numbers
-  \fB1\fR : well known logical unit numbers
-  \fB2\fR : all luns accessible to this I_T nexus
-  \fB0x10\fR : only accessible administrative luns
-  \fB0x11\fR : administrative luns plus non-conglomerate luns (see SPC\-4)
-  \fB0x12\fR : if \fIDEVICE\fR is an administrative LU, then report its
-         lun plus its subsidiary luns
-.PP
+    \fB0\fR : most luns excluding well known logical unit numbers
+    \fB1\fR : well known logical unit numbers
+    \fB2\fR : all luns accessible to this I_T nexus
+    \fB0x10\fR : only accessible administrative luns
+    \fB0x11\fR : administrative luns plus non-conglomerate luns (see SPC\-4)
+    \fB0x12\fR : if \fIDEVICE\fR is an administrative LU, then report its
+           lun plus its subsidiary luns
+.br
 For \fISR\fR values 0x10 and 0x11, the \fIDEVICE\fR must be either LUN 0 or
 the REPORT LUNS well known logical unit. Values between 0xf8 and
 0xff (inclusive) are vendor specific, other values are reserved. This

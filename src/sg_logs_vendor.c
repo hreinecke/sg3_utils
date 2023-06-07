@@ -752,7 +752,6 @@ show_seagate_farm_page(const uint8_t * resp, int len,
         sgj_pr_hr(jsp, "  %s: %d\n", param_c, pc);
         sgj_pr_hr(jsp, "    Parameter length: %d\n", pl - 4);
 
-        // Coding in progress .... yyyyyyyy  <<<<<<<<<<<<<<<<<<
         // Wow 0 through 82 (inclusive) parameters, many 160 bytes long
         switch (pc) {
         case 0:

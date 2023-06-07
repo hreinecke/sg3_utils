@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.33 20230519";    /* spc6r07 + sbc5r04 */
+static const char * version_str = "2.34 20230603";    /* spc6r08 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -74,6 +74,7 @@ static const char * const acsq_sn = "additional_sense_code_qualifier";
 static const char * const lp_sn = "log_page";
 static const char * const tims_s = "Timestamp";
 static const char * const tims_sn = "timestamp";
+static const char * const percent_s = "[percentage]";
 
 static struct option long_options[] = {
     {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
@@ -2699,7 +2700,7 @@ show_environmental_limits_page(const uint8_t * resp, int len,
             humidity_str(bp[4], true, b, blen);
             sgj_pr_hr(jsp, "    %s: %s\n", hcrhlt, b);
             js_snakenv_ihexstr_nex(jsp, jo3p, hcrhlt, bp[4], false,
-                                   NULL, b, "[percentage]");
+                                   NULL, b, percent_s);
             humidity_str(bp[5], true, b, blen);
             sgj_pr_hr(jsp, "    %s: %s\n", hcrhlr, b);
             js_snakenv_ihexstr_nex(jsp, jo3p, hcrhlr, bp[5], false,
@@ -3656,7 +3657,8 @@ show_temperature_page(const uint8_t * resp, int len, struct opts_t * op,
             if (! op->do_temperature) {
                 sgj_pr_hr(jsp, "  unknown %s = 0x%x, contents in hex:\n",
                           param_c, pc);
-                hex2stdout(bp, extra, op->dstrhex_no_ascii);
+                if (! jsp->pr_as_json)
+                    hex2stdout(bp, extra, op->dstrhex_no_ascii);
             } else {
                 if (jsp->pr_as_json)
                     sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
@@ -5549,7 +5551,8 @@ show_non_volatile_cache_page(const uint8_t * resp, int len,
             break;
         default:
             sgj_pr_hr(jsp, "  Unknown %s = 0x%x\n", param_c, pc);
-            hex2stdout(bp, pl, op->dstrhex_no_ascii);
+            if (! jsp->pr_as_json)
+                hex2stdout(bp, pl, op->dstrhex_no_ascii);
             break;
         }
         if (jsp->pr_as_json) {
@@ -5704,11 +5707,14 @@ show_lb_provisioning_page(const uint8_t * resp, int len,
                 }
             } else {
                 sgj_pr_hr(jsp, "  %s [0x%x]:", vend_spec, pc);
-                hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
+                if (! jsp->pr_as_json)
+                    hex2stdout(bp, ((pl < num) ? pl : num),
+                               op->dstrhex_no_ascii);
             }
         } else {
             sgj_pr_hr(jsp, "  Reserved [%s=0x%x]:\n", param_c_sn, pc);
-            hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
+            if (! jsp->pr_as_json)
+                hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
         }
         if (jsp->pr_as_json)
             sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
@@ -5826,7 +5832,8 @@ show_utilization_page(const uint8_t * resp, int len, struct opts_t * op,
             break;
         default:
             sgj_pr_hr(jsp, "  Reserved [parameter_code=0x%x]:\n", pc);
-            hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
+            if (! jsp->pr_as_json)
+                hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
             break;
         }
         if (jsp->pr_as_json)
@@ -5920,7 +5927,8 @@ show_solid_state_media_page(const uint8_t * resp, int len,
             break;
         default:
             sgj_pr_hr(jsp, "  Reserved [parameter_code=0x%x]:\n", pc);
-            hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
+            if (! jsp->pr_as_json)
+                hex2stdout(bp, ((pl < num) ? pl : num), op->dstrhex_no_ascii);
             break;
         }
         if (jsp->pr_as_json)
@@ -6343,7 +6351,7 @@ show_tapealert_response_page(const uint8_t * resp, int len,
                 if (0 == mod) {
                     if (div > 0)
                         sgj_pr_hr(jsp, "%s\n", b);
-		    /* restart filling 'b' */
+                    /* restart filling 'b' */
                     n = sg_scnpr(b, blen, "  Flag%02Xh: %d", k, v);
                 } else
                     n += sg_scn3pr(b, blen, n, "  %02Xh: %d", k, v);
@@ -8882,8 +8890,9 @@ show_volume_stats_pages(const uint8_t * resp, int len,
 {
     bool skip_out = false;
     bool evsm_output = false;
-    bool valid, is_count, is_ms, is_mb, is_num_or, is_str;
+    bool valid, is_count, is_ms, is_mb, is_num_or, is_str, all_ffs;
     int num, pl, pc, subpg_code;
+    uint64_t ull;
     bool spf;
     const char * ccp;
     const uint8_t * bp;
@@ -9059,6 +9068,26 @@ show_volume_stats_pages(const uint8_t * resp, int len,
             is_mb = true;
             is_num_or = true;
             break;
+        case 0x18:      /* ssc-5 am1 */
+            ccp =  "Application design capacity";
+            is_count = true;
+            is_mb = true;
+            is_num_or = true;
+            break;
+        case 0x19:      /* percentage, valid range: 0 to 100 */
+            ccp =  "Volume useful life remaining";
+            all_ffs = sg_all_ffs(bp + 4, pl - 4);
+            if (all_ffs) {
+                sgj_pr_hr(jsp, "  %s: %s\n", ccp, unkn_s);
+                js_snakenv_ihexstr_nex(jsp, jo3p, ccp, 255, false,
+                                       NULL, unkn_s, percent_s);
+                break;
+            }
+            ull = sg_get_unaligned_be(pl - 4, bp + 4);
+            sgj_pr_hr(jsp, "  %s: %" PRIu64 " %%\n", ccp, ull);
+            js_snakenv_ihexstr_nex(jsp, jo3p, ccp, ull, false,
+                                   NULL, NULL, percent_s);
+            break;
         case 0x1a:
             ccp =  "Volume stop writes of forward wraps";
             is_count = true;
@@ -9192,14 +9221,12 @@ show_volume_stats_pages(const uint8_t * resp, int len,
         }
         if (is_count || is_str) {
             bool is_unkn = false;
-            uint64_t ull;
             const char * cc2p = NULL;
 
             if (is_str)
                 sgj_pr_hr(jsp, "  %s: %.*s\n", ccp, pl - 4, bp + 4);
             else {      /* is_count */
-                bool all_ffs = sg_all_ffs(bp + 4, pl - 4);
-
+                all_ffs = sg_all_ffs(bp + 4, pl - 4);
                 if (is_num_or && all_ffs)
                     is_unkn = true;
                 ull = sg_get_unaligned_be(pl - 4, bp + 4);

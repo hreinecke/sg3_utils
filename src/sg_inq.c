@@ -53,7 +53,7 @@
 
 #include "sg_vpd_common.h"  /* for shared VPD page processing with sg_vpd */
 
-static const char * version_str = "2.47 20230518";  /* spc6r08, sbc5r04 */
+static const char * version_str = "2.48 20230606";  /* spc6r08, sbc5r04 */
 
 #define MY_NAME "sg_inq"
 
@@ -1554,6 +1554,7 @@ decode_dev_ids(const char * leadin, uint8_t * buff, int len,
                 sgj_pr_hr(jsp, "      vendor specific: %.*s\n", i_len, ip);
             else {
                 sgj_pr_hr(jsp, "      vendor specific:\n");
+                /* plain text output only here */
                 hex2stdout(ip, i_len, no_ascii_4hex(op));
             }
             break;
@@ -2126,7 +2127,7 @@ decode_b0_vpd(uint8_t * buff, int len, struct opts_t * op, sgj_opaque_p jop)
 
     if (dhex < 0)
         dhex = -dhex;
-    if (dhex < 3) {
+    if ((dhex > 0) && (dhex < 3)) {
         hex2stdout(buff, len, no_ascii_4hex(op));
         return;
     }
@@ -3858,53 +3859,84 @@ nvme_hex_raw(const uint8_t * b, int b_len, const struct opts_t * op)
 static const char * rperf[] = {"Best", "Better", "Good", "Degraded"};
 
 static void
-show_nvme_id_ns(const uint8_t * dinp, struct opts_t * op, sgj_opaque_p jop)
+show_nvme_id_ns(const uint8_t * dinp, uint32_t nsid, struct opts_t * op,
+                sgj_opaque_p jop)
 {
+    bool as_json, active;
     bool got_eui_128 = false;
     uint32_t u, k, n, off, num_lbaf, flbas, flba_info, md_size, lb_size;
-    uint64_t ns_sz, eui_64;
+    uint32_t format_ind, lb_sz_exp;
+    uint64_t ns_sz, ns_cap, ns_util, eui_64;
     sgj_state * jsp = &op->json_st;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
+    sgj_opaque_p jap = NULL;
     char b[144];
     static const int blen = sizeof(b);
+    static const char * u_lb_s = "[unit: logical block]";
 
-if (jop) {}
+    as_json = jsp->pr_as_json;
+    if (as_json) {
+        sg_scnpr(b, blen, "identify_namespace_%u_data_structure", nsid);
+        jo2p = sgj_named_subobject_r(jsp, jop, b);
+    }
     num_lbaf = dinp[25] + 1;  /* spec says this is "0's based value" */
-    flbas = dinp[26] & 0xf;   /* index of active LBA format (for this ns) */
     ns_sz = sg_get_unaligned_le64(dinp + 0);
+    ns_cap = sg_get_unaligned_le64(dinp + 8);
+    ns_util = sg_get_unaligned_le64(dinp + 16);
     eui_64 = sg_get_unaligned_be64(dinp + 120);  /* N.B. big endian */
     if (! sg_all_zeros(dinp + 104, 16))
         got_eui_128 = true;
     sgj_pr_hr(jsp, "    Namespace size/capacity: %" PRIu64 "/%" PRIu64
               " blocks\n", ns_sz, sg_get_unaligned_le64(dinp + 8));
     sgj_pr_hr(jsp, "    Namespace utilization: %" PRIu64 " blocks\n",
-              sg_get_unaligned_le64(dinp + 16));
+              ns_util);
+    if (as_json) {
+        sgj_js_nv_ihex_nex(jsp, jo2p, "namespace_size", ns_sz, true, u_lb_s);
+        sgj_js_nv_ihex_nex(jsp, jo2p, "namespace_capacity", ns_cap, true,
+                           u_lb_s);
+        sgj_js_nv_ihex_nex(jsp, jo2p, "namespace_utilization", ns_util, true,
+                           u_lb_s);
+    }
     if (got_eui_128) {          /* N.B. big endian */
-        n = sg_scnpr(b, blen, "    NGUID: 0x%02x", dinp[104]);
+        n = sg_scnpr(b, blen, "0x%02x", dinp[104]);
         for (k = 1; k < 16; ++k)
             n += sg_scn3pr(b, blen, n, "%02x", dinp[104 + k]);
-        sgj_pr_hr(jsp, "%s\n", b);
+        sgj_haj_vs(jsp, jo2p, 4, "NGUID", SGJ_SEP_COLON_1_SPACE, b);
     } else if (op->do_long)
         sgj_pr_hr(jsp, "    NGUID: 0x0\n");
-    if (eui_64) /* EUI_64 if given is BIG endian */
+    if (eui_64) { /* EUI_64 if given is BIG endian */
         sgj_pr_hr(jsp, "    EUI-64: 0x%" PRIx64 "\n", eui_64);
-    sgj_pr_hr(jsp, "    Number of LBA formats: %u\n", num_lbaf);
-    sgj_pr_hr(jsp, "    Index LBA size: %u\n", flbas);
+        sgj_js_nv_ihex(jsp, jo2p, "eui_64", eui_64);
+    }
+    sgj_haj_vi(jsp, jo2p, 4, "Number of LBA formats", SGJ_SEP_COLON_1_SPACE,
+               num_lbaf, false);
+    flbas = dinp[26];
+    format_ind = flbas & 0xf;
+    if (num_lbaf > 16)          /* hack upon hack */
+        format_ind = ((flbas & 0x60) >> 1) | format_ind;
+    sgj_haj_vi(jsp, jo2p, 4, "Format index", SGJ_SEP_COLON_1_SPACE,
+               format_ind, false);
+    if (as_json)
+        jap = sgj_named_subarray_r(jsp, jo2p, "lba_format_list");
+
     for (k = 0, off = 128; k < num_lbaf; ++k, off += 4) {
         sg_scnpr(b, blen, "    LBA format %u support:", k);
-        if (k == flbas)
+        active = (k == format_ind);
+        if (active)
             sgj_pr_hr(jsp, "%s <-- active\n", b);
         else
             sgj_pr_hr(jsp, "%s\n", b);
         flba_info = sg_get_unaligned_le32(dinp + off);
         md_size = flba_info & 0xffff;
-        lb_size = flba_info >> 16 & 0xff;
-        if (lb_size > 31) {
+        lb_sz_exp = (flba_info >> 16) & 0xff;
+        if (lb_sz_exp > 31) {
             pr2serr("%s: logical block size exponent of %u implies a LB "
                     "size larger than 4 billion bytes, ignore\n", __func__,
-                    lb_size);
+                    lb_sz_exp);
             continue;
         }
-        lb_size = 1U << lb_size;
+        lb_size = 1U << lb_sz_exp;
         ns_sz *= lb_size;
         ns_sz /= 500*1000*1000;
         if (ns_sz & 0x1)
@@ -3918,6 +3950,22 @@ if (jop) {}
         sgj_pr_hr(jsp, "      Metadata size: %u bytes\n", md_size);
         sgj_pr_hr(jsp, "      Relative performance: %s [0x%x]\n", rperf[u],
                   u);
+        if (as_json) {
+            jo3p = sgj_new_unattached_object_r(jsp);
+            sgj_js_nv_ihexstr(jsp, jo3p, "relative_performance", u, NULL,
+                              rperf[u]);
+            sgj_js_nv_ihex_nex(jsp, jo3p, "lba_data_size", lb_sz_exp, false,
+                               "power of 2");
+            sgj_js_nv_ihex_nex(jsp, jo3p, "logical_block_size", lb_size, true,
+                               "[unit: byte]");
+            sgj_js_nv_ihex_nex(jsp, jo3p, "metadata_size", md_size, true,
+                               "[unit: byte]");
+            sgj_js_nv_ihex_nex(jsp, jo3p, "active", (int)active, false,
+                               "most recent format used this");
+            sgj_js_nv_ihex_nex(jsp, jo3p, "approximate_namespace_size", ns_sz,
+                               true, "[unit: GigaByte]");
+            sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
+        }
     }
 }
 
@@ -3955,90 +4003,117 @@ nvme_id_namespace(struct sg_pt_base * ptvp, uint32_t nsid,
         nvme_hex_raw(id_dinp, id_din_len, op);
         return 0;
     }
-    show_nvme_id_ns(id_dinp, op, jop);
+    show_nvme_id_ns(id_dinp, nsid, op, jop);
     return 0;
 }
+
+static const char * const oacs_a[11] = {
+    "Security send and receive",
+    "Format NVM",
+    "Firmware download and commit",
+    "Namespace management and attachment",
+    "Device self-test",
+    "Directive send and directive receive",
+    "NVMe-MI send and NVMe-MI receive",
+    "Virtualization management",
+    "Doorbell buffer config",
+    "Get LBA status",                   /* NVMe 1.4 */
+    "Command and feature lockdown",     /* NVMe 2.0 */
+};
+
+static const char * const oncs_a[9] = {
+    "Compare",
+    "Write uncorrectable",
+    "Dataset management",
+    "Write zeroes",
+    "Save and Select fields non-zero",
+    "Reservations",
+    "Timestamp feature",
+    "Verify and Verify size limit",     /* NVMe 1.4 */
+    "Copy",                             /* NVMe 2.0 */
+};
 
 static void
 show_nvme_id_ctrl(const uint8_t *dinp, struct opts_t * op, sgj_opaque_p jop)
 {
-    bool got_fguid;
+    bool got_fguid, as_json;
     uint8_t ver_min, ver_ter, mtds;
     uint16_t ver_maj, oacs, oncs;
     uint32_t k, ver, max_nsid, npss, j, n, m;
+    int h;
     uint64_t sz1, sz2;
     const uint8_t * up;
+    const char * ccp;
+    sgj_opaque_p jap = NULL;
+    sgj_opaque_p jo2p = NULL;
+    sgj_opaque_p jo3p = NULL;
     sgj_state * jsp = &op->json_st;
     char b[144];
     static const int blen = sizeof(b);
 
-if (jop) {}
+    as_json = jsp->pr_as_json;
+    if (as_json)
+        jo2p = sgj_named_subobject_r(jsp, jop,
+                                     "identify_controller_data_structure");
     max_nsid = sg_get_unaligned_le32(dinp + 516); /* NN */
     sgj_pr_hr(jsp, "Identify controller for %s:\n", op->device_name);
-    sgj_pr_hr(jsp, "  Model number: %.40s\n", (const char *)(dinp + 24));
-    sgj_pr_hr(jsp, "  Serial number: %.20s\n", (const char *)(dinp + 4));
-    sgj_pr_hr(jsp, "  Firmware revision: %.8s\n", (const char *)(dinp + 64));
+    snprintf(b, blen, "%.40s", (const char *)(dinp + 24));
+    sgj_haj_vs(jsp, jo2p, 2, "Model number", SGJ_SEP_COLON_1_SPACE, b);
+    snprintf(b, blen, "%.20s", (const char *)(dinp + 4));
+    sgj_haj_vs(jsp, jo2p, 2, "Serial number", SGJ_SEP_COLON_1_SPACE, b);
+    snprintf(b, blen, "%.4s", (const char *)(dinp + 64));
+    sgj_haj_vs(jsp, jo2p, 2, "Firmware revision", SGJ_SEP_COLON_1_SPACE, b);
     ver = sg_get_unaligned_le32(dinp + 80);
     ver_maj = (ver >> 16);
     ver_min = (ver >> 8) & 0xff;
     ver_ter = (ver & 0xff);
-    sg_scnpr(b, blen, "  Version: %u.%u", ver_maj, ver_min);
+    h = sg_scnpr(b, blen, "%u.%u", ver_maj, ver_min);
     if ((ver_maj > 1) || ((1 == ver_maj) && (ver_min > 2)) ||
         ((1 == ver_maj) && (2 == ver_min) && (ver_ter > 0)))
-        sgj_pr_hr(jsp, "%s.%u\n", b, ver_ter);
-    else
-        sgj_pr_hr(jsp, "%s\n", b);
+        sg_scnpr(b + h, blen - h, ".%u", ver_ter);
+    sgj_haj_vs(jsp, jo2p, 2, "Version", SGJ_SEP_COLON_1_SPACE, b);
     oacs = sg_get_unaligned_le16(dinp + 256);
-    if (0x1ff & oacs) {
+    if (0x7ff & oacs) {
         sgj_pr_hr(jsp, "  Optional admin command support:\n");
-        if (0x200 & oacs)
-            sgj_pr_hr(jsp, "    Get LBA status\n");     /* NVMe 1.4 */
-        if (0x100 & oacs)
-            sgj_pr_hr(jsp, "    Doorbell buffer config\n");
-        if (0x80 & oacs)
-            sgj_pr_hr(jsp, "    Virtualization management\n");
-        if (0x40 & oacs)
-            sgj_pr_hr(jsp, "    NVMe-MI send and NVMe-MI receive\n");
-        if (0x20 & oacs)
-            sgj_pr_hr(jsp, "    Directive send and directive receive\n");
-        if (0x10 & oacs)
-            sgj_pr_hr(jsp, "    Device self-test\n");
-        if (0x8 & oacs)
-            sgj_pr_hr(jsp, "    Namespace management and attachment\n");
-        if (0x4 & oacs)
-            sgj_pr_hr(jsp, "    Firmware download and commit\n");
-        if (0x2 & oacs)
-            sgj_pr_hr(jsp, "    Format NVM\n");
-        if (0x1 & oacs)
-            sgj_pr_hr(jsp, "    Security send and receive\n");
+        if (as_json)
+            jap = sgj_named_subarray_r(jsp, jo2p,
+                                       "optional_admin_command_support_list");
+        for (k = 0x1, h = 0; h < 11; k <<= 1, ++h) {
+            if (k & oacs) {
+                ccp = oacs_a[h];
+                sgj_pr_hr(jsp, "    %s\n", ccp);
+                if (as_json) {
+                    jo3p = sgj_new_unattached_string_r(jsp, ccp);
+                    sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
+                }
+            }
+        }
     } else
         sgj_pr_hr(jsp, "  No optional admin command support\n");
     oncs = sg_get_unaligned_le16(dinp + 256);
-    if (0x7f & oncs) {
+    if (0x1ff & oncs) {
         sgj_pr_hr(jsp, "  Optional NVM command support:\n");
-        if (0x80 & oncs)
-            sgj_pr_hr(jsp, "    Verify\n");     /* NVMe 1.4 */
-        if (0x40 & oncs)
-            sgj_pr_hr(jsp, "    Timestamp feature\n");
-        if (0x20 & oncs)
-            sgj_pr_hr(jsp, "    Reservations\n");
-        if (0x10 & oncs)
-            sgj_pr_hr(jsp, "    Save and Select fields non-zero\n");
-        if (0x8 & oncs)
-            sgj_pr_hr(jsp, "    Write zeroes\n");
-        if (0x4 & oncs)
-            sgj_pr_hr(jsp, "    Dataset management\n");
-        if (0x2 & oncs)
-            sgj_pr_hr(jsp, "    Write uncorrectable\n");
-        if (0x1 & oncs)
-            sgj_pr_hr(jsp, "    Compare\n");
+        if (as_json)
+            jap = sgj_named_subarray_r(jsp, jo2p,
+                                       "optional_nvm_command_support_list");
+        for (k = 0x1, h = 0; h < 9; k <<= 1, ++h) {
+            if (k & oncs) {
+                ccp = oncs_a[h];
+                sgj_pr_hr(jsp, "    %s\n", ccp);
+                if (as_json) {
+                    jo3p = sgj_new_unattached_string_r(jsp, ccp);
+                    sgj_js_nv_o(jsp, jap, NULL /* name */, jo3p);
+                }
+            }
+        }
     } else
         sgj_pr_hr(jsp, "  No optional NVM command support\n");
+// yyyyyyyyyyyyy
     sgj_pr_hr(jsp, "  PCI vendor ID VID/SSVID: 0x%x/0x%x\n",
               sg_get_unaligned_le16(dinp + 0),
               sg_get_unaligned_le16(dinp + 2));
     sgj_pr_hr(jsp, "  IEEE OUI Identifier: 0x%x\n", /* has been renamed AOI */
-           sg_get_unaligned_le24(dinp + 73));
+              sg_get_unaligned_le24(dinp + 73));
     got_fguid = ! sg_all_zeros(dinp + 112, 16);
     if (got_fguid) {
         n = sg_scnpr(b, blen, "  FGUID: 0x%02x", dinp[112]);
@@ -4127,12 +4202,12 @@ if (jop) {}
  * 1 . The CNS (Controller or Namespace Structure) field is CDW10 7:0, was
  * only bit 0 in NVMe 1.0 and bits 1:0 in NVMe 1.1, thereafter 8 bits. */
 static int
-do_nvme_identify_ctrl(int pt_fd, struct opts_t * op, sgj_opaque_p jop)
+do_nvme_identify_ctrl(struct sg_pt_base * ptvp, struct opts_t * op,
+                      sgj_opaque_p jop)
 {
     int ret = 0;
     int vb = op->verbose;
     uint32_t k, nsid, max_nsid;
-    struct sg_pt_base * ptvp;
     struct sg_nvme_passthru_cmd identify_cmd;
     struct sg_nvme_passthru_cmd * id_cmdp = &identify_cmd;
     uint8_t * id_dinp = NULL;
@@ -4147,7 +4222,6 @@ do_nvme_identify_ctrl(int pt_fd, struct opts_t * op, sgj_opaque_p jop)
             return SG_LIB_FILE_ERROR;
         }
     }
-    ptvp = construct_scsi_pt_obj_with_fd(pt_fd, vb);
     if (NULL == ptvp) {
         pr2serr("%s: memory problem\n", __func__);
         return sg_convert_errno(ENOMEM);
@@ -4217,7 +4291,6 @@ skip1:
 fini:
     ret = 0;
 err_out:
-    destruct_scsi_pt_obj(ptvp);
     free(free_id_dinp);
     return ret;
 }
@@ -4665,7 +4738,6 @@ main(int argc, char * argv[])
                 ret = SG_LIB_FILE_ERROR;
             goto err_out;
         }
-
     } else {
         if ((sg_fd = sg_cmds_open_device(op->device_name, true /* ro */,
                                          vb)) < 0) {
@@ -4706,7 +4778,7 @@ main(int argc, char * argv[])
     if (pt_device_is_nvme(ptvp)) {   /* NVMe char or NVMe block */
         op->possible_nvme = true;
         if (! op->page_given) {
-            ret = do_nvme_identify_ctrl(sg_fd, op, jop);
+            ret = do_nvme_identify_ctrl(ptvp, op, jop);
             goto fini2;
         }
     }

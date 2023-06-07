@@ -1,4 +1,4 @@
-.TH SG_Z_ACT_QUERY "8" "December 2021" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_Z_ACT_QUERY "8" "June 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_z_act_query \- send a SCSI ZONE ACTIVATE or ZONE QUERY command
 .SH SYNOPSIS
@@ -51,7 +51,7 @@ invocation with the \fI\-\-inhex=FN\fR option.
 where \fIFN\fR is a file name whose contents are assumed to be ASCII
 hexadecimal. If \fIDEVICE\fR is also given then \fIDEVICE\fR is ignored,
 a warning is issued and the utility continues, decoding the file named
-\fIFN\fR. See the "FORMAT OF FILES CONTAINING ASCII HEX" section in the
+\fIFN\fR. See the "HEX, BINARY AND JSON FORMATS" section in the
 sg3_utils manpage for more information. If the \fI\-\-raw\fR option is
 also given then the contents of \fIFN\fR are treated as binary.
 .br
@@ -106,7 +106,7 @@ Written by Douglas Gilbert.
 .SH "REPORTING BUGS"
 Report bugs to <dgilbert at interlog dot com>.
 .SH COPYRIGHT
-Copyright \(co 2021 Douglas Gilbert
+Copyright \(co 2021\-2023 Douglas Gilbert
 .br
 This software is distributed under a BSD\-2\-Clause license. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

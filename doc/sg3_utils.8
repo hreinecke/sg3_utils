@@ -1,4 +1,4 @@
-.TH SG3_UTILS "8" "February 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG3_UTILS "8" "June 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg3_utils \- a package of utilities for sending SCSI commands
 .SH SYNOPSIS
@@ -486,6 +486,9 @@ the command sent to \fIDEVICE\fR has received an "aborted command" sense
 key with an additional sense code of 0x10 (as with error code) plus a flag
 indicating the Info field is valid.
 .TP
+.B 47
+flock (Unix system call) error.
+.TP
 .B 48
 this is an internal message indicating a NVMe status field (SF) is other
 than zero after a command has been executed (i.e. something went wrong).
@@ -644,8 +647,8 @@ multiple times (and is more conveniently given as '\-HH' or '\-HHH).
 This option has the same or similar functionality as \fI\-\-in=FN\fR. And
 perhaps 'inhex' is more descriptive since by default, ASCII hexadecimal is
 expected in the contents of file: \fIFN\fR. Alternatively the short form
-option may be \fI\-I\fR or \fI\-X\fR. See the "FORMAT OF FILES CONTAINING
-ASCII HEX" section below for more information.
+option may be \fI\-I\fR or \fI\-X\fR. See the "HEX, BINARY AND JSON FORMATS"
+section below for more information.
 .TP
 \fB\-\-json\fR[=\fIJO\fR]
 The default output of most utilities that decode information returned from
@@ -742,19 +745,19 @@ representation. So various other representations are permitted.
 Multiplicative suffixes are accepted. They are one, two or three letter
 strings appended directly after the number to which they apply:
 .PP
-   c C         *1
-   w W         *2
-   b B         *512
-   k K KiB     *1024
-   KB kB       *1000
-   m M MiB     *1048576
-   MB mB       *1000000
-   g G GiB     *(2^30)
-   GB gB       *(10^9)
-   t T TiB     *(2^40)
-   TB          *(10^12)
-   p P PiB     *(2^50)
-   PB          *(10^15)
+    c C         *1
+    w W         *2
+    b B         *512
+    k K KiB     *1024
+    KB kB       *1000
+    m M MiB     *1048576
+    MB mB       *1000000
+    g G GiB     *(2^30)
+    GB gB       *(10^9)
+    t T TiB     *(2^40)
+    TB          *(10^12)
+    p P PiB     *(2^50)
+    PB          *(10^15)
 .PP
 An example is "2k" for 2048. The large tera and peta suffixes are only
 available for numeric arguments that might require 64 bits to represent
@@ -781,26 +784,57 @@ in the C programming language. The second hexadecimal representation is a
 trailing "h" or "H" as found in (storage) standards. When hex numbers are
 given, multipliers cannot be used. For example the decimal value "256" can
 be given as "0x100" or "100h".
-.SH FORMAT OF FILES CONTAINING ASCII HEX
-Such a file is assumed to contain a sequence of one or two digit ASCII
-hexadecimal values separated by whitespace. "Whitespace consists of either
-spaces, tabs, blank lines, or any combination thereof". Hyphens (e.g. '\-')
-are also allowed as separators. Each one or two digit ASCII hex pair is
-decoded into a byte (i.e. 8 bits). The following will be decoded to
-valid (ascending valued) bytes: '0', '01', '3', 'c', 'F', '4a', 'cC'
-and 'ff'. Lines containing only whitespace are ignored. The contents of any
-line containing a hash mark ('#') are ignored from that point until the end
-of that line. Users are encouraged to use hash marks to introduce comments
-in hex files. The author uses the extension '.hex' on such files. Examples
-can be found in the 'inhex' directory. Note that this format does _not_
-have an index (counter) value at the beginning of each line (like, for
-example, the hexdump utility outputs).
+.SH HEX, BINARY AND JSON FORMATS
+Both hexadecimal (ASCII) and binary can be used as low level output of SCSI
+responses that can be redirected to a file and decoded with a later
+invocation. JSON output is typically generated after decoding and considered
+a high level output that may be parsed by some other tool. No utilities
+in sg3_utils can parse JSON as input.
 .PP
-The hexadecimal format described in the previous paragraph can be converted
-to binary using the sg_decode_sense utility with these
-options: "\fI\-\-inhex=HFN \-\-nodecode \-\-write=WFN\fR". The input (in
-hex) is in the \fIHFN\fR file while the output is placed in the \fIWFN\fR
-file.
+JSON output is outlined in its own manpage, see: sg3_utils_json(8).
+.PP
+Binary and especially hexadecimal output can have two roles: for viewing
+immediately (e.g. when debugging) or as a parsable output that can be decoded
+later. The latter action uses the \fI\-\-inhex=FN\fR option. For viewing
+hexadecimal output (e.g. from a SCSI command response) the \fI\-\-hex\fR
+option can be used once or twice. Both have output similar to:
+    $ hexdump \-\-no\-squeezing \-C
+.PP
+When there is a single \fI\-\-hex\fR option, the ASCII rendering to the right
+of each line is not shown; when used twice the ASCII rendering is shown.
+.br
+When the \fI\-\-hex\fR option is used three or more times then the assumption
+is that it will be parsed later. Only hex data bytes are output, up to
+16 per line. This is close to this hexdump invocation:
+    $ hexdump \-\-no\-squeezing \-C | cut \-s \-d ' ' \-f 2\-19
+.PP
+This should remove the first column (i.e. the count) and remove the ASCII
+rendering to the right. This makes parsing the hexadecimal a lot easier.
+When used 4 or more times the \fI\-\-hex\fR options adds comments (i.e.
+lines starting with the hash symbol):
+    $ sg_logs \-HHHH \-A /dev/sdc
+
+    # Supported log pages log page  [0x0]:
+    00 00 00 03 00 0d 2f
+
+    # Supported log pages and subpages log page  [0x0, 0xff]:
+    40 ff 00 0e 00 00 00 ff  0d 00 0d 01 0d ff 2f 00
+    2f ff
+    ...
+.PP
+Comments can also be placed after hex in a line, everything from the '#'
+to the end of a line is ignored.
+.PP
+There are many examples of hex files suitable for the \fI\-\-inhex=FN\fR
+option in the 'inhex' directory. The naming of files in that directory is
+the name of the utility that will decode it with the "sg_" prefix removed
+and a ".hex" suffix added. Those hex files can be viewed with a text editor
+and most contain an example of invoking it in the leading comments.
+.PP
+The hexadecimal format can be converted into binary using the sg_decode_sense
+utility with these options: "\fI\-\-inhex=HFN \-\-nodecode \-\-write=WFN\fR".
+The input (in hex) is in the \fIHFN\fR file while the output is placed in the
+\fIWFN\fR file.
 .PP
 To convert a binary file into a hexadecimal form that can be given as input
 to various sg3_utils utilities, the sg_decode_sense utility can also be
@@ -853,16 +887,16 @@ The Linux SCSI generic (sg) driver is often used under the utilities in
 this package. It uses a seldom (otherwise) used logging type of
 SCSI_LOG_TIMEOUT. An example of its use to turn on full debugging is:
 .PP
-  scsi_logging_level \-s \-T 7
+    scsi_logging_level \-s \-T 7
 .PP
 To reduce the amount of output to only error paths, the following is
 suggested:
 .PP
-  scsi_logging_level \-s \-T 3
+    scsi_logging_level \-s \-T 3
 .PP
 And to turn off logging in the sg driver:
 .PP
-  scsi_logging_level \-s \-T 0
+    scsi_logging_level \-s \-T 0
 .PP
 For analyzing machine crashes associated with a SCSI command, nothing beats
 a real serial port. By "real" means that it is _not_ a USB serial port.
@@ -901,7 +935,7 @@ under a BSD\-2\-Clause license. There is NO warranty; not even for
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 .SH "SEE ALSO"
 .B sg3_utils_json,sg_decode_sense(sg3_utils), sdparm(sdparm), ddpt(ddpt),
-.B lsscsi(lsscsi), dmesg(1), mt(1), hdparm(hdparm)
+.B lsscsi(lsscsi), dmesg(1), mt(1), hdparm(hdparm), hexdump(util\-linux)
 .br
 The format of this section is: <utility_name>(<package_containing_utility>)
 or <utility_name>(<manpage_section_number_containing_utility>) .

@@ -1,4 +1,4 @@
-.TH SG_MODES "8" "March 2023" "sg3_utils\-1.48" SG3_UTILS
+.TH SG_MODES "8" "May 2023" "sg3_utils\-1.48" SG3_UTILS
 .SH NAME
 sg_modes \- reads mode pages with SCSI MODE SENSE command
 .SH SYNOPSIS
@@ -58,10 +58,10 @@ pages but not mode subpages.
 \fB\-c\fR, \fB\-\-control\fR=\fIPC\fR
 \fIPC\fR is the page control value. Up to four different versions of each
 page are held by the device:
-  \fB0\fR : current values (i.e. those active at present)
-  \fB1\fR : changeable values
-  \fB2\fR : default values (i.e. the manufacturer's settings)
-  \fB3\fR : saved values
+    \fB0\fR : current values (i.e. those active at present)
+    \fB1\fR : changeable values
+    \fB2\fR : default values (i.e. the manufacturer's settings)
+    \fB3\fR : saved values
 .br
 The changeable values are bit masks showing which fields could be changed
 with a MODE SELECT. The saved values will be re\-instated the next time

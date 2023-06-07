@@ -949,7 +949,8 @@ decode_ata_info_vpd(const uint8_t * buff, int len, struct opts_t * op,
     ata_transp = (0x34 == buff[36]) ? "SATA" : "PATA";
     if (do_long_nq) {
         sgj_pr_hr(jsp, "  Device signature [%s] (in hex):\n", ata_transp);
-        hex2stdout(buff + 36, 20, 0);
+        if (! jsp->pr_as_json)
+            hex2stdout(buff + 36, 20, 0);
     } else
         sgj_pr_hr(jsp, "  Device signature indicates %s transport\n",
                   ata_transp);
