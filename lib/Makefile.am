@@ -100,7 +100,7 @@ AM_CFLAGS = -Wall -W $(DBG_CFLAGS)
 # AM_CFLAGS = -Wall -W -pedantic -std=c++11
 # AM_CFLAGS = -Wall -W -pedantic -std=c++14
 # AM_CFLAGS = -Wall -W -pedantic -std=c++17 $(DBG_CXXFLAGS)
-# AM_CFLAGS = -Wall -W -pedantic -std=c++20 --analyze
+# AM_CFLAGS = -Wall -W -pedantic -std=c++20 --analyze $(DBG_CXXFLAGS)
 # AM_CFLAGS = -Wall -W -pedantic -std=c++20 $(DBG_CXXFLAGS)
 # AM_CFLAGS = -Wall -W -pedantic -std=c++23 $(DBG_CXXFLAGS)
 

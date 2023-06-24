@@ -19,12 +19,12 @@
 #include "sg_lib_data.h"
 
 
-const char * sg_lib_version_str = "3.07 20230329";
+const char * const sg_lib_version_str = "3.08 20230623";
 /* spc6r08, sbc5r04, zbc2r13 */
 
 
 /* indexed by pdt; those that map to own index do not decay */
-int sg_lib_pdt_decay_arr[32] = {
+const int sg_lib_pdt_decay_arr[32] = {
     PDT_DISK, PDT_TAPE, PDT_TAPE /* printer */, PDT_PROCESSOR,
     PDT_DISK /* WO */, PDT_MMC, PDT_SCANNER, PDT_DISK /* optical */,
     PDT_MCHANGER, PDT_COMMS, 0xa, 0xb,
@@ -35,7 +35,7 @@ int sg_lib_pdt_decay_arr[32] = {
 };
 
 /* SCSI Status values */
-struct sg_lib_simple_value_name_t sg_lib_sstatus_str_arr[] = {
+const struct sg_lib_simple_value_name_t sg_lib_sstatus_str_arr[] = {
     {0x0,  "Good"},
     {0x2,  "Check Condition"},
     {0x4,  "Condition Met"},
@@ -51,7 +51,7 @@ struct sg_lib_simple_value_name_t sg_lib_sstatus_str_arr[] = {
 };
 
 #ifdef SG_SCSI_STRINGS
-struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
+const struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0, PDT_ALL, "Test Unit Ready"},
     {0x1, PDT_ALL, "Rezero Unit"},
     {0x1, PDT_TAPE, "Rewind"},
@@ -251,7 +251,7 @@ struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
 
 /* Read buffer(10) [0x3c] and Read buffer(16) [0x9b] service actions (sa),
  * need prefix */
-struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
+const struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
     {0x0, PDT_ALL, "combined header and data [or multiple modes]"},
     {0x2, PDT_ALL, "data"},
     {0x3, PDT_ALL, "descriptor"},
@@ -264,7 +264,7 @@ struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {
 };
 
 /* Write buffer [0x3b] service actions, need prefix */
-struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {
+const struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {
     {0x0, PDT_ALL, "combined header and data [or multiple modes]"},
     {0x2, PDT_ALL, "data"},
     {0x4, PDT_ALL, "download microcode and activate"},
@@ -283,7 +283,7 @@ struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {
 };
 
 /* Read position (SSC) [0x34] service actions, need prefix */
-struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {
+const struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {
     {0x0, PDT_TAPE, "short form - block id"},
     {0x1, PDT_TAPE, "short form - vendor specific"},
     {0x6, PDT_TAPE, "long form"},
@@ -292,7 +292,7 @@ struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {
 };
 
 /* Maintenance in [0xa3] service actions */
-struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
+const struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
     {0x0, PDT_SAC, "Report assigned/unassigned p_extent"},
     {0x0, PDT_ADC, "Report automation device attributes"},
     {0x1, PDT_SAC, "Report component device"},
@@ -322,7 +322,7 @@ struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {
 };
 
 /* Maintenance out [0xa4] service actions */
-struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
+const struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
     {0x0, PDT_SAC, "Add peripheral device / component device"},
     {0x0, PDT_ADC, "Set automation device attribute"},
     {0x1, PDT_SAC, "Attach to component device"},
@@ -347,7 +347,7 @@ struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {
 };
 
 /* Sanitize [0x48] service actions, need prefix */
-struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {
+const struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {
     {0x1, PDT_ALL, "overwrite"},
     {0x2, PDT_ALL, "block erase"},
     {0x3, PDT_ALL, "cryptographic erase"},
@@ -356,20 +356,20 @@ struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {
 };
 
 /* Service action in(12) [0xab] service actions */
-struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = {
+const struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = {
     {0x1, PDT_ALL, "Read media serial number"},
     {0xffff, 0, NULL},
 };
 
 /* Service action out(12) [0xa9] service actions */
-struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
+const struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = {
     {0x1f, PDT_ADC, "Set medium attribute"},
     {0xff, PDT_ALL, "Impossible command name"},
     {0xffff, 0, NULL},
 };
 
 /* Service action in(16) [0x9e] service actions */
-struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
+const struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
     {0xf, PDT_ALL, "Receive binding report"}, /* added spc5r11 */
     {0x10, PDT_ALL, "Read capacity(16)"},
     {0x11, PDT_ALL, "Read long(16)"},         /* obsolete in SBC-4 r7 */
@@ -386,7 +386,7 @@ struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = {
 };
 
 /* Service action out(16) [0x9f] service actions */
-struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
+const struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
     {0x0b, PDT_ALL, "Test bind"},             /* added spc5r13 */
     {0x0c, PDT_ALL, "Prepare bind report"},   /* added spc5r11 */
     {0x0d, PDT_ALL, "Set affiliation"},
@@ -400,12 +400,12 @@ struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = {
 };
 
 /* Service action bidirectional [0x9d] service actions */
-struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = {
+const struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = {
     {0xffff, 0, NULL},
 };
 
 /* Persistent reserve in [0x5e] service actions, need prefix */
-struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
+const struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
     {0x0, PDT_ALL, "read keys"},
     {0x1, PDT_ALL, "read reservation"},
     {0x2, PDT_ALL, "report capabilities"},
@@ -414,7 +414,7 @@ struct sg_lib_value_name_t sg_lib_pr_in_arr[] = {
 };
 
 /* Persistent reserve out [0x5f] service actions, need prefix */
-struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
+const struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
     {0x0, PDT_ALL, "register"},
     {0x1, PDT_ALL, "reserve"},
     {0x2, PDT_ALL, "release"},
@@ -432,7 +432,7 @@ struct sg_lib_value_name_t sg_lib_pr_out_arr[] = {
  * LID1 is an abbreviation of List Identifier length of 1 byte. In SPC-5
  * LID1 discontinued (references back to SPC-4) and "(LID4)" suffix removed
  * as there is no need to differentiate. */
-struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {    /* originating */
+const struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {  /* originating */
     {0x0, PDT_ALL, "Extended copy(LID1)"},
     {0x1, PDT_ALL, "Extended copy"}, /* 'Extended copy(LID4)' until spc5r01 */
     {0x10, PDT_ALL, "Populate token"},
@@ -445,7 +445,7 @@ struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = {    /* originating */
 /* Third party copy out [0x84] service actions
  * Opcode 'Extended copy' was renamed 'Third party copy out' in spc4r34
  * LID4 is an abbreviation of List Identifier length of 4 bytes */
-struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* retrieve */
+const struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* retrieve */
     {0x0, PDT_ALL, "Receive copy status(LID1)"},
     {0x1, PDT_ALL, "Receive copy data(LID1)"},
     {0x3, PDT_ALL, "Receive copy operating parameters"},
@@ -459,7 +459,7 @@ struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* retrieve */
 };
 
 /* Variable length cdb [0x7f] service actions (more than 16 bytes long) */
-struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
+const struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0x1, PDT_ALL, "Rebuild(32)"},
     {0x2, PDT_ALL, "Regenerate(32)"},
     {0x3, PDT_ALL, "Xdread(32)"},             /* obsolete in SBC-3 r31 */
@@ -538,7 +538,7 @@ struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
 };
 
 /* Zoning out [0x94] service actions */
-struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
+const struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
     {0x1, PDT_DISK_ZBC, "Close zone"},
     {0x2, PDT_DISK_ZBC, "Finish zone"},
     {0x3, PDT_DISK_ZBC, "Open zone"},
@@ -548,7 +548,7 @@ struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
 };
 
 /* Zoning in [0x95] service actions */
-struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
+const struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
     {0x0, PDT_DISK_ZBC, "Report zones"},
     {0x6, PDT_DISK_ZBC, "Report realms"},            /* zbc2r04 */
     {0x7, PDT_DISK_ZBC, "Report zone domains"},      /* zbc2r04 */
@@ -557,7 +557,7 @@ struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
     {0xffff, 0, NULL},
 };
 
-const char * sg_lib_tapealert_strs[] = {
+const char * const sg_lib_tapealert_strs[] = {
     "<parameter code 0, unknown>",              /* 0x0 */
     "Read warning",
     "Write warning",
@@ -627,7 +627,7 @@ const char * sg_lib_tapealert_strs[] = {
 };
 
 /* Read attribute [0x8c] service actions */
-struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
+const struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
     {0x0, PDT_ALL, "attribute values"},
     {0x1, PDT_ALL, "attribute list"},
     {0x2, PDT_ALL, "logical volume list"},
@@ -638,87 +638,89 @@ struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
 
 #else   /* SG_SCSI_STRINGS */
 
-struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
+const struct sg_lib_value_name_t sg_lib_normal_opcodes[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
+const struct sg_lib_value_name_t sg_lib_read_buff_arr[] = {  /* opcode 0x3c */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
+const struct sg_lib_value_name_t sg_lib_write_buff_arr[] = {  /* opcode 0x3b */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {  /* opcode 0x34 (SSC) */
+/* opcode 0x34 (SSC) */
+const struct sg_lib_value_name_t sg_lib_read_pos_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
+const struct sg_lib_value_name_t sg_lib_maint_in_arr[] = {  /* opcode 0xa3 */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
+const struct sg_lib_value_name_t sg_lib_maint_out_arr[] = {  /* opcode 0xa4 */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {  /* opcode 0x94 */
+/* opcode 0x94 */
+const struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = { /* opcode 0xab */
+const struct sg_lib_value_name_t sg_lib_serv_in12_arr[] = { /* opcode 0xab */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = { /* opcode 0xa9 */
+const struct sg_lib_value_name_t sg_lib_serv_out12_arr[] = { /* opcode 0xa9 */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
+const struct sg_lib_value_name_t sg_lib_serv_in16_arr[] = { /* opcode 0x9e */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
+const struct sg_lib_value_name_t sg_lib_serv_out16_arr[] = { /* opcode 0x9f */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = { /* opcode 0x9d */
+const struct sg_lib_value_name_t sg_lib_serv_bidi_arr[] = { /* opcode 0x9d */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_pr_in_arr[] = { /* opcode 0x5e */
+const struct sg_lib_value_name_t sg_lib_pr_in_arr[] = { /* opcode 0x5e */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_pr_out_arr[] = { /* opcode 0x5f */
+const struct sg_lib_value_name_t sg_lib_pr_out_arr[] = { /* opcode 0x5f */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = { /* opcode 0x83 */
+const struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[] = { /* opcode 0x83 */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
+const struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[] = { /* opcode 0x84 */
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
+const struct sg_lib_value_name_t sg_lib_variable_length_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
+const struct sg_lib_value_name_t sg_lib_zoning_out_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
+const struct sg_lib_value_name_t sg_lib_zoning_in_arr[] = {
     {0xffff, 0, NULL},
 };
 
-struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
+const struct sg_lib_value_name_t sg_lib_read_attr_arr[] = {
     {0xffff, 0, NULL},
 };
 
-const char * sg_lib_tapealert_strs[] = {
+const char * const sg_lib_tapealert_strs[] = {
     NULL,
 };
 
@@ -729,7 +731,7 @@ const char * sg_lib_tapealert_strs[] = {
  * The following should match asc-num.txt dated 20200817 */
 
 #ifdef SG_SCSI_STRINGS
-struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
+const struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
 {
     {0x40,0x01,0x7f,"Ram failure [0x%x]"},
     {0x40,0x80,0xff,"Diagnostic failure on component [0x%x]"},
@@ -740,7 +742,7 @@ struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
     {0, 0, 0, NULL}
 };
 
-struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
+const struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
 {
     {0x00,0x00,"No additional sense information"},
     {0x00,0x01,"Filemark detected"},
@@ -1538,18 +1540,18 @@ struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
 
 #else   /* SG_SCSI_STRINGS */
 
-struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
+const struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
 {
     {0, 0, 0, NULL}
 };
 
-struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
+const struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
 {
     {0, 0, NULL}
 };
 #endif /* SG_SCSI_STRINGS */
 
-const char * sg_lib_sense_key_desc[] = {
+const char * const sg_lib_sense_key_desc[] = {
     "No Sense",                 /* Filemark, ILI and/or EOM; progress
                                    indication (during FORMAT); power
                                    condition sensing (REQUEST SENSE) */
@@ -1574,7 +1576,7 @@ const char * sg_lib_sense_key_desc[] = {
     "Completed"                 /* may occur for successful cmd (spc4r23) */
 };
 
-const char * sg_lib_pdt_strs[32] = {    /* should have 2**5 elements */
+const char * const sg_lib_pdt_strs[32] = {    /* should have 2**5 elements */
     /* 0 */ "disk",
     "tape",
     "printer",                  /* obsolete, spc5r01 */
@@ -1605,7 +1607,7 @@ const char * sg_lib_pdt_strs[32] = {    /* should have 2**5 elements */
 
 /* name or abbreviation of standard associated with this PDT if other than
  * SPC. If multiple entries per pdt then semi-colon is used as separator. */
-struct sg_aux_info_t sg_lib_pdt_aux_a[32] = {
+const struct sg_aux_info_t sg_lib_pdt_aux_a[32] = {
     {"disk;sbc", 3, 0, 0, 0},
     {"tape;ssc", 3, 0, 0, 0},
     {"printer", 5, 0, 0, 0},
@@ -1640,7 +1642,7 @@ struct sg_aux_info_t sg_lib_pdt_aux_a[32] = {
     {"unknown", 3, 0, 0, 0},
 };
 
-const char * sg_lib_transport_proto_strs[] =
+const char * const sg_lib_transport_proto_strs[] =
 {
     "Fibre Channel Protocol for SCSI (FCP-5)",  /* now at fcp5r01 */
     "SCSI Parallel Interface (SPI-5)",  /* obsolete in spc5r01 */
@@ -1659,7 +1661,7 @@ const char * sg_lib_transport_proto_strs[] =
 };
 
 /* SCSI Feature Sets array. code->value, pdt->peri_dev_type (-1 for SPC) */
-struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
+const struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
 {
     {SCSI_FS_SPC_DISCOVERY_2016, -1, "Discovery 2016"},
     {SCSI_FS_SBC_BASE_2010, PDT_DISK, "SBC Base 2010"},
@@ -1676,7 +1678,7 @@ struct sg_lib_value_name_t sg_lib_scsi_feature_sets[] =
 
 /* Commands sent to the NVMe Admin Queue (queue id 0) have the following
  * names in the NVM Express 1.3a document dated 20171024 */
-struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[] =
+const struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[] =
 {
     {0x0,  "Delete I/O Submission Queue"},      /* first mandatory command */
     {0x1,  "Create I/O Submission Queue"},
@@ -1715,7 +1717,7 @@ struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[] =
 /* Commands sent any NVMe non-Admin Queue (queue id >0) for the NVM command
  * set have the following names in the NVM Express 1.3a document dated
  * 20171024 */
-struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[] =
+const struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[] =
 {
     {0x0,  "Flush"},                    /* first mandatory command */
     {0x1,  "Write"},
@@ -1743,7 +1745,7 @@ struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[] =
  * Bits 29:28 are reserved, bit 27:25 are the "Status Code Type" (SCT)
  * and bits 24:17 are the Status Code (SC). This table is in ascending
  * order of its .value field so a binary search could be done on it.  */
-struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
+const struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
 {
     /* Generic command status values, Status Code Type (SCT): 0h
      * Lowest 8 bits are the Status Code (SC), in this case:
@@ -1880,7 +1882,7 @@ struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
  * to this SCSI tuple: status, sense_key, additional sense code (asc) and
  * asc qualifier (ascq). For brevity SAM_STAT_CHECK_CONDITION is written
  * as 0x2. */
-struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
+const struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
 {
     /* SCSI Status, SCSI sense key, ASC, ASCQ */
 /* index: 0 */
@@ -1936,7 +1938,7 @@ struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
  * indicates NVMe non-zero status plus listing those that a Unix OS generates
  * for any executable (that fails). The convention is 0 means no error and
  * that in Unix the exit status is an (unsigned) 8 bit value. */
-struct sg_value_2names_t sg_exit_str_arr[] = {
+const struct sg_value_2names_t sg_exit_str_arr[] = {
     {0,  "No errors", "may also convey true"},
     {1,  "Syntax error", "command line options (usually)"},
     {2,  "Device not ready", "type: sense key"},
@@ -2021,35 +2023,35 @@ struct sg_value_2names_t sg_exit_str_arr[] = {
 
 #else           /* (SG_SCSI_STRINGS && HAVE_NVME && (! IGNORE_NVME)) */
 
-struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[] =
+const struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[] =
 {
 
     /* Vendor specific 0x80 to 0xff */
     {0xffff, NULL},                     /* Sentinel */
 };
 
-struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[] =
+const struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[] =
 {
 
     /* Vendor specific 0x80 to 0xff */
     {0xffff, NULL},                     /* Sentinel */
 };
 
-struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
+const struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[] =
 {
 
     /* Leave this Sentinel value at end of this array */
     {0x3ff, 0, NULL},
 };
 
-struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
+const struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[] =
 {
 
     /* Leave this Sentinel value at end of this array */
     {0xff, 0xff, 0xff, 0xff},
 };
 
-struct sg_value_2names_t sg_exit_str_arr[] = {
+const struct sg_value_2names_t sg_exit_str_arr[] = {
     {0xffff, NULL, NULL},       /* end marking sentinel */
 };
 

@@ -47,7 +47,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.22 20230519";
+static const char * version_str = "1.23 20230623";
 
 #define BPI (signed)(sizeof(int))
 
@@ -77,7 +77,7 @@ static int addwrite  = 0;
 static int addread   = 0;
 static int verbose   = 0;
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
         {"quick", no_argument, 0, 'q'},
         {"addrd", required_argument, 0, 'r'},

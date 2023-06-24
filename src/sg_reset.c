@@ -1,5 +1,5 @@
 /* A utility program originally written for the Linux OS SCSI subsystem.
- *  Copyright (C) 1999-2022 D. Gilbert
+ *  Copyright (C) 1999-2023 D. Gilbert
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2, or (at your option)
@@ -33,7 +33,7 @@
 
 #define ME "sg_reset: "
 
-static const char * version_str = "0.68 20220308";
+static const char * version_str = "0.69 20230622";
 
 #ifndef SG_SCSI_RESET
 #define SG_SCSI_RESET 0x2284
@@ -54,18 +54,18 @@ static const char * version_str = "0.68 20220308";
 #define SG_SCSI_RESET_NO_ESCALATE 0x100
 #endif
 
-static struct option long_options[] = {
-        {"bus", no_argument, 0, 'b'},
-        {"device", no_argument, 0, 'd'},
-        {"help", no_argument, 0, 'z'},
-        {"host", no_argument, 0, 'H'},
-        {"no-esc", no_argument, 0, 'N'},
-        {"no_esc", no_argument, 0, 'N'},
-        {"no-escalate", no_argument, 0, 'N'},
-        {"target", no_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"bus", no_argument, 0, 'b'},
+    {"device", no_argument, 0, 'd'},
+    {"help", no_argument, 0, 'z'},
+    {"host", no_argument, 0, 'H'},
+    {"no-esc", no_argument, 0, 'N'},
+    {"no_esc", no_argument, 0, 'N'},
+    {"no-escalate", no_argument, 0, 'N'},
+    {"target", no_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 #if defined(__GNUC__) || defined(__clang__)

@@ -37,7 +37,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.21 20180723";
+static const char * version_str = "1.22 20230623";
 
 
 #define MAX_XFER_LEN (15 * 1024)
@@ -46,21 +46,21 @@ static const char * version_str = "1.21 20180723";
 
 #define EBUFF_SZ 512
 
-static struct option long_options[] = {
-        {"16", no_argument, 0, 'S'},
-        {"cor_dis", no_argument, 0, 'c'},
-        {"cor-dis", no_argument, 0, 'c'},
-        {"help", no_argument, 0, 'h'},
-        {"in", required_argument, 0, 'i'},
-        {"lba", required_argument, 0, 'l'},
-        {"pblock", no_argument, 0, 'p'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"wr_uncor", no_argument, 0, 'w'},
-        {"wr-uncor", no_argument, 0, 'w'},
-        {"xfer_len", required_argument, 0, 'x'},
-        {"xfer-len", required_argument, 0, 'x'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"16", no_argument, 0, 'S'},
+    {"cor_dis", no_argument, 0, 'c'},
+    {"cor-dis", no_argument, 0, 'c'},
+    {"help", no_argument, 0, 'h'},
+    {"in", required_argument, 0, 'i'},
+    {"lba", required_argument, 0, 'l'},
+    {"pblock", no_argument, 0, 'p'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"wr_uncor", no_argument, 0, 'w'},
+    {"wr-uncor", no_argument, 0, 'w'},
+    {"xfer_len", required_argument, 0, 'x'},
+    {"xfer-len", required_argument, 0, 'x'},
+    {0, 0, 0, 0},
 };
 
 

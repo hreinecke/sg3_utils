@@ -71,7 +71,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"              /* used to get to SNTL for NVMe devices */
 
-static const char * version_str = "6.44 20230518";
+static const char * version_str = "6.45 20230618";
 
 static const char * my_name = "sg_dd: ";
 

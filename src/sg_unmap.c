@@ -36,7 +36,7 @@
  * logical blocks. Note that DATA MAY BE LOST.
  */
 
-static const char * version_str = "1.22 20230519";
+static const char * version_str = "1.23 20230623";
 static const char * my_name = "sg_unmap: ";
 
 
@@ -50,21 +50,21 @@ static const char * my_name = "sg_unmap: ";
 #endif
 
 
-static struct option long_options[] = {
-        {"all", required_argument, 0, 'A'},
-        {"anchor", no_argument, 0, 'a'},
-        {"dry-run", no_argument, 0, 'd'},
-        {"dry_run", no_argument, 0, 'd'},
-        {"force", no_argument, 0, 'f'},
-        {"grpnum", required_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"in", required_argument, 0, 'I'},
-        {"lba", required_argument, 0, 'l'},
-        {"num", required_argument, 0, 'n'},
-        {"timeout", required_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"all", required_argument, 0, 'A'},
+    {"anchor", no_argument, 0, 'a'},
+    {"dry-run", no_argument, 0, 'd'},
+    {"dry_run", no_argument, 0, 'd'},
+    {"force", no_argument, 0, 'f'},
+    {"grpnum", required_argument, 0, 'g'},
+    {"help", no_argument, 0, 'h'},
+    {"in", required_argument, 0, 'I'},
+    {"lba", required_argument, 0, 'l'},
+    {"num", required_argument, 0, 'n'},
+    {"timeout", required_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

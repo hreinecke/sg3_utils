@@ -39,33 +39,33 @@
  * the possibility of protection data (DIF).
  */
 
-static const char * version_str = "1.29 20230519";    /* sbc5r04 */
+static const char * version_str = "1.30 20230623";    /* sbc5r04 */
 
 #define ME "sg_verify: "
 
 #define EBUFF_SZ 256
 
 
-static struct option long_options[] = {
-        {"0", no_argument, 0, '0'},
-        {"16", no_argument, 0, 'S'},
-        {"bpc", required_argument, 0, 'b'},
-        {"bytchk", required_argument, 0, 'B'},  /* 4 backward compatibility */
-        {"count", required_argument, 0, 'c'},
-        {"dpo", no_argument, 0, 'd'},
-        {"ebytchk", required_argument, 0, 'E'}, /* extended bytchk (2 bits) */
-        {"group", required_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"in", required_argument, 0, 'i'},
-        {"lba", required_argument, 0, 'l'},
-        {"nbo", required_argument, 0, 'n'},     /* misspelling, legacy */
-        {"ndo", required_argument, 0, 'n'},
-        {"quiet", no_argument, 0, 'q'},
-        {"readonly", no_argument, 0, 'r'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"vrprotect", required_argument, 0, 'P'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"0", no_argument, 0, '0'},
+    {"16", no_argument, 0, 'S'},
+    {"bpc", required_argument, 0, 'b'},
+    {"bytchk", required_argument, 0, 'B'},  /* 4 backward compatibility */
+    {"count", required_argument, 0, 'c'},
+    {"dpo", no_argument, 0, 'd'},
+    {"ebytchk", required_argument, 0, 'E'}, /* extended bytchk (2 bits) */
+    {"group", required_argument, 0, 'g'},
+    {"help", no_argument, 0, 'h'},
+    {"in", required_argument, 0, 'i'},
+    {"lba", required_argument, 0, 'l'},
+    {"nbo", required_argument, 0, 'n'},     /* misspelling, legacy */
+    {"ndo", required_argument, 0, 'n'},
+    {"quiet", no_argument, 0, 'q'},
+    {"readonly", no_argument, 0, 'r'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"vrprotect", required_argument, 0, 'P'},
+    {0, 0, 0, 0},
 };
 
 static void

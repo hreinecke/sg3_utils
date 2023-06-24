@@ -74,7 +74,7 @@ struct opts_t {
 };
 
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"decode", no_argument, 0, 'd'},
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},
@@ -935,7 +935,7 @@ main(int argc, char * argv[])
         jap = sgj_named_subarray_r(jsp, jo2p, "lun_list");
         luns = (list_len / 8);
         if (! op->do_quiet)
-            sgj_pr_hr(jsp, "Lun list length = %d which imples %d lun "
+            sgj_pr_hr(jsp, "Lun list length = %d which implies %d lun "
                       "entr%s\n", list_len, luns,
                       ((1 == luns) ? "y" : "ies"));
         if ((list_len + 8) > op->maxlen) {

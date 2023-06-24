@@ -496,7 +496,7 @@ usage()
             "Queries a SAF-TE processor device\n");
 }
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"config", 0, 0, 'c'},
     {"devstatus", 0, 0, 'd'},
     {"encstatus", 0, 0, 's'},

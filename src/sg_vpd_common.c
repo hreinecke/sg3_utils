@@ -103,7 +103,7 @@ static const char * const mn_s = "meaning";
 
 /* Supported vendor specific VPD pages */
 /* Arrange in alphabetical order by acronym */
-struct svpd_vp_name_t vp_arr[] = {
+const struct svpd_vp_name_t vp_arr[] = {
     {VPD_VP_DDS, "dds", "DDS tape family from IBM"},
     {VPD_VP_EMC, "emc", "EMC (company)"},
     {VPD_VP_WDC_HITACHI, "hit", "WDC/Hitachi disk"},
@@ -121,7 +121,7 @@ struct svpd_vp_name_t vp_arr[] = {
 /* Supported vendor specific VPD pages */
 /* 'subvalue' holds vendor/product number to disambiguate */
 /* Arrange in alphabetical order by acronym */
-struct svpd_values_name_t vendor_vpd_pg[] = {
+const struct svpd_values_name_t vendor_vpd_pg[] = {
     {VPD_V_ACI_LTO, VPD_VP_HP_LTO, 1, "aci", "ACI revision level (HP LTO)"},
     {VPD_V_DATC_SEA, VPD_VP_SEAGATE, 0, "datc", "Date code (Seagate)"},
     {VPD_V_DCRL_LTO, VPD_VP_IBM_LTO, 1, "dcrl", "Drive component revision "

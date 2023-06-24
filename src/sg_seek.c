@@ -49,32 +49,32 @@
  * to that LBA ...
  */
 
-static const char * version_str = "1.09 20230220";
+static const char * version_str = "1.10 20230623";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
 #define CMD_ABORT_TIMEOUT  60      /* 60 seconds */
 
 
-static struct option long_options[] = {
-        {"10", no_argument, 0, 'T'},
-        {"count", required_argument, 0, 'c'},
-        {"grpnum", required_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"immed", no_argument, 0, 'i'},
-        {"lba", required_argument, 0, 'l'},
-        {"num-blocks", required_argument, 0, 'n'},
-        {"num_blocks", required_argument, 0, 'n'},
-        {"pre-fetch", no_argument, 0, 'p'},
-        {"pre_fetch", no_argument, 0, 'p'},
-        {"readonly", no_argument, 0, 'r'},
-        {"skip", required_argument, 0, 's'},
-        {"time", required_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"wrap-offset", required_argument, 0, 'w'},
-        {"wrap_offset", required_argument, 0, 'w'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"10", no_argument, 0, 'T'},
+    {"count", required_argument, 0, 'c'},
+    {"grpnum", required_argument, 0, 'g'},
+    {"help", no_argument, 0, 'h'},
+    {"immed", no_argument, 0, 'i'},
+    {"lba", required_argument, 0, 'l'},
+    {"num-blocks", required_argument, 0, 'n'},
+    {"num_blocks", required_argument, 0, 'n'},
+    {"pre-fetch", no_argument, 0, 'p'},
+    {"pre_fetch", no_argument, 0, 'p'},
+    {"readonly", no_argument, 0, 'r'},
+    {"skip", required_argument, 0, 's'},
+    {"time", required_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"wrap-offset", required_argument, 0, 'w'},
+    {"wrap_offset", required_argument, 0, 'w'},
+    {0, 0, 0, 0},
 };
 
 

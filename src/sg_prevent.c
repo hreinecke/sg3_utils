@@ -29,12 +29,12 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.15 20230519";
+static const char * version_str = "1.16 20230622";
 
 static const char * my_name = "sg_prevent: ";
 
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"allow", no_argument, 0, 'a'},
     {"help", no_argument, 0, 'h'},
     {"prevent", required_argument, 0, 'p'},

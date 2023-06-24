@@ -31,13 +31,13 @@
 #include "sg_unaligned.h"
 
 
-static const char * version_str = "1.43 20230517";
+static const char * version_str = "1.44 20230618";
 
 #define MY_NAME "sg_decode_sense"
 
 #define MAX_SENSE_LEN 8192 /* max descriptor format actually: 255+8 */
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"binary", required_argument, 0, 'b'},
     {"cdb", no_argument, 0, 'c'},
     {"err", required_argument, 0, 'e'},

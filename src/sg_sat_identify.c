@@ -54,22 +54,22 @@
 
 #define EBUFF_SZ 256
 
-static const char * version_str = "1.21 20230519";
+static const char * version_str = "1.22 20230622";
 
-static struct option long_options[] = {
-        {"ck-cond", no_argument, 0, 'c'},
-        {"ck_cond", no_argument, 0, 'c'},
-        {"extend", no_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"len", required_argument, 0, 'l'},
-        {"ident", no_argument, 0, 'i'},
-        {"packet", no_argument, 0, 'p'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"ck-cond", no_argument, 0, 'c'},
+    {"ck_cond", no_argument, 0, 'c'},
+    {"extend", no_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"len", required_argument, 0, 'l'},
+    {"ident", no_argument, 0, 'i'},
+    {"packet", no_argument, 0, 'p'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

@@ -44,7 +44,7 @@ static const char * my_name = "sg_readcap: ";
 #define RCAP_REPLY_LEN 8
 #define RCAP16_REPLY_LEN 32
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"brief", no_argument, 0, 'b'},
     {"help", no_argument, 0, 'h'},
     {"hex", no_argument, 0, 'H'},

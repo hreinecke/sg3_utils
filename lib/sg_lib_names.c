@@ -23,7 +23,7 @@
  * are squeezed into this list as long as they don't conflict.
  * The value is: (mode_page << 8) | mode_subpage
  * Maintain the list in numerical order to allow binary search. */
-struct sg_lib_simple_value_name_t sg_lib_names_mode_arr[] = {
+const struct sg_lib_simple_value_name_t sg_lib_names_mode_arr[] = {
     {0x0000, "Unit Attention condition"},  /* common vendor specific page */
     {0x0100, "Read-Write error recovery"},      /* SBC */
     {0x0200, "Disconnect-Reconnect"},           /* SPC */
@@ -85,7 +85,7 @@ const size_t sg_lib_names_mode_len =
  * are squeezed into this list as long as they don't conflict.
  * For VPDs > 0 the value is: (vpd << 8) | vpd_number
  * Maintain the list in numerical order to allow binary search. */
-struct sg_lib_simple_value_name_t sg_lib_names_vpd_arr[] = {
+const struct sg_lib_simple_value_name_t sg_lib_names_vpd_arr[] = {
     {0x00, "Supported VPD pages"},              /* SPC */
     {0x80, "Unit serial number"},               /* SPC */
     {0x81, "Implemented operating definition (obsolete)"}, /* SPC */

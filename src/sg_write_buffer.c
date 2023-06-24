@@ -40,7 +40,7 @@
  * This utility issues the SCSI WRITE BUFFER command to the given device.
  */
 
-static const char * version_str = "1.32 20230519";    /* spc6r07 */
+static const char * version_str = "1.33 20230623";    /* spc6r07 */
 
 static const char * my_name = "sg_write_buffer: ";    /* spc6r07 */
 
@@ -52,25 +52,25 @@ static const char * my_name = "sg_write_buffer: ";    /* spc6r07 */
 #define SENSE_BUFF_LEN 64       /* Arbitrary, could be larger */
 #define DEF_PT_TIMEOUT 300      /* 300 seconds, 5 minutes */
 
-static struct option long_options[] = {
-        {"bpw", required_argument, 0, 'b'},
-        {"dry-run", no_argument, 0, 'd'},
-        {"dry_run", no_argument, 0, 'd'},
-        {"help", no_argument, 0, 'h'},
-        {"id", required_argument, 0, 'i'},
-        {"in", required_argument, 0, 'I'},
-        {"length", required_argument, 0, 'l'},
-        {"mode", required_argument, 0, 'm'},
-        {"offset", required_argument, 0, 'o'},
-        {"read-stdin", no_argument, 0, 'r'},
-        {"read_stdin", no_argument, 0, 'r'},
-        {"raw", no_argument, 0, 'r'},
-        {"skip", required_argument, 0, 's'},
-        {"specific", required_argument, 0, 'S'},
-        {"timeout", required_argument, 0, 't' },
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"bpw", required_argument, 0, 'b'},
+    {"dry-run", no_argument, 0, 'd'},
+    {"dry_run", no_argument, 0, 'd'},
+    {"help", no_argument, 0, 'h'},
+    {"id", required_argument, 0, 'i'},
+    {"in", required_argument, 0, 'I'},
+    {"length", required_argument, 0, 'l'},
+    {"mode", required_argument, 0, 'm'},
+    {"offset", required_argument, 0, 'o'},
+    {"read-stdin", no_argument, 0, 'r'},
+    {"read_stdin", no_argument, 0, 'r'},
+    {"raw", no_argument, 0, 'r'},
+    {"skip", required_argument, 0, 's'},
+    {"specific", required_argument, 0, 'S'},
+    {"timeout", required_argument, 0, 't' },
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 
@@ -145,32 +145,32 @@ struct mode_s {
         const char *comment;
 };
 
-static struct mode_s mode_arr[] = {
-        {"hd",         MODE_HEADER_DATA, "combined header and data "
-                "(obsolete)"},
-        {"vendor",     MODE_VENDOR,    "vendor specific"},
-        {"data",       MODE_DATA,      "data"},
-        {"dmc",        MODE_DNLD_MC,   "download microcode and activate"},
-        {"dmc_save",   MODE_DNLD_MC_SAVE, "download microcode, save and "
-                "activate"},
-        {"dmc_offs",   MODE_DNLD_MC_OFFS, "download microcode with offsets "
-                "and activate"},
-        {"dmc_offs_save", MODE_DNLD_MC_OFFS_SAVE, "download microcode with "
-                "offsets, save and\n\t\t\t\tactivate"},
-        {"echo",       MODE_ECHO_BUFFER, "write data to echo buffer"},
-        {"dmc_offs_ev_defer", MODE_DNLD_MC_EV_OFFS_DEFER, "download "
-                "microcode with offsets, select\n\t\t\t\tactivation event, "
-                "save and defer activation"},
-        {"dmc_offs_defer", MODE_DNLD_MC_OFFS_DEFER, "download microcode "
-                "with offsets, save and\n\t\t\t\tdefer activation"},
-        {"activate_mc", MODE_ACTIVATE_MC, "activate deferred microcode"},
-        {"en_ex",      MODE_EN_EX_ECHO, "enable expander communications "
-                "protocol and\n\t\t\t\techo buffer (obsolete)"},
-        {"dis_ex",     MODE_DIS_EX, "disable expander communications "
-                "protocol\n\t\t\t\t(obsolete)"},
-        {"deh",        MODE_DNLD_ERR_HISTORY, "download application client "
-                "error history "},
-        {NULL, 0, NULL},
+static const struct mode_s mode_arr[] = {
+    {"hd",         MODE_HEADER_DATA, "combined header and data "
+            "(obsolete)"},
+    {"vendor",     MODE_VENDOR,    "vendor specific"},
+    {"data",       MODE_DATA,      "data"},
+    {"dmc",        MODE_DNLD_MC,   "download microcode and activate"},
+    {"dmc_save",   MODE_DNLD_MC_SAVE, "download microcode, save and "
+            "activate"},
+    {"dmc_offs",   MODE_DNLD_MC_OFFS, "download microcode with offsets "
+            "and activate"},
+    {"dmc_offs_save", MODE_DNLD_MC_OFFS_SAVE, "download microcode with "
+            "offsets, save and\n\t\t\t\tactivate"},
+    {"echo",       MODE_ECHO_BUFFER, "write data to echo buffer"},
+    {"dmc_offs_ev_defer", MODE_DNLD_MC_EV_OFFS_DEFER, "download "
+            "microcode with offsets, select\n\t\t\t\tactivation event, "
+            "save and defer activation"},
+    {"dmc_offs_defer", MODE_DNLD_MC_OFFS_DEFER, "download microcode "
+            "with offsets, save and\n\t\t\t\tdefer activation"},
+    {"activate_mc", MODE_ACTIVATE_MC, "activate deferred microcode"},
+    {"en_ex",      MODE_EN_EX_ECHO, "enable expander communications "
+            "protocol and\n\t\t\t\techo buffer (obsolete)"},
+    {"dis_ex",     MODE_DIS_EX, "disable expander communications "
+            "protocol\n\t\t\t\t(obsolete)"},
+    {"deh",        MODE_DNLD_ERR_HISTORY, "download application client "
+            "error history "},
+    {NULL, 0, NULL},
 };
 
 static void

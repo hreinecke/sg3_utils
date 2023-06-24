@@ -38,7 +38,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.33 20230502";
+static const char * version_str = "1.34 20230623";
 
 static const char * my_name = "sg_write_x: ";
 
@@ -88,7 +88,7 @@ static const char * my_name = "sg_write_x: ";
 #define UINT16_MAX ((uint16_t)-1)
 #endif
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"32", no_argument, 0, '3'},
     {"16", no_argument, 0, '6'},
     {"app-tag", required_argument, 0, 'a'},

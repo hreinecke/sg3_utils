@@ -38,7 +38,7 @@
  * given SCSI device.
  */
 
-static const char * version_str = "1.22 20230519";      /* sbc5r04 */
+static const char * version_str = "1.23 20230619";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_elem_status"
 
@@ -86,7 +86,7 @@ struct gpes_desc_t {    /* info in returned physical status descriptor */
 static uint8_t gpesBuff[DEF_GPES_BUFF_LEN];
 
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"brief", no_argument, 0, 'b'},
     {"filter", required_argument, 0, 'f'},
     {"help", no_argument, 0, 'h'},

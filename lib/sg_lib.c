@@ -359,7 +359,8 @@ sg_get_additional_sense_str(int asc, int ascq, bool add_sense_leadin,
         return buff;
     }
     for (k = 0; sg_lib_asc_ascq_range[k].text; ++k) {
-        struct sg_lib_asc_ascq_range_t * ei2p = &sg_lib_asc_ascq_range[k];
+        const struct sg_lib_asc_ascq_range_t * ei2p =
+					&sg_lib_asc_ascq_range[k];
 
         if ((ei2p->asc == asc) &&
             (ascq >= ei2p->ascq_min)  &&
@@ -377,7 +378,7 @@ sg_get_additional_sense_str(int asc, int ascq, bool add_sense_leadin,
         return buff;
 
     for (k = 0; sg_lib_asc_ascq[k].text; ++k) {
-        struct sg_lib_asc_ascq_t * eip = &sg_lib_asc_ascq[k];
+        const struct sg_lib_asc_ascq_t * eip = &sg_lib_asc_ascq[k];
 
         if (eip->asc == asc &&
             eip->ascq == ascq) {
@@ -621,7 +622,7 @@ sg_get_pdt_from_acronym(const char * acron)
 {
     int k;
     int len = strlen(acron);
-    struct sg_aux_info_t * aip;
+    const struct sg_aux_info_t * aip;
     const char * cc0p;
     const char * ccp;
     char b[32];
@@ -2380,11 +2381,11 @@ sg_get_command_name(const uint8_t * cdbp, int peri_type, int buff_len,
 struct op_code2sa_t {
     int op_code;
     int pdt_s;
-    struct sg_lib_value_name_t * arr;
+    const struct sg_lib_value_name_t * arr;
     const char * prefix;
 };
 
-static struct op_code2sa_t op_code2sa_arr[] = {
+static const struct op_code2sa_t op_code2sa_arr[] = {
     {SG_VARIABLE_LENGTH_CMD, PDT_ALL, sg_lib_variable_length_arr, NULL},
     {SG_MAINTENANCE_IN, PDT_ALL, sg_lib_maint_in_arr, NULL},
     {SG_MAINTENANCE_OUT, PDT_ALL, sg_lib_maint_out_arr, NULL},
@@ -2780,8 +2781,8 @@ sg_nvme_status2scsi(uint16_t sct_sc, uint8_t * status_p, uint8_t * sk_p,
 {
     int k, ind;
     uint16_t s = 0x3ff & sct_sc;
-    struct sg_lib_value_name_t * vp = sg_lib_nvme_cmd_status_arr;
-    struct sg_lib_4tuple_u8 * mp = sg_lib_scsi_status_sense_arr;
+    const struct sg_lib_value_name_t * vp = sg_lib_nvme_cmd_status_arr;
+    const struct sg_lib_4tuple_u8 * mp = sg_lib_scsi_status_sense_arr;
 
     for (k = 0; (vp->name && (k < 1000)); ++k, ++vp) {
         if (s == (uint16_t)vp->value)

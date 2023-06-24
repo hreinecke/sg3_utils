@@ -37,7 +37,7 @@
  * to the given SCSI device. Based on spc5r07.pdf .
  */
 
-static const char * version_str = "1.18 20230519";
+static const char * version_str = "1.19 20230623";
 
 static const char * my_name = "sg_timestamp: ";
 
@@ -56,21 +56,21 @@ uint8_t d_buff[256];
  *                     0, 0}; */
 
 
-static struct option long_options[] = {
-        {"elapsed", no_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"milliseconds", required_argument, 0, 'm'},
-        {"no_timestamp", no_argument, 0, 'N'},
-        {"no-timestamp", no_argument, 0, 'N'},
-        {"origin", no_argument, 0, 'o'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"seconds", required_argument, 0, 's'},
-        {"srep", no_argument, 0, 'S'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"elapsed", no_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"milliseconds", required_argument, 0, 'm'},
+    {"no_timestamp", no_argument, 0, 'N'},
+    {"no-timestamp", no_argument, 0, 'N'},
+    {"origin", no_argument, 0, 'o'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"seconds", required_argument, 0, 's'},
+    {"srep", no_argument, 0, 'S'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 /* Indexed by 'timestamp origin' field value */

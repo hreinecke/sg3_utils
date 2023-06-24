@@ -35,7 +35,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.72 20230407";
+static const char * version_str = "0.73 20230622";
 static const char * my_name = "sg_persist: ";
 
 
@@ -84,7 +84,7 @@ struct opts_t {
 };
 
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"alloc-length", required_argument, 0, 'l'},
     {"alloc_length", required_argument, 0, 'l'},
     {"clear", no_argument, 0, 'C'},
@@ -141,7 +141,7 @@ static struct option long_options[] = {
     {0, 0, 0, 0}
 };
 
-static const char * prin_sa_strs[] = {
+static const char * const prin_sa_strs[] = {
     "Read keys",
     "Read reservation",
     "Report capabilities",
@@ -153,7 +153,7 @@ static const char * prin_sa_strs[] = {
 };
 static const int num_prin_sa_strs = SG_ARRAY_SIZE(prin_sa_strs);
 
-static const char * prout_sa_strs[] = {
+static const char * const prout_sa_strs[] = {
     "Register",
     "Reserve",
     "Release",
@@ -167,7 +167,7 @@ static const char * prout_sa_strs[] = {
 };
 static const int num_prout_sa_strs = SG_ARRAY_SIZE(prout_sa_strs);
 
-static const char * pr_type_strs[] = {
+static const char * const pr_type_strs[] = {
     "obsolete [0]",
     "Write Exclusive",
     "obsolete [2]",

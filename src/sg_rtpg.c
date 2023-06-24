@@ -33,7 +33,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.28 20230519";
+static const char * version_str = "1.29 20230622";
 
 #define REPORT_TGT_GRP_BUFF_LEN 1024
 
@@ -49,16 +49,16 @@ static const char * version_str = "1.28 20230519";
 #define STATUS_CODE_CHANGED_BY_SET 0x1
 #define STATUS_CODE_CHANGED_BY_IMPLICIT 0x2
 
-static struct option long_options[] = {
-        {"decode", no_argument, 0, 'd'},
-        {"extended", no_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"decode", no_argument, 0, 'd'},
+    {"extended", no_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

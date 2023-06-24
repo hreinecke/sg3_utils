@@ -37,7 +37,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.14 20230519";    /* sbc4r10 */
+static const char * version_str = "1.15 20230622";    /* sbc4r10 */
 
 #define MAX_REFER_BUFF_LEN (1024 * 1024)
 #define DEF_REFER_BUFF_LEN 256
@@ -51,6 +51,21 @@ static const char * version_str = "1.14 20230519";    /* sbc4r10 */
 #define TPGS_STATE_TRANSITIONING 0xf
 
 static uint8_t referralBuff[DEF_REFER_BUFF_LEN];
+
+static const struct option long_options[] = {
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"lba", required_argument, 0, 'l'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"one-segment", no_argument, 0, 's'},
+    {"one_segment", no_argument, 0, 's'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
+};
+
 
 static const char *decode_tpgs_state(const int st)
 {
@@ -81,20 +96,6 @@ static const char *decode_tpgs_state(const int st)
         break;
     }
 }
-
-static struct option long_options[] = {
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"lba", required_argument, 0, 'l'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"one-segment", no_argument, 0, 's'},
-        {"one_segment", no_argument, 0, 's'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
-};
 
 static void
 usage()

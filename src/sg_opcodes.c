@@ -34,7 +34,7 @@
 
 #include "sg_pt.h"
 
-static const char * version_str = "1.01 20230519";    /* spc6r08 */
+static const char * version_str = "1.02 20230622";    /* spc6r08 */
 
 #define MY_NAME "sg_opcodes"
 
@@ -58,7 +58,7 @@ static const char * version_str = "1.01 20230519";    /* spc6r08 */
 static int peri_dtype = -1; /* ugly but not easy to pass to alpha compare */
 static bool no_final_msg = false;
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"alpha", no_argument, 0, 'a'},
     {"compact", no_argument, 0, 'c'},
     {"enumerate", no_argument, 0, 'e'},

@@ -27,7 +27,7 @@
    then only the read side will be mmap-ed, while the write side will
    use normal IO.
 
-   This version is designed for the Linux kernel 2.4, 2.6, 3, 4 and 5 series.
+   This version is designed for the Linux kernel 2.4 series and onward.
 */
 
 #define _XOPEN_SOURCE 600

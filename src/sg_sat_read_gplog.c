@@ -64,7 +64,7 @@
 
 #define MAX_LAR_LIST_ELEMS 8
 
-static const char * version_str = "1.29 20230519";
+static const char * version_str = "1.30 20230622";
 
 struct opts_t {
     bool ck_cond;
@@ -83,7 +83,7 @@ struct opts_t {
     const char * device_name;
 };
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"address", required_argument, 0, 'a'},
     {"count", required_argument, 0, 'c'},
     {"ck_cond", no_argument, 0, 'C'},

@@ -57,22 +57,22 @@
 #endif
 
 
-static const char * version_str = "5.09 20220425";
+static const char * version_str = "5.10 20230622";
 
-static struct option long_options[] = {
-        {"buffer", required_argument, 0, 'b'},
-        {"dio", no_argument, 0, 'd'},
-        {"echo", no_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"mmap", no_argument, 0, 'm'},
-        {"new", no_argument, 0, 'N'},
-        {"old", no_argument, 0, 'O'},
-        {"quick", no_argument, 0, 'q'},
-        {"size", required_argument, 0, 's'},
-        {"time", no_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"buffer", required_argument, 0, 'b'},
+    {"dio", no_argument, 0, 'd'},
+    {"echo", no_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"mmap", no_argument, 0, 'm'},
+    {"new", no_argument, 0, 'N'},
+    {"old", no_argument, 0, 'O'},
+    {"quick", no_argument, 0, 'q'},
+    {"size", required_argument, 0, 's'},
+    {"time", no_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 struct opts_t {

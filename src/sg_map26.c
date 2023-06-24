@@ -47,7 +47,7 @@
 #endif
 #include "sg_lib.h"
 
-static const char * version_str = "1.21 20230414";
+static const char * version_str = "1.22 20230622";
 
 #define ME "sg_map26: "
 
@@ -111,29 +111,30 @@ static const char * sys_osst_dir = "/sys/class/onstream_tape/";
 static const char * def_dev_dir = "/dev";
 
 
-static struct option long_options[] = {
-        {"dev_dir", required_argument, 0, 'd'},
-        {"given_is", required_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"result", required_argument, 0, 'r'},
-        {"symlink", no_argument, 0, 's'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"dev_dir", required_argument, 0, 'd'},
+    {"given_is", required_argument, 0, 'g'},
+    {"help", no_argument, 0, 'h'},
+    {"result", required_argument, 0, 'r'},
+    {"symlink", no_argument, 0, 's'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 static const char * nt_names[] = {
-        "No matching",
-        "disk",
-        "cd/dvd",
-        "hd",
-        "tape",
-        "tape (osst)",
-        "generic (sg)",
-        "changer",
-        "regular file",
-        "directory",
+    "No matching",
+    "disk",
+    "cd/dvd",
+    "hd",
+    "tape",
+    "tape (osst)",
+    "generic (sg)",
+    "changer",
+    "regular file",
+    "directory",
 };
+
 
 #if defined(__GNUC__) || defined(__clang__)
 static int pr2serr(const char * fmt, ...)

@@ -38,7 +38,7 @@
  * SCSI (tape) device and outputs the response. Based on ssc5r06.pdf
  */
 
-static const char * version_str = "1.02 20230519";
+static const char * version_str = "1.03 20230622";
 
 static const char * my_name = "sg_rep_density: ";
 
@@ -57,19 +57,19 @@ static const char * my_name = "sg_rep_density: ";
 static const char * rds_s = "Report density support";
 
 
-static struct option long_options[] = {
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
-        {"inhex", required_argument, 0, 'i'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"media", no_argument, 0, 'M'}, /* Media field; byte 1, bit 0 */
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"typem", no_argument, 0, 't'}, /* Medium type field, byte 1, bit 1 */
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
+    {"inhex", required_argument, 0, 'i'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"media", no_argument, 0, 'M'}, /* Media field; byte 1, bit 0 */
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"typem", no_argument, 0, 't'}, /* Medium type field, byte 1, bit 1 */
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

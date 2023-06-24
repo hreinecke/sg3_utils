@@ -40,7 +40,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.22 20230519";
+static const char * version_str = "1.23 20230623";
 
 
 #define ME "sg_write_verify: "
@@ -58,7 +58,7 @@ static const char * version_str = "1.22 20230519";
 #define DEF_TIMEOUT_SECS 60
 
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"16", no_argument, 0, 'S'},
     {"bytchk", required_argument, 0, 'b'},
     {"dpo", no_argument, 0, 'd'},

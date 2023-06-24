@@ -40,7 +40,7 @@
  *   - SEQUENTIALIZE ZONE
  */
 
-static const char * version_str = "1.20 20230519";
+static const char * version_str = "1.21 20230623";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define CLOSE_ZONE_SA 0x1
@@ -53,25 +53,25 @@ static const char * version_str = "1.20 20230519";
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
 
-static struct option long_options[] = {
-        {"all", no_argument, 0, 'a'},
-        {"close", no_argument, 0, 'c'},
-        {"count", required_argument, 0, 'C'},
-        {"element", required_argument, 0, 'e'},
-        {"finish", no_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"open", no_argument, 0, 'o'},
-        {"quick", no_argument, 0, 'q'},
-        {"remove", no_argument, 0, 'r'},
-        {"reset-all", no_argument, 0, 'R'},     /* same as --all */
-        {"reset_all", no_argument, 0, 'R'},
-        {"sequentialize", no_argument, 0, 'S'},
-        {"timeout", required_argument, 0, 't'},
-        {"tmo", required_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"zone", required_argument, 0, 'z'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"all", no_argument, 0, 'a'},
+    {"close", no_argument, 0, 'c'},
+    {"count", required_argument, 0, 'C'},
+    {"element", required_argument, 0, 'e'},
+    {"finish", no_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"open", no_argument, 0, 'o'},
+    {"quick", no_argument, 0, 'q'},
+    {"remove", no_argument, 0, 'r'},
+    {"reset-all", no_argument, 0, 'R'},     /* same as --all */
+    {"reset_all", no_argument, 0, 'R'},
+    {"sequentialize", no_argument, 0, 'S'},
+    {"timeout", required_argument, 0, 't'},
+    {"tmo", required_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"zone", required_argument, 0, 'z'},
+    {0, 0, 0, 0},
 };
 
 /* Indexed by service action of opcode 0x94 (Zone out) unless noted */

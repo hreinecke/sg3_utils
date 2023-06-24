@@ -45,7 +45,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "3.55 20230502";
+static const char * version_str = "3.56 20230623";
 
 static const char * my_name = "sg_turs: ";
 
@@ -54,23 +54,23 @@ static const char * tur_s = "Test unit ready";
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
 
-static struct option long_options[] = {
-        {"ascq", required_argument, 0, 'a'},
-        {"delay", required_argument, 0, 'd'},
-        {"help", no_argument, 0, 'h'},
-        {"low", no_argument, 0, 'l'},   /* use sg_pt, minimize open()s */
-        {"new", no_argument, 0, 'N'},
-        {"number", required_argument, 0, 'n'},
-        {"num", required_argument, 0, 'n'}, /* added in v3.32 (sg3_utils
-                                * v1.43) for sg_requests compatibility */
-        {"old", no_argument, 0, 'O'},
-        {"progress", no_argument, 0, 'p'},
-        {"time", no_argument, 0, 't'},
-        {"timeout", required_argument, 0, 'T'},
-        {"tmo", required_argument, 0, 'T'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"ascq", required_argument, 0, 'a'},
+    {"delay", required_argument, 0, 'd'},
+    {"help", no_argument, 0, 'h'},
+    {"low", no_argument, 0, 'l'},   /* use sg_pt, minimize open()s */
+    {"new", no_argument, 0, 'N'},
+    {"number", required_argument, 0, 'n'},
+    {"num", required_argument, 0, 'n'}, /* added in v3.32 (sg3_utils
+                            * v1.43) for sg_requests compatibility */
+    {"old", no_argument, 0, 'O'},
+    {"progress", no_argument, 0, 'p'},
+    {"time", no_argument, 0, 't'},
+    {"timeout", required_argument, 0, 'T'},
+    {"tmo", required_argument, 0, 'T'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 struct opts_t {
@@ -106,7 +106,7 @@ usage()
            "               [--number=NUM] [--num=NUM] [--progress] "
            "[--time]\n"
            "               [--timeout=SE] [--verbose] [--version] "
-	   "DEVICE\n"
+           "DEVICE\n"
            "  where:\n"
            "    --ascq=ASC[,ASQ] |    check sense from TUR for match on "
            "ASC[,ASQ]\n"
@@ -128,8 +128,8 @@ usage()
            "second\n"
            "    --timeout SE |-T SE    command timeout on each "
            "test_unit_ready command\n"
-	   "                           (def: 0 which is mapped to 60 "
-	   "seconds)\n"
+           "                           (def: 0 which is mapped to 60 "
+           "seconds)\n"
            "    --verbose|-v     increase verbosity\n"
            "    --version|-V     print version string then exit\n\n"
            "Performs a SCSI TEST UNIT READY command (or many of them).\n"

@@ -41,7 +41,7 @@
  * commands tailored for SES (enclosure) devices.
  */
 
-static const char * version_str = "2.85 20230518";    /* ses4r04 */
+static const char * version_str = "2.86 20230623";    /* ses4r04 */
 
 #define MY_NAME "sg_ses"
 
@@ -3144,24 +3144,24 @@ calc_fan_speed(int fan_speed_factor, int actual_fan_speed)
     return -1;        /* something is wrong */
 }
 
-static const char * elem_status_code_desc[] = {
+static const char * const elem_status_code_desc[] = {
     "Unsupported", "OK", "Critical", "Noncritical",
     "Unrecoverable", "Not installed", "Unknown", "Not available",
     "No access allowed", "reserved [9]", "reserved [10]", "reserved [11]",
     "reserved [12]", "reserved [13]", "reserved [14]", "reserved [15]",
 };
 
-static const char * actual_speed_desc[] = {
+static const char * const actual_speed_desc[] = {
     "stopped", "at lowest speed", "at second lowest speed",
     "at third lowest speed", "at intermediate speed",
     "at third highest speed", "at second highest speed", "at highest speed"
 };
 
-static const char * nv_cache_unit[] = {
+static const char * const nv_cache_unit[] = {
     "Bytes", "KiB", "MiB", "GiB"
 };
 
-static const char * invop_type_desc[] = {
+static const char * const invop_type_desc[] = {
     "SEND DIAGNOSTIC page code error", "SEND DIAGNOSTIC page format error",
     "Reserved", "Vendor specific error"
 };
@@ -5759,7 +5759,7 @@ supported_pages_both_sdp(bool is_ssp, const uint8_t * resp, int resp_len,
 }
 
 /* An array of Download microcode status field values and descriptions */
-static struct diag_page_code mc_status_arr[] = {
+static const struct diag_page_code mc_status_arr[] = {
     {0x0, "No download microcode operation in progress"},
     {0x1, "Download in progress, awaiting more"},
     {0x2, "Download complete, updating non-volatile storage"},

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2022 Luben Tuikov and Douglas Gilbert.
+ * Copyright (c) 2006-2023 Luben Tuikov and Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -39,7 +39,7 @@
  * device.
  */
 
-static const char * version_str = "1.35 20220217";      /* spc6r06 */
+static const char * version_str = "1.36 20230622";      /* spc6r06 */
 
 #ifndef SG_READ_BUFFER_10_CMD
 #define SG_READ_BUFFER_10_CMD 0x3c
@@ -66,26 +66,26 @@ static const char * version_str = "1.35 20220217";      /* spc6r06 */
 #define DEF_RESPONSE_LEN 4      /* increased to 64 for MODE_ERR_HISTORY */
 
 
-static struct option long_options[] = {
-        {"16", no_argument, 0, 'L'},
-        {"eh_code", required_argument, 0, 'e'},
-        {"eh-code", required_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"id", required_argument, 0, 'i'},
-        {"inhex", required_argument, 0, 'I'},
-        {"length", required_argument, 0, 'l'},
-        {"long", no_argument, 0, 'L'},
-        {"mode", required_argument, 0, 'm'},
-        {"no_output", no_argument, 0, 'N'},
-        {"no-output", no_argument, 0, 'N'},
-        {"offset", required_argument, 0, 'o'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"specific", required_argument, 0, 'S'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},   /* sentinel */
+static const struct option long_options[] = {
+    {"16", no_argument, 0, 'L'},
+    {"eh_code", required_argument, 0, 'e'},
+    {"eh-code", required_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"id", required_argument, 0, 'i'},
+    {"inhex", required_argument, 0, 'I'},
+    {"length", required_argument, 0, 'l'},
+    {"long", no_argument, 0, 'L'},
+    {"mode", required_argument, 0, 'm'},
+    {"no_output", no_argument, 0, 'N'},
+    {"no-output", no_argument, 0, 'N'},
+    {"offset", required_argument, 0, 'o'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"specific", required_argument, 0, 'S'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},   /* sentinel */
 };
 
 struct opts_t {

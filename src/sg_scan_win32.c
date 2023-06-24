@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2022 Douglas Gilbert.
+ * Copyright (c) 2006-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -43,7 +43,7 @@
 
 #include "sg_pt_win32.h"
 
-static const char * version_str = "1.23 (win32) 20220127";
+static const char * version_str = "1.24 (win32) 20230623";
 
 #define MAX_SCSI_ELEMS 4096
 #define MAX_ADAPTER_NUM 256
@@ -79,14 +79,14 @@ static uint8_t * free_storage_arr;
 static int next_unused_elem = 0;
 static int verbose = 0;
 
-static struct option long_options[] = {
-        {"bus", no_argument, 0, 'b'},
-        {"help", no_argument, 0, 'h'},
-        {"letter", required_argument, 0, 'l'},
-        {"verbose", no_argument, 0, 'v'},
-        {"scsi", no_argument, 0, 's'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"bus", no_argument, 0, 'b'},
+    {"help", no_argument, 0, 'h'},
+    {"letter", required_argument, 0, 'l'},
+    {"verbose", no_argument, 0, 'v'},
+    {"scsi", no_argument, 0, 's'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

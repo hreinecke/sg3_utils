@@ -39,7 +39,7 @@
  * vendor specific data is written.
  */
 
-static const char * version_str = "1.28 20230519";
+static const char * version_str = "1.29 20230622";
 
 #define DEF_DEFECT_LIST_FORMAT 4        /* bytes from index */
 
@@ -50,19 +50,20 @@ static const char * version_str = "1.28 20230519";
 #endif
 
 
-static struct option long_options[] = {
-        {"address", required_argument, 0, 'a'},
-        {"dummy", no_argument, 0, 'd'},
-        {"eight", required_argument, 0, 'e'},
-        {"grown", no_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"longlist", required_argument, 0, 'l'},
-        {"primary", no_argument, 0, 'p'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"address", required_argument, 0, 'a'},
+    {"dummy", no_argument, 0, 'd'},
+    {"eight", required_argument, 0, 'e'},
+    {"grown", no_argument, 0, 'g'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"longlist", required_argument, 0, 'l'},
+    {"primary", no_argument, 0, 'p'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
+
 
 static void
 usage()

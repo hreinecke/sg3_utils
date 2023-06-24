@@ -39,7 +39,7 @@
  * and decodes the response. Based on spc5r08.pdf
  */
 
-static const char * version_str = "1.18 20230407";
+static const char * version_str = "1.19 20230622";
 
 static const char * my_name = "sg_read_attr: ";
 
@@ -100,7 +100,7 @@ struct attr_name_info_t {
                          * 2 --> further processing */
 };
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"cache", no_argument, 0, 'c'},
     {"enumerate", no_argument, 0, 'e'},
     {"element", required_argument, 0, 'E'},   /* SMC-3 element address */
@@ -121,7 +121,7 @@ static struct option long_options[] = {
     {0, 0, 0, 0},   /* sentinel */
 };
 
-static struct acron_nv_t sa_acron_arr[] = {
+static const struct acron_nv_t sa_acron_arr[] = {
     {"av", "attribute values", 0},
     {"al", "attribute list", 1},
     {"lvl", "logical volume list", 2},
@@ -131,7 +131,7 @@ static struct acron_nv_t sa_acron_arr[] = {
     {NULL, NULL, -1},           /* sentinel */
 };
 
-static struct attr_name_info_t attr_name_arr[] = {
+static const struct attr_name_info_t attr_name_arr[] = {
 /* Device type attributes */
     {0x0, "Remaining capacity in partition [MiB]", RA_FMT_BINARY, 8, 0},
     {0x1, "Maximum capacity in partition [MiB]", RA_FMT_BINARY, 8, 0},

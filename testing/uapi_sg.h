@@ -167,7 +167,7 @@ typedef struct sg_scsi_id {
 typedef struct sg_req_info {	/* used by SG_GET_REQUEST_TABLE ioctl() */
 	char req_state;	/* See 'enum sg_rq_state' definition in v4 driver */
 	char orphan;	/* 0 -> normal request, 1 -> from interrupted SG_IO */
-	/* sg_io_owned set imples synchronous, clear implies asynchronous */
+	/* sg_io_owned set implies synchronous, clear implies asynchronous */
 	char sg_io_owned;/* 0 -> complete with read(), 1 -> owned by SG_IO */
 	char problem;	/* 0 -> no problem detected, 1 -> error to report */
 	/* If SG_CTL_FLAGM_TAG_FOR_PACK_ID set on fd then next field is tag */

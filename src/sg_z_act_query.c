@@ -38,7 +38,7 @@
  * command to the given SCSI device. Based on zbc2r12.pdf .
  */
 
-static const char * version_str = "1.05 20230407";
+static const char * version_str = "1.06 20230623";
 static const char * my_name = "sg_z_act_query: ";
 
 #define SG_ZBC_IN_CMDLEN 16
@@ -68,23 +68,23 @@ struct opts_t {
     const char * inhex_fn;
 };
 
-static struct option long_options[] = {
-        {"activate", no_argument, 0, 'A'},
-        {"all", no_argument, 0, 'a'},
-        {"force", no_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
-        {"inhex", required_argument, 0, 'i'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"num", required_argument, 0, 'n'},
-        {"other", required_argument, 0, 'o'},
-        {"query", no_argument, 0, 'q'},
-        {"raw", no_argument, 0, 'r'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"zone", required_argument, 0, 'z'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"activate", no_argument, 0, 'A'},
+    {"all", no_argument, 0, 'a'},
+    {"force", no_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"in", required_argument, 0, 'i'},      /* silent, same as --inhex= */
+    {"inhex", required_argument, 0, 'i'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"num", required_argument, 0, 'n'},
+    {"other", required_argument, 0, 'o'},
+    {"query", no_argument, 0, 'q'},
+    {"raw", no_argument, 0, 'r'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"zone", required_argument, 0, 'z'},
+    {0, 0, 0, 0},
 };
 
 

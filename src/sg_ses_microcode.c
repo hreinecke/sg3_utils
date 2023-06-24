@@ -45,7 +45,7 @@
  * RESULTS commands in order to send microcode to the given SES device.
  */
 
-static const char * version_str = "1.20 20230519";    /* ses4r02 */
+static const char * version_str = "1.21 20230623";    /* ses4r02 */
 
 #define ME "sg_ses_microcode: "
 #define MAX_XFER_LEN (128 * 1024 * 1024)
@@ -72,7 +72,7 @@ struct opts_t {
     int verbose;
 };
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"bpw", required_argument, 0, 'b'},
     {"dry-run", no_argument, 0, 'd'},
     {"dry_run", no_argument, 0, 'd'},
@@ -102,12 +102,12 @@ static struct option long_options[] = {
                                          * in progress */
 
 struct mode_s {
-        const char *mode_string;
-        int   mode;
-        const char *comment;
+    const char *mode_string;
+    int   mode;
+    const char *comment;
 };
 
-static struct mode_s mode_arr[] = {
+static const struct mode_s mode_arr[] = {
     {"dmc_status", MODE_DNLD_STATUS, "report status of microcode "
      "download"},
     {"dmc_offs", MODE_DNLD_MC_OFFS, "download microcode with offsets "
@@ -124,7 +124,7 @@ static struct mode_s mode_arr[] = {
 /* An array of Download microcode status field values and descriptions.
  * This table is a subset of one in sg_read_buffer for the read microcode
  * status page. */
-static struct sg_lib_simple_value_name_t mc_status_arr[] = {
+static const struct sg_lib_simple_value_name_t mc_status_arr[] = {
     {0x0, "No download microcode operation in progress"},
     {0x1, "Download in progress, awaiting more"},
     {0x2, "Download complete, updating storage"},
@@ -152,7 +152,7 @@ struct dout_buff_t {
 /* This dummy response is used when --dry-run skips the RECEIVE DIAGNOSTICS
  * RESULTS command. Say maximum download MC size is 4 MB. Set generation
  * code to 0 . */
-uint8_t dummy_rd_resp[] = {
+static uint8_t dummy_rd_resp[] = {
     0xe,  3,  0, 68,  0, 0, 0, 0,
     0,  0,  0,  0,  0x0, 0x40, 0x0, 0x0,  0, 0, 0,  0,  0x0, 0x0, 0x0, 0x0,
     0,  1,  0,  0,  0x0, 0x40, 0x0, 0x0,  0, 0, 0,  0,  0x0, 0x0, 0x0, 0x0,

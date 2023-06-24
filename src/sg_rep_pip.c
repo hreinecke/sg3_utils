@@ -39,7 +39,7 @@
  * sbc4r21.pdf
  */
 
-static const char * version_str = "1.05 20230519";
+static const char * version_str = "1.06 20230622";
 
 #define MAX_RPIP_BUFF_LEN (1024 * 1024)
 #define DEF_RPIP_BUFF_LEN 512
@@ -54,15 +54,15 @@ static const char * version_str = "1.05 20230519";
 static const char * rpip_s = "Report provisioning initialization pattern";
 
 
-static struct option long_options[] = {
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

@@ -41,7 +41,7 @@
  * and the optional list identifier passed as the list_id argument.
  */
 
-static const char * version_str = "1.24 20230519";
+static const char * version_str = "1.25 20230618";
 
 
 #define MAX_XFER_LEN 10000
@@ -250,20 +250,20 @@ scsi_operating_parameters(uint8_t *rcBuff, unsigned int rcBuffLen)
     printf("\n");
 }
 
-static struct option long_options[] = {
-        {"failed", no_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"list_id", required_argument, 0, 'l'},
-        {"list-id", required_argument, 0, 'l'},
-        {"params", no_argument, 0, 'p'},
-        {"readonly", no_argument, 0, 'R'},
-        {"receive", no_argument, 0, 'r'},
-        {"status", no_argument, 0, 's'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"xfer_len", required_argument, 0, 'x'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"failed", no_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"list_id", required_argument, 0, 'l'},
+    {"list-id", required_argument, 0, 'l'},
+    {"params", no_argument, 0, 'p'},
+    {"readonly", no_argument, 0, 'R'},
+    {"receive", no_argument, 0, 'r'},
+    {"status", no_argument, 0, 's'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"xfer_len", required_argument, 0, 'x'},
+    {0, 0, 0, 0},
 };
 
 static void

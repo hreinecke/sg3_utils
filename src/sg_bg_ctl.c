@@ -35,7 +35,7 @@
  * device. Based on sbc4r10.pdf .
  */
 
-static const char * version_str = "1.14 20230519";
+static const char * version_str = "1.15 20230618";
 
 #define BACKGROUND_CONTROL_SA 0x15
 
@@ -45,13 +45,13 @@ static const char * version_str = "1.14 20230519";
 static const char * cmd_name = "Background control";
 
 
-static struct option long_options[] = {
-        {"ctl", required_argument, 0, 'c'},
-        {"help", no_argument, 0, 'h'},
-        {"time", required_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"ctl", required_argument, 0, 'c'},
+    {"help", no_argument, 0, 'h'},
+    {"time", required_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

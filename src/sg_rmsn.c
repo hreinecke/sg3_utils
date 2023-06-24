@@ -33,19 +33,20 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.19 20230519";
+static const char * version_str = "1.20 20230622";
 
 #define SERIAL_NUM_SANITY_LEN (16 * 1024)
 
 
-static struct option long_options[] = {
-        {"help", no_argument, 0, 'h'},
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"help", no_argument, 0, 'h'},
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
+
 
 static void usage()
 {

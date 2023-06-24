@@ -52,9 +52,9 @@
 
 #define DEF_TIMEOUT 20
 
-static const char * version_str = "1.20 20230519";
+static const char * version_str = "1.21 20230622";
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"count", required_argument, 0, 'c'},
     {"ck_cond", no_argument, 0, 'C'},
     {"ck-cond", no_argument, 0, 'C'},

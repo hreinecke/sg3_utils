@@ -34,7 +34,7 @@
  * This program issues the SCSI command REQUEST SENSE to the given SCSI device.
  */
 
-static const char * version_str = "1.44 20230519";
+static const char * version_str = "1.45 20230622";
 
 static const char * my_name = "sg_requests: ";  /* REQUEST Sense command */
 
@@ -48,24 +48,25 @@ static const char * my_name = "sg_requests: ";  /* REQUEST Sense command */
 #define REQUEST_SENSE_CMDLEN 6
 
 
-static struct option long_options[] = {
-        {"desc", no_argument, 0, 'd'},
-        {"error", no_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"num", required_argument, 0, 'n'},
-        {"number", required_argument, 0, 'n'},
-        {"progress", no_argument, 0, 'p'},
-        {"raw", no_argument, 0, 'r'},
-        {"status", no_argument, 0, 's'},
-        {"time", no_argument, 0, 't'},
-        {"timeout", required_argument, 0, 'T'},
-        {"tmo", required_argument, 0, 'T'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"desc", no_argument, 0, 'd'},
+    {"error", no_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"num", required_argument, 0, 'n'},
+    {"number", required_argument, 0, 'n'},
+    {"progress", no_argument, 0, 'p'},
+    {"raw", no_argument, 0, 'r'},
+    {"status", no_argument, 0, 's'},
+    {"time", no_argument, 0, 't'},
+    {"timeout", required_argument, 0, 'T'},
+    {"tmo", required_argument, 0, 'T'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
+
 
 static void
 usage()

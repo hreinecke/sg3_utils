@@ -1,6 +1,6 @@
 /*
  * A utility program originally written for the Linux OS SCSI subsystem
- *    Copyright (C) 2003-2022 D. Gilbert
+ *    Copyright (C) 2003-2023 D. Gilbert
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
@@ -40,25 +40,25 @@ static const char * version_str = "0.65 20220128";
 
 #define DEF_ALLOC_LEN (1024 * 4)
 
-static struct option long_options[] = {
-        {"doff", no_argument, 0, 'd'},
-        {"extdur", no_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"list", no_argument, 0, 'l'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"new", no_argument, 0, 'N'},
-        {"old", no_argument, 0, 'O'},
-        {"page", required_argument, 0, 'P'},
-        {"pf", no_argument, 0, 'p'},
-        {"raw", required_argument, 0, 'r'},
-        {"selftest", required_argument, 0, 's'},
-        {"test", no_argument, 0, 't'},
-        {"timeout", required_argument, 0, 'T'},
-        {"uoff", no_argument, 0, 'u'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"doff", no_argument, 0, 'd'},
+    {"extdur", no_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"list", no_argument, 0, 'l'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"new", no_argument, 0, 'N'},
+    {"old", no_argument, 0, 'O'},
+    {"page", required_argument, 0, 'P'},
+    {"pf", no_argument, 0, 'p'},
+    {"raw", required_argument, 0, 'r'},
+    {"selftest", required_argument, 0, 's'},
+    {"test", no_argument, 0, 't'},
+    {"timeout", required_argument, 0, 'T'},
+    {"uoff", no_argument, 0, 'u'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 struct opts_t {
@@ -620,27 +620,27 @@ struct page_code_desc {
         int page_code;
         const char * desc;
 };
-static struct page_code_desc pc_desc_arr[] = {
-        {0x0, "Supported diagnostic pages"},
-        {0x1, "Configuration (SES)"},
-        {0x2, "Enclosure status/control (SES)"},
-        {0x3, "Help text (SES)"},
-        {0x4, "String In/Out (SES)"},
-        {0x5, "Threshold In/Out (SES)"},
-        {0x6, "Array Status/Control (SES, obsolete)"},
-        {0x7, "Element descriptor (SES)"},
-        {0x8, "Short enclosure status (SES)"},
-        {0x9, "Enclosure busy (SES-2)"},
-        {0xa, "Additional (device) element status (SES-2)"},
-        {0xb, "Subenclosure help text (SES-2)"},
-        {0xc, "Subenclosure string In/Out (SES-2)"},
-        {0xd, "Supported SES diagnostic pages (SES-2)"},
-        {0xe, "Download microcode diagnostic pages (SES-2)"},
-        {0xf, "Subenclosure nickname diagnostic pages (SES-2)"},
-        {0x3f, "Protocol specific (SAS transport)"},
-        {0x40, "Translate address (direct access)"},
-        {0x41, "Device status (direct access)"},
-        {0x42, "Rebuild assist (direct access)"}, /* sbc3r31 */
+static const struct page_code_desc pc_desc_arr[] = {
+    {0x0, "Supported diagnostic pages"},
+    {0x1, "Configuration (SES)"},
+    {0x2, "Enclosure status/control (SES)"},
+    {0x3, "Help text (SES)"},
+    {0x4, "String In/Out (SES)"},
+    {0x5, "Threshold In/Out (SES)"},
+    {0x6, "Array Status/Control (SES, obsolete)"},
+    {0x7, "Element descriptor (SES)"},
+    {0x8, "Short enclosure status (SES)"},
+    {0x9, "Enclosure busy (SES-2)"},
+    {0xa, "Additional (device) element status (SES-2)"},
+    {0xb, "Subenclosure help text (SES-2)"},
+    {0xc, "Subenclosure string In/Out (SES-2)"},
+    {0xd, "Supported SES diagnostic pages (SES-2)"},
+    {0xe, "Download microcode diagnostic pages (SES-2)"},
+    {0xf, "Subenclosure nickname diagnostic pages (SES-2)"},
+    {0x3f, "Protocol specific (SAS transport)"},
+    {0x40, "Translate address (direct access)"},
+    {0x41, "Device status (direct access)"},
+    {0x42, "Rebuild assist (direct access)"}, /* sbc3r31 */
 };
 
 static const char *
@@ -838,13 +838,13 @@ main(int argc, char * argv[])
             if (num >= 0xc) {
                 int secs = sg_get_unaligned_be16(rsp_buff + 8 + bd_len + 10);
 
-		if (0xffff == secs) {
-		    if (op->verbose > 1)
-			printf("Expected extended self-test duration's value "
-			       "[65535] indicates the\nsimilarly named field "
-			       "in the Extended Inquiry VPD page should be "
-			       "used\n");
-		} else {
+                if (0xffff == secs) {
+                    if (op->verbose > 1)
+                        printf("Expected extended self-test duration's value "
+                               "[65535] indicates the\nsimilarly named field "
+                               "in the Extended Inquiry VPD page should be "
+                               "used\n");
+                } else {
 #ifdef SG_LIB_MINGW
                     printf("Expected extended self-test duration=%d seconds "
                            "(%g minutes)\n", secs, secs / 60.0);
@@ -852,7 +852,7 @@ main(int argc, char * argv[])
                     printf("Expected extended self-test duration=%d seconds "
                            "(%.2f minutes)\n", secs, secs / 60.0);
 #endif
-		}
+                }
             } else
                 printf("Extended self-test duration not available\n");
         } else {

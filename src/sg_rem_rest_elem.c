@@ -37,7 +37,7 @@
  *   - RESTORE ELEMENTS AND REBUILD
  */
 
-static const char * version_str = "1.03 20230519";
+static const char * version_str = "1.04 20230622";
 
 #define REMOVE_ELEM_SA 0x18
 #define RESTORE_ELEMS_SA 0x19
@@ -46,18 +46,18 @@ static const char * version_str = "1.03 20230519";
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
 
-static struct option long_options[] = {
-        {"capacity", required_argument, 0, 'c'},
-        {"element", required_argument, 0, 'e'},
-        {"help", no_argument, 0, 'h'},
-        {"quick", no_argument, 0, 'q'},
-        {"remove", no_argument, 0, 'r'},
-        {"restore", no_argument, 0, 'R'},
-        {"timeout", required_argument, 0, 't'},
-        {"tmo", required_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"capacity", required_argument, 0, 'c'},
+    {"element", required_argument, 0, 'e'},
+    {"help", no_argument, 0, 'h'},
+    {"quick", no_argument, 0, 'q'},
+    {"remove", no_argument, 0, 'r'},
+    {"restore", no_argument, 0, 'R'},
+    {"timeout", required_argument, 0, 't'},
+    {"tmo", required_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 static const char * remove_cmd_s = "Remove element and truncate";

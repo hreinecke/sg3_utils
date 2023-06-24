@@ -40,7 +40,7 @@
 
 #include "sg_logs.h"
 
-static const char * version_str = "2.34 20230603";    /* spc6r08 + sbc5r04 */
+static const char * version_str = "2.35 20230622";    /* spc6r08 + sbc5r04 */
 
 #define MY_NAME "sg_logs"
 
@@ -76,7 +76,7 @@ static const char * const tims_s = "Timestamp";
 static const char * const tims_sn = "timestamp";
 static const char * const percent_s = "[percentage]";
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"All", no_argument, 0, 'A'},   /* equivalent to '-aa' */
     {"ALL", no_argument, 0, 'A'},   /* equivalent to '-aa' */
     {"all", no_argument, 0, 'a'},
@@ -227,7 +227,7 @@ static bool show_ie_page(const uint8_t * resp, int len,
                          struct opts_t * op, sgj_opaque_p jop);
 
 /* elements in page_number/subpage_number order */
-static struct log_elem log_arr[] = {
+static const struct log_elem log_arr[] = {
     {SUPP_PAGES_LPAGE, 0, 0, -1, MVP_STD, "Supported log pages", "sp",
      show_supported_pgs_page},          /* 0, 0 */
     {SUPP_PAGES_LPAGE, SUPP_SPGS_SUBPG, 0, -1, MVP_STD, "Supported log pages "
@@ -381,7 +381,7 @@ static struct log_elem log_arr[] = {
 
 /* Supported vendor product codes */
 /* Arrange in alphabetical order by acronym */
-static struct vp_name_t vp_arr[] = {
+static const struct vp_name_t vp_arr[] = {
     {VP_SEAG, "sea", "Seagate", "SEAGATE", NULL},
     {VP_HITA, "hit", "Hitachi", "HGST", NULL},
     {VP_HITA, "wdc", "WDC/Hitachi", "WDC", NULL},
@@ -695,8 +695,8 @@ static void
 enumerate_pages(struct opts_t * op)
 {
     int j;
-    struct log_elem * lep;
-    struct log_elem ** lep_arr;
+    const struct log_elem * lep;
+    const struct log_elem ** lep_arr;
     sgj_state * jsp = &op->json_st;
     char b[128];
     static const int blen = sizeof(b);
@@ -708,12 +708,13 @@ enumerate_pages(struct opts_t * op)
         snprintf(b, blen, "All %s", lpi);
     if (op->do_enumerate < 3) { /* -e, -ee: sort by acronym */
         int k;
-        struct log_elem ** lepp;
+        const struct log_elem ** lepp;
 
         for (k = 0, lep = log_arr; lep->pg_code >=0; ++lep, ++k)
             ;
         ++k;
-        lep_arr = (struct log_elem **)calloc(k, sizeof(struct log_elem *));
+        lep_arr = (const struct log_elem **)
+			calloc(k, sizeof(struct log_elem *));
         if (NULL == lep_arr) {
             pr2serr("%s: out of memory\n", __func__);
             return;
@@ -3217,7 +3218,8 @@ show_last_n_inq_data_ch_page(const uint8_t * resp, int len,
         } else {        /* pc > 0x0 */
             int m;
             const int nn = sg_lib_names_mode_len;
-            struct sg_lib_simple_value_name_t * nvp = sg_lib_names_vpd_arr;
+            const struct sg_lib_simple_value_name_t * nvp =
+						 sg_lib_names_vpd_arr;
 
             snprintf(b, blen, "  %s 0x%x, ", param_c, pc);
             vpd = !! (1 & *(bp + 4));
@@ -3347,7 +3349,8 @@ show_last_n_mode_pg_data_ch_page(const uint8_t * resp, int len,
         } else {        /* pc > 0x0 */
             int val;
             const int nn = sg_lib_names_mode_len;
-            struct sg_lib_simple_value_name_t * nmp = sg_lib_names_mode_arr;
+            const struct sg_lib_simple_value_name_t * nmp =
+						sg_lib_names_mode_arr;
 
             snprintf(b, blen, "  %s 0x%x, ", param_c, pc);
             spf = !! (0x40 & *(bp + 4));

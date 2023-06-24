@@ -87,39 +87,39 @@ struct page_code_desc {
 };
 
 struct pc_desc_group {
-    struct page_code_desc * pcdp;
+    const struct page_code_desc * pcdp;
     const char * group_name;
 };
 
-static struct option long_options[] = {
-        {"all", no_argument, 0, 'a'},
-        {"ALL", no_argument, 0, 'A'},
-        {"control", required_argument, 0, 'c'},
-        {"dbd", no_argument, 0, 'd'},
-        {"dbout", no_argument, 0, 'D'},
-        {"examine", no_argument, 0, 'e'},
-        {"flexible", no_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"list", no_argument, 0, 'l'},
-        {"llbaa", no_argument, 0, 'L'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"multiple", no_argument, 0, 'M'},
-        {"new", no_argument, 0, 'N'},
-        {"old", no_argument, 0, 'O'},
-        {"page", required_argument, 0, 'p'},
-        {"raw", no_argument, 0, 'r'},
-        {"read-write", no_argument, 0, 'w'},
-        {"read_write", no_argument, 0, 'w'},
-        {"readwrite", no_argument, 0, 'w'},
-        {"six", no_argument, 0, '6'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"all", no_argument, 0, 'a'},
+    {"ALL", no_argument, 0, 'A'},
+    {"control", required_argument, 0, 'c'},
+    {"dbd", no_argument, 0, 'd'},
+    {"dbout", no_argument, 0, 'D'},
+    {"examine", no_argument, 0, 'e'},
+    {"flexible", no_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"list", no_argument, 0, 'l'},
+    {"llbaa", no_argument, 0, 'L'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"multiple", no_argument, 0, 'M'},
+    {"new", no_argument, 0, 'N'},
+    {"old", no_argument, 0, 'O'},
+    {"page", required_argument, 0, 'p'},
+    {"raw", no_argument, 0, 'r'},
+    {"read-write", no_argument, 0, 'w'},
+    {"read_write", no_argument, 0, 'w'},
+    {"readwrite", no_argument, 0, 'w'},
+    {"six", no_argument, 0, '6'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 /* Common to all SCSI devices (found in SPCx). In numerical order */
-static struct page_code_desc pc_desc_common[] = {
+static const struct page_code_desc pc_desc_common[] = {
     {0x0, 0x0, "ua", "Unit Attention condition [vendor specific format]"},
     {0x2, 0x0, "dr", "Disconnect-Reconnect"},
     {0x9, 0x0, "pd", "Peripheral device (obsolete)"},
@@ -142,7 +142,7 @@ static struct page_code_desc pc_desc_common[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_disk[] = {
+static const struct page_code_desc pc_desc_disk[] = {
     {0x1, 0x0, "rw", "Read-Write error recovery"},
     {0x3, 0x0, "fo", "Format (obsolete)"},
     {0x4, 0x0, "rd", "Rigid disk geometry (obsolete)"},
@@ -164,7 +164,7 @@ static struct page_code_desc pc_desc_disk[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_tape[] = {
+static const struct page_code_desc pc_desc_tape[] = {
     {0x1, 0x0, "rw", "Read-Write error recovery"},
     {0xa, 0xf0, "cdp", "Control data protection"},
     {0xf, 0x0, "dac", "Data Compression"},
@@ -179,7 +179,7 @@ static struct page_code_desc pc_desc_tape[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_cddvd[] = {
+static const struct page_code_desc pc_desc_cddvd[] = {
     {0x1, 0x0, "rw", "Read-Write error recovery"},
     {0x3, 0x0, "mrw", "Mount Rainer rewritable"},
     {0x5, 0x0, "wp", "Write parameters"},
@@ -194,7 +194,7 @@ static struct page_code_desc pc_desc_cddvd[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_smc[] = {
+static const struct page_code_desc pc_desc_smc[] = {
     {0x1d, 0x0, "eaa", "Element address assignment"},
     {0x1e, 0x0, "tgp", "Transport geometry parameters"},
     {0x1f, 0x0, "dcs", "Device capabilities"},
@@ -202,22 +202,22 @@ static struct page_code_desc pc_desc_smc[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_scc[] = {
+static const struct page_code_desc pc_desc_scc[] = {
     {0x1b, 0x0, "sslm", "LUN mapping"},
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_ses[] = {
+static const struct page_code_desc pc_desc_ses[] = {
     {0x14, 0x0, "esm", "Enclosure services management"},
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_rbc[] = {
+static const struct page_code_desc pc_desc_rbc[] = {
     {0x6, 0x0, "rbc", "RBC device parameters"},
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_adc[] = {
+static const struct page_code_desc pc_desc_adc[] = {
     /* {0xe, 0x0, "ADC device configuration"}, */
     {0xe, 0x1, "adtd", "Target device"},
     {0xe, 0x2, "addp", "DT device primary port"},
@@ -228,13 +228,13 @@ static struct page_code_desc pc_desc_adc[] = {
 
 
 /* Transport reated mode pages */
-static struct page_code_desc pc_desc_t_fcp[] = {
+static const struct page_code_desc pc_desc_t_fcp[] = {
     {0x18, 0x0, "pl", "LU control"},
     {0x19, 0x0, "pp", "Port control"},
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_t_spi4[] = {
+static const struct page_code_desc pc_desc_t_spi4[] = {
     {0x18, 0x0, "luc", "LU control"},
     {0x19, 0x0, "pp", "Port control short format"},
     {0x19, 0x1, "mc", "Margin control"},
@@ -245,7 +245,7 @@ static struct page_code_desc pc_desc_t_spi4[] = {
 };
 
 /* SAS protocol layers now in SPL standards */
-static struct page_code_desc pc_desc_t_sas[] = {
+static const struct page_code_desc pc_desc_t_sas[] = {
     {0x18, 0x0, "pslu", "Protocol specific logical unit (SPL)"},
     {0x19, 0x0, "pspo", "Protocol specific port (SPL)"},
     {0x19, 0x1, "pcd", "Phy control and discover (SPL)"},
@@ -255,7 +255,7 @@ static struct page_code_desc pc_desc_t_sas[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_t_adc[] = {
+static const struct page_code_desc pc_desc_t_adc[] = {
     {0xe, 0x1, "addt", "Target device"},
     {0xe, 0x2, "addp", "DT device primary port"},
     {0xe, 0x3, "adlu", "Logical unit"},
@@ -264,7 +264,7 @@ static struct page_code_desc pc_desc_t_adc[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
-static struct page_code_desc pc_desc_zbc[] = {
+static const struct page_code_desc pc_desc_zbc[] = {
     {0x1, 0x0, "rw", "Read-Write error recovery"},
     {0x7, 0x0, "ve", "Verify error recovery"},
     {0x8, 0x0, "ca", "Caching"},
@@ -274,7 +274,7 @@ static struct page_code_desc pc_desc_zbc[] = {
     {0x0, 0x0, NULL, NULL},
 };
 
-struct pc_desc_group pcd_gr_arr[] = {
+static const struct pc_desc_group pcd_gr_arr[] = {
     {pc_desc_common, "common"},
     {pc_desc_disk, "disk"},
     {pc_desc_tape, "tape"},
@@ -844,7 +844,7 @@ count_desc_elems(const struct page_code_desc * pcdp)
  * table if scsi_ptype is -1. Yields numbers of elements in returned
  * table via pointer sizep. If scsi_ptype not known then returns NULL
  * with *sizep set to zero. */
-static struct page_code_desc *
+static const struct page_code_desc *
 get_mpage_tbl_size(int scsi_ptype, int * sizep)
 {
     switch (scsi_ptype)
@@ -888,7 +888,7 @@ get_mpage_tbl_size(int scsi_ptype, int * sizep)
 }
 
 
-static struct page_code_desc *
+static const struct page_code_desc *
 get_mpage_trans_tbl_size(int t_proto, int * sizep)
 {
     switch (t_proto)

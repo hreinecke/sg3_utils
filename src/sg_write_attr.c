@@ -35,7 +35,7 @@
  * device and decodes the response. Based on spc5r19.pdf
  */
 
-static const char * version_str = "1.07 20230507";
+static const char * version_str = "1.08 20230623";
 
 static const char * my_name = "sg_write_attr: ";
 
@@ -95,7 +95,7 @@ struct attr_value_pair_t {
     uint8_t value[MAX_ATTR_VALUE_LEN];
 };
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"enumerate", no_argument, 0, 'e'},
     {"element", required_argument, 0, 'E'},   /* SMC-3 element address */
     {"help", no_argument, 0, 'h'},
@@ -112,29 +112,29 @@ static struct option long_options[] = {
 
 /* Attribute value acronyms currently implemented for single-byte values
  * only */
-static struct acron_nv_t tli_acron_arr[] = {
+static const struct acron_nv_t tli_acron_arr[] = {
 /* Text localization identifier. Acronyms must match charset names supported
  * by iconv library */
-        { 0x00, "ascii", "No code specified (ASCII)" },
-        { 0x01, "iso-8859-1", "ISO/IEC 8859-1 (Europe, Latin America)" },
-        { 0x02, "iso-8859-2", "ISO/IEC 8859-2 (Eastern Europe)" },
-        { 0x03, "iso-8859-3", "ISO/IEC 8859-3 (SE Europe/miscellaneous)" },
-        { 0x04, "iso-8859-4", "ISO/IEC 8859-4 (Scandinavia/Baltic)" },
-        { 0x05, "iso-8859-5", "ISO/IEC 8859-5 (Cyrillic)" },
-        { 0x06, "iso-8859-6", "ISO/IEC 8859-6 (Arabic)" },
-        { 0x07, "iso-8859-7", "ISO/IEC 8859-7 (Greek)" },
-        { 0x08, "iso-8859-8", "ISO/IEC 8859-8 (Hebrew)" },
-        { 0x09, "iso-8859-9", "ISO/IEC 8859-9 (Latin 5)" },
-        { 0x0A, "iso-8859-10", "ISO/IEC 8859-10 (Latin 6)" },
-        /* 0Bh to 7Fh Reserved */
-        { 0x80, "ucs-2be", "ISO/IEC 10646-1 (UCS-2BE)" },
-        { 0x81, "utf-8", "ISO/IEC 10646-1 (UTF-8)" },
-        /* 82h to FFh Reserved */
-        { 0xff, NULL, NULL }
+    { 0x00, "ascii", "No code specified (ASCII)" },
+    { 0x01, "iso-8859-1", "ISO/IEC 8859-1 (Europe, Latin America)" },
+    { 0x02, "iso-8859-2", "ISO/IEC 8859-2 (Eastern Europe)" },
+    { 0x03, "iso-8859-3", "ISO/IEC 8859-3 (SE Europe/miscellaneous)" },
+    { 0x04, "iso-8859-4", "ISO/IEC 8859-4 (Scandinavia/Baltic)" },
+    { 0x05, "iso-8859-5", "ISO/IEC 8859-5 (Cyrillic)" },
+    { 0x06, "iso-8859-6", "ISO/IEC 8859-6 (Arabic)" },
+    { 0x07, "iso-8859-7", "ISO/IEC 8859-7 (Greek)" },
+    { 0x08, "iso-8859-8", "ISO/IEC 8859-8 (Hebrew)" },
+    { 0x09, "iso-8859-9", "ISO/IEC 8859-9 (Latin 5)" },
+    { 0x0A, "iso-8859-10", "ISO/IEC 8859-10 (Latin 6)" },
+    /* 0Bh to 7Fh Reserved */
+    { 0x80, "ucs-2be", "ISO/IEC 10646-1 (UCS-2BE)" },
+    { 0x81, "utf-8", "ISO/IEC 10646-1 (UTF-8)" },
+    /* 82h to FFh Reserved */
+    { 0xff, NULL, NULL }
 };
 
 /* Only Host type attributes are writable in most devices */
-static struct attr_name_info_t attr_name_arr[] = {
+static const struct attr_name_info_t attr_name_arr[] = {
 /* Device type attributes */
     {0x0, NULL, "Remaining capacity in partition [MiB]", RA_FMT_BINARY, 8, 0,
      NULL},

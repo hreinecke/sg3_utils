@@ -1,5 +1,5 @@
 /*
-*  Copyright (c) 2012-2022, Kaminario Technologies LTD
+*  Copyright (c) 2012-2023, Kaminario Technologies LTD
 *  All rights reserved.
 *  Redistribution and use in source and binary forms, with or without
 *  modification, are permitted provided that the following conditions are met:
@@ -56,7 +56,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.32 20220127";
+static const char * version_str = "1.33 20230618";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_NUM_BLOCKS (1)
@@ -70,7 +70,7 @@ static const char * version_str = "1.32 20220127";
 
 #define ME "sg_compare_and_write: "
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
         {"dpo", no_argument, 0, 'd'},
         {"fua", no_argument, 0, 'f'},
         {"fua_nv", no_argument, 0, 'F'},

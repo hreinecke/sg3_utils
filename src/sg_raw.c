@@ -39,7 +39,7 @@
 #include "sg_pr2serr.h"
 #include "sg_unaligned.h"
 
-#define SG_RAW_VERSION "0.4.41 (2023-05-04)"
+#define SG_RAW_VERSION "0.4.42 (2023-06-22)"
 
 static const char * my_name = "sg_raw: ";
 
@@ -53,7 +53,7 @@ static const char * my_name = "sg_raw: ";
 #define NVME_DATA_LEN_DATA_IN  0xfffffffe
 #define NVME_DATA_LEN_DATA_OUT 0xfffffffd
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     { "binary",  no_argument,       NULL, 'b' },
     { "cmdfile", required_argument, NULL, 'c' },
     { "cmdset",  required_argument, NULL, 'C' },

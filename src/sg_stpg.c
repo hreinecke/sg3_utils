@@ -34,7 +34,7 @@
  * to the given SCSI device.
  */
 
-static const char * version_str = "1.22 20230519";
+static const char * version_str = "1.23 20230623";
 
 #define TGT_GRP_BUFF_LEN 1024
 #define MX_ALLOC_LEN (0xc000 + 0x80)
@@ -58,12 +58,12 @@ static const uint8_t state_sup_mask[] = {
 #else
 
 static const uint8_t state_sup_mask[] = {
-        [TPGS_STATE_OPTIMIZED]     = 0x01,
-        [TPGS_STATE_NONOPTIMIZED]  = 0x02,
-        [TPGS_STATE_STANDBY]       = 0x04,
-        [TPGS_STATE_UNAVAILABLE]   = 0x08,
-        [TPGS_STATE_OFFLINE]       = 0x40,
-        [TPGS_STATE_TRANSITIONING] = 0x80,
+    [TPGS_STATE_OPTIMIZED]     = 0x01,
+    [TPGS_STATE_NONOPTIMIZED]  = 0x02,
+    [TPGS_STATE_STANDBY]       = 0x04,
+    [TPGS_STATE_UNAVAILABLE]   = 0x08,
+    [TPGS_STATE_OFFLINE]       = 0x40,
+    [TPGS_STATE_TRANSITIONING] = 0x80,
 };
 
 #endif  /* C or C++ ? */
@@ -74,25 +74,25 @@ static const uint8_t state_sup_mask[] = {
 #define MAX_PORT_LIST_ARR_LEN 16
 
 struct tgtgrp {
-        int id;
-        int current;
-        int valid;
+    int id;
+    int current;
+    int valid;
 };
 
-static struct option long_options[] = {
-        {"active", no_argument, 0, 'a'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"offline", no_argument, 0, 'l'},
-        {"optimized", no_argument, 0, 'o'},
-        {"raw", no_argument, 0, 'r'},
-        {"standby", no_argument, 0, 's'},
-        {"state", required_argument, 0, 'S'},
-        {"tp", required_argument, 0, 't'},
-        {"unavailable", no_argument, 0, 'u'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"active", no_argument, 0, 'a'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"offline", no_argument, 0, 'l'},
+    {"optimized", no_argument, 0, 'o'},
+    {"raw", no_argument, 0, 'r'},
+    {"standby", no_argument, 0, 's'},
+    {"state", required_argument, 0, 'S'},
+    {"tp", required_argument, 0, 't'},
+    {"unavailable", no_argument, 0, 'u'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 static void

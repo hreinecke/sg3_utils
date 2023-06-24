@@ -40,24 +40,24 @@ static const char * version_str = "0.68 20230407";  /* sbc3r14; mmc6r01a */
 
 static const char * my_name = "sg_start: ";
 
-static struct option long_options[] = {
-        {"eject", no_argument, 0, 'e'},
-        {"fl", required_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"immed", no_argument, 0, 'i'},
-        {"load", no_argument, 0, 'l'},
-        {"loej", no_argument, 0, 'L'},
-        {"mod", required_argument, 0, 'm'},
-        {"noflush", no_argument, 0, 'n'},
-        {"new", no_argument, 0, 'N'},
-        {"old", no_argument, 0, 'O'},
-        {"pc", required_argument, 0, 'p'},
-        {"readonly", no_argument, 0, 'r'},
-        {"start", no_argument, 0, 's'},
-        {"stop", no_argument, 0, 'S'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"eject", no_argument, 0, 'e'},
+    {"fl", required_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"immed", no_argument, 0, 'i'},
+    {"load", no_argument, 0, 'l'},
+    {"loej", no_argument, 0, 'L'},
+    {"mod", required_argument, 0, 'm'},
+    {"noflush", no_argument, 0, 'n'},
+    {"new", no_argument, 0, 'N'},
+    {"old", no_argument, 0, 'O'},
+    {"pc", required_argument, 0, 'p'},
+    {"readonly", no_argument, 0, 'r'},
+    {"start", no_argument, 0, 's'},
+    {"stop", no_argument, 0, 'S'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 struct opts_t {

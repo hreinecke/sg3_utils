@@ -33,7 +33,7 @@
  * DEVICE IDENTIFIER and SET DEVICE IDENTIFIER prior to spc4r07.
  */
 
-static const char * version_str = "1.24 20230407";
+static const char * version_str = "1.24 20230622";
 
 static const char * my_name = "sg_ident: ";
 
@@ -41,16 +41,16 @@ static const char * my_name = "sg_ident: ";
 #define REPORT_ID_INFO_SANITY_LEN 512
 
 
-static struct option long_options[] = {
-        {"ascii", no_argument, 0, 'A'},
-        {"clear", no_argument, 0, 'C'},
-        {"help", no_argument, 0, 'h'},
-        {"itype", required_argument, 0, 'i'},
-        {"raw", no_argument, 0, 'r'},
-        {"set", no_argument, 0, 'S'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"ascii", no_argument, 0, 'A'},
+    {"clear", no_argument, 0, 'C'},
+    {"help", no_argument, 0, 'h'},
+    {"itype", required_argument, 0, 'i'},
+    {"raw", no_argument, 0, 'r'},
+    {"set", no_argument, 0, 'S'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 static void

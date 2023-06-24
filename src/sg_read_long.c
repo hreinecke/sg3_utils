@@ -45,19 +45,19 @@ static const char * version_str = "1.28 20230519";
 #define EBUFF_SZ 512
 
 
-static struct option long_options[] = {
-        {"16", no_argument, 0, 'S'},
-        {"correct", no_argument, 0, 'c'},
-        {"help", no_argument, 0, 'h'},
-        {"lba", required_argument, 0, 'l'},
-        {"out", required_argument, 0, 'o'},
-        {"pblock", no_argument, 0, 'p'},
-        {"readonly", no_argument, 0, 'r'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"xfer_len", required_argument, 0, 'x'},
-        {"xfer-len", required_argument, 0, 'x'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"16", no_argument, 0, 'S'},
+    {"correct", no_argument, 0, 'c'},
+    {"help", no_argument, 0, 'h'},
+    {"lba", required_argument, 0, 'l'},
+    {"out", required_argument, 0, 'o'},
+    {"pblock", no_argument, 0, 'p'},
+    {"readonly", no_argument, 0, 'r'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"xfer_len", required_argument, 0, 'x'},
+    {"xfer-len", required_argument, 0, 'x'},
+    {0, 0, 0, 0},
 };
 
 static void

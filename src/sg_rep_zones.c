@@ -41,7 +41,7 @@
  * Based on zbc2r12.pdf
  */
 
-static const char * version_str = "1.50 20230518";
+static const char * version_str = "1.51 20230622";
 
 #define MY_NAME "sg_rep_zones"
 
@@ -96,7 +96,7 @@ struct zt_num2abbrev_t {
     const char * abbrev;
 };
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"brief", no_argument, 0, 'b'}, /* only header and last descriptor */
     {"domain", no_argument, 0, 'd'},
     {"domains", no_argument, 0, 'd'},
@@ -128,7 +128,7 @@ static struct option long_options[] = {
 };
 
 /* Zone types */
-static struct zt_num2abbrev_t zt_num2abbrev[] = {
+static const struct zt_num2abbrev_t zt_num2abbrev[] = {
     {0, "none"},
     {1, "c"},           /* conventionial */
     {2, "swr"},         /* sequential write required */
@@ -1273,7 +1273,7 @@ main(int argc, char * argv[])
                 if (off)
                     op->find_zt = -op->find_zt; /* find first not equal */
             } else {    /* check for abbreviation */
-                struct zt_num2abbrev_t * zn2ap = zt_num2abbrev;
+                const struct zt_num2abbrev_t * zn2ap = zt_num2abbrev;
 
                 for ( ; zn2ap->abbrev; ++zn2ap) {
                     if (0 == strcmp(optarg + off, zn2ap->abbrev))

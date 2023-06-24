@@ -40,7 +40,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"
 
-static const char * version_str = "1.72 20230502";
+static const char * version_str = "1.73 20230618";
 
 
 #define MY_NAME "sg_format"
@@ -113,7 +113,7 @@ struct opts_t {
 
 
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
         {"cappid", no_argument, 0, 'a'},
         {"count", required_argument, 0, 'c'},
         {"cmplst", required_argument, 0, 'C'},

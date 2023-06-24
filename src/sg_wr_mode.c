@@ -32,7 +32,7 @@
  * mode page on the given device.
  */
 
-static const char * version_str = "1.29 20230519";
+static const char * version_str = "1.30 20230623";
 
 #define ME "sg_wr_mode: "
 
@@ -42,22 +42,22 @@ static const char * version_str = "1.29 20230519";
 #define EBUFF_SZ 256
 
 
-static struct option long_options[] = {
-        {"cfile", required_argument, 0, 'C'},
-        {"contents", required_argument, 0, 'c'},
-        {"dbd", no_argument, 0, 'd'},
-        {"force", no_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"len", required_argument, 0, 'l'},
-        {"mask", required_argument, 0, 'm'},
-        {"page", required_argument, 0, 'p'},
-        {"raw", no_argument, 0, 'r'},
-        {"rtd", no_argument, 0, 'R'},
-        {"save", no_argument, 0, 's'},
-        {"six", no_argument, 0, '6'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"cfile", required_argument, 0, 'C'},
+    {"contents", required_argument, 0, 'c'},
+    {"dbd", no_argument, 0, 'd'},
+    {"force", no_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"len", required_argument, 0, 'l'},
+    {"mask", required_argument, 0, 'm'},
+    {"page", required_argument, 0, 'p'},
+    {"raw", no_argument, 0, 'r'},
+    {"rtd", no_argument, 0, 'R'},
+    {"save", no_argument, 0, 's'},
+    {"six", no_argument, 0, '6'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

@@ -37,7 +37,7 @@
  * (e.g. disks).
  */
 
-static const char * version_str = "1.30 20230519";
+static const char * version_str = "1.31 20230623";
 
 static const char * my_name = "sg_sync: ";
 
@@ -47,19 +47,19 @@ static const char * my_name = "sg_sync: ";
 #define DEF_PT_TIMEOUT  60       /* 60 seconds */
 
 
-static struct option long_options[] = {
-        {"16", no_argument, 0, 'S'},
-        {"count", required_argument, 0, 'c'},
-        {"group", required_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"immed", no_argument, 0, 'i'},
-        {"lba", required_argument, 0, 'l'},
-        {"sync-nv", no_argument, 0, 's'},
-        {"timeout", required_argument, 0, 't'},
-        {"tmo", required_argument, 0, 't'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"16", no_argument, 0, 'S'},
+    {"count", required_argument, 0, 'c'},
+    {"group", required_argument, 0, 'g'},
+    {"help", no_argument, 0, 'h'},
+    {"immed", no_argument, 0, 'i'},
+    {"lba", required_argument, 0, 'l'},
+    {"sync-nv", no_argument, 0, 's'},
+    {"timeout", required_argument, 0, 't'},
+    {"tmo", required_argument, 0, 't'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 static void

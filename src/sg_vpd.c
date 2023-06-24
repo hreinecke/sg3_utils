@@ -43,7 +43,7 @@
 
 */
 
-static const char * version_str = "1.96 20230518";  /* spc6r08 + sbc5r04 */
+static const char * version_str = "1.96 20230622";  /* spc6r08 + sbc5r04 */
 
 #define MY_NAME "sg_vpd"
 
@@ -84,35 +84,35 @@ static const int rsp_buff_sz = MX_ALLOC_LEN + 2;
 
 static uint8_t * free_rsp_buff;
 
-static struct option long_options[] = {
-        {"all", no_argument, 0, 'a'},
-        {"debug", no_argument, 0, 'D'},
-        {"enumerate", no_argument, 0, 'e'},
-        {"examine", no_argument, 0, 'E'},
-        {"force", no_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"ident", no_argument, 0, 'i'},
-        {"inhex", required_argument, 0, 'I'},
-        {"json", optional_argument, 0, '^'},    /* short option is '-j' */
-        {"js-file", required_argument, 0, 'J'},
-        {"js_file", required_argument, 0, 'J'},
-        {"long", no_argument, 0, 'l'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"page", required_argument, 0, 'p'},
-        {"quiet", no_argument, 0, 'q'},
-        {"raw", no_argument, 0, 'r'},
-        {"sinq_inraw", required_argument, 0, 'Q'},
-        {"sinq-inraw", required_argument, 0, 'Q'},
-        {"vendor", required_argument, 0, 'M'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"all", no_argument, 0, 'a'},
+    {"debug", no_argument, 0, 'D'},
+    {"enumerate", no_argument, 0, 'e'},
+    {"examine", no_argument, 0, 'E'},
+    {"force", no_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"ident", no_argument, 0, 'i'},
+    {"inhex", required_argument, 0, 'I'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-j' */
+    {"js-file", required_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'J'},
+    {"long", no_argument, 0, 'l'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"page", required_argument, 0, 'p'},
+    {"quiet", no_argument, 0, 'q'},
+    {"raw", no_argument, 0, 'r'},
+    {"sinq_inraw", required_argument, 0, 'Q'},
+    {"sinq-inraw", required_argument, 0, 'Q'},
+    {"vendor", required_argument, 0, 'M'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 
 /* arranged in alphabetical order by acronym */
-static struct svpd_values_name_t standard_vpd_pg[] = {
+static const struct svpd_values_name_t standard_vpd_pg[] = {
     {VPD_AUTOMATION_DEV_SN, 0, 1, "adsn", "Automation device serial "
      "number (SSC)"},
     {VPD_ATA_INFO, 0, -1, "ai", "ATA information (SAT)"},

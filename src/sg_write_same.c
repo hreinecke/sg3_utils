@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2022 Douglas Gilbert.
+ * Copyright (c) 2009-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -33,7 +33,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.34 20220127";
+static const char * version_str = "1.35 20230623";
 
 
 #define ME "sg_write_same: "
@@ -59,7 +59,7 @@ static const char * version_str = "1.34 20220127";
 #define UINT32_MAX ((uint32_t)-1)
 #endif
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"10", no_argument, 0, 'R'},
     {"16", no_argument, 0, 'S'},
     {"32", no_argument, 0, 'T'},

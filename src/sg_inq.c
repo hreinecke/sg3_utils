@@ -141,7 +141,7 @@ static void prepare_ata_identify(const struct opts_t * op, int inhex_len);
 
 
 /* Note that this table is sorted by acronym */
-static struct svpd_values_name_t t10_vpd_pg[] = {
+static const struct svpd_values_name_t t10_vpd_pg[] = {
     {VPD_AUTOMATION_DEV_SN, 0, 1, "adsn", "Automation device serial "
      "number (SSC)"},
     {VPD_ATA_INFO, 0, -1, "ai", "ATA information (SAT)"},
@@ -202,13 +202,13 @@ static struct svpd_values_name_t t10_vpd_pg[] = {
 };
 
 /* Some alternate acronyms for T10 VPD pages (compatibility with sg_vpd) */
-static struct svpd_values_name_t alt_t10_vpd_pg[] = {
+static const struct svpd_values_name_t alt_t10_vpd_pg[] = {
     {VPD_NOPE_WANT_STD_INQ, 0, -1, "stdinq", "Standard inquiry data format"},
     {VPD_POWER_CONDITION, 0, -1, "pc", "Power condition"},
     {0, 0, 0, NULL, NULL},
 };
 
-static struct svpd_values_name_t vs_vpd_pg[] = {
+static const struct svpd_values_name_t vs_vpd_pg[] = {
     /* Following are vendor specific */
     {SG_NVME_VPD_NICR, 0, -1, "nicr",
      "NVMe Identify Controller Response (sg3_utils)"},
@@ -218,43 +218,43 @@ static struct svpd_values_name_t vs_vpd_pg[] = {
     {0, 0, 0, NULL, NULL},
 };
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
 #if defined(SG_LIB_LINUX) && defined(SG_SCSI_STRINGS) && \
     defined(HDIO_GET_IDENTITY)
-        {"ata", no_argument, 0, 'a'},
+    {"ata", no_argument, 0, 'a'},
 #endif
-        {"block", required_argument, 0, 'B'},
-        {"cmddt", no_argument, 0, 'c'},
-        {"descriptors", no_argument, 0, 'd'},
-        {"debug", no_argument, 0, 'D'},
-        {"export", no_argument, 0, 'u'},
-        {"extended", no_argument, 0, 'x'},
-        {"force", no_argument, 0, 'f'},
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"id", no_argument, 0, 'i'},
-        {"inhex", required_argument, 0, 'I'},
-        {"json", optional_argument, 0, '^'},    /* short option is '-j' */
-        {"js-file", required_argument, 0, 'J'},
-        {"js_file", required_argument, 0, 'J'},
-        {"len", required_argument, 0, 'l'},
-        {"long", no_argument, 0, 'L'},
-        {"maxlen", required_argument, 0, 'm'},
+    {"block", required_argument, 0, 'B'},
+    {"cmddt", no_argument, 0, 'c'},
+    {"descriptors", no_argument, 0, 'd'},
+    {"debug", no_argument, 0, 'D'},
+    {"export", no_argument, 0, 'u'},
+    {"extended", no_argument, 0, 'x'},
+    {"force", no_argument, 0, 'f'},
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"id", no_argument, 0, 'i'},
+    {"inhex", required_argument, 0, 'I'},
+    {"json", optional_argument, 0, '^'},    /* short option is '-j' */
+    {"js-file", required_argument, 0, 'J'},
+    {"js_file", required_argument, 0, 'J'},
+    {"len", required_argument, 0, 'l'},
+    {"long", no_argument, 0, 'L'},
+    {"maxlen", required_argument, 0, 'm'},
 #ifdef SG_SCSI_STRINGS
-        {"new", no_argument, 0, 'N'},
-        {"old", no_argument, 0, 'O'},
+    {"new", no_argument, 0, 'N'},
+    {"old", no_argument, 0, 'O'},
 #endif
-        {"only", no_argument, 0, 'o'},
-        {"page", required_argument, 0, 'p'},
-        {"quiet", no_argument, 0, 'q'},
-        {"raw", no_argument, 0, 'r'},
-        {"sinq_inraw", required_argument, 0, 'Q'},
-        {"sinq-inraw", required_argument, 0, 'Q'},
-        {"vendor", no_argument, 0, 's'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"vpd", no_argument, 0, 'e'},
-        {0, 0, 0, 0},
+    {"only", no_argument, 0, 'o'},
+    {"page", required_argument, 0, 'p'},
+    {"quiet", no_argument, 0, 'q'},
+    {"raw", no_argument, 0, 'r'},
+    {"sinq_inraw", required_argument, 0, 'Q'},
+    {"sinq-inraw", required_argument, 0, 'Q'},
+    {"vendor", no_argument, 0, 's'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"vpd", no_argument, 0, 'e'},
+    {0, 0, 0, 0},
 };
 
 

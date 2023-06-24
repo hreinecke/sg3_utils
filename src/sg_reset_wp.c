@@ -37,7 +37,7 @@
  * device. Based on zbc-r04c.pdf .
  */
 
-static const char * version_str = "1.17 20230519";
+static const char * version_str = "1.18 20230622";
 
 #define SG_ZONING_OUT_CMDLEN 16
 #define RESET_WRITE_POINTER_SA 0x4
@@ -46,16 +46,16 @@ static const char * version_str = "1.17 20230519";
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
 
-static struct option long_options[] = {
-        {"all", no_argument, 0, 'a'},
-        {"count", required_argument, 0, 'C'},
-        {"help", no_argument, 0, 'h'},
-        {"reset-all", no_argument, 0, 'R'},
-        {"reset_all", no_argument, 0, 'R'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {"zone", required_argument, 0, 'z'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"all", no_argument, 0, 'a'},
+    {"count", required_argument, 0, 'C'},
+    {"help", no_argument, 0, 'h'},
+    {"reset-all", no_argument, 0, 'R'},
+    {"reset_all", no_argument, 0, 'R'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {"zone", required_argument, 0, 'z'},
+    {0, 0, 0, 0},
 };
 
 

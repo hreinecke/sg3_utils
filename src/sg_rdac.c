@@ -3,7 +3,7 @@
  *
  * Retrieve / set RDAC options.
  *
- * Copyright (C) 2006-2018 Hannes Reinecke <hare@suse.de>
+ * Copyright (C) 2006-2023 Hannes Reinecke <hare@suse.de>
  *
  * Based on sg_modes.c and sg_emc_trespass.c; credits from there apply.
  *
@@ -32,16 +32,16 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.17 20180512";
+static const char * version_str = "1.18 20230622";
 
-uint8_t mode6_hdr[] = {
+static const uint8_t mode6_hdr[] = {
     0x75, /* Length */
     0, /* medium */
     0, /* params */
     8, /* Block descriptor length */
 };
 
-uint8_t mode10_hdr[] = {
+static const uint8_t mode10_hdr[] = {
     0x01, 0x18, /* Length */
     0, /* medium */
     0, /* params */
@@ -49,7 +49,7 @@ uint8_t mode10_hdr[] = {
     0, 0, /* block descriptor length */
 };
 
-uint8_t block_descriptor[] = {
+static const uint8_t block_descriptor[] = {
     0, /* Density code */
     0, 0, 0, /* Number of blocks */
     0, /* Reserved */
@@ -86,6 +86,7 @@ struct rdac_expanded_page {
 };
 
 static int do_verbose = 0;
+
 
 static void dump_mode_page( uint8_t *page, int len )
 {

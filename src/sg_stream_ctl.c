@@ -35,7 +35,7 @@
  * to the given SCSI device. Based on sbc4r15.pdf .
  */
 
-static const char * version_str = "1.14 20230519";
+static const char * version_str = "1.15 20230623";
 
 #define STREAM_CONTROL_SA 0x14
 #define GET_STREAM_STATUS_SA 0x16
@@ -47,19 +47,19 @@ static const char * version_str = "1.14 20230519";
 #define DEF_PT_TIMEOUT  60      /* 60 seconds */
 
 
-static struct option long_options[] = {
-        {"brief", no_argument, 0, 'b'},
-        {"close", no_argument, 0, 'c'},
-        {"ctl", required_argument, 0, 'C'},
-        {"get", no_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"id", required_argument, 0, 'i'},
-        {"maxlen", required_argument, 0, 'm'},
-        {"open", no_argument, 0, 'o'},
-        {"readonly", no_argument, 0, 'r'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"brief", no_argument, 0, 'b'},
+    {"close", no_argument, 0, 'c'},
+    {"ctl", required_argument, 0, 'C'},
+    {"get", no_argument, 0, 'g'},
+    {"help", no_argument, 0, 'h'},
+    {"id", required_argument, 0, 'i'},
+    {"maxlen", required_argument, 0, 'm'},
+    {"open", no_argument, 0, 'o'},
+    {"readonly", no_argument, 0, 'r'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

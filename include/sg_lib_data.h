@@ -107,45 +107,45 @@ struct sg_aux_info_t {
 };
 
 
-extern const char * sg_lib_version_str;
+extern const char * const sg_lib_version_str;
 
-extern struct sg_lib_value_name_t sg_lib_normal_opcodes[];
-extern struct sg_lib_value_name_t sg_lib_read_buff_arr[];
-extern struct sg_lib_value_name_t sg_lib_write_buff_arr[];
-extern struct sg_lib_value_name_t sg_lib_maint_in_arr[];
-extern struct sg_lib_value_name_t sg_lib_maint_out_arr[];
-extern struct sg_lib_value_name_t sg_lib_pr_in_arr[];
-extern struct sg_lib_value_name_t sg_lib_pr_out_arr[];
-extern struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[];
-extern struct sg_lib_value_name_t sg_lib_serv_in12_arr[];
-extern struct sg_lib_value_name_t sg_lib_serv_out12_arr[];
-extern struct sg_lib_value_name_t sg_lib_serv_in16_arr[];
-extern struct sg_lib_value_name_t sg_lib_serv_out16_arr[];
-extern struct sg_lib_value_name_t sg_lib_serv_bidi_arr[];
-extern struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[];
-extern struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[];
-extern struct sg_lib_value_name_t sg_lib_variable_length_arr[];
-extern struct sg_lib_value_name_t sg_lib_zoning_out_arr[];
-extern struct sg_lib_value_name_t sg_lib_zoning_in_arr[];
-extern struct sg_lib_value_name_t sg_lib_read_attr_arr[];
-extern struct sg_lib_value_name_t sg_lib_read_pos_arr[];
-extern struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[];
-extern struct sg_lib_simple_value_name_t sg_lib_sstatus_str_arr[];
-extern struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];
-extern struct sg_lib_value_name_t sg_lib_scsi_feature_sets[];
-extern const char * sg_lib_sense_key_desc[];
-extern const char * sg_lib_pdt_strs[];
-extern struct sg_aux_info_t sg_lib_pdt_aux_a[];
-extern const char * sg_lib_transport_proto_strs[];
-extern const char * sg_lib_tapealert_strs[];
-extern int sg_lib_pdt_decay_arr[];
+extern const struct sg_lib_value_name_t sg_lib_normal_opcodes[];
+extern const struct sg_lib_value_name_t sg_lib_read_buff_arr[];
+extern const struct sg_lib_value_name_t sg_lib_write_buff_arr[];
+extern const struct sg_lib_value_name_t sg_lib_maint_in_arr[];
+extern const struct sg_lib_value_name_t sg_lib_maint_out_arr[];
+extern const struct sg_lib_value_name_t sg_lib_pr_in_arr[];
+extern const struct sg_lib_value_name_t sg_lib_pr_out_arr[];
+extern const struct sg_lib_value_name_t sg_lib_sanitize_sa_arr[];
+extern const struct sg_lib_value_name_t sg_lib_serv_in12_arr[];
+extern const struct sg_lib_value_name_t sg_lib_serv_out12_arr[];
+extern const struct sg_lib_value_name_t sg_lib_serv_in16_arr[];
+extern const struct sg_lib_value_name_t sg_lib_serv_out16_arr[];
+extern const struct sg_lib_value_name_t sg_lib_serv_bidi_arr[];
+extern const struct sg_lib_value_name_t sg_lib_xcopy_sa_arr[];
+extern const struct sg_lib_value_name_t sg_lib_rec_copy_sa_arr[];
+extern const struct sg_lib_value_name_t sg_lib_variable_length_arr[];
+extern const struct sg_lib_value_name_t sg_lib_zoning_out_arr[];
+extern const struct sg_lib_value_name_t sg_lib_zoning_in_arr[];
+extern const struct sg_lib_value_name_t sg_lib_read_attr_arr[];
+extern const struct sg_lib_value_name_t sg_lib_read_pos_arr[];
+extern const struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[];
+extern const struct sg_lib_simple_value_name_t sg_lib_sstatus_str_arr[];
+extern const struct sg_lib_asc_ascq_t sg_lib_asc_ascq[];
+extern const struct sg_lib_value_name_t sg_lib_scsi_feature_sets[];
+extern const char * const sg_lib_sense_key_desc[];
+extern const char * const sg_lib_pdt_strs[];
+extern const struct sg_aux_info_t sg_lib_pdt_aux_a[];
+extern const char * const sg_lib_transport_proto_strs[];
+extern const char * const sg_lib_tapealert_strs[];
+extern const int sg_lib_pdt_decay_arr[];
 
-extern struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[];
-extern struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[];
-extern struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[];
-extern struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[];
+extern const struct sg_lib_simple_value_name_t sg_lib_nvme_admin_cmd_arr[];
+extern const struct sg_lib_simple_value_name_t sg_lib_nvme_nvm_cmd_arr[];
+extern const struct sg_lib_value_name_t sg_lib_nvme_cmd_status_arr[];
+extern const struct sg_lib_4tuple_u8 sg_lib_scsi_status_sense_arr[];
 
-extern struct sg_value_2names_t sg_exit_str_arr[];
+extern const struct sg_value_2names_t sg_exit_str_arr[];
 
 #ifdef __cplusplus
 }

@@ -327,8 +327,8 @@ extern const char * fp_vpdp;
 extern const char * cpr_vpdp;
 extern const char * cap_vpdp;
 
-extern struct svpd_vp_name_t vp_arr[];
-extern struct svpd_values_name_t vendor_vpd_pg[];
+extern const struct svpd_vp_name_t vp_arr[];
+extern const struct svpd_values_name_t vendor_vpd_pg[];
 
 
 #ifdef __cplusplus

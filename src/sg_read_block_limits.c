@@ -35,7 +35,7 @@
  * SCSI device.
  */
 
-static const char * version_str = "1.10 20230519";
+static const char * version_str = "1.11 20230622";
 
 #define DEF_READ_BLOCK_LIMITS_LEN 6
 #define MLIO_READ_BLOCK_LIMITS_LEN 20
@@ -44,15 +44,15 @@ static const char * version_str = "1.10 20230519";
 static uint8_t readBlkLmtBuff[MAX_READ_BLOCK_LIMITS_LEN];
 
 
-static struct option long_options[] = {
-        {"help", no_argument, 0, 'h'},
-        {"hex", no_argument, 0, 'H'},
-        {"mloi", no_argument, 0, 'm'},  /* added in ssc4r02.pdf */
-        {"raw", no_argument, 0, 'r'},
-        {"readonly", no_argument, 0, 'R'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"help", no_argument, 0, 'h'},
+    {"hex", no_argument, 0, 'H'},
+    {"mloi", no_argument, 0, 'm'},  /* added in ssc4r02.pdf */
+    {"raw", no_argument, 0, 'r'},
+    {"readonly", no_argument, 0, 'R'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 

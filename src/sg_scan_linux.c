@@ -53,7 +53,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "4.18 20220118";
+static const char * version_str = "4.19 20230623";
 
 #define ME "sg_scan: "
 
@@ -67,7 +67,7 @@ static const char * version_str = "4.18 20220118";
 #define FNAME_SZ 64
 #define PRESENT_ARRAY_SIZE 8192
 
-static const char * sysfs_sg_dir = "/sys/class/scsi_generic";
+static const char * const sysfs_sg_dir = "/sys/class/scsi_generic";
 static int * gen_index_arr;
 
 typedef struct my_scsi_idlun {

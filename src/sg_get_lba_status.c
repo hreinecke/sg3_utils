@@ -36,7 +36,7 @@
  * device.
  */
 
-static const char * version_str = "1.42 20230519";      /* sbc5r04 */
+static const char * version_str = "1.43 20230619";      /* sbc5r04 */
 
 #define MY_NAME "sg_get_lba_status"
 
@@ -74,7 +74,7 @@ struct opts_t {
 };
 
 
-static struct option long_options[] = {
+static const struct option long_options[] = {
     {"16", no_argument, 0, 'S'},
     {"32", no_argument, 0, 'T'},
     {"brief", no_argument, 0, 'b'},

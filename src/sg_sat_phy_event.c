@@ -28,7 +28,7 @@
 #include "sg_cmds_extra.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.16 20230519";
+static const char * version_str = "1.17 20230622";
 
 /* This program uses a ATA PASS-THROUGH SCSI command. This usage is
  * defined in the SCSI to ATA Translation (SAT) drafts and standards.
@@ -63,19 +63,19 @@ static const char * version_str = "1.16 20230519";
 
 #define EBUFF_SZ 256
 
-static struct option long_options[] = {
-        {"ck_cond", no_argument, 0, 'c'},
-        {"ck-cond", no_argument, 0, 'c'},
-        {"extend", no_argument, 0, 'e'},
-        {"hex", no_argument, 0, 'H'},
-        {"ignore", no_argument, 0, 'i'},
-        {"len", no_argument, 0, 'l'},
-        {"raw", no_argument, 0, 'r'},
-        {"reset", no_argument, 0, 'R'},
-        {"help", no_argument, 0, 'h'},
-        {"verbose", no_argument, 0, 'v'},
-        {"version", no_argument, 0, 'V'},
-        {0, 0, 0, 0},
+static const struct option long_options[] = {
+    {"ck_cond", no_argument, 0, 'c'},
+    {"ck-cond", no_argument, 0, 'c'},
+    {"extend", no_argument, 0, 'e'},
+    {"hex", no_argument, 0, 'H'},
+    {"ignore", no_argument, 0, 'i'},
+    {"len", no_argument, 0, 'l'},
+    {"raw", no_argument, 0, 'r'},
+    {"reset", no_argument, 0, 'R'},
+    {"help", no_argument, 0, 'h'},
+    {"verbose", no_argument, 0, 'v'},
+    {"version", no_argument, 0, 'V'},
+    {0, 0, 0, 0},
 };
 
 struct phy_event_t {
@@ -83,7 +83,8 @@ struct phy_event_t {
     const char * desc;
 };
 
-static struct phy_event_t phy_event_arr[] = {   /* SATA 2.5 section 13.7.2 */
+/* SATA 2.5 section 13.7.2 */
+static const struct phy_event_t phy_event_arr[] = {
     {0x1, "Command failed and ICRC error bit set in Error register"}, /* M */
     {0x2, "R_ERR(p) response for data FIS"},
     {0x3, "R_ERR(p) response for device-to-host data FIS"},
@@ -105,6 +106,7 @@ static struct phy_event_t phy_event_arr[] = {   /* SATA 2.5 section 13.7.2 */
     {0xc02, "PM: corrupts CRC propagation of device-to-host FISes"},
     {0x0, NULL},        /* end marker */        /* M(andatory) */
 };
+
 
 static void
 usage()
