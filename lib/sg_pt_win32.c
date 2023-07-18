@@ -286,7 +286,7 @@ bus_type_str(int bt)
 static char *
 get_err_str(DWORD err, int max_b_len, char * b)
 {
-    LPVOID lpMsgBuf;
+    LPVOID lpMsgBuf = NULL;
     int k, num, ch;
 
     memset(b, 0, max_b_len);
@@ -298,7 +298,7 @@ get_err_str(DWORD err, int max_b_len, char * b)
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPTSTR) &lpMsgBuf,
         0, NULL );
-    num = lstrlen((LPCTSTR)lpMsgBuf);
+    num = lpMsgBuf ? lstrlen((LPCTSTR)lpMsgBuf) : 0;
     if (num < 1)
         return b;
     num = (num < max_b_len) ? num : (max_b_len - 1);

@@ -57,12 +57,18 @@
 #ifndef major
 #include <sys/types.h>
 #endif
-#include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
-#include <linux/fs.h>           /* for BLKSSZGET and friends */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+#ifdef HAVE_LINUX_MAJOR_H
+#include <linux/major.h>
+#include <linux/fs.h>           /* for BLKSSZGET and friends */
+#else
+#include "sg_pt_linux_missing.h"
+#endif
+
 #include "sg_lib.h"
 #include "sg_cmds_basic.h"
 #include "sg_io_linux.h"
@@ -70,7 +76,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.24 20230519";
+static const char * version_str = "1.25 20230717";
 
 static const char * my_name = "sgm_dd: ";
 
@@ -481,6 +487,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     }
     return 0;
 #else
+    if (sg_fd) { ; }      /* unused, suppress warning */
     if (verbose)
         pr2serr("      BLKSSZGET+BLKGETSIZE ioctl not available\n");
     *num_sect = 0;

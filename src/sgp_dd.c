@@ -57,11 +57,16 @@
 #include <sys/types.h>
 #endif
 #include <sys/time.h>
-#include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
-#include <linux/fs.h>           /* for BLKSSZGET and friends */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+#ifdef HAVE_LINUX_MAJOR_H
+#include <linux/major.h>
+#include <linux/fs.h>           /* for BLKSSZGET and friends */
+#else
+#include "sg_pt_linux_missing.h"
 #endif
 
 #ifdef __STDC_VERSION__
@@ -89,7 +94,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "5.92 20230519";
+static const char * version_str = "5.93 20230717";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128
@@ -662,6 +667,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz)
     }
     return 0;
 #else
+    if (sg_fd) { ; }      /* unused, suppress warning */
     *num_sect = 0;
     *sect_sz = 0;
     return -1;
@@ -1834,7 +1840,7 @@ main(int argc, char * argv[])
     pr2serr("In DEBUG mode, ");
     if (verbose_given && version_given) {
         pr2serr("but override: '-vV' given, zero verbose and continue\n");
-        /* verbose_given = false;	*/
+        /* verbose_given = false;       */
         version_given = false;
         clp->debug = 0;
     } else if (! verbose_given) {

@@ -2,7 +2,7 @@ Each utility has its own version number, date of last change and
 some description at the top of its ".c" file. All utilities in the main
 directory have their own "man" pages. There is also a sg3_utils man page.
 
-Changelog for pre-release sg3_utils-1.48 [20230623] [svn: r1040]
+Changelog for pre-release sg3_utils-1.48 [20230718] [svn: r1041]
   - decoding utilities: add --json[=JO] and --js-file=JFN
     options, short form changed to -j[=JO]
   - sg_sat_datetime: new utility for setting or accessing
@@ -155,6 +155,7 @@ Changelog for pre-release sg3_utils-1.48 [20230623] [svn: r1040]
     - remove unused out2_off in main()
     - add support for accessing NVMe devices via pass-through
   - sg_pt_dummy.c: remove problematic include
+  - linux musl libc: changes so musl libc will build
   - sg3_utils.spec: change tarball extension from .tgz to
     .tar.gz ; fix build issue with Fedora 36
   - build cleanups for 'make distcheck', see

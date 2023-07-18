@@ -46,10 +46,15 @@
 #endif
 #include <sys/mman.h>
 #include <sys/time.h>
-#include <linux/major.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+#ifdef HAVE_LINUX_MAJOR_H
+#include <linux/major.h>
+#else
+#include "sg_pt_linux_missing.h"
 #endif
 
 #include "sg_lib.h"
@@ -58,7 +63,7 @@
 #include "sg_pr2serr.h"
 
 
-static const char * version_str = "1.39 20230519";
+static const char * version_str = "1.40 20230716";
 
 #define DEF_BLOCK_SIZE 512
 #define DEF_BLOCKS_PER_TRANSFER 128

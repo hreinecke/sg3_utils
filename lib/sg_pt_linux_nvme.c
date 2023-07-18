@@ -71,7 +71,9 @@
 #include "config.h"
 #endif
 
+#ifdef HAVE_LINUX_MAJOR_H
 #include <linux/major.h>
+#endif
 
 #include "sg_pt.h"
 #include "sg_lib.h"

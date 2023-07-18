@@ -2,7 +2,7 @@
 #define SG_PT_LINUX_H
 
 /*
- * Copyright (c) 2017-2018 Douglas Gilbert.
+ * Copyright (c) 2017-2023 Douglas Gilbert.
  * All rights reserved.
  * Use of this source code is governed by a BSD-style
  * license that can be found in the BSD_LICENSE file.
@@ -13,7 +13,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef HAVE_LINUX_TYPES_H
 #include <linux/types.h>
+#else
+#include "sg_pt_linux_missing.h"
+#endif
 
 #include "sg_pt_nvme.h"
 

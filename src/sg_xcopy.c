@@ -56,10 +56,15 @@
 #ifndef major
 #include <sys/types.h>
 #endif
-#include <linux/major.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
+#endif
+
+#ifdef HAVE_LINUX_MAJOR_H
+#include <linux/major.h>
+#else
+#include "sg_pt_linux_missing.h"
 #endif
 
 #include "sg_lib.h"
@@ -69,7 +74,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "0.75 20230519";
+static const char * version_str = "0.76 20230716";
 
 #define ME "sg_xcopy: "
 

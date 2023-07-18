@@ -728,7 +728,7 @@ const char * const sg_lib_tapealert_strs[] = {
 
 /* A conveniently formatted list of SCSI ASC/ASCQ codes and their
  * corresponding text can be found at: www.t10.org/lists/asc-num.txt
- * The following should match asc-num.txt dated 20200817 */
+ * The following should match asc-num.txt dated 20230325*/
 
 #ifdef SG_SCSI_STRINGS
 const struct sg_lib_asc_ascq_range_t sg_lib_asc_ascq_range[] =
@@ -1514,7 +1514,7 @@ const struct sg_lib_asc_ascq_t sg_lib_asc_ascq[] =
     {0x74,0x04,"Cryptographic integrity validation failed"},
     {0x74,0x05,"Error decrypting data"},
     {0x74,0x06,"Unknown signature verification key"},
-    {0x74,0x07,"Encryption parameters not usable"},
+    {0x74,0x07,"Encryption parameters not useable"},
     {0x74,0x08,"Digital signature validation failure"},
     {0x74,0x09,"Encryption mode mismatch on read"},
     {0x74,0x0a,"Encrypted block not raw read enabled"},

@@ -63,7 +63,7 @@ sg_scnpr(char * cp, int cp_max_len, const char * fmt, ...)
 
 #ifdef DEBUG
     if (cp_max_len < 2) {
-        /* stack nacktrace would be good here ... */
+        /* stack backtrace would be good here ... */
         pr2ws("%s: buffer would overrun, 'fmt' string: %s\n", __func__, fmt);
         return 0;
     }
@@ -90,7 +90,7 @@ sg_scn3pr(char * fcp, int fcp_len, int off, const char * fmt, ...)
 
 #ifdef DEBUG
     if (cp_max_len < 2) {
-        /* stack nacktrace would be good here ... */
+        /* stack backtrace would be good here ... */
         pr2ws("%s: buffer would overrun, 'fmt' string: %s\n", __func__, fmt);
         return 0;
     }

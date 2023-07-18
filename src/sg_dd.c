@@ -54,12 +54,19 @@
 #ifndef major
 #include <sys/types.h>
 #endif
-#include <linux/major.h>        /* for MEM_MAJOR, SCSI_GENERIC_MAJOR, etc */
-#include <linux/fs.h>           /* for BLKSSZGET and friends */
+
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+#ifdef HAVE_LINUX_MAJOR_H
+#include <linux/major.h>
+#include <linux/fs.h>           /* for BLKSSZGET and friends */
+#else
+#include "sg_pt_linux_missing.h"
+#endif
+
 #ifdef HAVE_GETRANDOM
 #include <sys/random.h>         /* for getrandom() system call */
 #endif
@@ -71,7 +78,7 @@
 #include "sg_pr2serr.h"
 #include "sg_pt.h"              /* used to get to SNTL for NVMe devices */
 
-static const char * version_str = "6.45 20230618";
+static const char * version_str = "6.46 20230717";
 
 static const char * my_name = "sg_dd: ";
 
@@ -628,6 +635,7 @@ read_blkdev_capacity(int sg_fd, int64_t * num_sect, int * sect_sz,
     }
     return 0;
 #else
+    if (sg_fd) { ; }      /* unused, suppress warning */
     if (op->verbose)
         pr2serr("      BLKSSZGET+BLKGETSIZE ioctl not available\n");
     *num_sect = 0;

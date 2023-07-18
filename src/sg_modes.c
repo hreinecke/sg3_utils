@@ -32,7 +32,7 @@
 #include "sg_unaligned.h"
 #include "sg_pr2serr.h"
 
-static const char * version_str = "1.78 20230326";
+static const char * version_str = "1.79 20230707";
 
 #define MY_NAME "sg_modes"
 
@@ -1277,6 +1277,11 @@ process_multiple(int sg_fd, const uint8_t * bp, int blen, int md_len,
     for (j1 = 0, msk = 1; j1 < 4; ++j1, msk <<= 1) {
         if (smask & msk)
             break;
+    }
+    if (j1 >= 4) {      /* for bounds checkers: smask==0 handled above */
+        if (op->verbose > 0)
+            pr2serr("%s: smask 0, logic error\n", __func__);
+        j1 = 0;
     }
     mp_p = (const uint8_t *)pc_arr[j1];
     for (k = 0; k < rlen; k += mp_len, mp_p += mp_len) {

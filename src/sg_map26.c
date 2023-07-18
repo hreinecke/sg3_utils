@@ -40,14 +40,20 @@
 #ifndef major
 #include <sys/types.h>
 #endif
-#include <linux/major.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+
+#ifdef HAVE_LINUX_MAJOR_H
+#include <linux/major.h>
+#else
+#include "sg_pt_linux_missing.h"
+#endif
+
 #include "sg_lib.h"
 
-static const char * version_str = "1.22 20230622";
+static const char * version_str = "1.23 20230717";
 
 #define ME "sg_map26: "
 

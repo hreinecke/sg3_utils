@@ -71,6 +71,10 @@ check_for_linux_nvme_headers() {
 		     # include <linux/types.h>
 		     #endif
 		     ]])
+	AC_CHECK_HEADERS([linux/major.h], [AC_DEFINE_UNQUOTED(HAVE_LINUX_MAJOR_H, 1,
+		     [Found linux/major.h])], [], [])
+	AC_CHECK_HEADERS([linux/types.h], [AC_DEFINE_UNQUOTED(HAVE_LINUX_TYPES_H, 1,
+		     [Found linux/types.h])], [], [])
 }
 
 check_for_linux_sg_v4_hdr() {
@@ -117,7 +121,7 @@ case "${host}" in
 		check_for_getrandom
                 CFLAGS="$CFLAGS -D__USE_MINGW_ANSI_STDIO";;
         *-*-linux-gnu* | *-*-linux* | *-*-uclinux-gnu* | *-*-uclinux*)
-                AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
+                AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on Linux])
 		check_for_linux_sg_v4_hdr
 		check_for_getrandom
                 check_for_linux_nvme_headers;;

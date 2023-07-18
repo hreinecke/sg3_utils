@@ -238,6 +238,15 @@ builds are sensitive to the value in the debian/compat file. If it
 contains "7" then it works on lenny and gives warning on squeeze (but
 fails on the earlier etch).
 
+musl libc
+=========
+Changes have been made so this package will build with the MUSL libc
+replacing the "standard" libc (GNU and/or clang?) in Linux. In the Ubuntu
+distribution these packages were installed: musl-dev, musl-tools and musl.
+Then the ./configure line is changed to 'CC=musl-gcc ./configure'. MUSL
+depends a lot less on Linux specific header files (e.g. <linux/major.h> )
+so a new minimal substitute header has been added: sg_pt_linux_missing.h .
+
 Warning
 =======
 Many devices use SCSI command sets over transport protocols not normally
@@ -561,4 +570,4 @@ See https://sg.danny.cz/sg/tools.html
 
 
 Douglas Gilbert         dgilbert@interlog.com
-15th May 2023
+17th July 2023
