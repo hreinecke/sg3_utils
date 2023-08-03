@@ -22,7 +22,7 @@ jobs:
         include:
         - build: android
           cc: clang
-          host: aarch64-linux-android32
+          host: aarch64-linux-android33
         - build: linux-gcc
           cc: gcc
         - build: linux-clang
@@ -44,8 +44,8 @@ jobs:
       - name: Install Android NDK
         run: |
           if [ ${{matrix.build}} = android ]; then \
-              wget --quiet https://dl.google.com/android/repository/android-ndk-r24-linux.zip; \
-              unzip -q android-ndk-r24-linux.zip;  \
+              wget --quiet https://dl.google.com/android/repository/android-ndk-r25c-linux.zip; \
+              unzip -q android-ndk-r25c-linux.zip;  \
           fi
       - name: Install Ubuntu packages
         run: |
@@ -60,7 +60,7 @@ jobs:
       - name: Build
         run: |
           echo "HOST=${{matrix.host}}"
-          NDK=$PWD/android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64/bin
+          NDK=$PWD/android-ndk-r25c/toolchains/llvm/prebuilt/linux-x86_64/bin
           export PATH="$NDK:$PATH"
           ./autogen.sh
           ./configure --host=${{matrix.host}} \
