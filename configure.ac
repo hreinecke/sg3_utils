@@ -1,4 +1,4 @@
-AC_INIT([sg3_utils],[1.48],[dgilbert@interlog.com])
+AC_INIT([sg3_utils],[1.49],[dgilbert@interlog.com])
 
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AM_MAINTAINER_MODE
@@ -87,13 +87,31 @@ check_for_linux_sg_v4_hdr() {
 		[AC_DEFINE_UNQUOTED(HAVE_LINUX_SG_V4_HDR, 1, [Have Linux sg v4 header]) ])
 }
 
+check_for___u64() {
+	AC_MSG_CHECKING([for __u64])
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+	#ifdef HAVE_LINUX_TYPES_H
+	#include <linux/types.h>
+	#endif
+	]],[[
+	__u64 var = 0;
+	return var;
+	]])],
+	[
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE___U64, 1, [__u64 is defined in <linux/types.h>])
+	],
+	[AC_MSG_RESULT(no)])
+}
+
 case "${host}" in
 	*-*-android*)
 		AC_DEFINE_UNQUOTED(SG_LIB_ANDROID, 1, [sg3_utils on android])
 		AC_DEFINE_UNQUOTED(SG_LIB_LINUX, 1, [sg3_utils on linux])
 		check_for_linux_sg_v4_hdr
 		check_for_getrandom
-		check_for_linux_nvme_headers;;
+		check_for_linux_nvme_headers
+		check_for___u64;;
         *-*-freebsd*|*-*-kfreebsd*-gnu*)
 		AC_DEFINE_UNQUOTED(SG_LIB_FREEBSD, 1, [sg3_utils on FreeBSD])
 		AC_DEFINE_UNQUOTED(HAVE_NVME, 1, [Found NVMe])
