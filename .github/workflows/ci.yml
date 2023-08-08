@@ -12,7 +12,8 @@ jobs:
       fail-fast: false
       matrix:
         build:
-        - android
+        - android-23
+        - android-33
         - linux-gcc
         - linux-clang
         - linux-x86-gcc
@@ -20,7 +21,10 @@ jobs:
         - linux-mingw64-gcc
         - macos
         include:
-        - build: android
+        - build: android-23
+          cc: clang
+          host: aarch64-linux-android23
+        - build: android-33
           cc: clang
           host: aarch64-linux-android33
         - build: linux-gcc
@@ -43,10 +47,11 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install Android NDK
         run: |
-          if [ ${{matrix.build}} = android ]; then \
+          case ${{matrix.build}} \
+          in android*) \
               wget --quiet https://dl.google.com/android/repository/android-ndk-r25c-linux.zip; \
-              unzip -q android-ndk-r25c-linux.zip;  \
-          fi
+              unzip -q android-ndk-r25c-linux.zip;;  \
+          esac
       - name: Install Ubuntu packages
         run: |
           sudo apt-get -q update

@@ -61,7 +61,20 @@ AC_CANONICAL_HOST
 AC_DEFINE_UNQUOTED(SG_LIB_BUILD_HOST, "${host}", [sg3_utils Build Host])
 
 check_for_getrandom() {
-	AC_CHECK_HEADERS([sys/random.h], [AC_DEFINE_UNQUOTED(HAVE_GETRANDOM, 1, [Found sys/random.h])], [], [])
+	AC_CHECK_HEADERS([sys/random.h])
+	AC_MSG_CHECKING([for getrandom()])
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#ifdef HAVE_SYS_RANDOM_H
+#include <sys/random.h>
+#endif
+]], [[
+char buf[16];
+return getrandom(buf, sizeof(buf), 0);
+]])], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE_UNQUOTED(HAVE_GETRANDOM, 1, [Define to 1 if you have the `getrandom' function])], [
+		AC_MSG_RESULT(no)
+		])
 }
 
 check_for_linux_nvme_headers() {
