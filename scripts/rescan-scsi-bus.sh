@@ -366,7 +366,7 @@ idlist ()
 
   oldlist=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*:[0-9]*\)/\1/p" | uniq)
   # Rescan LUN 0 to check if we found new targets
-  echo "${channel} - 0" > /sys/class/scsi_host/host${host}/scan
+  echo "${channel} - -" > /sys/class/scsi_host/host${host}/scan
   newlist=$(ls /sys/class/scsi_device/ | sed -n "s/${host}:${channel}:\([0-9]*:[0-9]*\)/\1/p" | uniq)
   for newid in $newlist ; do
     oldid=$newid
